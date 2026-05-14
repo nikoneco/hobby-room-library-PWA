@@ -1,0 +1,68 @@
+コード変更なしで、現行仕様書 v1 をここに作成します。
+
+現行仕様書 v1
+1. プロジェクト概要
+「趣味部屋図書館」は、所有している漫画・書籍を検索し、重複購入を防ぐための個人用Webアプリ。Google Apps Script + HTML/CSS/JavaScript + Googleスプレッドシートで構成される。
+
+2. ファイル構成
+config.gs.txt は共通設定。コード.gs.txt はスプレッドシート操作。Webアプリ.gs.txt はWeb APIと検索処理。index.html は画面構造。script.js.html はフロント処理。style.css.html は表示スタイル。あらすじ取得_Main.gs.txt / あらすじ取得_kobo.gs.txt / Web画像取得.gs.txt はデータ補完用。debug専用.gs.txt は調査用。BookShelf.gs.txt は空の雛形。
+
+3. スプレッドシート構成
+Drive上のスプレッドシート名は 趣味部屋図書館。確認済みシートは 目録, データ, genre_master, series_master, 検索モード, 砂場, Bup。検索モード と Bup は hidden。メインデータは 目録。目録 は28列で、I列タイトルからAB列fallback画像SOURCEまでを扱う。
+
+4. CONFIG / 定数設計
+CONFIG.COL はシート絶対列番号、1始まり。CONFIG.IDX は 目録!I:AB 取得後の配列index、0始まり。CONFIG.SHEETS は 目録, データ, 検索モード。NO_IMAGE_URL, CACHE_CONFIG, DROPDOWN_VALUES が共通定数。あらすじ・画像補完系は各ファイル内に専用定数を持つ。
+
+5. 初期表示フロー
+doGet() が index テンプレートを返す。index.html が style.css.html と script.js.html をインライン読み込みする。画面ロード後、DOMContentLoaded で fetchInitialSearchData() が実行される。
+
+6. データ読み込みフロー
+getInitialSearchData() がサジェスト、詳細検索候補、件数プレビュー用indexをまとめて返す。内部では getLibraryDataset_() を呼び、キャッシュがなければ buildLibraryDataset_() で 目録 からデータセットを構築する。最終行は原則 データ!L2 のヒントを使い、不正なら列スキャンに戻る。
+
+7. 通常検索フロー
+フロントの search() が通常モード時に searchBooksSimple(keyword) を呼ぶ。対象はタイトル・読み仮名・作者を正規化して結合した searchKey。部分一致検索。キーワード空欄なら全件返却する実装。
+
+8. 詳細検索フロー
+詳細検索欄が開いている場合、searchBooksAdvanced(...) を呼ぶ。キーワード、タイトル、読み仮名、作者は部分一致。出版社、ストーリー、題材、雰囲気、状況は完全一致。発売年月はFrom/Toの範囲比較。条件はAND。
+
+9. ランダム検索フロー
+showRandomBooks() が getRandomBooks(10) を呼ぶ。サーバー側で重複なしにランダム抽出し、10件を返す。
+
+10. カード表示 / リスト表示 / 本棚表示
+表示は currentViewMode で card, list, shelf を切替。カード表示は表紙と主要情報をカード化。リスト表示は省スペース行と詳細アコーディオン。本棚表示は shelf / location から本棚グループ・段に分類し、小型表紙を棚状に表示する。
+
+11. モーダル表示
+表紙クリックで showPopup() が開く。表紙、タイトル、著者、出版社、ISBN、棚、発売日、レーベル、備考、あらすじ、外部リンク、シリーズボタンを表示する。左右矢印・キーボード・スワイプで前後移動できる。
+
+12. シリーズ判定
+generateSeriesKeyAuto(title) がタイトルから巻数・版種・付属語を除去し、シリーズキーを生成する。extractPrimarySeriesTitle_() は「日本語 = 英語」形式で左側を優先する。資料系ジャンルは __extra__ prefix を付けて本編シリーズから分離する。
+
+13. あらすじ表示
+現コードでは summary: V列 || Y列。ただし運用上、V列は短縮版構想の名残で現在は使っていない。実データ表示は基本的にY列 あらすじ_RAW が使われる。フロントではカード・リスト・モーダル内に「あらすじを見る」ボタンで折りたたみ表示する。
+
+14. 画像処理
+Web表示ではISBNからHanmoto画像URLを生成し、ブラウザ側で読み込み失敗時にfallback候補へ進む。AA列 FALLBACK_IMAGE_URL とAB列 FALLBACK_IMAGE_SOURCE はOpenBD、楽天Books、GoogleBooks等から補完される。Manual指定のfallback画像は最優先。
+
+15. キャッシュ処理
+CacheService.getScriptCache() を使用。キーは library_dataset_v21、TTLは1時間。100KB制限対策としてJSONを90KB単位に分割保存する。onEdit や画像補完などデータ変更時に clearLibrarySearchCache_() で破棄する。
+
+16. onEdit 処理
+onEdit(e) は 目録 と 検索モード の編集を監視する。A1のモード切替、検索モードからの戻り、検索シート初期化、あらすじManualマーキング、fallback画像Manualマーキング、タイトル編集時のシリーズキー更新、キャッシュ破棄を行う。
+
+17. フィルター初期化 / ソート処理
+resetAndSortFilter() は 目録 のフィルターを外し、B:ABをタイトル列基準で一体ソートする。W列ジャンルのARRAYFORMULAはソート前に一時退避し、ソート後に復元する。Y/Z/AA/ABの行ズレ防止が明確な目的。
+
+18. 外部API・Script Properties 依存
+あらすじ取得はHanmoto、楽天Books、OpenBD、GoogleBooksを使用。Kobo救済は楽天Kobo APIを使用。画像fallbackはOpenBD、楽天Books、GoogleBooks。楽天系は RAKUTEN_APP_ID と RAKUTEN_APKEY のScript Propertiesに依存する。
+
+19. 現時点で危険な箇所
+CONFIG.COL と CONFIG.IDX の混同。Webアプリ.gs.txt 内の buildImageUrlFromIsbn_ 二重定義。onEdit の副作用。B:ABソートとW列ARRAYFORMULA退避。Y/Z/AA/ABの行ズレ。HTMLのid/classとJSの密結合。V列がコード上はY列より優先される点。
+
+20. 今後改修する時の禁止事項
+無断で既存関数を削除・改名しない。引数順・引数数を変えない。HTML/CSS/DOM構造、id/class、UI挙動を勝手に変えない。列参照を相対列で曖昧に扱わない。ソート・フィルター・onEdit・キャッシュ・Y/Z/AA/ABを理解前に触らない。
+
+21. 未確認・不明点
+実際のデプロイURLでの動作確認は未実施。series_master がシート数式側でどこまで使われているかは未確認。データ シート全列の用途は一部未確認。V列に残っている値が現在どの程度あるかは未集計。最新GASプロジェクト側とローカルファイルの完全一致は、ユーザー申告により一致として扱う。
+
+22. 次に調査すべきこと
+次回は、変更なしで 目録 / データ / series_master / genre_master の列用途をもう少し表に整理すると良いです。特に、ジャンル生成のシート数式、V列残存データ、series_key_autoの実データ揺れ、buildImageUrlFromIsbn_ 二重定義の実害有無を確認すると、次の改修がかなり安全になります。

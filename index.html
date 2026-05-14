@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>趣味部屋図書館検索</title>
+  <?!= HtmlService.createHtmlOutputFromFile('style.css.html').getContent(); ?>
+</head>
+<body>
+  <div id="searchContainer" class="search-container centered">
+    <div id="searchStatusArea" class="search-status-area" hidden>
+      <div id="searchStatusCount" class="search-status-count"></div>
+      <div id="searchStatusChips" class="search-status-chips"></div>
+    </div>
+    
+    <img src="https://i.imgur.com/szIBHwj.png" alt="ロゴ" class="logo" onclick="resetSearch()">
+
+    <div class="search-form">
+      <!-- 通常検索 -->
+      <div class="input-group">
+        <label for="keyword">検索</label>
+        <input type="text" id="keyword" autocomplete="off" placeholder="タイトル・読み仮名・作者で検索">
+        <div id="keyword-suggest" class="suggest-box"></div>
+      </div>
+
+      <div class="button-group">
+        <button type="button" onclick="search()">検索</button>
+        <button type="button" onclick="showAllBookshelf()" class="top-shelf-btn">本棚を見る</button>
+        <button type="button" onclick="showRandomBooks()">ランダム検索</button>
+        <button type="button" id="advancedToggleBtn" onclick="toggleAdvancedSearch()">詳細検索</button>
+      </div>
+
+      <!-- 詳細検索 -->
+      <div id="advancedSearchArea" class="advanced-search-area" style="display:none;">
+        <div class="advanced-grid">
+          <div class="input-group">
+            <label for="detailTitle">タイトル</label>
+            <input type="text" id="detailTitle" autocomplete="off">
+            <div id="detailTitle-suggest" class="suggest-box"></div>
+          </div>
+
+          <div class="input-group">
+            <label for="detailYomi">読み仮名</label>
+            <input type="text" id="detailYomi" autocomplete="off">
+          </div>
+
+          <div class="input-group">
+            <label for="detailAuthor">作者</label>
+            <input type="text" id="detailAuthor" autocomplete="off">
+          </div>
+
+          <div class="input-group">
+            <label for="detailPublisher">出版社</label>
+            <select id="detailPublisher">
+              <option value="">すべて</option>
+            </select>
+          </div>
+
+          <div class="input-group">
+            <label for="detailStory">ストーリー</label>
+            <select id="detailStory">
+              <option value="">すべて</option>
+            </select>
+          </div>
+
+          <div class="input-group">
+            <label for="detailTheme">題材</label>
+            <select id="detailTheme">
+              <option value="">すべて</option>
+            </select>
+          </div>
+
+          <div class="input-group">
+            <label for="detailMood">雰囲気</label>
+            <select id="detailMood">
+              <option value="">すべて</option>
+            </select>
+          </div>
+
+          <div class="input-group">
+            <label for="detailStatus">状況</label>
+            <select id="detailStatus">
+              <option value="">すべて</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="released-range-row">
+          <label for="detailReleasedFromYear">発売日</label>
+
+          <div class="released-range-controls">
+            <select id="detailReleasedFromYear">
+              <option value="">年</option>
+            </select>
+            <select id="detailReleasedFromMonth" disabled>
+              <option value="">月</option>
+            </select>
+
+            <span class="released-range-separator">〜</span>
+
+            <select id="detailReleasedToYear">
+              <option value="">年</option>
+            </select>
+            <select id="detailReleasedToMonth" disabled>
+              <option value="">月</option>
+            </select>
+          </div>
+        </div>
+
+
+        <div class="advanced-actions">
+          <button type="button" onclick="search()">検索</button>
+          <button type="button" class="clear-btn" onclick="clearSearchConditions()">条件クリア</button>
+          <button type="button" class="sub-btn" onclick="toggleAdvancedSearch()">詳細を閉じる</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="viewToggle" class="view-toggle">
+    <button id="tileViewBtn" class="toggle-btn active" title="タイル表示">
+      <span class="toggle-icon">▦</span>
+      <span class="toggle-label">タイル</span>
+    </button>
+    <button id="listViewBtn" class="toggle-btn" title="リスト表示">
+      <span class="toggle-icon">≡</span>
+      <span class="toggle-label">リスト</span>
+    </button>
+    <button id="shelfViewBtn" class="toggle-btn" title="本棚表示">
+      <span class="toggle-icon">▤</span>
+      <span class="toggle-label">本棚</span>
+    </button>
+  </div>
+
+  <div id="spinner-overlay" style="display: none;">
+    <div class="spinner"></div>
+    <div class="spinner-label">検索中...</div>
+  </div>
+
+  <div id="result"></div>
+
+  <div id="image-popup-overlay" style="display:none;">
+    <div id="image-popup-content">
+      <span id="image-popup-close">&times;</span>
+      <span id="popup-prev" class="popup-arrow">&lt;</span>
+      <span id="popup-next" class="popup-arrow">&gt;</span>
+      <img id="image-popup-img" src="" alt="拡大画像">
+      <div id="image-popup-info"></div>
+    </div>
+  </div>
+
+  <?!= HtmlService.createHtmlOutputFromFile('script.js.html').getContent(); ?>
+</body>
+</html>
