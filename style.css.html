@@ -64,6 +64,10 @@ body {
   gap: 0.35em;
 }
 
+.search-container.shrink.compact .bookshelf-cta-wrap {
+  display: none;
+}
+
 .search-container.shrink.compact .search-status-area {
   top: 8px;
   left: 10px;
@@ -327,6 +331,50 @@ body.shelf-immersive-active #viewToggle {
   flex-wrap: wrap;
   gap: 14px;    /* ← ここでボタン間隔を調整！お好みで8～20pxくらい */
 }
+
+.bookshelf-cta-wrap {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  margin-top: 0.15em;
+}
+
+.bookshelf-cta-card.top-shelf-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.28em;
+  width: min(520px, 92vw);
+  min-height: 74px;
+  padding: 0.85em 1.25em;
+  border: 1px solid rgba(119, 231, 255, 0.34);
+  border-radius: 12px;
+  background:
+    linear-gradient(135deg, rgba(123, 92, 255, 0.95) 0%, rgba(30, 160, 255, 0.92) 54%, rgba(31, 230, 222, 0.86) 100%);
+  box-shadow: 0 14px 34px rgba(39, 122, 255, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  text-align: center;
+}
+
+.bookshelf-cta-card.top-shelf-btn:hover,
+.bookshelf-cta-card.top-shelf-btn:focus-visible {
+  background:
+    linear-gradient(135deg, rgba(145, 112, 255, 0.98) 0%, rgba(35, 179, 255, 0.95) 54%, rgba(47, 255, 221, 0.9) 100%);
+  box-shadow: 0 18px 42px rgba(39, 122, 255, 0.24), 0 0 18px rgba(39, 196, 255, 0.22);
+  transform: translateY(-1px);
+}
+
+.bookshelf-cta-title {
+  font-size: 1.12em;
+  line-height: 1.25;
+}
+
+.bookshelf-cta-subtitle {
+  font-size: 0.82em;
+  line-height: 1.35;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.86);
+}
+
 .advanced-search-area {
   width: 100%;
   max-width: 1020px;
@@ -2345,6 +2393,29 @@ body.shelf-immersive-active #backToTop {
     white-space: normal;
     word-break: keep-all;
     overflow-wrap: normal;
+  }
+
+  .button-group button:nth-child(3):last-child {
+    grid-column: 1 / -1;
+  }
+
+  .bookshelf-cta-wrap {
+    margin-top: 0;
+  }
+
+  .bookshelf-cta-card.top-shelf-btn {
+    width: min(360px, calc(100vw - 28px));
+    min-height: 68px;
+    padding: 0.72em 0.85em;
+    border-radius: 10px;
+  }
+
+  .bookshelf-cta-title {
+    font-size: 1em;
+  }
+
+  .bookshelf-cta-subtitle {
+    font-size: 0.78em;
   }
 
   .search-container.shrink.shelf-view-active .button-group button {

@@ -24,7 +24,6 @@
 
       <div class="button-group">
         <button type="button" onclick="search()">検索</button>
-        <button type="button" onclick="showAllBookshelf()" class="top-shelf-btn">本棚を見る</button>
         <button type="button" onclick="showRandomBooks()">ランダム検索</button>
         <button type="button" id="advancedToggleBtn" onclick="toggleAdvancedSearch()">詳細検索</button>
       </div>
@@ -112,6 +111,13 @@
           <button type="button" class="clear-btn" onclick="clearSearchConditions()">条件クリア</button>
           <button type="button" class="sub-btn" onclick="toggleAdvancedSearch()">詳細を閉じる</button>
         </div>
+      </div>
+
+      <div class="bookshelf-cta-wrap">
+        <button type="button" class="bookshelf-cta-card top-shelf-btn" aria-label="本棚を見る。棚マップから所蔵本を眺める">
+          <span class="bookshelf-cta-title">本棚を見る</span>
+          <span class="bookshelf-cta-subtitle">棚マップから所蔵本を眺める</span>
+        </button>
       </div>
     </div>
   </div>
