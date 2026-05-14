@@ -670,6 +670,8 @@ function toggleAdvancedSearch() {
     closeAdvancedSearchPanel_();
   }
 
+  syncBookshelfCtaVisibility_();
+
   const preservingAppliedStatus =
     searchStatusState.visible &&
     (searchStatusState.mode === 'result' || searchStatusState.mode === 'random');
@@ -688,6 +690,13 @@ function closeAdvancedSearchPanel_() {
     btn.classList.remove('active');
     btn.textContent = '詳細検索';
   }
+  syncBookshelfCtaVisibility_();
+}
+
+function syncBookshelfCtaVisibility_() {
+  const bookshelfCta = document.querySelector('.bookshelf-cta-wrap');
+  if (!bookshelfCta) return;
+  bookshelfCta.style.display = isAdvancedOpen() ? 'none' : '';
 }
 
 
