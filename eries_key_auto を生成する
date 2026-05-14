@@ -1,0 +1,246 @@
+warning: in the working copy of 'config.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'コード.js', LF will be replaced by CRLF the next time Git touches it
+[1mdiff --git a/config.js b/config.js[m
+[1mindex d27375f..7d7675b 100644[m
+[1m--- a/config.js[m
+[1m+++ b/config.js[m
+[36m@@ -4,7 +4,6 @@[m [mconst CONFIG = {[m
+   SHEETS: {[m
+     MAIN  : '目録',[m
+     DATA  : 'データ',[m
+[31m-    SEARCH: '検索モード',[m
+     GENRE_MASTER: 'genre_master',[m
+     SERIES_MASTER: 'series_master'[m
+   },[m
+[36m@@ -80,17 +79,11 @@[m [mconst DROPDOWN_VALUES = {[m
+   NML: [[m
+     '機能選択',[m
+     'Filter初期化',[m
+[31m-    'ISBN入力モード',[m
+[31m-    '検索モード',[m
+[31m-    '画像補完モード'[m
+[32m+[m[32m    'ISBN入力モード'[m
+   ],[m
+   ISBN: [[m
+     'ISBN入力モード',[m
+     '入力モード終了'[m
+[31m-  ],[m
+[31m-  FILL: [[m
+[31m-    '画像補完モード',[m
+[31m-    '補完モード終了'[m
+   ][m
+ };[m
+ [m
+[1mdiff --git "a/\343\202\263\343\203\274\343\203\211.js" "b/\343\202\263\343\203\274\343\203\211.js"[m
+[1mindex 9a26b56..c175836 100644[m
+[1m--- "a/\343\202\263\343\203\274\343\203\211.js"[m
+[1m+++ "b/\343\202\263\343\203\274\343\203\211.js"[m
+[36m@@ -5,7 +5,7 @@[m
+ // ＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝[m
+ [m
+ /**[m
+[31m- * onEditトリガー：A1セルや検索モード等の編集イベントをモード分岐[m
+[32m+[m[32m * onEditトリガー：A1セル等の編集イベントをモード分岐[m
+  */[m
+ function onEdit(e) {[m
+   if (!e || !e.range) return;[m
+[36m@@ -22,7 +22,7 @@[m [mfunction onEdit(e) {[m
+   const row = e.range.getRow();[m
+   const col = e.range.getColumn();[m
+   const colEnd = col + e.range.getNumColumns() - 1;[m
+[31m-  const { MAIN, SEARCH } = CONFIG.SHEETS;[m
+[32m+[m[32m  const { MAIN } = CONFIG.SHEETS;[m
+   // Web検索データに影響するシート・セルが編集されたら検索キャッシュを破棄[m
+   if (shouldClearLibrarySearchCacheOnEdit_(sheetName, e.range)) {[m
+     clearLibrarySearchCache_();[m
+[36m@@ -44,36 +44,10 @@[m [mfunction onEdit(e) {[m
+         a1.setValue('機能選択');[m
+         setDropdownNML();[m
+         break;[m
+[31m-      case '検索モード':[m
+[31m-        openSearchSheet();[m
+[31m-        a1.setValue('機能選択');[m
+[31m-        setDropdownNML();[m
+[31m-        break;[m
+[31m-      case '画像補完モード':[m
+[31m-        fillMissingBookImagesFallback();[m
+[31m-        highlightFillMode(sh);[m
+[31m-        setDropdownFillMode();[m
+[31m-        break;[m
+[31m-      case '補完モード終了':[m
+[31m-        convertFormulasAndClearRange();[m
+[31m-        resetAndSortFilter();[m
+[31m-        a1.setValue('機能選択');[m
+[31m-        setDropdownNML();[m
+[31m-        break;[m
+     }[m
+     return;[m
+   }[m
+ [m
+[31m-  // 検索モードシートの戻る操作[m
+[31m-  if (sheetName === SEARCH && notation === 'A1' && value === '本棚へ戻る') {[m
+[31m-    returnToMainSheet();[m
+[31m-    return;[m
+[31m-  }[m
+[31m-  // 検索モードシートの初期化ボタン（G1）[m
+[31m-  if (sheetName === SEARCH && notation === 'G1') {[m
+[31m-    resetSearchSheet(sh);[m
+[31m-    return;[m
+[31m-  }[m
+   if (sheetName === MAIN && row >= 2) {[m
+     markSynopsisManualOnEdit_(e);[m
+   }[m
+[36m@@ -393,60 +367,6 @@[m [mfunction resetAndSortFilterISBN() {[m
+   setDropdownISBN();[m
+ }[m
+ [m
+[31m-/**[m
+[31m- * 画像補完：ISBNから画像URL補完[m
+[31m- *  - 画像列が空欄で、ISBNが存在する行に対して一括補完[m
+[31m- */[m
+[31m-function fillMissingBookImagesFallback() {[m
+[31m-  const sh = getSheet(CONFIG.SHEETS.MAIN);[m
+[31m-  const last = getLastDataRow(sh, CONFIG.COL.ISBN);[m
+[31m-  const isbnList = sh.getRange(2, CONFIG.COL.ISBN, last - 1).getValues();[m
+[31m-  const jVals = sh.getRange(2, CONFIG.COL.IMAGE, last - 1).getDisplayValues();[m
+[31m-[m
+[31m-  for (let i = 0; i < isbnList.length; i++) {[m
+[31m-    const isbn = normalizeIsbn_(isbnList[i][0]);[m
+[31m-    const j = jVals[i][0];[m
+[31m-[m
+[31m-    if (!isbn || j !== '') continue;[m
+[31m-[m
+[31m-    const url = getImageUrlByISBN(isbn);[m
+[31m-    if (url) sh.getRange(i + 2, CONFIG.COL.IMAGE).setFormula(`=IMAGE("${url}")`);[m
+[31m-  }[m
+[31m-[m
+[31m-  const jr = sh.getRange(2, CONFIG.COL.IMAGE, last - 1);[m
+[31m-  jr.copyTo(jr, { contentsOnly: true });[m
+[31m-[m
+[31m-  SpreadsheetApp.flush();[m
+[31m-  clearLibrarySearchCache_();[m
+[31m-  SpreadsheetApp.getActive().toast('画像補完が完了しました');[m
+[31m-}[m
+[31m-[m
+[31m-/**[m
+[31m- * ISBN→画像URL補完（OpenBD→GoogleBooks順に取得）[m
+[31m- */[m
+[31m-function getImageUrlByISBN(isbn) {[m
+[31m-  const safeIsbn = normalizeIsbn13ForImage_(isbn);[m
+[31m-  if (!safeIsbn) return null;[m
+[31m-[m
+[31m-  const han = `https://hanmoto.com/bd/img/${safeIsbn}_400.jpg`;[m
+[31m-  if (urlExists(han)) return han;[m
+[31m-[m
+[31m-  try {[m
+[31m-    const ob = UrlFetchApp.fetch(`https://api.openbd.jp/v1/get?isbn=${safeIsbn}`, { muteHttpExceptions: true });[m
+[31m-    const cover = JSON.parse(ob.getContentText())[0]?.summary?.cover;[m
+[31m-    if (cover && urlExists(cover)) return cover;[m
+[31m-  } catch (e) {}[m
+[31m-[m
+[31m-  try {[m
+[31m-    const gb = UrlFetchApp.fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${safeIsbn}`, { muteHttpExceptions: true });[m
+[31m-    const thumb = JSON.parse(gb.getContentText())?.items?.[0]?.volumeInfo?.imageLinks?.thumbnail;[m
+[31m-    if (thumb && urlExists(thumb.replace(/^http:/, 'https:')))[m
+[31m-      return thumb.replace(/^http:/, 'https:');[m
+[31m-  } catch (e) {}[m
+[31m-[m
+[31m-  return null;[m
+[31m-}[m
+[31m-[m
+ /**[m
+  * ISBNや画像列の式→値変換＆クリア[m
+  *  - ISBN、画像、著者列等をdisplayValuesで書き戻し[m
+[36m@@ -474,11 +394,10 @@[m [mfunction convertFormulasAndClearRange() {[m
+ }[m
+ [m
+ /**[m
+[31m- * ドロップダウン切り替え：通常/ISBN/画像補完[m
+[32m+[m[32m * ドロップダウン切り替え：通常/ISBN[m
+  */[m
+ function setDropdownNML()  { setDropdownFromList(DROPDOWN_VALUES.NML);  }[m
+ function setDropdownISBN() { setDropdownFromList(DROPDOWN_VALUES.ISBN); }[m
+[31m-function setDropdownFillMode() { setDropdownFromList(DROPDOWN_VALUES.FILL); }[m
+ function setDropdownFromList(values) {[m
+   const cell = getSheet(CONFIG.SHEETS.MAIN).getRange('A1');[m
+   cell.clearDataValidations();[m
+[36m@@ -494,11 +413,6 @@[m [mfunction highlightISBNMode(sheet) {[m
+   const c = sheet.getLastColumn();[m
+   sheet.getRange(1, 1, r, c).setBackground('#FFF8DC').setFontColor('#003366');[m
+ }[m
+[31m-function highlightFillMode(sheet) {[m
+[31m-  const r = getLastDataRow(sheet, CONFIG.COL.ISBN);[m
+[31m-  const c = sheet.getLastColumn();[m
+[31m-  sheet.getRange(1, 1, r, c).setBackground('#E0F7FA').setFontColor('#004D40');[m
+[31m-}[m
+ function resetSheetStyle(sheet) {[m
+   const r = getLastDataRow(sheet, CONFIG.COL.ISBN);[m
+   const c = sheet.getLastColumn();[m
+[36m@@ -507,32 +421,7 @@[m [mfunction resetSheetStyle(sheet) {[m
+ }[m
+ [m
+ /**[m
+[31m- * 検索モード切り替え・戻る操作[m
+[31m- */[m
+[31m-function openSearchSheet() {[m
+[31m-  const main = getSheet(CONFIG.SHEETS.MAIN);[m
+[31m-  const search = getSheet(CONFIG.SHEETS.SEARCH);[m
+[31m-  search.showSheet(); main.hideSheet();[m
+[31m-  resetSearchSheet(search);[m
+[31m-}[m
+[31m-function returnToMainSheet() {[m
+[31m-  const main = getSheet(CONFIG.SHEETS.MAIN);[m
+[31m-  const search = getSheet(CONFIG.SHEETS.SEARCH);[m
+[31m-  main.showSheet(); search.hideSheet();[m
+[31m-  resetSearchSheet(search);[m
+[31m-  main.getRange('A1').setValue('機能選択');[m
+[31m-  resetAndSortFilter();[m
+[31m-}[m
+[31m-function resetSearchSheet(sheet) {[m
+[31m-  const r = sheet.getRangeList(['A1','B1','D1','G1']).getRanges();[m
+[31m-  r[0].setValue('検索モード');[m
+[31m-  r[1].clearContent();[m
+[31m-  r[2].clearContent();[m
+[31m-  r[3].uncheck();[m
+[31m-}[m
+[31m-[m
+[31m-/**[m
+[31m- * ユーティリティ：シート取得・最終データ行取得・URL存在判定[m
+[32m+[m[32m * ユーティリティ：シート取得・最終データ行取得[m
+  */[m
+ function getSheet(name) {[m
+   const s = SpreadsheetApp.getActive().getSheetByName(name);[m
+[36m@@ -545,33 +434,6 @@[m [mfunction getLastDataRow(sheet, col) {[m
+   for (let i = vals.length - 1; i >= 0; i--) if (vals[i][0] !== '') return i + 2;[m
+   return 1;[m
+ }[m
+[31m-function urlExists(url) {[m
+[31m-  try {[m
+[31m-    const head = UrlFetchApp.fetch(url, {[m
+[31m-      method: 'head',[m
+[31m-      muteHttpExceptions: true,[m
+[31m-      followRedirects: true[m
+[31m-    });[m
+[31m-[m
+[31m-    const code = head.getResponseCode();[m
+[31m-    if (code >= 200 && code < 400) return true;[m
+[31m-[m
+[31m-    if (code !== 403 && code !== 405) return false;[m
+[31m-[m
+[31m-    const get = UrlFetchApp.fetch(url, {[m
+[31m-      method: 'get',[m
+[31m-      muteHttpExceptions: true,[m
+[31m-      followRedirects: true[m
+[31m-    });[m
+[31m-[m
+[31m-    const getCode = get.getResponseCode();[m
+[31m-    return getCode >= 200 && getCode < 400;[m
+[31m-  } catch (e) {[m
+[31m-    return false;[m
+[31m-  }[m
+[31m-}[m
+[31m-[m
+[31m-[m
+ /**[m
+  * タイトルから series_key_auto を生成する[m
+  * 目的:[m

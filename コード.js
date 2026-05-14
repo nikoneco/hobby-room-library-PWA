@@ -5,7 +5,7 @@
 // ＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝
 
 /**
- * onEditトリガー：A1セルや検索モード等の編集イベントをモード分岐
+ * onEditトリガー：A1セル等の編集イベントをモード分岐
  */
 function onEdit(e) {
   if (!e || !e.range) return;
@@ -22,7 +22,7 @@ function onEdit(e) {
   const row = e.range.getRow();
   const col = e.range.getColumn();
   const colEnd = col + e.range.getNumColumns() - 1;
-  const { MAIN, SEARCH } = CONFIG.SHEETS;
+  const { MAIN } = CONFIG.SHEETS;
   // Web検索データに影響するシート・セルが編集されたら検索キャッシュを破棄
   if (shouldClearLibrarySearchCacheOnEdit_(sheetName, e.range)) {
     clearLibrarySearchCache_();
@@ -44,36 +44,10 @@ function onEdit(e) {
         a1.setValue('機能選択');
         setDropdownNML();
         break;
-      case '検索モード':
-        openSearchSheet();
-        a1.setValue('機能選択');
-        setDropdownNML();
-        break;
-      case '画像補完モード':
-        fillMissingBookImagesFallback();
-        highlightFillMode(sh);
-        setDropdownFillMode();
-        break;
-      case '補完モード終了':
-        convertFormulasAndClearRange();
-        resetAndSortFilter();
-        a1.setValue('機能選択');
-        setDropdownNML();
-        break;
     }
     return;
   }
 
-  // 検索モードシートの戻る操作
-  if (sheetName === SEARCH && notation === 'A1' && value === '本棚へ戻る') {
-    returnToMainSheet();
-    return;
-  }
-  // 検索モードシートの初期化ボタン（G1）
-  if (sheetName === SEARCH && notation === 'G1') {
-    resetSearchSheet(sh);
-    return;
-  }
   if (sheetName === MAIN && row >= 2) {
     markSynopsisManualOnEdit_(e);
   }
@@ -394,60 +368,6 @@ function resetAndSortFilterISBN() {
 }
 
 /**
- * 画像補完：ISBNから画像URL補完
- *  - 画像列が空欄で、ISBNが存在する行に対して一括補完
- */
-function fillMissingBookImagesFallback() {
-  const sh = getSheet(CONFIG.SHEETS.MAIN);
-  const last = getLastDataRow(sh, CONFIG.COL.ISBN);
-  const isbnList = sh.getRange(2, CONFIG.COL.ISBN, last - 1).getValues();
-  const jVals = sh.getRange(2, CONFIG.COL.IMAGE, last - 1).getDisplayValues();
-
-  for (let i = 0; i < isbnList.length; i++) {
-    const isbn = normalizeIsbn_(isbnList[i][0]);
-    const j = jVals[i][0];
-
-    if (!isbn || j !== '') continue;
-
-    const url = getImageUrlByISBN(isbn);
-    if (url) sh.getRange(i + 2, CONFIG.COL.IMAGE).setFormula(`=IMAGE("${url}")`);
-  }
-
-  const jr = sh.getRange(2, CONFIG.COL.IMAGE, last - 1);
-  jr.copyTo(jr, { contentsOnly: true });
-
-  SpreadsheetApp.flush();
-  clearLibrarySearchCache_();
-  SpreadsheetApp.getActive().toast('画像補完が完了しました');
-}
-
-/**
- * ISBN→画像URL補完（OpenBD→GoogleBooks順に取得）
- */
-function getImageUrlByISBN(isbn) {
-  const safeIsbn = normalizeIsbn13ForImage_(isbn);
-  if (!safeIsbn) return null;
-
-  const han = `https://hanmoto.com/bd/img/${safeIsbn}_400.jpg`;
-  if (urlExists(han)) return han;
-
-  try {
-    const ob = UrlFetchApp.fetch(`https://api.openbd.jp/v1/get?isbn=${safeIsbn}`, { muteHttpExceptions: true });
-    const cover = JSON.parse(ob.getContentText())[0]?.summary?.cover;
-    if (cover && urlExists(cover)) return cover;
-  } catch (e) {}
-
-  try {
-    const gb = UrlFetchApp.fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${safeIsbn}`, { muteHttpExceptions: true });
-    const thumb = JSON.parse(gb.getContentText())?.items?.[0]?.volumeInfo?.imageLinks?.thumbnail;
-    if (thumb && urlExists(thumb.replace(/^http:/, 'https:')))
-      return thumb.replace(/^http:/, 'https:');
-  } catch (e) {}
-
-  return null;
-}
-
-/**
  * ISBNや画像列の式→値変換＆クリア
  *  - ISBN、画像、著者列等をdisplayValuesで書き戻し
  *  - サブ範囲はクリア
@@ -474,11 +394,10 @@ function convertFormulasAndClearRange() {
 }
 
 /**
- * ドロップダウン切り替え：通常/ISBN/画像補完
+ * ドロップダウン切り替え：通常/ISBN
  */
 function setDropdownNML()  { setDropdownFromList(DROPDOWN_VALUES.NML);  }
 function setDropdownISBN() { setDropdownFromList(DROPDOWN_VALUES.ISBN); }
-function setDropdownFillMode() { setDropdownFromList(DROPDOWN_VALUES.FILL); }
 function setDropdownFromList(values) {
   const cell = getSheet(CONFIG.SHEETS.MAIN).getRange('A1');
   cell.clearDataValidations();
@@ -494,11 +413,6 @@ function highlightISBNMode(sheet) {
   const c = sheet.getLastColumn();
   sheet.getRange(1, 1, r, c).setBackground('#FFF8DC').setFontColor('#003366');
 }
-function highlightFillMode(sheet) {
-  const r = getLastDataRow(sheet, CONFIG.COL.ISBN);
-  const c = sheet.getLastColumn();
-  sheet.getRange(1, 1, r, c).setBackground('#E0F7FA').setFontColor('#004D40');
-}
 function resetSheetStyle(sheet) {
   const r = getLastDataRow(sheet, CONFIG.COL.ISBN);
   const c = sheet.getLastColumn();
@@ -507,32 +421,7 @@ function resetSheetStyle(sheet) {
 }
 
 /**
- * 検索モード切り替え・戻る操作
- */
-function openSearchSheet() {
-  const main = getSheet(CONFIG.SHEETS.MAIN);
-  const search = getSheet(CONFIG.SHEETS.SEARCH);
-  search.showSheet(); main.hideSheet();
-  resetSearchSheet(search);
-}
-function returnToMainSheet() {
-  const main = getSheet(CONFIG.SHEETS.MAIN);
-  const search = getSheet(CONFIG.SHEETS.SEARCH);
-  main.showSheet(); search.hideSheet();
-  resetSearchSheet(search);
-  main.getRange('A1').setValue('機能選択');
-  resetAndSortFilter();
-}
-function resetSearchSheet(sheet) {
-  const r = sheet.getRangeList(['A1','B1','D1','G1']).getRanges();
-  r[0].setValue('検索モード');
-  r[1].clearContent();
-  r[2].clearContent();
-  r[3].uncheck();
-}
-
-/**
- * ユーティリティ：シート取得・最終データ行取得・URL存在判定
+ * ユーティリティ：シート取得・最終データ行取得
  */
 function getSheet(name) {
   const s = SpreadsheetApp.getActive().getSheetByName(name);
@@ -545,33 +434,6 @@ function getLastDataRow(sheet, col) {
   for (let i = vals.length - 1; i >= 0; i--) if (vals[i][0] !== '') return i + 2;
   return 1;
 }
-function urlExists(url) {
-  try {
-    const head = UrlFetchApp.fetch(url, {
-      method: 'head',
-      muteHttpExceptions: true,
-      followRedirects: true
-    });
-
-    const code = head.getResponseCode();
-    if (code >= 200 && code < 400) return true;
-
-    if (code !== 403 && code !== 405) return false;
-
-    const get = UrlFetchApp.fetch(url, {
-      method: 'get',
-      muteHttpExceptions: true,
-      followRedirects: true
-    });
-
-    const getCode = get.getResponseCode();
-    return getCode >= 200 && getCode < 400;
-  } catch (e) {
-    return false;
-  }
-}
-
-
 /**
  * タイトルから series_key_auto を生成する
  * 目的:

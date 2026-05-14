@@ -4,7 +4,6 @@ const CONFIG = {
   SHEETS: {
     MAIN  : '目録',
     DATA  : 'データ',
-    SEARCH: '検索モード',
     GENRE_MASTER: 'genre_master',
     SERIES_MASTER: 'series_master'
   },
@@ -80,17 +79,11 @@ const DROPDOWN_VALUES = {
   NML: [
     '機能選択',
     'Filter初期化',
-    'ISBN入力モード',
-    '検索モード',
-    '画像補完モード'
+    'ISBN入力モード'
   ],
   ISBN: [
     'ISBN入力モード',
     '入力モード終了'
-  ],
-  FILL: [
-    '画像補完モード',
-    '補完モード終了'
   ]
 };
 

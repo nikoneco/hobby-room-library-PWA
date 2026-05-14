@@ -285,7 +285,8 @@ let searchStatusState = {
   previewCount: null,
   previewReady: false,
   previewPending: false,
-  removingChipKey: ''
+  removingChipKey: '',
+  message: ''
 };
 
 let PREVIEW_INDEX = [];
@@ -666,9 +667,7 @@ function toggleAdvancedSearch() {
     btn.classList.add('active');
     btn.textContent = '詳細検索を閉じる';
   } else {
-    area.style.display = 'none';
-    btn.classList.remove('active');
-    btn.textContent = '詳細検索';
+    closeAdvancedSearchPanel_();
   }
 
   const preservingAppliedStatus =
@@ -677,6 +676,17 @@ function toggleAdvancedSearch() {
 
   if (!preservingAppliedStatus) {
     syncSearchStatusPreviewFromForm_();
+  }
+}
+
+function closeAdvancedSearchPanel_() {
+  const area = document.getElementById('advancedSearchArea');
+  const btn = document.getElementById('advancedToggleBtn');
+
+  if (area) area.style.display = 'none';
+  if (btn) {
+    btn.classList.remove('active');
+    btn.textContent = '詳細検索';
   }
 }
 
@@ -945,6 +955,10 @@ function buildSearchStatusChips_(mode, params) {
 function getSearchStatusCountText_() {
   const hasConditions = searchStatusState.chips.length > 0;
 
+  if (searchStatusState.message) {
+    return searchStatusState.message;
+  }
+
   if (searchStatusState.mode === 'random') {
     return `${searchStatusState.resultCount}件見つかりました`;
   }
@@ -1023,6 +1037,7 @@ function showSearchStatusPreview_(mode, params, previewCount, previewReady) {
   searchStatusState.previewReady = Boolean(previewReady);
   searchStatusState.previewPending = !searchStatusState.previewReady && searchStatusState.chips.length > 0;
   searchStatusState.removingChipKey = '';
+  searchStatusState.message = '';
   renderSearchStatus_();
 }
 
@@ -1035,6 +1050,20 @@ function showSearchStatusResult_(mode, resultCount, params) {
   searchStatusState.previewReady = false;
   searchStatusState.previewPending = false;
   searchStatusState.removingChipKey = '';
+  searchStatusState.message = '';
+  renderSearchStatus_();
+}
+
+function showSearchStatusNotice_(message) {
+  searchStatusState.visible = true;
+  searchStatusState.mode = 'notice';
+  searchStatusState.resultCount = 0;
+  searchStatusState.chips = [];
+  searchStatusState.previewCount = null;
+  searchStatusState.previewReady = false;
+  searchStatusState.previewPending = false;
+  searchStatusState.removingChipKey = '';
+  searchStatusState.message = message || '';
   renderSearchStatus_();
 }
 
@@ -1047,6 +1076,7 @@ function hideSearchStatus_() {
   searchStatusState.previewReady = false;
   searchStatusState.previewPending = false;
   searchStatusState.removingChipKey = '';
+  searchStatusState.message = '';
   renderSearchStatus_();
 }
 
@@ -1387,24 +1417,53 @@ function removeSearchCondition_(key) {
   }, 180);
 }
 
-function search() {
+function showEmptySearchNotice_(message) {
+  hideSpinner();
+  hideAllSuggest();
   resetViewModeToCardForNewSearch_();
 
+  const result = document.getElementById('result');
+  if (result) result.innerHTML = '';
+
+  const viewToggle = document.getElementById('viewToggle');
+  if (viewToggle) viewToggle.style.display = 'none';
+
+  if (!isAdvancedOpen()) {
+    const container = document.getElementById('searchContainer');
+    if (container) {
+      container.classList.remove('shrink');
+      container.classList.add('centered');
+    }
+  }
+
+  lastResult = null;
+  showSearchStatusNotice_(message);
+}
+
+function search() {
   hideAllSuggest();
 
-  const container = document.getElementById('searchContainer');
-  container.classList.remove('centered');
-  container.classList.add('shrink');
-  document.getElementById('viewToggle').style.display = 'flex';
-  showSpinner();
-
-  const keyword = document.getElementById('keyword').value || '';
+  const keywordEl = document.getElementById('keyword');
+  const keyword = keywordEl ? (keywordEl.value || '') : '';
 
   if (isAdvancedOpen()) {
     const params = getAdvancedSearchParams_();
+    if (!hasAnySearchCondition_(params)) {
+      showEmptySearchNotice_('検索条件を入力してください');
+      return;
+    }
+
+    resetViewModeToCardForNewSearch_();
+
+    const container = document.getElementById('searchContainer');
+    container.classList.remove('centered');
+    container.classList.add('shrink');
+    document.getElementById('viewToggle').style.display = 'flex';
+    showSpinner();
 
     google.script.run
       .withSuccessHandler(function(data) {
+        closeAdvancedSearchPanel_();
         lastResult = data;
         showResult(data);
         showSearchStatusResult_('advanced', data.length, params);
@@ -1429,24 +1488,40 @@ function search() {
         params.detailReleasedToYear,
         params.detailReleasedToMonth
       );
-  } else {
-    google.script.run
-      .withSuccessHandler(function(data) {
-        lastResult = data;
-        showResult(data);
-        showSearchStatusResult_('normal', data.length, { keyword: keyword });
-      })
-      .withFailureHandler(function(err) {
-        console.error('searchBooksSimple failed:', err);
-        hideSpinner();
-        alert('検索中にエラーが発生しました。時間をおいて再度お試しください。');
-      })
-      .searchBooksSimple(keyword);
+    return;
   }
+
+  if (!String(keyword).trim()) {
+    showEmptySearchNotice_('検索語を入力してください');
+    if (keywordEl) keywordEl.focus();
+    return;
+  }
+
+  resetViewModeToCardForNewSearch_();
+
+  const container = document.getElementById('searchContainer');
+  container.classList.remove('centered');
+  container.classList.add('shrink');
+  document.getElementById('viewToggle').style.display = 'flex';
+  showSpinner();
+
+  google.script.run
+    .withSuccessHandler(function(data) {
+      lastResult = data;
+      showResult(data);
+      showSearchStatusResult_('normal', data.length, { keyword: keyword });
+    })
+    .withFailureHandler(function(err) {
+      console.error('searchBooksSimple failed:', err);
+      hideSpinner();
+      alert('検索中にエラーが発生しました。時間をおいて再度お試しください。');
+    })
+    .searchBooksSimple(keyword);
 }
 
 function showRandomBooks() {
   resetViewModeToCardForNewSearch_();
+  closeAdvancedSearchPanel_();
 
   showSpinner();
   google.script.run
@@ -1494,13 +1569,7 @@ function showAllBookshelf() {
       if (el) el.value = '';
     });
 
-    const area = document.getElementById('advancedSearchArea');
-    const btn = document.getElementById('advancedToggleBtn');
-    if (area) area.style.display = 'none';
-    if (btn) {
-      btn.classList.remove('active');
-      btn.textContent = '詳細検索';
-    }
+    closeAdvancedSearchPanel_();
 
     if (typeof syncReleasedRangeOptions_ === 'function') {
       syncReleasedRangeOptions_();
@@ -1528,6 +1597,7 @@ function showAllBookshelf() {
         lastResult = books;
         showResult(books);
         showSearchStatusResult_('normal', books.length, {});
+        scrollToBookshelfTop_();
       })
       .withFailureHandler(function(err) {
         console.error('showAllBookshelf failed:', err);
@@ -1545,17 +1615,17 @@ function showAllBookshelf() {
 // HtmlService内の inline onclick から確実に呼べるよう、明示的に window へ公開する。
 window.showAllBookshelf = showAllBookshelf;
 
+function scrollToBookshelfTop_() {
+  window.requestAnimationFrame(function() {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+}
+
 function resetSearch() {
   document.getElementById('keyword').value = '';
   clearAdvancedFields();
 
-  const area = document.getElementById('advancedSearchArea');
-  const btn = document.getElementById('advancedToggleBtn');
-  if (area) area.style.display = 'none';
-  if (btn) {
-    btn.classList.remove('active');
-    btn.textContent = '詳細検索';
-  }
+  closeAdvancedSearchPanel_();
 
   document.getElementById('result').innerHTML = '';
   document.getElementById('viewToggle').style.display = 'none';
