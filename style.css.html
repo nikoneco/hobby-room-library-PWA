@@ -643,23 +643,55 @@ button:hover {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0.18em 0.78em;
+  gap: 0.38em;
+  min-height: 30px;
+  padding: 0.28em 0.9em;
   border-radius: 999px;
-  background: rgba(169, 104, 255, 0.18);
-  border: 1px solid rgba(202, 157, 255, 0.55);
-  color: #f1ddff;
+  background: linear-gradient(135deg, rgba(177, 102, 255, 0.82) 0%, rgba(86, 91, 255, 0.72) 100%);
+  border: 1px solid rgba(236, 210, 255, 0.76);
+  color: #ffffff;
   font-size: 0.82em;
   line-height: 1.35;
   white-space: nowrap;
   cursor: pointer;
-  font-weight: 700;
-  box-shadow: 0 0 10px rgba(160, 98, 255, 0.10);
+  font-weight: 800;
+  text-shadow: 0 1px 1px rgba(26, 18, 52, 0.34);
+  box-shadow:
+    0 5px 14px rgba(93, 70, 255, 0.26),
+    inset 0 1px 0 rgba(255, 255, 255, 0.28);
+  transform: translateY(0);
+  transition: transform 0.16s ease, box-shadow 0.16s ease, background 0.16s ease, border-color 0.16s ease;
+}
+
+.summary-chip-toggle::before {
+  content: "+";
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.2em;
+  height: 1.2em;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+  font-size: 0.88em;
+  line-height: 1;
 }
 
 .summary-chip-toggle:hover {
-  background: rgba(185, 123, 255, 0.30);
-  border-color: rgba(225, 190, 255, 0.78);
+  background: linear-gradient(135deg, rgba(199, 128, 255, 0.94) 0%, rgba(78, 178, 255, 0.84) 100%);
+  border-color: rgba(255, 240, 255, 0.94);
   color: #ffffff;
+  box-shadow:
+    0 8px 20px rgba(93, 70, 255, 0.34),
+    0 0 14px rgba(211, 138, 255, 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  transform: translateY(-1px);
+}
+
+.summary-chip-toggle:active {
+  transform: translateY(1px);
+  box-shadow:
+    0 2px 8px rgba(93, 70, 255, 0.22),
+    inset 0 2px 5px rgba(20, 16, 46, 0.28);
 }
 
 .summary-chip-toggle:focus-visible {
@@ -668,9 +700,13 @@ button:hover {
 }
 
 .summary-chip-toggle[aria-expanded="true"] {
-  background: rgba(185, 123, 255, 0.34);
+  background: linear-gradient(135deg, rgba(116, 89, 166, 0.92) 0%, rgba(60, 128, 180, 0.82) 100%);
   border-color: rgba(230, 200, 255, 0.86);
   color: #ffffff;
+}
+
+.summary-chip-toggle[aria-expanded="true"]::before {
+  content: "-";
 }
 
 .book-summary {

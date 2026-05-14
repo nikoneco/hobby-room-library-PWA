@@ -2316,6 +2316,20 @@ function groupBooksByShelf_(data) {
     }));
 }
 
+function flattenShelfBooksForPopup_(groups) {
+  const orderedItems = [];
+  (groups || []).forEach(group => {
+    (group.sections || []).forEach(section => {
+      (section.levels || []).forEach(level => {
+        (level.books || []).forEach(item => {
+          orderedItems.push(item);
+        });
+      });
+    });
+  });
+  return orderedItems;
+}
+
 function createShelfBookElement_(book, originalIndex, data) {
   const button = document.createElement('button');
   button.type = 'button';
@@ -2349,6 +2363,15 @@ function createShelfBookElement_(book, originalIndex, data) {
 
 function renderShelfView_(data) {
   const groups = groupBooksByShelf_(data);
+  const shelfPopupItems = flattenShelfBooksForPopup_(groups);
+  const shelfPopupData = shelfPopupItems.map(item => item.book);
+  const shelfPopupIndexByOriginalIndex = new Map();
+  shelfPopupItems.forEach((item, popupIndex) => {
+    if (!shelfPopupIndexByOriginalIndex.has(item.originalIndex)) {
+      shelfPopupIndexByOriginalIndex.set(item.originalIndex, popupIndex);
+    }
+  });
+
   const container = document.createElement('div');
   container.className = 'shelf-view';
 
@@ -2396,7 +2419,10 @@ function renderShelfView_(data) {
         const strip = document.createElement('div');
         strip.className = 'bookshelf-strip';
         level.books.forEach(item => {
-          strip.appendChild(createShelfBookElement_(item.book, item.originalIndex, data));
+          const popupIndex = shelfPopupIndexByOriginalIndex.has(item.originalIndex)
+            ? shelfPopupIndexByOriginalIndex.get(item.originalIndex)
+            : item.originalIndex;
+          strip.appendChild(createShelfBookElement_(item.book, popupIndex, shelfPopupData));
         });
 
         levelWrap.appendChild(strip);
