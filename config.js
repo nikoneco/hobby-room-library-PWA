@@ -15,11 +15,14 @@ const CONFIG = {
     IMAGE    : 10,   // J列：スプシ表示専用
     ISBN     : 19,   // S列
     YOMIGANA : 21,   // U列
-    SUMMARY  : 22,   // V列：表示用あらすじ
+    RESERVED  : 22,   // V列：予備
     GENRE    : 23,   // W列
     SERIES_KEY_AUTO: 24, // X列
-    SUMMARY_RAW   : 25, // Y列：外部取得した生あらすじ
+    SUMMARY   : 25,   // Y列：あらすじ
     SUMMARY_SOURCE: 26, // Z列：あらすじ取得元 / STATUS
+
+    // 旧名互換。今後の新規実装では SUMMARY を使う。
+    SUMMARY_RAW: 25, // Y列：旧 SUMMARY_RAW。現在は「あらすじ」
 
     FALLBACK_IMAGE_URL   : 27, // AA列：Hanmoto失敗時の保険画像URL
     FALLBACK_IMAGE_SOURCE: 28, // AB列：保険画像URL取得元 / STATUS
@@ -44,15 +47,16 @@ const CONFIG = {
     ISBN     : 10,
     MEMO     : 11,
     YOMIGANA : 12,
-    SUMMARY  : 13,
+    RESERVED  : 13,
     GENRE    : 14,
     SERIES_KEY_AUTO: 15,
-    SUMMARY_RAW: 16,
+    SUMMARY   : 16,
     SUMMARY_SOURCE: 17,
     FALLBACK_IMAGE_URL: 18,
     FALLBACK_IMAGE_SOURCE: 19,
 
     // 移行期間の互換エイリアス
+    SUMMARY_RAW: 16,
     WEB_IMAGE_URL: 18,
     WEB_IMAGE_SOURCE: 19
   },

@@ -1155,7 +1155,7 @@ function debugRakutenKoboCandidatesByRow_(rowNumber) {
 }
 
 /**
- * NOT_FOUND. を再試行前の NOT_FOUND に戻し、Y列RAWを空にする。
+ * NOT_FOUND. を再試行前の NOT_FOUND に戻し、Y列あらすじを空にする。
  * Kobo救済ロジック調整後に再実行したい場合だけ手動実行する。
  * @returns {{resetRows: number}}
  */
@@ -1167,7 +1167,7 @@ function resetKoboNotFoundDoneToNotFound() {
   if (last < 2) return { resetRows: 0 };
 
   const rowCount = last - 1;
-  const range = sheet.getRange(2, CONFIG.COL.SUMMARY_RAW, rowCount, 2);
+  const range = sheet.getRange(2, CONFIG.COL.SUMMARY, rowCount, 2);
   const values = range.getValues();
   let resetRows = 0;
 

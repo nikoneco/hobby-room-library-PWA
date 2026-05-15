@@ -893,9 +893,9 @@ function debugLibraryDatasetSize() {
  * debug: 図書館Webアプリ dataset サイズ検証
  *
  * 目的:
- * - 現在のY列あらすじRAW込みdatasetサイズを測る
- * - Y列あらすじRAWを空にした仮想datasetサイズを測る
- * - V/Y両方を空にした仮想datasetサイズを測る
+ * - 現在のY列あらすじ込みdatasetサイズを測る
+ * - Y列あらすじを空にした仮想datasetサイズを測る
+ * - Y列あらすじとZ列あらすじ_SOURCEを空にした仮想datasetサイズを測る
  * - 検索レスポンスにsummaryがある/ない場合のサイズ差を見る
  * - 本番キャッシュキーを壊さず、debug専用キーでput/get速度を見る
  *
@@ -907,7 +907,7 @@ function debugLibraryDatasetSize() {
 
 const DEBUG_LIBRARY_SIZE_CONFIG = {
   CACHE_KEY_FULL: 'debug_library_dataset_size_full',
-  CACHE_KEY_NO_RAW: 'debug_library_dataset_size_no_raw',
+  CACHE_KEY_NO_SUMMARY: 'debug_library_dataset_size_no_summary',
   CACHE_TTL_SECONDS: 300,
 
   // 検索レスポンス検証用。
@@ -956,17 +956,17 @@ function debugCompareLibraryDatasetSize_(keyword, limit) {
   const dataset = buildLibraryDataset_();
   const t1 = Date.now();
 
-  const noRawDataset = stripSummaryRawFromDatasetForDebug_(dataset);
-  const noSummaryDataset = stripSummaryAndRawFromDatasetForDebug_(dataset);
+  const noSummaryDataset = stripSummaryRawFromDatasetForDebug_(dataset);
+  const noSynopsisFieldsDataset = stripSummaryAndRawFromDatasetForDebug_(dataset);
 
   const t2 = Date.now();
 
-  const fullSize = measureJsonPayloadForDebug_('dataset_full_current_V_and_Y', dataset);
-  const noRawSize = measureJsonPayloadForDebug_('dataset_no_Y_summary_raw', noRawDataset);
-  const noSummarySize = measureJsonPayloadForDebug_('dataset_no_V_summary_no_Y_raw', noSummaryDataset);
+  const fullSize = measureJsonPayloadForDebug_('dataset_full_current_Y_and_Z', dataset);
+  const noSummarySize = measureJsonPayloadForDebug_('dataset_no_Y_summary', noSummaryDataset);
+  const noSynopsisFieldsSize = measureJsonPayloadForDebug_('dataset_no_Y_summary_no_Z_source', noSynopsisFieldsDataset);
 
   const fullCache = debugCacheRoundTripForDebug_(DEBUG_LIBRARY_SIZE_CONFIG.CACHE_KEY_FULL, dataset);
-  const noRawCache = debugCacheRoundTripForDebug_(DEBUG_LIBRARY_SIZE_CONFIG.CACHE_KEY_NO_RAW, noRawDataset);
+  const noSummaryCache = debugCacheRoundTripForDebug_(DEBUG_LIBRARY_SIZE_CONFIG.CACHE_KEY_NO_SUMMARY, noSummaryDataset);
 
   const searchSample = buildSearchResponseSampleForDebug_(dataset, keyword, limit);
   const searchWithSummarySize = measureJsonPayloadForDebug_(
@@ -986,10 +986,12 @@ function debugCompareLibraryDatasetSize_(keyword, limit) {
 
     config: {
       webappMaxCol: CONFIG.COL.WEBAPP_MAX,
+      reservedCol: CONFIG.COL.RESERVED,
       summaryCol: CONFIG.COL.SUMMARY,
-      summaryRawCol: CONFIG.COL.SUMMARY_RAW,
+      summarySourceCol: CONFIG.COL.SUMMARY_SOURCE,
+      reservedIndex: CONFIG.IDX.RESERVED,
       summaryIndex: CONFIG.IDX.SUMMARY,
-      summaryRawIndex: CONFIG.IDX.SUMMARY_RAW,
+      summarySourceIndex: CONFIG.IDX.SUMMARY_SOURCE,
       productionCacheKey: CACHE_CONFIG.LIBRARY_DATASET_KEY,
       chunkSize: CACHE_CONFIG.CHUNK_SIZE,
       ttlSeconds: CACHE_CONFIG.TTL_SECONDS
@@ -1011,15 +1013,15 @@ function debugCompareLibraryDatasetSize_(keyword, limit) {
 
     datasetSize: {
       fullCurrent: fullSize,
-      noSummaryRawY: noRawSize,
-      noSummaryVAndRawY: noSummarySize,
-      diffFullMinusNoRaw: buildPayloadDiffForDebug_(fullSize, noRawSize),
-      diffFullMinusNoSummary: buildPayloadDiffForDebug_(fullSize, noSummarySize)
+      noSummaryY: noSummarySize,
+      noSummaryYAndSourceZ: noSynopsisFieldsSize,
+      diffFullMinusNoSummaryY: buildPayloadDiffForDebug_(fullSize, noSummarySize),
+      diffFullMinusNoSynopsisFields: buildPayloadDiffForDebug_(fullSize, noSynopsisFieldsSize)
     },
 
     cacheRoundTrip: {
       fullCurrent: fullCache,
-      noSummaryRawY: noRawCache
+      noSummaryY: noSummaryCache
     },
 
     searchResponseSample: {
@@ -1035,20 +1037,20 @@ function debugCompareLibraryDatasetSize_(keyword, limit) {
 }
 
 /**
- * Y列あらすじRAWだけを空にした仮想datasetを作る。
+ * Y列あらすじだけを空にした仮想datasetを作る。
  * 実データは変更しない。
  *
  * @param {Object} dataset
  * @returns {Object}
  */
 function stripSummaryRawFromDatasetForDebug_(dataset) {
-  const rawIndex = CONFIG.IDX.SUMMARY_RAW;
+  const summaryIndex = CONFIG.IDX.SUMMARY;
 
   return {
     rows: (dataset.rows || []).map(row => {
       const next = row.slice();
-      if (rawIndex >= 0 && rawIndex < next.length) {
-        next[rawIndex] = '';
+      if (summaryIndex >= 0 && summaryIndex < next.length) {
+        next[summaryIndex] = '';
       }
       return next;
     }),
@@ -1059,15 +1061,15 @@ function stripSummaryRawFromDatasetForDebug_(dataset) {
 }
 
 /**
- * V列SUMMARYとY列SUMMARY_RAWを空にした仮想datasetを作る。
- * 将来V列に短縮あらすじを入れた時の重さ見積もり用。
+ * 旧名互換の関数。
+ * 現在はY列あらすじとZ列あらすじ_SOURCEを空にした仮想datasetを作る。
  *
  * @param {Object} dataset
  * @returns {Object}
  */
 function stripSummaryAndRawFromDatasetForDebug_(dataset) {
   const summaryIndex = CONFIG.IDX.SUMMARY;
-  const rawIndex = CONFIG.IDX.SUMMARY_RAW;
+  const sourceIndex = CONFIG.IDX.SUMMARY_SOURCE;
 
   return {
     rows: (dataset.rows || []).map(row => {
@@ -1076,8 +1078,8 @@ function stripSummaryAndRawFromDatasetForDebug_(dataset) {
       if (summaryIndex >= 0 && summaryIndex < next.length) {
         next[summaryIndex] = '';
       }
-      if (rawIndex >= 0 && rawIndex < next.length) {
-        next[rawIndex] = '';
+      if (sourceIndex >= 0 && sourceIndex < next.length) {
+        next[sourceIndex] = '';
       }
 
       return next;

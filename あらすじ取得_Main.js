@@ -2,7 +2,7 @@
 // ＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝
 // あらすじ取得_Main.gs
 //  - 通常取得: 版元ドットコム / 楽天Books / OpenBD / Google Books
-//  - Y列 あらすじ_RAW / Z列 あらすじ_SOURCE
+//  - Y列 あらすじ / Z列 あらすじ_SOURCE
 //  - 楽天Kobo救済は あらすじ取得_kobo.gs に分離
 // ＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝
 
@@ -110,7 +110,7 @@ function clearAllSynopsisRawAndSource() {
 
   const rowCount = last - 1;
   sheet
-    .getRange(2, CONFIG.COL.SUMMARY_RAW, rowCount, 2)
+    .getRange(2, CONFIG.COL.SUMMARY, rowCount, 2)
     .clearContent()
     .clearNote();
 
@@ -163,7 +163,6 @@ function batchFetchSynopsisRawByLimit_(limit) {
     const title = String(row[CONFIG.COL.TITLE - 1] || '').trim();
     const isbn = normalizeIsbn_(row[CONFIG.COL.ISBN - 1]);
     const summary = String(row[CONFIG.COL.SUMMARY - 1] || '').trim();
-    const raw = String(row[CONFIG.COL.SUMMARY_RAW - 1] || '').trim();
     const source = normalizeSynopsisSourceValue_(row[CONFIG.COL.SUMMARY_SOURCE - 1]);
 
     if (source) continue;
@@ -171,8 +170,8 @@ function batchFetchSynopsisRawByLimit_(limit) {
 
     processed++;
 
-    if (summary || raw) {
-      writeSynopsisResult_(sheet, rowNumber, raw, SYNOPSIS_SOURCE.MANUAL);
+    if (summary) {
+      writeSynopsisResult_(sheet, rowNumber, summary, SYNOPSIS_SOURCE.MANUAL);
       manualProtected++;
       Utilities.sleep(50);
       continue;
@@ -243,9 +242,9 @@ function ensureSynopsisColumns_(sheet) {
     );
   }
 
-  const rawHeader = String(sh.getRange(1, CONFIG.COL.SUMMARY_RAW).getValue() || '').trim();
-  if (!rawHeader) {
-    sh.getRange(1, CONFIG.COL.SUMMARY_RAW).setValue('あらすじ_RAW');
+  const summaryHeader = String(sh.getRange(1, CONFIG.COL.SUMMARY).getValue() || '').trim();
+  if (!summaryHeader) {
+    sh.getRange(1, CONFIG.COL.SUMMARY).setValue('あらすじ');
   }
 
   const sourceHeader = String(sh.getRange(1, CONFIG.COL.SUMMARY_SOURCE).getValue() || '').trim();
@@ -269,7 +268,7 @@ function ensureSynopsisColumns_(sheet) {
 
 /**
  * 手動編集時のManualマーキング。
- * V列またはY列が手入力された場合、Z列が空欄/失敗系ならManualにする。
+ * Y列（あらすじ）が手入力された場合、Z列が空欄/失敗系ならManualにする。
  * 既にOpenBD/Hanmoto/GoogleBooks/Manualが入っている場合は上書きしない。
  * @param {GoogleAppsScript.Events.SheetsOnEdit} e
  */
@@ -288,10 +287,9 @@ function markSynopsisManualOnEdit_(e) {
   if (rowEnd < 2) return;
 
   const touchesSummary = colStart <= CONFIG.COL.SUMMARY && colEnd >= CONFIG.COL.SUMMARY;
-  const touchesRaw = colStart <= CONFIG.COL.SUMMARY_RAW && colEnd >= CONFIG.COL.SUMMARY_RAW;
   const touchesSource = colStart <= CONFIG.COL.SUMMARY_SOURCE && colEnd >= CONFIG.COL.SUMMARY_SOURCE;
 
-  if (!touchesSummary && !touchesRaw) return;
+  if (!touchesSummary) return;
   if (touchesSource) return;
 
   ensureSynopsisColumns_(sheet);
@@ -301,7 +299,6 @@ function markSynopsisManualOnEdit_(e) {
   if (targetRows <= 0) return;
 
   const summaryVals = sheet.getRange(targetStartRow, CONFIG.COL.SUMMARY, targetRows, 1).getDisplayValues();
-  const rawVals = sheet.getRange(targetStartRow, CONFIG.COL.SUMMARY_RAW, targetRows, 1).getDisplayValues();
   const sourceRange = sheet.getRange(targetStartRow, CONFIG.COL.SUMMARY_SOURCE, targetRows, 1);
   const sourceVals = sourceRange.getDisplayValues();
 
@@ -309,9 +306,8 @@ function markSynopsisManualOnEdit_(e) {
   const next = sourceVals.map((r, i) => {
     const current = normalizeSynopsisSourceValue_(r[0]);
     const summary = String(summaryVals[i][0] || '').trim();
-    const raw = String(rawVals[i][0] || '').trim();
 
-    if ((summary || raw) && shouldAutoMarkManual_(current)) {
+    if (summary && shouldAutoMarkManual_(current)) {
       changed = true;
       return [SYNOPSIS_SOURCE.MANUAL];
     }
@@ -659,7 +655,7 @@ function fetchSynopsisFromRakutenBooks_(isbn) {
 
 /**
  * 楽天Booksからあらすじ候補リストを取得する。
- * 主に itemCaption をY列RAW候補として利用する。
+ * 主に itemCaption をY列あらすじ候補として利用する。
  * @param {*} isbn
  * @returns {string[]}
  */
@@ -1719,7 +1715,7 @@ function escapeRegExp_(text) {
  */
 function writeSynopsisResult_(sheet, rowNumber, raw, source, errorObj) {
   sheet
-    .getRange(rowNumber, CONFIG.COL.SUMMARY_RAW, 1, 2)
+    .getRange(rowNumber, CONFIG.COL.SUMMARY, 1, 2)
     .setValues([[raw || '', source || '']]);
 
   const sourceCell = sheet.getRange(rowNumber, CONFIG.COL.SUMMARY_SOURCE);
@@ -1746,7 +1742,7 @@ function snapshotSynopsisByBookKey_(sheet, lastRow) {
 
   const rowCount = last - 1;
   const displayRows = sheet.getRange(2, 1, rowCount, CONFIG.COL.MAX).getDisplayValues();
-  const synopsisRows = sheet.getRange(2, CONFIG.COL.SUMMARY_RAW, rowCount, 2).getValues();
+  const synopsisRows = sheet.getRange(2, CONFIG.COL.SUMMARY, rowCount, 2).getValues();
   const map = {};
 
   displayRows.forEach((row, i) => {
@@ -1788,7 +1784,7 @@ function restoreSynopsisByBookKey_(sheet, snapshot, lastRow) {
   });
 
   sheet
-    .getRange(2, CONFIG.COL.SUMMARY_RAW, output.length, 2)
+    .getRange(2, CONFIG.COL.SUMMARY, output.length, 2)
     .setValues(output);
 }
 

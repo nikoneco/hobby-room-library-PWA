@@ -656,8 +656,7 @@ function mapRowsToBooks_(rows, indexData) {
   return rows.map((row, i) => {
     const isbn = normalizeIsbn_(row[CONFIG.IDX.ISBN]);
     const idx = Array.isArray(indexData) ? indexData[i] : null;
-    const summaryRaw = row[CONFIG.IDX.SUMMARY_RAW] || '';
-    const summaryShort = row[CONFIG.IDX.SUMMARY] || '';
+    const summary = row[CONFIG.IDX.SUMMARY] || '';
 
     return {
       title    : row[CONFIG.IDX.TITLE]     || '',
@@ -675,7 +674,7 @@ function mapRowsToBooks_(rows, indexData) {
       isbn     : isbn,
       memo     : row[CONFIG.IDX.MEMO]      || '',
       yomi     : row[CONFIG.IDX.YOMIGANA]  || '',
-      summary       : summaryRaw || summaryShort || '',
+      summary       : summary,
       genre         : row[CONFIG.IDX.GENRE]     || '',
       genreMeta     : idx ? (idx.genreMeta || []) : [],
       seriesKeyAuto   : idx ? (idx.seriesKeyAuto || '') : '',
