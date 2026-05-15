@@ -1007,13 +1007,16 @@ function renderSearchStatus_() {
   els.count.textContent = getSearchStatusCountText_();
   els.count.classList.toggle('loading-dots', searchStatusState.previewPending);
 
+  const removableChipCount = searchStatusState.chips.filter(chip => chip && chip.removable).length;
+
   els.chips.innerHTML = searchStatusState.chips.map(chip => {
+    const canRemoveChip = chip.removable && removableChipCount > 1;
     const classNames = ['search-status-chip'];
     if (chip.className) classNames.push(chip.className);
-    if (chip.removable) classNames.push('removable');
+    if (canRemoveChip) classNames.push('removable');
     if (chip.key && chip.key === searchStatusState.removingChipKey) classNames.push('is-removing');
 
-    const removeButton = chip.removable ? `
+    const removeButton = canRemoveChip ? `
       <button
         type="button"
         class="search-status-chip-remove"
