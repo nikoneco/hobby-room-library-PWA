@@ -535,9 +535,9 @@ function countPreviewMatchesAuthoritative(
         genres: { story: [], theme: [], mood: [], status: [] }
       };
 
-      const keywordMatch = !nKeyword || (idx.searchKey && idx.searchKey.includes(nKeyword));
-      const titleMatch = !nTitle || (idx.title && idx.title.includes(nTitle));
-      const yomiMatch = !nYomi || (idx.yomi && idx.yomi.includes(nYomi));
+      const keywordMatch = !nKeyword || keywordMixedMatch_(nKeyword, idx);
+      const titleMatch = !nTitle || titleYomiMixedMatch_(nTitle, idx.title, idx.yomi);
+      const yomiMatch = !nYomi || titleYomiMixedMatch_(nYomi, idx.title, idx.yomi);
       const authorMatch = !nAuthor || (idx.author && idx.author.includes(nAuthor));
       const publisherMatch = !selectedPublisher || idx.publisher === selectedPublisher;
       const storyMatch = !selectedStory || (idx.genres.story || []).includes(selectedStory);
@@ -703,6 +703,77 @@ function buildSearchKey_(title, yomi, author) {
     normalizeKana(yomi || ''),
     normalizeKana(author || '')
   ].join(' ');
+}
+
+function titleYomiMixedMatch_(query, title, yomi) {
+  const q = normalizeKana(query || '');
+  if (!q) return true;
+
+  const t = normalizeKana(title || '');
+  const y = normalizeKana(yomi || '');
+
+  if ((t && t.includes(q)) || (y && y.includes(q))) return true;
+  if (!t || !y) return false;
+
+  let titlePos = 0;
+  let yomiPos = 0;
+  let progress = 0;
+
+  for (let i = 0; i < q.length; i++) {
+    const char = q[i];
+    const titleNext = findNextMixedMatchCandidate_(char, t, titlePos, progress);
+    const yomiNext = findNextMixedMatchCandidate_(char, y, yomiPos, progress);
+    const next = chooseMixedMatchCandidate_(titleNext, yomiNext);
+
+    if (!next) return false;
+
+    if (next === titleNext) {
+      titlePos = next.index + 1;
+    } else {
+      yomiPos = next.index + 1;
+    }
+
+    progress = next.progressAfter;
+  }
+
+  return true;
+}
+
+function findNextMixedMatchCandidate_(char, text, startIndex, minProgress) {
+  if (!text) return null;
+
+  const step = 1 / Math.max(text.length, 1);
+
+  for (let i = Math.max(0, startIndex || 0); i < text.length; i++) {
+    if (text[i] !== char) continue;
+
+    const progress = i * step;
+    if (progress + 0.000001 < minProgress) continue;
+
+    return {
+      index: i,
+      progress,
+      progressAfter: progress + step
+    };
+  }
+
+  return null;
+}
+
+function chooseMixedMatchCandidate_(titleCandidate, yomiCandidate) {
+  if (!titleCandidate) return yomiCandidate || null;
+  if (!yomiCandidate) return titleCandidate;
+
+  return titleCandidate.progress <= yomiCandidate.progress
+    ? titleCandidate
+    : yomiCandidate;
+}
+
+function keywordMixedMatch_(query, idx) {
+  const q = normalizeKana(query || '');
+  if (!q) return true;
+  if (idx && idx.searchKey && idx.searchKey.includes(q)) return true;
+  return titleYomiMixedMatch_(q, idx && idx.title, idx && idx.yomi);
 }
 
 
@@ -1214,9 +1285,9 @@ function searchBooksSimple(keyword) {
     const matchedIndex = [];
 
     for (let i = 0; i < rows.length; i++) {
-      const idx = index[i] || { searchKey: '' };
+      const idx = index[i] || { title: '', yomi: '', searchKey: '' };
 
-      if (idx.searchKey && idx.searchKey.includes(nKeyword)) {
+      if (keywordMixedMatch_(nKeyword, idx)) {
         matchedRows.push(rows[i]);
         matchedIndex.push(idx);
       }
@@ -1317,9 +1388,9 @@ function searchBooksAdvanced(
         genres: { story: [], theme: [], mood: [], status: [] }
       };
 
-      const keywordMatch = !nKeyword || (idx.searchKey && idx.searchKey.includes(nKeyword));
-      const titleMatch = !nTitle || (idx.title && idx.title.includes(nTitle));
-      const yomiMatch = !nYomi || (idx.yomi && idx.yomi.includes(nYomi));
+      const keywordMatch = !nKeyword || keywordMixedMatch_(nKeyword, idx);
+      const titleMatch = !nTitle || titleYomiMixedMatch_(nTitle, idx.title, idx.yomi);
+      const yomiMatch = !nYomi || titleYomiMixedMatch_(nYomi, idx.title, idx.yomi);
       const authorMatch = !nAuthor || (idx.author && idx.author.includes(nAuthor));
       const publisherMatch = !selectedPublisher || idx.publisher === selectedPublisher;
       const storyMatch = !selectedStory || (idx.genres.story || []).includes(selectedStory);
