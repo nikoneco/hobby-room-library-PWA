@@ -715,58 +715,73 @@ function titleYomiMixedMatch_(query, title, yomi) {
   if ((t && t.includes(q)) || (y && y.includes(q))) return true;
   if (!t || !y) return false;
 
-  let titlePos = 0;
-  let yomiPos = 0;
+  const chunks = splitMixedSearchQuery_(q);
+  if (chunks.length <= 1) return false;
+
   let progress = 0;
 
-  for (let i = 0; i < q.length; i++) {
-    const char = q[i];
-    const titleNext = findNextMixedMatchCandidate_(char, t, titlePos, progress);
-    const yomiNext = findNextMixedMatchCandidate_(char, y, yomiPos, progress);
-    const next = chooseMixedMatchCandidate_(titleNext, yomiNext);
+  for (let i = 0; i < chunks.length; i++) {
+    const chunk = chunks[i];
+    const target = chunk.type === 'kana' ? y : t;
+    const match = findChunkMixedMatch_(chunk.text, target, progress);
 
-    if (!next) return false;
+    if (!match) return false;
 
-    if (next === titleNext) {
-      titlePos = next.index + 1;
-    } else {
-      yomiPos = next.index + 1;
-    }
-
-    progress = next.progressAfter;
+    progress = match.progressAfter;
   }
 
   return true;
 }
 
-function findNextMixedMatchCandidate_(char, text, startIndex, minProgress) {
-  if (!text) return null;
+function splitMixedSearchQuery_(query) {
+  const q = normalizeKana(query || '');
+  if (!q) return [];
+
+  const chunks = [];
+  let currentType = '';
+  let currentText = '';
+
+  for (let i = 0; i < q.length; i++) {
+    const char = q[i];
+    const type = isKanaChar_(char) ? 'kana' : 'title';
+
+    if (currentText && type !== currentType) {
+      chunks.push({ type: currentType, text: currentText });
+      currentText = '';
+    }
+
+    currentType = type;
+    currentText += char;
+  }
+
+  if (currentText) {
+    chunks.push({ type: currentType, text: currentText });
+  }
+
+  return chunks;
+}
+
+function isKanaChar_(char) {
+  return /^[\u3041-\u3096\u30fc]$/.test(char || '');
+}
+
+function findChunkMixedMatch_(chunk, text, minProgress) {
+  if (!chunk || !text) return null;
 
   const step = 1 / Math.max(text.length, 1);
 
-  for (let i = Math.max(0, startIndex || 0); i < text.length; i++) {
-    if (text[i] !== char) continue;
-
-    const progress = i * step;
+  for (let index = text.indexOf(chunk); index >= 0; index = text.indexOf(chunk, index + 1)) {
+    const progress = index * step;
     if (progress + 0.000001 < minProgress) continue;
 
     return {
-      index: i,
+      index,
       progress,
-      progressAfter: progress + step
+      progressAfter: (index + chunk.length) * step
     };
   }
 
   return null;
-}
-
-function chooseMixedMatchCandidate_(titleCandidate, yomiCandidate) {
-  if (!titleCandidate) return yomiCandidate || null;
-  if (!yomiCandidate) return titleCandidate;
-
-  return titleCandidate.progress <= yomiCandidate.progress
-    ? titleCandidate
-    : yomiCandidate;
 }
 
 function keywordMixedMatch_(query, idx) {
