@@ -8,6 +8,25 @@ let lastResult = null;
 
 const NO_IMAGE_URL = "https://i.imgur.com/Q80wBRc.jpeg";
 
+const UI_ICONS = {
+  search: '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"></circle><path d="M16 16l4 4"></path></svg>',
+  shuffle: '<svg viewBox="0 0 24 24"><path d="M4 7h4l3 10h3"></path><path d="M17 7h3v3"></path><path d="M20 7l-6 6"></path><path d="M17 17h3v-3"></path><path d="M20 17l-3-3"></path></svg>',
+  filter: '<svg viewBox="0 0 24 24"><path d="M4 7h16"></path><path d="M7 12h10"></path><path d="M10 17h4"></path></svg>',
+  shelf: '<svg viewBox="0 0 24 24"><path d="M4 20h16"></path><path d="M5 4h3v13H5z"></path><path d="M10 4h3v13h-3z"></path><path d="M15 5l3-.8 3.4 12.8-3 .8z"></path></svg>',
+  map: '<svg viewBox="0 0 24 24"><path d="M4 6l5-2 6 2 5-2v14l-5 2-6-2-5 2z"></path><path d="M9 4v14"></path><path d="M15 6v14"></path></svg>',
+  back: '<svg viewBox="0 0 24 24"><path d="M11 6l-6 6 6 6"></path><path d="M5 12h14"></path></svg>',
+  collection: '<svg viewBox="0 0 24 24"><path d="M5 5h10a4 4 0 0 1 4 4v10H9a4 4 0 0 1-4-4z"></path><path d="M9 9h6"></path><path d="M9 13h5"></path></svg>',
+  link: '<svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7 0l2-2a5 5 0 0 0-7-7l-1 1"></path><path d="M14 11a5 5 0 0 0-7 0l-2 2a5 5 0 0 0 7 7l1-1"></path></svg>',
+  store: '<svg viewBox="0 0 24 24"><path d="M5 10h14l-1 10H6z"></path><path d="M8 10a4 4 0 0 1 8 0"></path></svg>',
+  bell: '<svg viewBox="0 0 24 24"><path d="M6 17h12"></path><path d="M8 17V10a4 4 0 0 1 8 0v7"></path><path d="M10 20h4"></path></svg>',
+  close: '<svg viewBox="0 0 24 24"><path d="M6 6l12 12"></path><path d="M18 6L6 18"></path></svg>',
+  chevronDown: '<svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"></path></svg>'
+};
+
+function uiIcon_(name, extraClass) {
+  return `<span class="ui-icon ${extraClass || ''}" aria-hidden="true">${UI_ICONS[name] || ''}</span>`;
+}
+
 // 画像取得率の計測はデバッグ用。
 // 通常時はOFF。URLに ?debugImageStats=1 を付けるか、
 // localStorage.setItem('shumiLibrary.debugImageStats', '1') 後に再読み込みでON。
@@ -1868,7 +1887,7 @@ function renderShelfJumpNav_(groups, totalCount, immersive) {
     const mapButton = document.createElement('button');
     mapButton.type = 'button';
     mapButton.className = 'shelf-jump-chip shelf-jump-map-chip';
-    mapButton.textContent = '🗺 マップ';
+    mapButton.innerHTML = `${uiIcon_('map', 'ui-icon-inline')}<span>マップ</span>`;
     mapButton.onclick = function() {
       openShelfRoomMapOverlay_();
     };
@@ -2036,7 +2055,7 @@ function renderShelfRoomMapFloatingLauncher_() {
   button.type = 'button';
   button.className = 'shelf-room-map-fab';
   button.setAttribute('aria-label', '趣味部屋マップを開く');
-  button.innerHTML = '<span class="shelf-room-map-fab-icon">🗺</span><span class="shelf-room-map-fab-label">マップ</span>';
+  button.innerHTML = `${uiIcon_('map', 'shelf-room-map-fab-icon')}<span class="shelf-room-map-fab-label">マップ</span>`;
   button.onclick = function() {
     openShelfRoomMapOverlay_();
   };
@@ -2090,7 +2109,7 @@ function renderShelfRoomMapOverlay_(groups) {
   closeButton.type = 'button';
   closeButton.className = 'shelf-room-map-modal-close';
   closeButton.setAttribute('aria-label', '趣味部屋マップを閉じる');
-  closeButton.textContent = '×';
+  closeButton.innerHTML = uiIcon_('close');
   closeButton.onclick = function() {
     closeShelfRoomMapOverlay_();
   };
@@ -2571,7 +2590,7 @@ function showResult(data) {
       const btn = document.createElement('button');
       btn.className = 'accordion-toggle';
       btn.setAttribute('aria-expanded', 'false');
-      btn.innerHTML = '<span class="arrow"></span>';
+      btn.innerHTML = uiIcon_('chevronDown', 'arrow');
       row.appendChild(btn);
 
       card.appendChild(row);
@@ -2632,9 +2651,9 @@ function buildExternalLinksHtml(book) {
 
   return `
     <div class="popup-link-row">
-      <a href="${googleUrl}" target="_blank" rel="noopener noreferrer" class="popup-link-btn">Googleで新刊検索</a>
-      <a href="${bellUrl}" target="_blank" rel="noopener noreferrer" class="popup-link-btn">BellAlert</a>
-      <a href="${amazonUrl}" target="_blank" rel="noopener noreferrer" class="popup-link-btn">Amazon</a>
+      <a href="${googleUrl}" target="_blank" rel="noopener noreferrer" class="popup-link-btn">${uiIcon_('search', 'ui-icon-inline')}<span>Googleで新刊検索</span></a>
+      <a href="${bellUrl}" target="_blank" rel="noopener noreferrer" class="popup-link-btn">${uiIcon_('bell', 'ui-icon-inline')}<span>BellAlert</span></a>
+      <a href="${amazonUrl}" target="_blank" rel="noopener noreferrer" class="popup-link-btn">${uiIcon_('store', 'ui-icon-inline')}<span>Amazon</span></a>
     </div>
   `;
 }
@@ -2645,7 +2664,7 @@ function buildPopupActionsHtml(book, seriesContext) {
   if (seriesContext && Array.isArray(seriesContext.items)) {
     parts.push(`
       <button type="button" id="popup-series-back-btn" class="popup-action-btn">
-        シリーズ一覧へ戻る
+        ${uiIcon_('back', 'ui-icon-inline')}<span>シリーズ一覧へ戻る</span>
       </button>
     `);
   }
@@ -2653,7 +2672,7 @@ function buildPopupActionsHtml(book, seriesContext) {
   if (shouldShowSeriesButton(book)) {
     parts.push(`
       <button type="button" id="popup-series-btn" class="popup-action-btn primary">
-        このシリーズを見る（${Number(book.seriesCount || 0)}冊）
+        ${uiIcon_('collection', 'ui-icon-inline')}<span>このシリーズを見る（${Number(book.seriesCount || 0)}冊）</span>
       </button>
     `);
   }
@@ -2700,6 +2719,7 @@ function openSeriesPanel(sourceBook) {
   if (!sourceBook || !sourceBook.seriesKeyAuto) return;
 
   const overlay = document.getElementById('image-popup-overlay');
+  const popupContent = document.getElementById('image-popup-content');
   const img = document.getElementById('image-popup-img');
   const info = document.getElementById('image-popup-info');
   const prevBtn = document.getElementById('popup-prev');
@@ -2708,6 +2728,7 @@ function openSeriesPanel(sourceBook) {
 
   overlay.style.display = 'flex';
   document.body.classList.add('modal-open');
+  if (popupContent) popupContent.classList.add('series-mode');
   img.style.display = 'none';
   prevBtn.style.display = 'none';
   nextBtn.style.display = 'none';
@@ -2726,10 +2747,10 @@ function openSeriesPanel(sourceBook) {
     })
     .withFailureHandler(function(error) {
       info.innerHTML = `
-        <div class="series-panel">
-          <div class="series-panel-title">シリーズ一覧を取得できませんでした</div>
-          <div class="series-panel-subtitle">${escapeHtml(error && error.message ? error.message : '時間を置いて再度お試しください。')}</div>
-          <button type="button" id="series-panel-back-detail" class="popup-action-btn primary">詳細へ戻る</button>
+          <div class="series-panel">
+            <div class="series-panel-title">シリーズ一覧を取得できませんでした</div>
+            <div class="series-panel-subtitle">${escapeHtml(error && error.message ? error.message : '時間を置いて再度お試しください。')}</div>
+          <button type="button" id="series-panel-back-detail" class="popup-action-btn primary">${uiIcon_('back', 'ui-icon-inline')}<span>詳細へ戻る</span></button>
         </div>
       `;
       const backBtn = document.getElementById('series-panel-back-detail');
@@ -2743,6 +2764,7 @@ function openSeriesPanel(sourceBook) {
 
 function showSeriesPanel(sourceBook, seriesBooks, returnContext) {
   const overlay = document.getElementById('image-popup-overlay');
+  const popupContent = document.getElementById('image-popup-content');
   const img = document.getElementById('image-popup-img');
   const info = document.getElementById('image-popup-info');
   const closeBtn = document.getElementById('image-popup-close');
@@ -2754,6 +2776,7 @@ function showSeriesPanel(sourceBook, seriesBooks, returnContext) {
   const linksHtml = buildExternalLinksHtml(sourceBook);
 
   img.style.display = 'none';
+  if (popupContent) popupContent.classList.add('series-mode');
   prevBtn.style.display = 'none';
   nextBtn.style.display = 'none';
   clearPopupTouchHandlers_();
@@ -2774,7 +2797,7 @@ function showSeriesPanel(sourceBook, seriesBooks, returnContext) {
       <div class="series-panel-title">${escapeHtml(sourceTitle)} シリーズ一覧（${items.length}冊）</div>
       ${linksHtml ? `<div class="series-panel-actions">${linksHtml}</div>` : ''}
       <div class="series-list">${listHtml}</div>
-      <button type="button" id="series-panel-back-detail" class="popup-action-btn">詳細へ戻る</button>
+      <button type="button" id="series-panel-back-detail" class="popup-action-btn">${uiIcon_('back', 'ui-icon-inline')}<span>詳細へ戻る</span></button>
     </div>
   `;
 
@@ -2835,23 +2858,28 @@ function showPopup(book, index, dataArr, seriesContext) {
   const nextBtn = document.getElementById('popup-next');
 
   img.style.display = '';
+  if (popupContent) popupContent.classList.remove('series-mode');
   img.alt = book.title || '表紙';
   setupBookImageElement_(img, book, { track: false });
 
   const actionsHtml = buildPopupActionsHtml(book, popupSeriesContext);
 info.innerHTML = `
-  <div style="font-size:1.15em; font-weight:bold; color:#38d0fc; margin-bottom:4px;">
-    ${escapeHtml(book.title || '(タイトルなし)')}
+  <div class="popup-book-detail">
+    <div class="popup-book-title">${escapeHtml(book.title || '(タイトルなし)')}</div>
+    <div class="genre-chip-wrap popup">${buildGenreChips(book)}</div>
+    <div class="popup-meta-grid">
+      <div><span>著者</span>${escapeHtml(book.author || '-')}</div>
+      <div><span>出版社</span>${escapeHtml(book.publisher || '-')}</div>
+      <div><span>ISBN</span>${escapeHtml(book.isbn || '-')}</div>
+      <div><span>棚</span>${escapeHtml(book.shelf || '-')}-${escapeHtml(book.location || '')}</div>
+      <div><span>価格</span>${escapeHtml(book.price || '-')}</div>
+      <div><span>発売日</span>${escapeHtml(book.released || '-')}</div>
+      <div><span>レーベル</span>${escapeHtml(book.brand || '-')}</div>
+      <div><span>備考</span>${escapeHtml(book.memo || '-')}</div>
+    </div>
+    ${actionsHtml}
+    <div class="popup-position">${popupIndex + 1} / ${popupData.length}</div>
   </div>
-  <div class="genre-chip-wrap popup">${buildGenreChips(book)}</div>
-  <div>著者：${escapeHtml(book.author || '-')}</div>
-  <div>出版社：${escapeHtml(book.publisher || '-')}</div>
-  <div>ISBN：${escapeHtml(book.isbn || '-')}</div>
-  <div>棚：${escapeHtml(book.shelf || '-')}-${escapeHtml(book.location || '')} ／ 値: ${escapeHtml(book.price || '-')} ／ 発: ${escapeHtml(book.released || '')}</div>
-  <div>レーベル：${escapeHtml(book.brand || '-')}</div>
-  <div>備考：${escapeHtml(book.memo || '-')}</div>
-  ${actionsHtml}
-  <div style="margin-top:6px; font-size:0.98em; opacity:0.6;">${popupIndex + 1} / ${popupData.length}</div>
 `;
 
   appendPopupSummaryAccordion_(info.querySelector('.genre-chip-wrap.popup'), book);

@@ -23,9 +23,24 @@
       </div>
 
       <div class="button-group">
-        <button type="button" onclick="search()">検索</button>
-        <button type="button" onclick="showRandomBooks()">ランダム検索</button>
-        <button type="button" id="advancedToggleBtn" onclick="toggleAdvancedSearch()">詳細検索</button>
+        <button type="button" class="primary-action" onclick="search()">
+          <span class="ui-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"></circle><path d="M16 16l4 4"></path></svg>
+          </span>
+          <span>検索</span>
+        </button>
+        <button type="button" class="quiet-action" onclick="showRandomBooks()">
+          <span class="ui-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M4 7h4l3 10h3"></path><path d="M17 7h3v3"></path><path d="M20 7l-6 6"></path><path d="M17 17h3v-3"></path><path d="M20 17l-3-3"></path></svg>
+          </span>
+          <span>ランダム</span>
+        </button>
+        <button type="button" class="quiet-action" id="advancedToggleBtn" onclick="toggleAdvancedSearch()">
+          <span class="ui-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M4 7h16"></path><path d="M7 12h10"></path><path d="M10 17h4"></path></svg>
+          </span>
+          <span>詳細</span>
+        </button>
       </div>
 
       <!-- 詳細検索 -->
@@ -107,14 +122,32 @@
 
 
         <div class="advanced-actions">
-          <button type="button" onclick="search()">検索</button>
-          <button type="button" class="clear-btn" onclick="clearSearchConditions()">条件クリア</button>
-          <button type="button" class="sub-btn" onclick="toggleAdvancedSearch()">詳細を閉じる</button>
+          <button type="button" class="primary-action" onclick="search()">
+            <span class="ui-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"></circle><path d="M16 16l4 4"></path></svg>
+            </span>
+            <span>検索</span>
+          </button>
+          <button type="button" class="clear-btn quiet-action" onclick="clearSearchConditions()">
+            <span class="ui-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M5 6h14"></path><path d="M9 6V4h6v2"></path><path d="M8 10v8"></path><path d="M16 10v8"></path><path d="M7 6l1 14h8l1-14"></path></svg>
+            </span>
+            <span>条件クリア</span>
+          </button>
+          <button type="button" class="sub-btn quiet-action" onclick="toggleAdvancedSearch()">
+            <span class="ui-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M6 15l6-6 6 6"></path></svg>
+            </span>
+            <span>詳細を閉じる</span>
+          </button>
         </div>
       </div>
 
       <div class="bookshelf-cta-wrap">
         <button type="button" class="bookshelf-cta-card top-shelf-btn" aria-label="本棚を見る。棚マップから所蔵本を眺める">
+          <span class="bookshelf-cta-icon ui-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M5 4h3v16H5z"></path><path d="M10 4h3v16h-3z"></path><path d="M15 5l3-.8 4.1 15.4-3 .8z"></path></svg>
+          </span>
           <span class="bookshelf-cta-title">本棚を見る</span>
           <span class="bookshelf-cta-subtitle">棚マップから所蔵本を眺める</span>
         </button>
@@ -124,15 +157,21 @@
 
   <div id="viewToggle" class="view-toggle">
     <button id="tileViewBtn" class="toggle-btn active" title="タイル表示">
-      <span class="toggle-icon">▦</span>
+      <span class="toggle-icon ui-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><path d="M5 5h5v5H5z"></path><path d="M14 5h5v5h-5z"></path><path d="M5 14h5v5H5z"></path><path d="M14 14h5v5h-5z"></path></svg>
+      </span>
       <span class="toggle-label">タイル</span>
     </button>
     <button id="listViewBtn" class="toggle-btn" title="リスト表示">
-      <span class="toggle-icon">≡</span>
+      <span class="toggle-icon ui-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><path d="M8 6h12"></path><path d="M8 12h12"></path><path d="M8 18h12"></path><path d="M4 6h.01"></path><path d="M4 12h.01"></path><path d="M4 18h.01"></path></svg>
+      </span>
       <span class="toggle-label">リスト</span>
     </button>
     <button id="shelfViewBtn" class="toggle-btn" title="本棚表示">
-      <span class="toggle-icon">▤</span>
+      <span class="toggle-icon ui-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><path d="M4 20h16"></path><path d="M5 4h3v13H5z"></path><path d="M10 4h3v13h-3z"></path><path d="M15 5l3-.8 3.4 12.8-3 .8z"></path></svg>
+      </span>
       <span class="toggle-label">本棚</span>
     </button>
   </div>
@@ -146,9 +185,19 @@
 
   <div id="image-popup-overlay" style="display:none;">
     <div id="image-popup-content">
-      <span id="image-popup-close">&times;</span>
-      <span id="popup-prev" class="popup-arrow">&lt;</span>
-      <span id="popup-next" class="popup-arrow">&gt;</span>
+      <button id="image-popup-close" class="ui-icon" aria-label="閉じる" type="button">
+        <svg viewBox="0 0 24 24"><path d="M6 6l12 12"></path><path d="M18 6L6 18"></path></svg>
+      </button>
+      <button id="popup-prev" class="popup-arrow" aria-label="前へ" type="button">
+        <span class="ui-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"></path></svg>
+        </span>
+      </button>
+      <button id="popup-next" class="popup-arrow" aria-label="次へ" type="button">
+        <span class="ui-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"></path></svg>
+        </span>
+      </button>
       <img id="image-popup-img" src="" alt="拡大画像">
       <div id="image-popup-info"></div>
     </div>
