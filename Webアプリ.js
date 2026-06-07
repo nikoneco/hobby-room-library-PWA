@@ -727,7 +727,7 @@ function titleYomiMixedMatch_(query, title, yomi) {
 
     if (!match) return false;
 
-    progress = match.progressAfter;
+    progress = match.progress;
   }
 
   return true;
