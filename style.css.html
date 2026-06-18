@@ -2566,6 +2566,89 @@ body::before {
   top: 12vh;
 }
 
+.sensitive-toggle {
+  position: absolute;
+  top: 1.1rem;
+  right: clamp(1rem, 5vw, 4.5rem);
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.42rem 0.5rem 0.42rem 0.72rem;
+  border: 1px solid rgba(148, 163, 184, 0.20);
+  border-radius: 999px;
+  background: rgba(15, 19, 27, 0.56);
+  color: rgba(220, 232, 238, 0.78);
+  box-shadow: none;
+  backdrop-filter: blur(12px);
+  cursor: pointer;
+  user-select: none;
+}
+
+.sensitive-toggle-label {
+  font-size: 0.78rem;
+  font-weight: 750;
+  line-height: 1;
+  letter-spacing: 0;
+}
+
+.sensitive-toggle-input {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.sensitive-toggle-switch {
+  position: relative;
+  display: inline-flex;
+  width: 2.25rem;
+  height: 1.22rem;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.09);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  transition: background var(--lib-ease), border-color var(--lib-ease);
+}
+
+.sensitive-toggle-switch::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 0.16rem;
+  width: 0.84rem;
+  height: 0.84rem;
+  border-radius: 50%;
+  background: rgba(220, 232, 238, 0.82);
+  transform: translateY(-50%);
+  transition: transform var(--lib-ease), background var(--lib-ease);
+}
+
+.sensitive-toggle-input:checked + .sensitive-toggle-switch {
+  background: rgba(214, 164, 95, 0.34);
+  border-color: rgba(214, 164, 95, 0.48);
+}
+
+.sensitive-toggle-input:checked + .sensitive-toggle-switch::before {
+  background: #f7dfba;
+  transform: translate(1.02rem, -50%);
+}
+
+.sensitive-toggle:focus-within {
+  outline: 2px solid rgba(104, 191, 215, 0.70);
+  outline-offset: 2px;
+}
+
+.search-container.shrink .sensitive-toggle,
+.search-container.shrink.compact .sensitive-toggle,
+.search-container.shrink.shelf-view-active .sensitive-toggle {
+  right: clamp(14rem, 24vw, 18rem);
+}
+
 .search-container.shrink,
 .search-container.shrink.compact,
 .search-container.shrink.shelf-view-active {
@@ -3540,6 +3623,20 @@ body.shelf-immersive-active .shelf-room-map-fab:focus-visible {
 
   .search-container {
     padding: 1rem 0.6rem 1.25rem;
+  }
+
+  .sensitive-toggle {
+    position: relative;
+    top: auto;
+    right: auto;
+    width: fit-content;
+    margin: 0 0 0.85rem auto;
+  }
+
+  .search-container.shrink .sensitive-toggle,
+  .search-container.shrink.compact .sensitive-toggle,
+  .search-container.shrink.shelf-view-active .sensitive-toggle {
+    right: auto;
   }
 
   .logo {

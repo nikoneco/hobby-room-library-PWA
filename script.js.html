@@ -7,6 +7,8 @@ let isCardView = true; // 既存コード互換用。card/list切替に同期す
 let lastResult = null;
 
 const NO_IMAGE_URL = "https://i.imgur.com/Q80wBRc.jpeg";
+const SENSITIVE_THEME_NAME = '18禁';
+const SENSITIVE_COVER_STORAGE_KEY = 'shumiLibrary.showSensitiveCovers';
 
 const UI_ICONS = {
   search: '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"></circle><path d="M16 16l4 4"></path></svg>',
@@ -46,6 +48,90 @@ function normalizeImageCandidateUrl_(url) {
   }
 
   return /^https:\/\//i.test(value) ? value : '';
+}
+
+function isSensitiveCoverVisible_() {
+  try {
+    return localStorage.getItem(SENSITIVE_COVER_STORAGE_KEY) === '1';
+  } catch (e) {
+    return false;
+  }
+}
+
+function setSensitiveCoverVisible_(visible) {
+  try {
+    localStorage.setItem(SENSITIVE_COVER_STORAGE_KEY, visible ? '1' : '0');
+  } catch (e) {
+    // localStorageが使えない環境では、その場の表示だけ切り替える。
+  }
+}
+
+function isSensitiveBook_(book) {
+  if (!book) return false;
+
+  const themes = book.genres && Array.isArray(book.genres.theme)
+    ? book.genres.theme
+    : [];
+  if (themes.includes(SENSITIVE_THEME_NAME)) return true;
+
+  const meta = Array.isArray(book.genreMeta) ? book.genreMeta : [];
+  return meta.some(item => item && item.category === 'theme' && item.name === SENSITIVE_THEME_NAME);
+}
+
+function syncSensitiveToggleUi_() {
+  const toggle = document.getElementById('sensitiveToggle');
+  if (!toggle) return;
+  toggle.checked = isSensitiveCoverVisible_();
+}
+
+function refreshSensitiveCoverVisibility_() {
+  if (Array.isArray(lastResult) && lastResult.length) {
+    showResult(lastResult);
+  }
+
+  const overlay = document.getElementById('image-popup-overlay');
+  const popupOpen = overlay && overlay.style.display !== 'none';
+  if (popupOpen && Array.isArray(popupData) && popupData[popupIndex]) {
+    showPopup(popupData[popupIndex], popupIndex, popupData, popupSeriesContext);
+  }
+}
+
+function bindSensitiveToggle_() {
+  const toggle = document.getElementById('sensitiveToggle');
+  if (!toggle) return;
+  const wrapper = toggle.closest('.sensitive-toggle');
+
+  syncSensitiveToggleUi_();
+
+  function applySensitiveToggleState_(visible) {
+    toggle.checked = Boolean(visible);
+    setSensitiveCoverVisible_(toggle.checked);
+    refreshSensitiveCoverVisibility_();
+  }
+
+  if (wrapper) {
+    wrapper.addEventListener('click', function(event) {
+      if (event.target === toggle) {
+        setSensitiveCoverVisible_(toggle.checked);
+        refreshSensitiveCoverVisibility_();
+        return;
+      }
+
+      event.preventDefault();
+      applySensitiveToggleState_(!toggle.checked);
+    });
+  }
+
+  toggle.addEventListener('change', function() {
+    setSensitiveCoverVisible_(toggle.checked);
+    refreshSensitiveCoverVisibility_();
+  });
+
+  toggle.addEventListener('keydown', function(event) {
+    if (event.key !== ' ' && event.key !== 'Enter') return;
+    event.preventDefault();
+    applySensitiveToggleState_(!toggle.checked);
+  });
 }
 
 function isImageLoadStatsEnabled_() {
@@ -161,6 +247,14 @@ function logImageLoadStats_() {
 }
 
 function buildBookImageCandidates_(book) {
+  if (isSensitiveBook_(book) && !isSensitiveCoverVisible_()) {
+    return [{
+      url: NO_IMAGE_URL,
+      label: 'NO_IMAGE',
+      detail: 'SensitiveHidden'
+    }];
+  }
+
   const candidates = [];
   const fallback = normalizeImageCandidateUrl_(book && book.fallbackImg);
   const source = String(book && book.fallbackImageSource || '').trim();
@@ -3048,6 +3142,7 @@ function popupMove(diff) {
 
 window.addEventListener('DOMContentLoaded', function() {
   fetchInitialSearchData();
+  bindSensitiveToggle_();
 
   const keywordInput = document.getElementById('keyword');
   keywordInput.addEventListener('input', function() {
