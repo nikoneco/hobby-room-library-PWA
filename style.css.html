@@ -3061,6 +3061,31 @@ button.quiet-action:hover,
   box-shadow: 0 16px 36px rgba(0, 0, 0, 0.34);
 }
 
+.book-cover.book-image-loading,
+.list-thumb.book-image-loading,
+.shelf-book-cover.book-image-loading,
+#image-popup-img.book-image-loading {
+  opacity: 0.18;
+}
+
+.book-cover.book-image-loaded,
+.list-thumb.book-image-loaded,
+.shelf-book-cover.book-image-loaded,
+#image-popup-img.book-image-loaded {
+  animation: book-image-reveal 220ms ease-out both;
+}
+
+@keyframes book-image-reveal {
+  from {
+    opacity: 0.18;
+    filter: saturate(0.82);
+  }
+  to {
+    opacity: 1;
+    filter: saturate(1);
+  }
+}
+
 .book-summary,
 .book-details,
 .list-title-author {

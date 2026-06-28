@@ -312,9 +312,17 @@ function setupBookImageElement_(img, book, options) {
   const track = Boolean(opt.track);
   const trackKey = opt.trackKey || '';
   const trackRunId = IMAGE_LOAD_STATS_RUN_ID;
+  const loading = opt.loading || 'lazy';
+  const fetchPriority = opt.fetchPriority || (loading === 'eager' ? 'high' : 'low');
 
   let currentIndex = -1;
   let settled = false;
+
+  img.classList.remove('book-image-loaded');
+  img.classList.add('book-image-loading');
+  img.loading = loading;
+  img.decoding = 'async';
+  img.setAttribute('fetchpriority', fetchPriority);
 
   function setCandidate(index) {
     if (index < 0 || index >= candidates.length) return;
@@ -325,6 +333,8 @@ function setupBookImageElement_(img, book, options) {
   function settleCurrentCandidate() {
     if (settled) return;
     settled = true;
+    img.classList.remove('book-image-loading');
+    img.classList.add('book-image-loaded');
 
     if (track) {
       recordImageLoadResult_(trackKey, candidates[currentIndex], trackRunId);
@@ -2829,7 +2839,9 @@ function showResult(data) {
 
       setupBookImageElement_(img, book, {
         track: true,
-        trackKey: getBookImageTrackKey_(book, idx)
+        trackKey: getBookImageTrackKey_(book, idx),
+        loading: idx < 4 ? 'eager' : 'lazy',
+        fetchPriority: idx < 4 ? 'high' : 'low'
       });
 
       card.appendChild(img);
@@ -2871,7 +2883,9 @@ function showResult(data) {
 
       setupBookImageElement_(thumb, book, {
         track: true,
-        trackKey: getBookImageTrackKey_(book, idx)
+        trackKey: getBookImageTrackKey_(book, idx),
+        loading: idx < 8 ? 'eager' : 'lazy',
+        fetchPriority: idx < 8 ? 'high' : 'low'
       });
 
       const row = document.createElement('div');
@@ -3167,7 +3181,11 @@ function showPopup(book, index, dataArr, seriesContext) {
   img.style.display = '';
   if (popupContent) popupContent.classList.remove('series-mode');
   img.alt = book.title || '表紙';
-  setupBookImageElement_(img, book, { track: false });
+  setupBookImageElement_(img, book, {
+    track: false,
+    loading: 'eager',
+    fetchPriority: 'high'
+  });
 
   const actionsHtml = buildPopupActionsHtml(book, popupSeriesContext);
 info.innerHTML = `
