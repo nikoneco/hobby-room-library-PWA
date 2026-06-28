@@ -471,6 +471,37 @@ let PREVIEW_INDEX_READY = false;
 let PREVIEW_COUNT_REQUEST_SEQ = 0;
 let PREVIEW_COUNT_DEBOUNCE_TIMER = null;
 
+const QUICK_BROWSE_CONFIG = [
+  {
+    field: 'detailMood',
+    source: 'moodGenres',
+    genreKey: 'mood',
+    label: '雰囲気',
+    priority: ['シリアス', '日常コメディ', 'ほのぼの', '癒し', '明るい', '泣ける', 'ダーク']
+  },
+  {
+    field: 'detailTheme',
+    source: 'themeGenres',
+    genreKey: 'theme',
+    label: '題材',
+    priority: ['青春', '学園', '恋愛', '魔法', 'ファンタジー', 'ミステリー', '家族', '仕事']
+  },
+  {
+    field: 'detailStory',
+    source: 'storyGenres',
+    genreKey: 'story',
+    label: 'ストーリー',
+    priority: ['4コマ／短編集', 'ファンタジー', 'ラブコメ', 'ミステリー', 'ホラー', 'SF']
+  },
+  {
+    field: 'detailStatus',
+    source: 'statusGenres',
+    genreKey: 'status',
+    label: '状況',
+    priority: ['単巻', '完結', '連載中', '完結(全巻未所持)']
+  }
+];
+
 function hiraToKana(str) {
   return (str || '').replace(/[\u3041-\u3096]/g, function(match) {
     return String.fromCharCode(match.charCodeAt(0) + 0x60);
@@ -607,6 +638,7 @@ function applyInitialSearchData_(data) {
   }
 
   populateAdvancedOptions();
+  renderQuickBrowseRail_();
   syncSearchStatusPreviewFromForm_();
 }
 
@@ -644,11 +676,13 @@ function fetchAdvancedOptions() {
     .withSuccessHandler(function(data) {
       ADVANCED_OPTIONS = data || getEmptyAdvancedOptions_();
       populateAdvancedOptions();
+      renderQuickBrowseRail_();
     })
     .withFailureHandler(function(err) {
       console.error('getAdvancedSearchOptions failed:', err);
       ADVANCED_OPTIONS = getEmptyAdvancedOptions_();
       populateAdvancedOptions();
+      renderQuickBrowseRail_();
     })
     .getAdvancedSearchOptions();
 }
@@ -658,12 +692,14 @@ function fetchPreviewIndex() {
     .withSuccessHandler(function(data) {
       PREVIEW_INDEX = Array.isArray(data) ? data : [];
       PREVIEW_INDEX_READY = true;
+      renderQuickBrowseRail_();
       syncSearchStatusPreviewFromForm_();
     })
     .withFailureHandler(function(err) {
       console.error('getPreviewIndex failed:', err);
       PREVIEW_INDEX = [];
       PREVIEW_INDEX_READY = false;
+      renderQuickBrowseRail_();
       syncSearchStatusPreviewFromForm_();
     })
     .getPreviewIndex();
@@ -968,8 +1004,105 @@ function closeAdvancedSearchPanel_() {
 
 function syncBookshelfCtaVisibility_() {
   const bookshelfCta = document.querySelector('.bookshelf-cta-wrap');
-  if (!bookshelfCta) return;
-  bookshelfCta.style.display = isAdvancedOpen() ? 'none' : '';
+  if (bookshelfCta) {
+    bookshelfCta.style.display = isAdvancedOpen() ? 'none' : '';
+  }
+  syncQuickBrowseRailVisibility_();
+}
+
+function isSensitiveQuickBrowseValue_(value) {
+  return /18|成人|成年|アダルト|r-?18/i.test(String(value || ''));
+}
+
+function countQuickBrowseMatches_(config, value) {
+  if (!Array.isArray(PREVIEW_INDEX) || !PREVIEW_INDEX.length) return 0;
+
+  return PREVIEW_INDEX.reduce((count, item) => {
+    const genres = item && item.genres ? item.genres : {};
+    const values = Array.isArray(genres[config.genreKey]) ? genres[config.genreKey] : [];
+    return values.includes(value) ? count + 1 : count;
+  }, 0);
+}
+
+function buildQuickBrowseItems_() {
+  const items = [];
+  const used = new Set();
+
+  QUICK_BROWSE_CONFIG.forEach(config => {
+    const values = Array.isArray(ADVANCED_OPTIONS[config.source])
+      ? ADVANCED_OPTIONS[config.source].filter(value => hasDisplayValue_(value) && !isSensitiveQuickBrowseValue_(value))
+      : [];
+    if (!values.length) return;
+
+    const counts = new Map(values.map(value => [value, countQuickBrowseMatches_(config, value)]));
+    const preferred = config.priority
+      .filter(value => values.includes(value))
+      .map(value => ({ config, value, count: counts.get(value) || 0, preferred: true }))
+      .filter(item => item.count > 0);
+
+    const popular = values
+      .map(value => ({ config, value, count: counts.get(value) || 0, preferred: false }))
+      .filter(item => item.count > 0)
+      .sort((a, b) => b.count - a.count || String(a.value).localeCompare(String(b.value), 'ja'));
+
+    preferred.concat(popular).some(item => {
+      const key = `${item.config.field}:${item.value}`;
+      if (used.has(key)) return false;
+      used.add(key);
+      items.push(item);
+      return true;
+    });
+  });
+
+  return items
+    .sort((a, b) => Number(b.preferred) - Number(a.preferred) || b.count - a.count)
+    .slice(0, 7);
+}
+
+function syncQuickBrowseRailVisibility_() {
+  const rail = document.getElementById('quickBrowseRail');
+  if (!rail) return;
+
+  const ready = rail.dataset.ready === 'true';
+  rail.hidden = !ready || isAdvancedOpen();
+}
+
+function renderQuickBrowseRail_() {
+  const rail = document.getElementById('quickBrowseRail');
+  const chips = document.getElementById('quickBrowseChips');
+  if (!rail || !chips) return;
+
+  const items = buildQuickBrowseItems_();
+  chips.innerHTML = items.map(item => `
+    <button
+      type="button"
+      class="quick-browse-chip"
+      data-field="${escapeHtml(item.config.field)}"
+      data-value="${escapeHtml(item.value)}"
+      aria-label="${escapeHtml(item.config.label + ': ' + item.value + 'で開く')}"
+    >
+      <span class="quick-browse-chip-type">${escapeHtml(item.config.label)}</span>
+      <span class="quick-browse-chip-value">${escapeHtml(item.value)}</span>
+      <span class="quick-browse-chip-count">${escapeHtml(item.count)}冊</span>
+    </button>
+  `).join('');
+
+  rail.dataset.ready = items.length ? 'true' : 'false';
+  syncQuickBrowseRailVisibility_();
+}
+
+function applyQuickBrowseCondition_(field, value) {
+  const select = document.getElementById(field);
+  if (!select || !value) return;
+
+  const hasOption = Array.from(select.options || []).some(option => option.value === value);
+  if (!hasOption) return;
+
+  clearSearchFormValuesForBrowse_();
+  select.value = value;
+  closeAdvancedSearchPanel_();
+  syncSearchStatusPreviewFromForm_();
+  rerunSearchWithParams_(getAdvancedSearchParams_());
 }
 
 
@@ -1982,6 +2115,7 @@ function resetSearch() {
   lastResult = null;
   hideAllSuggest();
   syncSearchStatusPreviewFromForm_();
+  syncQuickBrowseRailVisibility_();
 }
 
 function showSpinner() {
@@ -3923,6 +4057,18 @@ window.addEventListener('DOMContentLoaded', function() {
       if (!key || key === 'random') return;
 
       removeSearchCondition_(key);
+    });
+  }
+
+  const quickBrowseChips = document.getElementById('quickBrowseChips');
+  if (quickBrowseChips) {
+    quickBrowseChips.addEventListener('click', function(event) {
+      const chip = event.target.closest('.quick-browse-chip');
+      if (!chip) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      applyQuickBrowseCondition_(chip.dataset.field || '', chip.dataset.value || '');
     });
   }
 
