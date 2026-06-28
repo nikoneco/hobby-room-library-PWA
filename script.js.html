@@ -1042,6 +1042,13 @@ function getSearchStatusElements_() {
   };
 }
 
+function getSearchStatusModeClass_(mode) {
+  if (mode === 'random') return 'is-random';
+  if (mode === 'result') return 'is-result';
+  if (mode === 'notice') return 'is-notice';
+  return 'is-preview';
+}
+
 function getAdvancedSearchParams_() {
   return {
     keyword: document.getElementById('keyword').value || '',
@@ -1310,6 +1317,7 @@ function renderSearchStatus_() {
 
   if (!searchStatusState.visible) {
     els.area.hidden = true;
+    els.area.classList.remove('is-preview', 'is-result', 'is-random', 'is-notice');
     els.count.textContent = '';
     els.count.classList.remove('loading-dots');
     els.chips.innerHTML = '';
@@ -1317,6 +1325,8 @@ function renderSearchStatus_() {
   }
 
   els.area.hidden = false;
+  els.area.classList.remove('is-preview', 'is-result', 'is-random', 'is-notice');
+  els.area.classList.add(getSearchStatusModeClass_(searchStatusState.mode));
   els.count.textContent = getSearchStatusCountText_();
   els.count.classList.toggle('loading-dots', searchStatusState.previewPending);
 
