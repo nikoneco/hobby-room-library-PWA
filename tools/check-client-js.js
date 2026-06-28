@@ -4,6 +4,10 @@ const vm = require('vm');
 
 const root = path.resolve(__dirname, '..');
 const scriptPath = path.join(root, 'script.js.html');
+const indexPath = path.join(root, 'index.html');
+const serverPath = path.join(root, 'Webアプリ.js');
+const indexSource = fs.readFileSync(indexPath, 'utf8');
+const serverSource = fs.readFileSync(serverPath, 'utf8');
 const source = fs
   .readFileSync(scriptPath, 'utf8')
   .replace(/^\s*<script>\s*/, '')
@@ -80,6 +84,21 @@ function assertEqual(actual, expected, message) {
     throw new Error(`${message}: expected ${expected}, got ${actual}`);
   }
 }
+
+assert(!/\son(?:click|change|input|submit|keydown)=/i.test(indexSource), 'index.html has no inline event handlers');
+['search', 'random', 'toggle-advanced', 'clear-conditions', 'reset-search'].forEach(action => {
+  assert(indexSource.includes(`data-action="${action}"`), `index.html exposes data-action="${action}"`);
+});
+assert(serverSource.includes('WEB_APP_API_REGISTRY_'), 'Webアプリ.js has API registry');
+assert(serverSource.includes('currentWebApp'), 'Webアプリ.js registry classifies current Web App API');
+assert(serverSource.includes('compatibility'), 'Webアプリ.js registry classifies compatibility API');
+
+const actionKeys = vm.runInContext('Object.keys(STATIC_ACTION_HANDLERS).sort().join(",")', sandbox);
+assertEqual(
+  actionKeys,
+  'clear-conditions,random,reset-search,search,toggle-advanced',
+  'STATIC_ACTION_HANDLERS maps static data-actions'
+);
 
 assertEqual(sandbox.normalizeKana('ＡＢＣ カタカナ'), 'abcかたかな', 'normalizeKana normalizes width and kana');
 

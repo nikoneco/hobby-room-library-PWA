@@ -10,12 +10,21 @@ let popupDragSuppressNextClick = false;
 let isRandomBooksLoading = false;
 let preferredResultViewMode = '';
 let resultViewModeChangedLocally = false;
+let shelfScrollSpyObserver = null;
 
 const NO_IMAGE_URL = "https://i.imgur.com/Q80wBRc.jpeg";
 const SENSITIVE_THEME_NAME = '18禁';
 const SENSITIVE_COVER_STORAGE_KEY = 'shumiLibrary.showSensitiveCovers';
 const RESULT_VIEW_MODE_STORAGE_KEY = 'shumiLibrary.resultViewMode';
 const RESULT_VIEW_MODES = ['card', 'list', 'shelf'];
+
+const STATIC_ACTION_HANDLERS = {
+  'search': search,
+  'random': showRandomBooks,
+  'toggle-advanced': toggleAdvancedSearch,
+  'clear-conditions': clearSearchConditions,
+  'reset-search': resetSearch
+};
 
 const UI_ICONS = {
   search: '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"></circle><path d="M16 16l4 4"></path></svg>',
@@ -185,6 +194,27 @@ function bindSensitiveToggle_() {
     if (event.key !== ' ' && event.key !== 'Enter') return;
     event.preventDefault();
     applySensitiveToggleState_(!toggle.checked);
+  });
+}
+
+function bindStaticActionHandlers_() {
+  document.querySelectorAll('[data-action]').forEach(element => {
+    const action = element.dataset.action || '';
+    const handler = STATIC_ACTION_HANDLERS[action];
+    if (typeof handler !== 'function') return;
+
+    element.addEventListener('click', function(event) {
+      event.preventDefault();
+      handler();
+    });
+
+    if (element.tagName !== 'BUTTON') {
+      element.addEventListener('keydown', function(event) {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault();
+        handler();
+      });
+    }
   });
 }
 
@@ -2587,6 +2617,10 @@ function syncShelfViewUiState_(mode) {
   if (!isImmersive) {
     unmountShelfRoomMapPortal_();
   }
+
+  if (!isShelf) {
+    disconnectShelfScrollSpy_();
+  }
 }
 
 function getShelfGroupBookCount_(group) {
@@ -2599,6 +2633,124 @@ function getShelfGroupBookCount_(group) {
 
 function getShelfNavTargetId_(index) {
   return `bookshelf-group-${index + 1}`;
+}
+
+function getShelfViewStats_(groups, totalCount) {
+  const stats = {
+    total: Number(totalCount) || 0,
+    groups: Array.isArray(groups) ? groups.length : 0,
+    sections: 0,
+    levels: 0,
+    unresolved: 0
+  };
+
+  (groups || []).forEach(group => {
+    if (group && group.key === '__unknown__') {
+      stats.unresolved += Number(group.count || getShelfGroupBookCount_(group) || 0);
+    }
+
+    (group.sections || []).forEach(section => {
+      stats.sections += 1;
+      stats.levels += (section.levels || []).length;
+    });
+  });
+
+  return stats;
+}
+
+function renderShelfViewOverview_(groups, totalCount, immersive) {
+  const stats = getShelfViewStats_(groups, totalCount);
+  const overview = document.createElement('section');
+  overview.className = immersive ? 'shelf-view-overview immersive' : 'shelf-view-overview';
+  overview.setAttribute('aria-label', '本棚表示の概要');
+
+  const heading = document.createElement('div');
+  heading.className = 'shelf-view-mode';
+  heading.textContent = immersive
+    ? '蔵書全体を本棚順で表示中'
+    : '検索結果を本棚順で表示中';
+  overview.appendChild(heading);
+
+  const statGrid = document.createElement('div');
+  statGrid.className = 'shelf-view-stat-grid';
+
+  [
+    { label: '表示冊数', value: `${stats.total}冊` },
+    { label: '棚グループ', value: `${stats.groups}件` },
+    { label: '棚段', value: `${stats.levels}段` },
+    { label: '整理待ち', value: `${stats.unresolved}冊` }
+  ].forEach(item => {
+    const stat = document.createElement('div');
+    stat.className = 'shelf-view-stat';
+    stat.innerHTML = `
+      <span class="shelf-view-stat-label">${escapeHtml(item.label)}</span>
+      <span class="shelf-view-stat-value">${escapeHtml(item.value)}</span>
+    `;
+    statGrid.appendChild(stat);
+  });
+
+  overview.appendChild(statGrid);
+
+  const note = document.createElement('div');
+  note.className = 'shelf-view-note';
+  note.textContent = immersive
+    ? 'マップと棚ジャンプで、部屋の配置から本棚へ移動できます。'
+    : '検索結果だけを棚順に並べています。全体を眺めるときはトップの「本棚を見る」を使います。';
+  overview.appendChild(note);
+
+  return overview;
+}
+
+function syncActiveShelfNavigation_(targetId) {
+  if (!targetId) return;
+
+  document.querySelectorAll('.shelf-jump-chip[data-shelf-target]').forEach(chip => {
+    const active = chip.dataset.shelfTarget === targetId;
+    chip.classList.toggle('is-active', active);
+    chip.setAttribute('aria-current', active ? 'true' : 'false');
+  });
+
+  document.querySelectorAll('.room-map-shelf[data-shelf-target]').forEach(shelf => {
+    shelf.classList.toggle('is-active', shelf.dataset.shelfTarget === targetId);
+  });
+
+  document.querySelectorAll('.bookshelf-group').forEach(group => {
+    group.classList.toggle('is-active', group.id === targetId);
+  });
+}
+
+function disconnectShelfScrollSpy_() {
+  if (shelfScrollSpyObserver && typeof shelfScrollSpyObserver.disconnect === 'function') {
+    shelfScrollSpyObserver.disconnect();
+  }
+  shelfScrollSpyObserver = null;
+}
+
+function bindShelfScrollSpy_(container) {
+  disconnectShelfScrollSpy_();
+
+  if (!container) return;
+  const sections = Array.from(container.querySelectorAll('.bookshelf-group[id]'));
+  if (!sections.length) return;
+
+  syncActiveShelfNavigation_(sections[0].id);
+
+  if (!('IntersectionObserver' in window)) return;
+
+  shelfScrollSpyObserver = new IntersectionObserver(entries => {
+    const visible = entries
+      .filter(entry => entry.isIntersecting)
+      .sort((a, b) => b.intersectionRatio - a.intersectionRatio);
+
+    if (!visible.length) return;
+    syncActiveShelfNavigation_(visible[0].target.id);
+  }, {
+    root: null,
+    rootMargin: '-22% 0px -58% 0px',
+    threshold: [0.02, 0.12, 0.28, 0.5]
+  });
+
+  sections.forEach(section => shelfScrollSpyObserver.observe(section));
 }
 
 function renderShelfJumpNav_(groups, totalCount, immersive) {
@@ -2656,10 +2808,12 @@ function renderShelfJumpNav_(groups, totalCount, immersive) {
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'shelf-jump-chip';
+    button.dataset.shelfTarget = getShelfNavTargetId_(index);
     button.textContent = `${group.label} ${group.count || getShelfGroupBookCount_(group)}冊`;
     button.onclick = function() {
-      const target = document.getElementById(getShelfNavTargetId_(index));
+      const target = document.getElementById(button.dataset.shelfTarget);
       if (!target) return;
+      syncActiveShelfNavigation_(button.dataset.shelfTarget);
       target.scrollIntoView({ behavior: 'smooth', block: 'start' });
     };
     chips.appendChild(button);
@@ -2765,6 +2919,9 @@ function createShelfRoomMapViewport_(groups, options) {
     const button = document.createElement('button');
     button.type = 'button';
     button.className = `room-map-shelf ${config.tone || ''}`;
+    if (targetIndex >= 0) {
+      button.dataset.shelfTarget = getShelfNavTargetId_(targetIndex);
+    }
     button.disabled = targetIndex < 0;
     button.setAttribute('aria-label', `${config.label} 本棚へ移動`);
     button.innerHTML = `
@@ -3181,19 +3338,22 @@ function renderShelfView_(data) {
 
   let shelfRevealIndex = 0;
 
-  const summary = document.createElement('div');
-  summary.className = 'shelf-view-summary';
-  summary.textContent = `本棚ビュー：${data.length}件を配置中 / ${groups.length}グループ`;
-  container.appendChild(summary);
+  container.appendChild(renderShelfViewOverview_(groups, data.length, isShelfImmersiveMode));
 
   groups.forEach((group, groupIndex) => {
     const groupSection = document.createElement('section');
     groupSection.className = 'bookshelf-group';
+    if (group.key === '__unknown__') {
+      groupSection.classList.add('is-unresolved');
+    }
     groupSection.id = getShelfNavTargetId_(groupIndex);
 
     const groupTitle = document.createElement('h2');
     groupTitle.className = 'bookshelf-group-title';
-    groupTitle.textContent = `${group.label} / ${group.count || getShelfGroupBookCount_(group)}冊`;
+    groupTitle.innerHTML = `
+      <span class="bookshelf-group-label">${escapeHtml(group.label)}</span>
+      <span class="bookshelf-group-count">${escapeHtml(String(group.count || getShelfGroupBookCount_(group)))}冊</span>
+    `;
     groupSection.appendChild(groupTitle);
 
     group.sections.forEach(section => {
@@ -3211,7 +3371,10 @@ function renderShelfView_(data) {
 
         const levelTitle = document.createElement('div');
         levelTitle.className = 'bookshelf-level-title';
-        levelTitle.textContent = `${level.label} / ${level.books.length}冊`;
+        levelTitle.innerHTML = `
+          <span class="bookshelf-level-label">${escapeHtml(level.label)}</span>
+          <span class="bookshelf-level-count">${escapeHtml(String(level.books.length))}冊</span>
+        `;
         levelWrap.appendChild(levelTitle);
 
         const strip = document.createElement('div');
@@ -3246,6 +3409,8 @@ function showResult(data) {
   if (!data || !Array.isArray(data) || data.length === 0) {
     renderEmptyResult_(result);
     resetImageLoadStats_([]);
+    disconnectShelfScrollSpy_();
+    unmountShelfRoomMapPortal_();
     return;
   }
 
@@ -3259,7 +3424,11 @@ function showResult(data) {
   resetImageLoadStats_(viewMode === 'shelf' ? [] : data);
 
   if (viewMode === 'shelf') {
-    result.appendChild(renderShelfView_(data));
+    const shelfView = renderShelfView_(data);
+    result.appendChild(shelfView);
+    window.requestAnimationFrame(function() {
+      bindShelfScrollSpy_(shelfView);
+    });
     if (isShelfImmersiveMode) {
       mountShelfRoomMapPortal_(currentShelfRoomMapGroups);
     } else {
@@ -4061,6 +4230,7 @@ function popupMove(diff) {
 window.addEventListener('DOMContentLoaded', function() {
   fetchInitialSearchData();
   bindSensitiveToggle_();
+  bindStaticActionHandlers_();
 
   const keywordInput = document.getElementById('keyword');
   keywordInput.addEventListener('input', function() {
@@ -4175,19 +4345,19 @@ window.addEventListener('DOMContentLoaded', function() {
   const shelfBtn = document.getElementById('shelfViewBtn');
 
   if (tileBtn) {
-    tileBtn.onclick = function() {
+    tileBtn.addEventListener('click', function() {
       setViewMode_('card');
-    };
+    });
   }
   if (listBtn) {
-    listBtn.onclick = function() {
+    listBtn.addEventListener('click', function() {
       setViewMode_('list');
-    };
+    });
   }
   if (shelfBtn) {
-    shelfBtn.onclick = function() {
+    shelfBtn.addEventListener('click', function() {
       setViewMode_('shelf');
-    };
+    });
   }
   currentViewMode = loadPreferredResultViewMode_();
   isCardView = currentViewMode === 'card';

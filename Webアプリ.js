@@ -3,6 +3,37 @@
 // ※定数・ユーティリティはすべて config.gs で一元管理
 // ＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝
 
+const WEB_APP_API_REGISTRY_ = Object.freeze({
+  webEntry: [
+    { name: 'doGet', role: 'WebアプリHTML入口' }
+  ],
+  currentWebApp: [
+    { name: 'getInitialSearchData', calledBy: 'script.js.html: fetchInitialSearchData', role: '初期表示データ一括取得' },
+    { name: 'searchBooksSimple', calledBy: 'script.js.html: search/rerunSearchWithParams_', role: '通常検索・本棚全件表示' },
+    { name: 'searchBooksAdvanced', calledBy: 'script.js.html: search/rerunSearchWithParams_', role: '詳細検索' },
+    { name: 'countPreviewMatchesAuthoritative', calledBy: 'script.js.html: syncSearchStatusPreviewFromForm_', role: '詳細検索プレビュー件数のサーバー補正' },
+    { name: 'getRandomBooks', calledBy: 'script.js.html: showRandomBooks', role: 'ランダム表示' },
+    { name: 'getBooksBySeriesKey', calledBy: 'script.js.html: loadSeriesPanel', role: 'シリーズ一覧表示' },
+    { name: 'getWebAppUserPreferences', calledBy: 'script.js.html: fetchInitialSearchData', role: 'Webアプリ表示設定取得' },
+    { name: 'saveWebAppUserPreferences', calledBy: 'script.js.html: savePreferredResultViewModeToServer_', role: 'Webアプリ表示設定保存' }
+  ],
+  compatibility: [
+    { name: 'searchBooks', role: '旧来互換のタイトル/作者検索' },
+    { name: 'getSuggestData', role: '旧分割取得互換。現行はgetInitialSearchDataへ統合' },
+    { name: 'getAdvancedSearchOptions', role: '旧分割取得互換。現行はgetInitialSearchDataへ統合' },
+    { name: 'getPreviewIndex', role: '旧分割取得互換。現行はgetInitialSearchDataへ統合' },
+    { name: 'getAllBooks', role: '旧全件取得互換。現行の本棚全件表示はsearchBooksSimple空検索' }
+  ],
+  manualDebug: [
+    { name: 'debugWebAppApiRegistry_', role: 'この台帳をApps Scriptログへ出す' },
+    { name: 'debugSeriesMap_', role: 'シリーズ巻数マップ診断' },
+    { name: 'debugOwnedMaxVolume_', role: '所持最大巻数診断' },
+    { name: 'debugSeriesCandidateList_', role: 'シリーズ候補診断' },
+    { name: 'debugSeriesCandidateLinks_', role: 'シリーズ検索リンク診断' },
+    { name: 'debugFirstBookLinks_', role: '先頭本のリンク診断' }
+  ]
+});
+
 /**
  * 目録シートから I列(タイトル)〜AB列(WEB_IMAGE_SOURCE) をまとめて取得する共通関数
  * タイトル空行は除外する
@@ -1290,7 +1321,9 @@ function getLibraryDataset_() {
 }
 
 /**
- * 旧来互換の検索API
+ * 互換API: 旧来のタイトル/作者検索。
+ * 現行Web画面は searchBooksSimple / searchBooksAdvanced を使う。
+ *
  * 第1引数: タイトル/読み仮名
  * 第2引数: 作者
  */
@@ -1341,7 +1374,7 @@ function searchBooks(title, author) {
 }
 
 /**
- * 通常検索API
+ * 現行WebアプリAPI: 通常検索。
  * キーワードをタイトル・読み仮名・作者に対して部分一致
  * @param {string} keyword
  * @returns {Object[]}
@@ -1380,7 +1413,7 @@ function searchBooksSimple(keyword) {
 }
 
 /**
- * ランダム表示用API
+ * 現行WebアプリAPI: ランダム表示。
  * 全件返却せず、サーバー側で重複なしランダム抽出した件数だけ返す
  * @param {number} count
  * @returns {Object[]}
@@ -1420,7 +1453,7 @@ function getRandomBooks(count) {
 }
 
 /**
- * 詳細検索API
+ * 現行WebアプリAPI: 詳細検索。
  * 文字入力欄は部分一致
  * ドロップダウンは完全一致
  * すべてAND
@@ -1459,7 +1492,8 @@ function searchBooksAdvanced(
 }
 
 /**
- * サジェストAPI
+ * 互換API: サジェスト単体取得。
+ * 現行Web画面は getInitialSearchData で初期データとしてまとめて取得する。
  */
 function getSuggestData() {
   try {
@@ -1472,7 +1506,8 @@ function getSuggestData() {
 }
 
 /**
- * 全件取得API
+ * 互換API: 全件取得。
+ * 現行Web画面の本棚全件表示は searchBooksSimple('') を使う。
  */
 function getAllBooks() {
   try {
@@ -1485,11 +1520,7 @@ function getAllBooks() {
 }
 
 /**
- * Webアプリエンドポイント
- */
-
-/**
- * 同一 series_key_auto の本を目録順で返す。
+ * 現行WebアプリAPI: 同一 series_key_auto の本を目録順で返す。
  * @param {string} seriesKeyAuto
  * @returns {Object[]}
  */
@@ -1520,6 +1551,9 @@ function getBooksBySeriesKey(seriesKeyAuto) {
   }
 }
 
+/**
+ * WebアプリHTML入口。
+ */
 function doGet() {
   return HtmlService.createTemplateFromFile('index').evaluate();
 }
@@ -1528,7 +1562,11 @@ function doGet() {
 
 
 
-/** debug */
+/** Apps Scriptエディタ手動実行専用 / debug */
+
+function debugWebAppApiRegistry_() {
+  Logger.log(JSON.stringify(WEB_APP_API_REGISTRY_, null, 2));
+}
 
 function debugSeriesMap_(){
   const ds = getLibraryDataset_();
