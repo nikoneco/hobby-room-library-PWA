@@ -2891,6 +2891,7 @@ function showResult(data) {
     data.forEach((book, idx) => {
       const card = document.createElement('div');
       card.className = 'book-card';
+      setupBookOpenSurface_(card, book, idx, data);
 
       const img = document.createElement('img');
       img.className = 'book-cover';
@@ -2954,6 +2955,7 @@ function showResult(data) {
 
       const row = document.createElement('div');
       row.className = 'list-row';
+      setupBookOpenSurface_(row, book, idx, data);
 
       const titleRow = document.createElement('div');
       titleRow.className = 'list-title-row';
@@ -3016,6 +3018,24 @@ function showResult(data) {
   setTimeout(() => {
     result.classList.add('show');
   }, 40);
+}
+
+function shouldIgnoreBookOpenSurfaceClick_(target) {
+  return !!(
+    target &&
+    typeof target.closest === 'function' &&
+    target.closest('button, a, input, select, textarea, label, .summary-text')
+  );
+}
+
+function setupBookOpenSurface_(element, book, idx, data) {
+  if (!element) return;
+  element.classList.add('book-open-surface');
+  element.title = '詳細を開く';
+  element.onclick = function(e) {
+    if (shouldIgnoreBookOpenSurfaceClick_(e.target)) return;
+    showPopup(book, idx, data);
+  };
 }
 
 
