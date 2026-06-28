@@ -3190,6 +3190,11 @@ function closeCoverFullscreen_() {
   document.body.classList.remove('cover-fullscreen-open');
   if (img) {
     img.removeAttribute('src');
+    img.removeAttribute('role');
+    img.removeAttribute('tabindex');
+    img.removeAttribute('aria-label');
+    img.onclick = null;
+    img.onkeydown = null;
     img.classList.remove('book-image-loading', 'book-image-loaded');
   }
   document.onkeydown = coverFullscreenPreviousKeydown || null;
@@ -3204,6 +3209,9 @@ function openCoverFullscreen_(book) {
   if (!overlay || !img || !closeBtn || !book) return;
 
   img.alt = `${book.title || '表紙'} の拡大画像`;
+  img.setAttribute('role', 'button');
+  img.setAttribute('tabindex', '0');
+  img.setAttribute('aria-label', '拡大表示を閉じる');
   setupBookImageElement_(img, book, {
     track: false,
     loading: 'eager',
@@ -3224,6 +3232,16 @@ function openCoverFullscreen_(book) {
 
   overlay.onclick = function(e) {
     if (e.target === overlay) closeCoverFullscreen_();
+  };
+  img.onclick = function(e) {
+    e.stopPropagation();
+    closeCoverFullscreen_();
+  };
+  img.onkeydown = function(e) {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      closeCoverFullscreen_();
+    }
   };
   closeBtn.onclick = function(e) {
     e.stopPropagation();
