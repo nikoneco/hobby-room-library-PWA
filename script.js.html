@@ -2124,7 +2124,10 @@ function updateViewToggleButtons_() {
   Object.keys(buttonMap).forEach(key => {
     const btn = buttonMap[key];
     if (!btn) return;
-    btn.classList.toggle('active', key === mode);
+    const active = key === mode;
+    btn.classList.toggle('active', active);
+    btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+    btn.setAttribute('data-state', active ? 'active' : 'idle');
   });
 }
 

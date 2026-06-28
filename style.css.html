@@ -2964,6 +2964,7 @@ button.quiet-action:hover,
 }
 
 .toggle-btn {
+  position: relative;
   min-width: 72px;
   padding: 0.42rem 0.7rem;
   border: 1px solid transparent;
@@ -2972,6 +2973,19 @@ button.quiet-action:hover,
   color: var(--lib-muted);
   font-size: 0.92rem;
   gap: 0.32rem;
+}
+
+.toggle-btn::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 0.26rem;
+  width: 4px;
+  height: 4px;
+  border-radius: 999px;
+  background: transparent;
+  transform: translateX(-50%) scale(0.65);
+  transition: background 160ms ease, transform 160ms ease;
 }
 
 .toggle-icon {
@@ -2987,9 +3001,14 @@ button.quiet-action:hover,
 
 .toggle-btn.active {
   border-color: rgba(104, 191, 215, 0.38);
-  background: rgba(104, 191, 215, 0.16);
+  background: rgba(104, 191, 215, 0.18);
   color: #e7fbff;
-  box-shadow: none;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.toggle-btn.active::after {
+  background: rgba(214, 164, 95, 0.95);
+  transform: translateX(-50%) scale(1);
 }
 
 .toggle-btn:hover,
