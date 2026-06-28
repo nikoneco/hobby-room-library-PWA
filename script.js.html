@@ -1284,11 +1284,11 @@ function getSearchStatusCountText_() {
   }
 
   if (searchStatusState.mode === 'result') {
-    return `${searchStatusState.resultCount}件見つかりました`;
+    return `${searchStatusState.resultCount}冊見つかりました`;
   }
 
   if (!hasConditions) {
-    return '未検索';
+    return '検索前';
   }
 
   if (searchStatusState.previewPending) {
@@ -1296,10 +1296,10 @@ function getSearchStatusCountText_() {
   }
 
   if (searchStatusState.previewReady && Number.isFinite(searchStatusState.previewCount)) {
-    return `未検索 / 対象${searchStatusState.previewCount}件`;
+    return `検索前 / 対象${searchStatusState.previewCount}冊`;
   }
 
-  return '未検索';
+  return '検索前';
 }
 
 function renderSearchStatus_() {
