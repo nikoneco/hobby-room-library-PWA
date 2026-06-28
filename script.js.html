@@ -1014,6 +1014,24 @@ function isSensitiveQuickBrowseValue_(value) {
   return /18|成人|成年|アダルト|r-?18/i.test(String(value || ''));
 }
 
+function shouldExcludeQuickBrowseValue_(config, value) {
+  if (config && config.genreKey === 'theme' && String(value || '').trim() === SENSITIVE_THEME_NAME) {
+    return true;
+  }
+  return isSensitiveQuickBrowseValue_(value);
+}
+
+function shuffledCopy_(items) {
+  const result = Array.isArray(items) ? items.slice() : [];
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const tmp = result[i];
+    result[i] = result[j];
+    result[j] = tmp;
+  }
+  return result;
+}
+
 function countQuickBrowseMatches_(config, value) {
   if (!Array.isArray(PREVIEW_INDEX) || !PREVIEW_INDEX.length) return 0;
 
@@ -1030,22 +1048,21 @@ function buildQuickBrowseItems_() {
 
   QUICK_BROWSE_CONFIG.forEach(config => {
     const values = Array.isArray(ADVANCED_OPTIONS[config.source])
-      ? ADVANCED_OPTIONS[config.source].filter(value => hasDisplayValue_(value) && !isSensitiveQuickBrowseValue_(value))
+      ? ADVANCED_OPTIONS[config.source].filter(value => hasDisplayValue_(value) && !shouldExcludeQuickBrowseValue_(config, value))
       : [];
     if (!values.length) return;
 
     const counts = new Map(values.map(value => [value, countQuickBrowseMatches_(config, value)]));
-    const preferred = config.priority
-      .filter(value => values.includes(value))
-      .map(value => ({ config, value, count: counts.get(value) || 0, preferred: true }))
+    const candidates = values
+      .map(value => ({
+        config,
+        value,
+        count: counts.get(value) || 0,
+        preferred: config.priority.includes(value)
+      }))
       .filter(item => item.count > 0);
 
-    const popular = values
-      .map(value => ({ config, value, count: counts.get(value) || 0, preferred: false }))
-      .filter(item => item.count > 0)
-      .sort((a, b) => b.count - a.count || String(a.value).localeCompare(String(b.value), 'ja'));
-
-    preferred.concat(popular).some(item => {
+    shuffledCopy_(candidates).some(item => {
       const key = `${item.config.field}:${item.value}`;
       if (used.has(key)) return false;
       used.add(key);
@@ -1054,9 +1071,7 @@ function buildQuickBrowseItems_() {
     });
   });
 
-  return items
-    .sort((a, b) => Number(b.preferred) - Number(a.preferred) || b.count - a.count)
-    .slice(0, 7);
+  return shuffledCopy_(items).slice(0, 7);
 }
 
 function syncQuickBrowseRailVisibility_() {
@@ -2381,7 +2396,6 @@ function buildGenreChips(book) {
         data-genre-field="${escapeHtml(field)}"
         data-genre-value="${escapeHtml(item.name)}"
         aria-label="${escapeHtml(label + ': ' + item.name + 'で探す')}"
-        title="${escapeHtml(label + ': ' + item.name + 'で探す')}"
       >${escapeHtml(item.name)}</button>
     `;
   }).join('');
@@ -3066,7 +3080,7 @@ function createShelfBookElement_(book, originalIndex, data, revealIndex) {
   const button = document.createElement('button');
   button.type = 'button';
   button.className = 'shelf-book';
-  button.title = book && book.title ? book.title : 'タイトルなし';
+  button.setAttribute('aria-label', `${book && book.title ? book.title : 'タイトルなし'} の詳細を開く`);
   setBookRevealIndex_(button, revealIndex);
 
   const imgWrap = document.createElement('span');
@@ -3355,7 +3369,6 @@ function shouldIgnoreBookOpenSurfaceClick_(target) {
 function setupBookOpenSurface_(element, book, idx, data) {
   if (!element) return;
   element.classList.add('book-open-surface');
-  element.title = '詳細を開く';
   element.onclick = function(e) {
     if (shouldIgnoreBookOpenSurfaceClick_(e.target)) return;
     showPopup(book, idx, data);
@@ -3368,7 +3381,6 @@ function setupBookKeyboardOpenSurface_(element, book, idx, data) {
   element.tabIndex = 0;
   element.setAttribute('role', 'button');
   element.setAttribute('aria-label', `${book && book.title ? book.title : 'この本'} の詳細を開く`);
-  element.title = '詳細を開く';
   element.onkeydown = function(e) {
     if (shouldIgnoreBookOpenSurfaceClick_(e.target)) return;
     if (e.key !== 'Enter' && e.key !== ' ') return;
