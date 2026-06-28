@@ -3149,6 +3149,29 @@ function attachPopupActionHandlers(book, seriesContext) {
   }
 }
 
+function getPopupNavBookLabel_(targetIndex) {
+  if (!Array.isArray(popupData) || targetIndex < 0 || targetIndex >= popupData.length) return '';
+  const targetBook = popupData[targetIndex];
+  return targetBook && targetBook.title ? String(targetBook.title) : '';
+}
+
+function setupPopupNavButton_(button, targetIndex, directionLabel) {
+  if (!button) return;
+
+  const targetTitle = getPopupNavBookLabel_(targetIndex);
+  const accessibleLabel = targetTitle ? `${directionLabel}: ${targetTitle}` : directionLabel;
+  button.setAttribute('aria-label', accessibleLabel);
+  button.title = accessibleLabel;
+
+  if (targetTitle) {
+    button.classList.add('has-nav-label');
+    button.setAttribute('data-nav-label', targetTitle);
+  } else {
+    button.classList.remove('has-nav-label');
+    button.removeAttribute('data-nav-label');
+  }
+}
+
 function clearPopupTouchHandlers_() {
   const overlay = document.getElementById('image-popup-overlay');
   if (!overlay) return;
@@ -3413,6 +3436,8 @@ info.innerHTML = `
 
   prevBtn.style.display = (popupIndex > 0) ? 'block' : 'none';
   nextBtn.style.display = (popupIndex < popupData.length - 1) ? 'block' : 'none';
+  setupPopupNavButton_(prevBtn, popupIndex - 1, '前へ');
+  setupPopupNavButton_(nextBtn, popupIndex + 1, '次へ');
   prevBtn.onclick = function(e) { e.stopPropagation(); popupMove(-1); };
   nextBtn.onclick = function(e) { e.stopPropagation(); popupMove(1); };
 
