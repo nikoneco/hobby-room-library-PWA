@@ -3031,9 +3031,19 @@ function shouldIgnoreBookOpenSurfaceClick_(target) {
 function setupBookOpenSurface_(element, book, idx, data) {
   if (!element) return;
   element.classList.add('book-open-surface');
+  element.tabIndex = 0;
+  element.setAttribute('role', 'button');
+  element.setAttribute('aria-label', `${book && book.title ? book.title : 'この本'} の詳細を開く`);
   element.title = '詳細を開く';
   element.onclick = function(e) {
     if (shouldIgnoreBookOpenSurfaceClick_(e.target)) return;
+    showPopup(book, idx, data);
+  };
+  element.onkeydown = function(e) {
+    if (shouldIgnoreBookOpenSurfaceClick_(e.target)) return;
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+
+    e.preventDefault();
     showPopup(book, idx, data);
   };
 }
