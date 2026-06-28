@@ -1292,11 +1292,11 @@ function getSearchStatusCountText_() {
   }
 
   if (searchStatusState.previewPending) {
-    return '確認中';
+    return '候補を確認中';
   }
 
   if (searchStatusState.previewReady && Number.isFinite(searchStatusState.previewCount)) {
-    return `検索前 / 対象${searchStatusState.previewCount}冊`;
+    return `この条件なら${searchStatusState.previewCount}冊`;
   }
 
   return '検索前';
