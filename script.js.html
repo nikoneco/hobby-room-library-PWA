@@ -1916,6 +1916,15 @@ function buildBookMemoHtml_(book) {
   return `<div class="book-note">備考: ${escapeHtml(book.memo)}</div>`;
 }
 
+function buildPopupBookLeadHtml_(book) {
+  const parts = [];
+  if (hasDisplayValue_(book && book.author)) parts.push(escapeHtml(book.author));
+  if (hasDisplayValue_(book && book.publisher)) parts.push(escapeHtml(book.publisher));
+  if (!parts.length) return '';
+
+  return `<div class="popup-book-lead">${parts.join('<span></span>')}</div>`;
+}
+
 function buildBookDetailsHtml_(book) {
   const rows = [
     ['著者', book && book.author],
@@ -3152,17 +3161,10 @@ function showPopup(book, index, dataArr, seriesContext) {
 info.innerHTML = `
   <div class="popup-book-detail">
     <div class="popup-book-title">${escapeHtml(book.title || '(タイトルなし)')}</div>
+    ${buildPopupBookLeadHtml_(book)}
     <div class="genre-chip-wrap popup">${buildGenreChips(book)}</div>
-    <div class="popup-meta-grid">
-      <div><span>著者</span>${escapeHtml(book.author || '-')}</div>
-      <div><span>出版社</span>${escapeHtml(book.publisher || '-')}</div>
-      <div><span>ISBN</span>${escapeHtml(book.isbn || '-')}</div>
-      <div><span>棚</span>${escapeHtml(book.shelf || '-')}-${escapeHtml(book.location || '')}</div>
-      <div><span>価格</span>${escapeHtml(book.price || '-')}</div>
-      <div><span>発売日</span>${escapeHtml(book.released || '-')}</div>
-      <div><span>レーベル</span>${escapeHtml(book.brand || '-')}</div>
-      <div><span>備考</span>${escapeHtml(book.memo || '-')}</div>
-    </div>
+    ${buildBookMetaPillsHtml_(book, { includeIsbn: true })}
+    ${buildBookMemoHtml_(book)}
     ${actionsHtml}
     <div class="popup-position">${popupIndex + 1} / ${popupData.length}</div>
   </div>
