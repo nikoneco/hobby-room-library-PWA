@@ -1270,6 +1270,18 @@ function renderSearchStatus_() {
       </span>
     `;
   }).join('');
+
+  if (searchStatusState.mode === 'random') {
+    els.chips.insertAdjacentHTML('beforeend', `
+      <button
+        type="button"
+        class="search-status-reroll"
+        data-action="random-reroll"
+        aria-label="ランダムで別の10冊を表示"
+        title="別の10冊を表示"
+      >もう一度ひく</button>
+    `);
+  }
 }
 
 function showSearchStatusPreview_(mode, params, previewCount, previewReady) {
@@ -3392,6 +3404,14 @@ window.addEventListener('DOMContentLoaded', function() {
   const searchStatusChips = document.getElementById('searchStatusChips');
   if (searchStatusChips) {
     searchStatusChips.addEventListener('click', function(event) {
+      const rerollBtn = event.target.closest('.search-status-reroll');
+      if (rerollBtn) {
+        event.preventDefault();
+        event.stopPropagation();
+        showRandomBooks();
+        return;
+      }
+
       const removeBtn = event.target.closest('.search-status-chip-remove');
       if (!removeBtn) return;
 
