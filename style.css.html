@@ -183,7 +183,26 @@ body.shelf-immersive-active #viewToggle {
 }
 
 .search-status-chip-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.34em;
   min-width: 0;
+}
+
+.search-status-chip-key {
+  flex: 0 0 auto;
+  padding: 0.08em 0.42em;
+  border-radius: 999px;
+  background: rgba(214, 164, 95, 0.16);
+  color: #f3d5a4;
+  font-size: 0.82em;
+  font-weight: 760;
+}
+
+.search-status-chip-value {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .search-status-chip.removable {

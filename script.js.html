@@ -1144,7 +1144,8 @@ function buildSearchStatusChips_(mode, params) {
       chips.push({
         key: 'keyword',
         value: params.keyword,
-        label: `🔎 ${params.keyword}`,
+        labelPrefix: '検索',
+        label: params.keyword,
         className: '',
         removable: true
       });
@@ -1156,7 +1157,7 @@ function buildSearchStatusChips_(mode, params) {
     chips.push({
       key: 'random',
       value: 'random',
-      label: '🎲 ランダム',
+      label: 'ランダム',
       className: 'random',
       removable: false
     });
@@ -1169,7 +1170,8 @@ function buildSearchStatusChips_(mode, params) {
     chips.push({
       key: 'keyword',
       value: params.keyword,
-      label: `🔎 ${params.keyword}`,
+      labelPrefix: '検索',
+      label: params.keyword,
       className: '',
       removable: true
     });
@@ -1178,7 +1180,8 @@ function buildSearchStatusChips_(mode, params) {
     chips.push({
       key: 'detailTitle',
       value: params.detailTitle,
-      label: `📘 ${params.detailTitle}`,
+      labelPrefix: 'タイトル',
+      label: params.detailTitle,
       className: '',
       removable: true
     });
@@ -1187,7 +1190,8 @@ function buildSearchStatusChips_(mode, params) {
     chips.push({
       key: 'detailYomi',
       value: params.detailYomi,
-      label: `📝 ${params.detailYomi}`,
+      labelPrefix: '読み',
+      label: params.detailYomi,
       className: '',
       removable: true
     });
@@ -1196,7 +1200,8 @@ function buildSearchStatusChips_(mode, params) {
     chips.push({
       key: 'detailAuthor',
       value: params.detailAuthor,
-      label: `👤 ${params.detailAuthor}`,
+      labelPrefix: '作者',
+      label: params.detailAuthor,
       className: '',
       removable: true
     });
@@ -1205,7 +1210,8 @@ function buildSearchStatusChips_(mode, params) {
     chips.push({
       key: 'detailPublisher',
       value: params.detailPublisher,
-      label: `🏢 ${params.detailPublisher}`,
+      labelPrefix: '出版社',
+      label: params.detailPublisher,
       className: '',
       removable: true
     });
@@ -1214,7 +1220,8 @@ function buildSearchStatusChips_(mode, params) {
     chips.push({
       key: 'detailStory',
       value: params.detailStory,
-      label: `📖 ${params.detailStory}`,
+      labelPrefix: 'ストーリー',
+      label: params.detailStory,
       className: '',
       removable: true
     });
@@ -1223,7 +1230,8 @@ function buildSearchStatusChips_(mode, params) {
     chips.push({
       key: 'detailTheme',
       value: params.detailTheme,
-      label: `📚 ${params.detailTheme}`,
+      labelPrefix: '題材',
+      label: params.detailTheme,
       className: '',
       removable: true
     });
@@ -1232,7 +1240,8 @@ function buildSearchStatusChips_(mode, params) {
     chips.push({
       key: 'detailMood',
       value: params.detailMood,
-      label: `🎭 ${params.detailMood}`,
+      labelPrefix: '雰囲気',
+      label: params.detailMood,
       className: '',
       removable: true
     });
@@ -1241,7 +1250,8 @@ function buildSearchStatusChips_(mode, params) {
     chips.push({
       key: 'detailStatus',
       value: params.detailStatus,
-      label: `🌍 ${params.detailStatus}`,
+      labelPrefix: '状況',
+      label: params.detailStatus,
       className: '',
       removable: true
     });
@@ -1252,6 +1262,7 @@ function buildSearchStatusChips_(mode, params) {
     chips.push({
       key: 'detailReleased',
       value: releasedLabel,
+      labelPrefix: '発売',
       label: releasedLabel,
       className: '',
       removable: true
@@ -1316,13 +1327,21 @@ function renderSearchStatus_() {
     if (canRemoveChip) classNames.push('removable');
     if (chip.key && chip.key === searchStatusState.removingChipKey) classNames.push('is-removing');
 
+    const visibleLabel = chip.labelPrefix
+      ? `${chip.labelPrefix}: ${chip.label || ''}`
+      : (chip.label || '');
+    const chipLabelHtml = chip.labelPrefix ? `
+        <span class="search-status-chip-key">${escapeHtml(chip.labelPrefix)}</span>
+        <span class="search-status-chip-value">${escapeHtml(chip.label || '')}</span>
+      ` : `<span class="search-status-chip-value">${escapeHtml(chip.label || '')}</span>`;
+
     const removeButton = canRemoveChip ? `
       <button
         type="button"
         class="search-status-chip-remove"
         data-action="remove-chip"
         data-key="${escapeHtml(chip.key || '')}"
-        aria-label="${escapeHtml((chip.label || '') + ' を削除')}"
+        aria-label="${escapeHtml(visibleLabel + ' を削除')}"
         title="この条件を削除"
       >×</button>
     ` : '';
@@ -1333,7 +1352,7 @@ function renderSearchStatus_() {
         data-key="${escapeHtml(chip.key || '')}"
         data-value="${escapeHtml(chip.value || '')}"
       >
-        <span class="search-status-chip-label">${escapeHtml(chip.label || '')}</span>
+        <span class="search-status-chip-label">${chipLabelHtml}</span>
         ${removeButton}
       </span>
     `;
