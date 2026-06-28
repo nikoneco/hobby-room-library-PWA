@@ -935,6 +935,35 @@ function clearSearchConditions() {
   syncSearchStatusPreviewFromForm_();
 }
 
+function clearSearchFormValuesForBrowse_() {
+  if (typeof hideAllSuggest === 'function') hideAllSuggest();
+
+  const keywordEl = document.getElementById('keyword');
+  if (keywordEl) keywordEl.value = '';
+
+  [
+    'detailTitle',
+    'detailYomi',
+    'detailAuthor',
+    'detailPublisher',
+    'detailStory',
+    'detailTheme',
+    'detailMood',
+    'detailStatus',
+    'detailReleasedFromYear',
+    'detailReleasedFromMonth',
+    'detailReleasedToYear',
+    'detailReleasedToMonth'
+  ].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+
+  if (typeof syncReleasedRangeOptions_ === 'function') {
+    syncReleasedRangeOptions_();
+  }
+}
+
 function getSearchStatusElements_() {
   return {
     area: document.getElementById('searchStatusArea'),
@@ -1736,6 +1765,7 @@ function search() {
 
 function showRandomBooks() {
   resetViewModeToCardForNewSearch_();
+  clearSearchFormValuesForBrowse_();
   closeAdvancedSearchPanel_();
 
   showSpinner();
@@ -1759,36 +1789,8 @@ function showRandomBooks() {
 
 function showAllBookshelf() {
   try {
-    if (typeof hideAllSuggest === 'function') hideAllSuggest();
-
-    const keywordEl = document.getElementById('keyword');
-    if (keywordEl) keywordEl.value = '';
-
-    // clearAdvancedFields() は内部でプレビュー同期まで行うため、
-    // トップ導線ではDOM欠落や初期化タイミングの影響を避けて、必要項目だけ安全に空にする。
-    [
-      'detailTitle',
-      'detailYomi',
-      'detailAuthor',
-      'detailPublisher',
-      'detailStory',
-      'detailTheme',
-      'detailMood',
-      'detailStatus',
-      'detailReleasedFromYear',
-      'detailReleasedFromMonth',
-      'detailReleasedToYear',
-      'detailReleasedToMonth'
-    ].forEach(id => {
-      const el = document.getElementById(id);
-      if (el) el.value = '';
-    });
-
+    clearSearchFormValuesForBrowse_();
     closeAdvancedSearchPanel_();
-
-    if (typeof syncReleasedRangeOptions_ === 'function') {
-      syncReleasedRangeOptions_();
-    }
 
     const container = document.getElementById('searchContainer');
     if (container) {
@@ -1965,7 +1967,7 @@ function renderEmptyResult_(result) {
   clearButton.className = 'quiet-action empty-result-action';
   clearButton.innerHTML = `${uiIcon_('trash', 'ui-icon-inline')}<span>条件をクリア</span>`;
   clearButton.onclick = function() {
-    clearSearchConditions();
+    resetSearch();
   };
 
   actions.appendChild(focusButton);
