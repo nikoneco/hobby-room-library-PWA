@@ -1110,12 +1110,12 @@ function buildReleasedChipLabel_(params) {
   const toLabel = formatReleasedChipPart_(toYear, toMonth);
 
   if (fromYear && toYear) {
-    return `🗓 ${fromLabel}〜${toLabel}`;
+    return `${fromLabel}〜${toLabel}`;
   }
   if (fromYear) {
-    return `🗓 ${fromLabel}以降`;
+    return `${fromLabel}以降`;
   }
-  return `🗓 ${toLabel}以前`;
+  return `${toLabel}以前`;
 }
 
 function normalizeReleasedYmClient_(year, month, isFrom) {
