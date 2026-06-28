@@ -187,9 +187,9 @@
     </button>
   </div>
 
-  <div id="spinner-overlay" style="display: none;">
+  <div id="spinner-overlay" role="status" aria-live="polite" aria-busy="true" style="display: none;">
     <div class="spinner"></div>
-    <div class="spinner-label">検索中...</div>
+    <div id="spinner-label" class="spinner-label">検索中...</div>
   </div>
 
   <div id="result"></div>
