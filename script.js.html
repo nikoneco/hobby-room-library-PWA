@@ -2922,6 +2922,7 @@ function showResult(data) {
       `;
 
       appendSummaryAccordion_(info.querySelector('.genre-chip-wrap'), book);
+      setupBookKeyboardOpenSurface_(info.querySelector('.book-title'), book, idx, data);
 
       card.appendChild(info);
       container.appendChild(card);
@@ -2970,6 +2971,7 @@ function showResult(data) {
       `;
 
       appendSummaryAccordion_(titleBlock.querySelector('.genre-chip-wrap'), book);
+      setupBookKeyboardOpenSurface_(titleBlock.querySelector('.book-title'), book, idx, data);
 
       const authorDiv = document.createElement('div');
       authorDiv.className = 'list-title-author';
@@ -3031,14 +3033,20 @@ function shouldIgnoreBookOpenSurfaceClick_(target) {
 function setupBookOpenSurface_(element, book, idx, data) {
   if (!element) return;
   element.classList.add('book-open-surface');
-  element.tabIndex = 0;
-  element.setAttribute('role', 'button');
-  element.setAttribute('aria-label', `${book && book.title ? book.title : 'この本'} の詳細を開く`);
   element.title = '詳細を開く';
   element.onclick = function(e) {
     if (shouldIgnoreBookOpenSurfaceClick_(e.target)) return;
     showPopup(book, idx, data);
   };
+}
+
+function setupBookKeyboardOpenSurface_(element, book, idx, data) {
+  if (!element) return;
+  element.classList.add('book-open-keyboard-surface');
+  element.tabIndex = 0;
+  element.setAttribute('role', 'button');
+  element.setAttribute('aria-label', `${book && book.title ? book.title : 'この本'} の詳細を開く`);
+  element.title = '詳細を開く';
   element.onkeydown = function(e) {
     if (shouldIgnoreBookOpenSurfaceClick_(e.target)) return;
     if (e.key !== 'Enter' && e.key !== ' ') return;
