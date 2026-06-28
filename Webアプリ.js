@@ -550,63 +550,14 @@ function countPreviewMatchesAuthoritative(
 
     if (!rows.length) return 0;
 
-    const nKeyword = normalizeKana(keyword || '');
-    const nTitle = normalizeKana(title || '');
-    const nYomi = normalizeKana(yomi || '');
-    const nAuthor = normalizeKana(author || '');
-    const selectedPublisher = String(publisher || '').trim();
-    const selectedStory = String(story || '').trim();
-    const selectedTheme = String(theme || '').trim();
-    const selectedMood = String(mood || '').trim();
-    const selectedStatus = String(status || '').trim();
-
-    const fromYm = releasedFromYear
-      ? normalizeReleasedYm_(`${releasedFromYear}-${releasedFromMonth || '01'}`)
-      : 0;
-    const toYm = releasedToYear
-      ? normalizeReleasedYm_(`${releasedToYear}-${releasedToMonth || '12'}`)
-      : 0;
-
+    const criteria = buildServerSearchCriteria_(
+      keyword, title, yomi, author, publisher, story, theme, mood, status,
+      releasedFromYear, releasedFromMonth, releasedToYear, releasedToMonth
+    );
     let count = 0;
 
     for (let i = 0; i < rows.length; i++) {
-      const idx = index[i] || {
-        title: '',
-        yomi: '',
-        author: '',
-        searchKey: '',
-        publisher: '',
-        releasedYm: 0,
-        genres: { story: [], theme: [], mood: [], status: [] }
-      };
-
-      const keywordMatch = !nKeyword || keywordMixedMatch_(nKeyword, idx);
-      const titleMatch = !nTitle || titleYomiMixedMatch_(nTitle, idx.title, idx.yomi);
-      const yomiMatch = !nYomi || titleYomiMixedMatch_(nYomi, idx.title, idx.yomi);
-      const authorMatch = !nAuthor || (idx.author && idx.author.includes(nAuthor));
-      const publisherMatch = !selectedPublisher || idx.publisher === selectedPublisher;
-      const storyMatch = !selectedStory || (idx.genres.story || []).includes(selectedStory);
-      const themeMatch = !selectedTheme || (idx.genres.theme || []).includes(selectedTheme);
-      const moodMatch = !selectedMood || (idx.genres.mood || []).includes(selectedMood);
-      const statusMatch = !selectedStatus || (idx.genres.status || []).includes(selectedStatus);
-
-      const releasedYm = Number(idx.releasedYm || 0);
-      const releasedFromMatch = !fromYm || (releasedYm && releasedYm >= fromYm);
-      const releasedToMatch = !toYm || (releasedYm && releasedYm <= toYm);
-
-      if (
-        keywordMatch &&
-        titleMatch &&
-        yomiMatch &&
-        authorMatch &&
-        publisherMatch &&
-        storyMatch &&
-        themeMatch &&
-        moodMatch &&
-        statusMatch &&
-        releasedFromMatch &&
-        releasedToMatch
-      ) {
+      if (matchesSearchCriteria_(index[i], criteria)) {
         count++;
       }
     }
@@ -834,6 +785,74 @@ function keywordMixedMatch_(query, idx) {
   if (!q) return true;
   if (idx && idx.searchKey && idx.searchKey.includes(q)) return true;
   return titleYomiMixedMatch_(q, idx && idx.title, idx && idx.yomi);
+}
+
+function buildServerSearchCriteria_(
+  keyword, title, yomi, author, publisher, story, theme, mood, status,
+  releasedFromYear, releasedFromMonth, releasedToYear, releasedToMonth
+) {
+  return {
+    nKeyword: normalizeKana(keyword || ''),
+    nTitle: normalizeKana(title || ''),
+    nYomi: normalizeKana(yomi || ''),
+    nAuthor: normalizeKana(author || ''),
+    selectedPublisher: String(publisher || '').trim(),
+    selectedStory: String(story || '').trim(),
+    selectedTheme: String(theme || '').trim(),
+    selectedMood: String(mood || '').trim(),
+    selectedStatus: String(status || '').trim(),
+    fromYm: releasedFromYear
+      ? normalizeReleasedYm_(`${releasedFromYear}-${releasedFromMonth || '01'}`)
+      : 0,
+    toYm: releasedToYear
+      ? normalizeReleasedYm_(`${releasedToYear}-${releasedToMonth || '12'}`)
+      : 0
+  };
+}
+
+function getDefaultSearchIndexItem_() {
+  return {
+    title: '',
+    yomi: '',
+    author: '',
+    searchKey: '',
+    publisher: '',
+    releasedYm: 0,
+    genres: { story: [], theme: [], mood: [], status: [] }
+  };
+}
+
+function matchesSearchCriteria_(idx, criteria) {
+  const item = idx || getDefaultSearchIndexItem_();
+  const c = criteria || buildServerSearchCriteria_();
+
+  const keywordMatch = !c.nKeyword || keywordMixedMatch_(c.nKeyword, item);
+  const titleMatch = !c.nTitle || titleYomiMixedMatch_(c.nTitle, item.title, item.yomi);
+  const yomiMatch = !c.nYomi || titleYomiMixedMatch_(c.nYomi, item.title, item.yomi);
+  const authorMatch = !c.nAuthor || (item.author && item.author.includes(c.nAuthor));
+  const publisherMatch = !c.selectedPublisher || item.publisher === c.selectedPublisher;
+  const storyMatch = !c.selectedStory || (item.genres.story || []).includes(c.selectedStory);
+  const themeMatch = !c.selectedTheme || (item.genres.theme || []).includes(c.selectedTheme);
+  const moodMatch = !c.selectedMood || (item.genres.mood || []).includes(c.selectedMood);
+  const statusMatch = !c.selectedStatus || (item.genres.status || []).includes(c.selectedStatus);
+
+  const releasedYm = Number(item.releasedYm || 0);
+  const releasedFromMatch = !c.fromYm || (releasedYm && releasedYm >= c.fromYm);
+  const releasedToMatch = !c.toYm || (releasedYm && releasedYm <= c.toYm);
+
+  return Boolean(
+    keywordMatch &&
+    titleMatch &&
+    yomiMatch &&
+    authorMatch &&
+    publisherMatch &&
+    storyMatch &&
+    themeMatch &&
+    moodMatch &&
+    statusMatch &&
+    releasedFromMatch &&
+    releasedToMatch
+  );
 }
 
 
@@ -1417,64 +1436,16 @@ function searchBooksAdvanced(
 
     if (!rows.length) return [];
 
-    const nKeyword = normalizeKana(keyword || '');
-    const nTitle = normalizeKana(title || '');
-    const nYomi = normalizeKana(yomi || '');
-    const nAuthor = normalizeKana(author || '');
-    const selectedPublisher = String(publisher || '').trim();
-    const selectedStory = String(story || '').trim();
-    const selectedTheme = String(theme || '').trim();
-    const selectedMood = String(mood || '').trim();
-    const selectedStatus = String(status || '').trim();
-
-    const fromYm = releasedFromYear
-      ? normalizeReleasedYm_(`${releasedFromYear}-${releasedFromMonth || '01'}`)
-      : 0;
-    const toYm = releasedToYear
-      ? normalizeReleasedYm_(`${releasedToYear}-${releasedToMonth || '12'}`)
-      : 0;
-
+    const criteria = buildServerSearchCriteria_(
+      keyword, title, yomi, author, publisher, story, theme, mood, status,
+      releasedFromYear, releasedFromMonth, releasedToYear, releasedToMonth
+    );
     const matchedRows = [];
     const matchedIndex = [];
 
     for (let i = 0; i < rows.length; i++) {
-      const idx = index[i] || {
-        title: '',
-        yomi: '',
-        author: '',
-        searchKey: '',
-        publisher: '',
-        releasedYm: 0,
-        genres: { story: [], theme: [], mood: [], status: [] }
-      };
-
-      const keywordMatch = !nKeyword || keywordMixedMatch_(nKeyword, idx);
-      const titleMatch = !nTitle || titleYomiMixedMatch_(nTitle, idx.title, idx.yomi);
-      const yomiMatch = !nYomi || titleYomiMixedMatch_(nYomi, idx.title, idx.yomi);
-      const authorMatch = !nAuthor || (idx.author && idx.author.includes(nAuthor));
-      const publisherMatch = !selectedPublisher || idx.publisher === selectedPublisher;
-      const storyMatch = !selectedStory || (idx.genres.story || []).includes(selectedStory);
-      const themeMatch = !selectedTheme || (idx.genres.theme || []).includes(selectedTheme);
-      const moodMatch = !selectedMood || (idx.genres.mood || []).includes(selectedMood);
-      const statusMatch = !selectedStatus || (idx.genres.status || []).includes(selectedStatus);
-
-      const releasedYm = Number(idx.releasedYm || 0);
-      const releasedFromMatch = !fromYm || (releasedYm && releasedYm >= fromYm);
-      const releasedToMatch = !toYm || (releasedYm && releasedYm <= toYm);
-
-      if (
-        keywordMatch &&
-        titleMatch &&
-        yomiMatch &&
-        authorMatch &&
-        publisherMatch &&
-        storyMatch &&
-        themeMatch &&
-        moodMatch &&
-        statusMatch &&
-        releasedFromMatch &&
-        releasedToMatch
-      ) {
+      const idx = index[i] || getDefaultSearchIndexItem_();
+      if (matchesSearchCriteria_(idx, criteria)) {
         matchedRows.push(rows[i]);
         matchedIndex.push(idx);
       }

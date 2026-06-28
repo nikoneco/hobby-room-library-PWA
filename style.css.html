@@ -4061,6 +4061,61 @@ button.popup-arrow:focus-visible {
   margin: 0;
 }
 
+.popup-book-head {
+  min-width: 0;
+  padding: 0 2.5rem 0.75rem 0;
+  border-bottom: 1px solid rgba(246, 241, 229, 0.10);
+}
+
+.popup-book-head .popup-book-title {
+  margin-right: 0;
+}
+
+.popup-book-head .popup-book-lead {
+  margin-right: 0;
+  margin-bottom: 0;
+}
+
+.popup-book-kicker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.36rem;
+  margin: 0 0 0.45rem;
+  color: rgba(246, 241, 229, 0.72);
+  font-size: 0.76rem;
+  font-weight: 750;
+  line-height: 1.35;
+}
+
+.popup-book-kicker span {
+  min-width: 0;
+  max-width: 100%;
+  padding: 0.22rem 0.46rem;
+  border: 1px solid rgba(214, 164, 95, 0.22);
+  border-radius: 999px;
+  background: rgba(214, 164, 95, 0.08);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.popup-book-primary-meta {
+  min-width: 0;
+  padding-top: 0.7rem;
+}
+
+#image-popup-info .popup-action-btn:hover,
+#image-popup-info .popup-link-btn:hover,
+#image-popup-info .popup-action-btn:focus-visible,
+#image-popup-info .popup-link-btn:focus-visible {
+  transform: none;
+}
+
+#popup-prev,
+#popup-next {
+  transform: translateY(-50%);
+}
+
 .series-panel {
   color: var(--lib-text);
 }
@@ -4328,6 +4383,14 @@ body.shelf-immersive-active .shelf-room-map-fab:focus-visible {
     max-width: min(220px, 70vw);
     max-height: 38vh;
     justify-self: center;
+  }
+
+  .popup-book-head {
+    padding-right: 2.1rem;
+  }
+
+  .popup-book-kicker span {
+    max-width: 100%;
   }
 
   #cover-fullscreen-img {

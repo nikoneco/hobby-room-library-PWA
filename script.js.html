@@ -602,6 +602,110 @@ function keywordMixedMatch_(query, idx) {
   return titleYomiMixedMatch_(q, idx && idx.title, idx && idx.yomi);
 }
 
+const SEARCH_CONDITION_KEYS = [
+  'keyword',
+  'detailTitle',
+  'detailYomi',
+  'detailAuthor',
+  'detailPublisher',
+  'detailStory',
+  'detailTheme',
+  'detailMood',
+  'detailStatus',
+  'detailReleasedFromYear',
+  'detailReleasedFromMonth',
+  'detailReleasedToYear',
+  'detailReleasedToMonth'
+];
+
+const ADVANCED_SEARCH_CONDITION_KEYS = SEARCH_CONDITION_KEYS.filter(key => key !== 'keyword');
+
+function createEmptySearchParams_() {
+  return SEARCH_CONDITION_KEYS.reduce((params, key) => {
+    params[key] = '';
+    return params;
+  }, {});
+}
+
+function normalizeSearchParams_(params) {
+  const source = params || {};
+  return SEARCH_CONDITION_KEYS.reduce((normalized, key) => {
+    normalized[key] = String(source[key] || '').trim();
+    return normalized;
+  }, {});
+}
+
+function buildClientSearchCriteria_(params) {
+  const normalized = normalizeSearchParams_(params);
+  return {
+    params: normalized,
+    nKeyword: normalizeKana(normalized.keyword),
+    nTitle: normalizeKana(normalized.detailTitle),
+    nYomi: normalizeKana(normalized.detailYomi),
+    nAuthor: normalizeKana(normalized.detailAuthor),
+    selectedPublisher: normalized.detailPublisher,
+    selectedStory: normalized.detailStory,
+    selectedTheme: normalized.detailTheme,
+    selectedMood: normalized.detailMood,
+    selectedStatus: normalized.detailStatus,
+    fromYm: normalizeReleasedYmClient_(
+      normalized.detailReleasedFromYear,
+      normalized.detailReleasedFromMonth,
+      true
+    ),
+    toYm: normalizeReleasedYmClient_(
+      normalized.detailReleasedToYear,
+      normalized.detailReleasedToMonth,
+      false
+    )
+  };
+}
+
+function getDefaultPreviewIndexItem_() {
+  return {
+    title: '',
+    yomi: '',
+    author: '',
+    searchKey: '',
+    publisher: '',
+    releasedYm: 0,
+    genres: { story: [], theme: [], mood: [], status: [] }
+  };
+}
+
+function matchesSearchCriteria_(idx, criteria) {
+  const item = idx || getDefaultPreviewIndexItem_();
+  const c = criteria || buildClientSearchCriteria_({});
+
+  const keywordMatch = !c.nKeyword || keywordMixedMatch_(c.nKeyword, item);
+  const titleMatch = !c.nTitle || titleYomiMixedMatch_(c.nTitle, item.title, item.yomi);
+  const yomiMatch = !c.nYomi || titleYomiMixedMatch_(c.nYomi, item.title, item.yomi);
+  const authorMatch = !c.nAuthor || (item.author && item.author.includes(c.nAuthor));
+  const publisherMatch = !c.selectedPublisher || item.publisher === c.selectedPublisher;
+  const storyMatch = !c.selectedStory || (item.genres.story || []).includes(c.selectedStory);
+  const themeMatch = !c.selectedTheme || (item.genres.theme || []).includes(c.selectedTheme);
+  const moodMatch = !c.selectedMood || (item.genres.mood || []).includes(c.selectedMood);
+  const statusMatch = !c.selectedStatus || (item.genres.status || []).includes(c.selectedStatus);
+
+  const releasedYm = Number(item.releasedYm || 0);
+  const releasedFromMatch = !c.fromYm || (releasedYm && releasedYm >= c.fromYm);
+  const releasedToMatch = !c.toYm || (releasedYm && releasedYm <= c.toYm);
+
+  return Boolean(
+    keywordMatch &&
+    titleMatch &&
+    yomiMatch &&
+    authorMatch &&
+    publisherMatch &&
+    storyMatch &&
+    themeMatch &&
+    moodMatch &&
+    statusMatch &&
+    releasedFromMatch &&
+    releasedToMatch
+  );
+}
+
 function getEmptySuggestData_() {
   return {
     titles: [],
@@ -1668,67 +1772,11 @@ function countPreviewMatches_(params) {
     return null;
   }
 
-  const nKeyword = normalizeKana(params.keyword || '');
-  const nTitle = normalizeKana(params.detailTitle || '');
-  const nYomi = normalizeKana(params.detailYomi || '');
-  const nAuthor = normalizeKana(params.detailAuthor || '');
-  const selectedPublisher = String(params.detailPublisher || '').trim();
-  const selectedStory = String(params.detailStory || '').trim();
-  const selectedTheme = String(params.detailTheme || '').trim();
-  const selectedMood = String(params.detailMood || '').trim();
-  const selectedStatus = String(params.detailStatus || '').trim();
-
-  const fromYm = normalizeReleasedYmClient_(
-    params.detailReleasedFromYear,
-    params.detailReleasedFromMonth,
-    true
-  );
-  const toYm = normalizeReleasedYmClient_(
-    params.detailReleasedToYear,
-    params.detailReleasedToMonth,
-    false
-  );
-
+  const criteria = buildClientSearchCriteria_(params);
   let count = 0;
 
   for (let i = 0; i < PREVIEW_INDEX.length; i++) {
-    const idx = PREVIEW_INDEX[i] || {
-      title: '',
-      yomi: '',
-      author: '',
-      searchKey: '',
-      publisher: '',
-      releasedYm: 0,
-      genres: { story: [], theme: [], mood: [], status: [] }
-    };
-
-    const keywordMatch = !nKeyword || keywordMixedMatch_(nKeyword, idx);
-    const titleMatch = !nTitle || titleYomiMixedMatch_(nTitle, idx.title, idx.yomi);
-    const yomiMatch = !nYomi || titleYomiMixedMatch_(nYomi, idx.title, idx.yomi);
-    const authorMatch = !nAuthor || (idx.author && idx.author.includes(nAuthor));
-    const publisherMatch = !selectedPublisher || idx.publisher === selectedPublisher;
-    const storyMatch = !selectedStory || (idx.genres.story || []).includes(selectedStory);
-    const themeMatch = !selectedTheme || (idx.genres.theme || []).includes(selectedTheme);
-    const moodMatch = !selectedMood || (idx.genres.mood || []).includes(selectedMood);
-    const statusMatch = !selectedStatus || (idx.genres.status || []).includes(selectedStatus);
-
-    const releasedYm = Number(idx.releasedYm || 0);
-    const releasedFromMatch = !fromYm || (releasedYm && releasedYm >= fromYm);
-    const releasedToMatch = !toYm || (releasedYm && releasedYm <= toYm);
-
-    if (
-      keywordMatch &&
-      titleMatch &&
-      yomiMatch &&
-      authorMatch &&
-      publisherMatch &&
-      storyMatch &&
-      themeMatch &&
-      moodMatch &&
-      statusMatch &&
-      releasedFromMatch &&
-      releasedToMatch
-    ) {
+    if (matchesSearchCriteria_(PREVIEW_INDEX[i], criteria)) {
       count++;
     }
   }
@@ -1823,37 +1871,20 @@ function syncSearchStatusPreviewFromForm_() {
 
 function hasAnySearchCondition_(params) {
   if (!params) return false;
-
-  return Boolean(
-    params.keyword ||
-    params.detailTitle ||
-    params.detailYomi ||
-    params.detailAuthor ||
-    params.detailPublisher ||
-    params.detailStory ||
-    params.detailTheme ||
-    params.detailMood ||
-    params.detailStatus ||
-    params.detailReleasedFromYear ||
-    params.detailReleasedToYear
-  );
+  const normalized = normalizeSearchParams_(params);
+  return SEARCH_CONDITION_KEYS.some(key => {
+    if (key === 'detailReleasedFromMonth' || key === 'detailReleasedToMonth') return false;
+    return Boolean(normalized[key]);
+  });
 }
 
 function hasAnyAdvancedCondition_(params) {
   if (!params) return false;
-
-  return Boolean(
-    params.detailTitle ||
-    params.detailYomi ||
-    params.detailAuthor ||
-    params.detailPublisher ||
-    params.detailStory ||
-    params.detailTheme ||
-    params.detailMood ||
-    params.detailStatus ||
-    params.detailReleasedFromYear ||
-    params.detailReleasedToYear
-  );
+  const normalized = normalizeSearchParams_(params);
+  return ADVANCED_SEARCH_CONDITION_KEYS.some(key => {
+    if (key === 'detailReleasedFromMonth' || key === 'detailReleasedToMonth') return false;
+    return Boolean(normalized[key]);
+  });
 }
 
 function rerunSearchWithParams_(params, loadingMessage) {
@@ -2301,6 +2332,24 @@ function buildPopupBookLeadHtml_(book) {
   if (!parts.length) return '';
 
   return `<div class="popup-book-lead">${parts.join('<span></span>')}</div>`;
+}
+
+function buildPopupBookContextHtml_(book) {
+  const parts = [];
+  const shelfLabel = formatShelfLabel_(book);
+  const seriesCount = Number(book && book.seriesCount || 0);
+  const ownedMaxVolume = Number(book && book.ownedMaxVolume || 0);
+
+  if (shelfLabel) parts.push(`棚 ${shelfLabel}`);
+  if (seriesCount >= 2) parts.push(`${seriesCount}冊のシリーズ`);
+  if (ownedMaxVolume > 0) parts.push(`所持 ${ownedMaxVolume}巻まで`);
+  if (!parts.length) return '';
+
+  return `
+    <div class="popup-book-kicker">
+      ${parts.map(part => `<span>${escapeHtml(part)}</span>`).join('')}
+    </div>
+  `;
 }
 
 function buildBookDetailsHtml_(book) {
@@ -3844,17 +3893,22 @@ function showPopup(book, index, dataArr, seriesContext) {
   };
 
   const actionsHtml = buildPopupActionsHtml(book, popupSeriesContext);
-info.innerHTML = `
-  <div class="popup-book-detail">
-    <div class="popup-book-title">${escapeHtml(book.title || '(タイトルなし)')}</div>
-    ${buildPopupBookLeadHtml_(book)}
-    <div class="genre-chip-wrap popup">${buildGenreChips(book)}</div>
-    ${buildBookMetaPillsHtml_(book, { includeIsbn: true })}
-    ${buildBookMemoHtml_(book)}
-    ${actionsHtml}
-    <div class="popup-position">${popupIndex + 1} / ${popupData.length}</div>
-  </div>
-`;
+  info.innerHTML = `
+    <div class="popup-book-detail">
+      <div class="popup-book-head">
+        ${buildPopupBookContextHtml_(book)}
+        <div class="popup-book-title">${escapeHtml(book.title || '(タイトルなし)')}</div>
+        ${buildPopupBookLeadHtml_(book)}
+      </div>
+      <div class="genre-chip-wrap popup">${buildGenreChips(book)}</div>
+      <div class="popup-book-primary-meta">
+        ${buildBookMetaPillsHtml_(book, { includeIsbn: true })}
+        ${buildBookMemoHtml_(book)}
+      </div>
+      ${actionsHtml}
+      <div class="popup-position">${popupIndex + 1} / ${popupData.length}</div>
+    </div>
+  `;
 
   appendPopupSummaryAccordion_(info.querySelector('.genre-chip-wrap.popup'), book);
   attachPopupActionHandlers(book, popupSeriesContext);
