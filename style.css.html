@@ -3101,6 +3101,7 @@ button.quiet-action:hover,
   border-radius: var(--lib-radius-sm);
   background: rgba(0, 0, 0, 0.24);
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.28);
+  transition: transform var(--lib-ease), box-shadow var(--lib-ease);
 }
 
 .book-card:hover .book-cover {
@@ -3111,6 +3112,34 @@ button.quiet-action:hover,
 .list-row.book-open-surface,
 .book-open-keyboard-surface {
   cursor: pointer;
+}
+
+.book-card.book-open-surface,
+.list-row.book-open-surface,
+.book-cover,
+.list-thumb,
+.shelf-book {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: rgba(104, 191, 215, 0.16);
+}
+
+.list-row.book-open-surface {
+  border-radius: var(--lib-radius-sm);
+  transition: transform var(--lib-ease);
+}
+
+.book-card.book-open-surface:active,
+.shelf-book:active {
+  transform: translateY(1px) scale(0.995);
+}
+
+.list-row.book-open-surface:active {
+  transform: translateY(1px);
+}
+
+.book-cover:active,
+.list-thumb:active {
+  transform: scale(0.985);
 }
 
 .book-card.book-open-surface:hover .book-title,
@@ -3302,6 +3331,7 @@ button.quiet-action:hover,
   border-radius: 6px;
   background: rgba(0, 0, 0, 0.24);
   box-shadow: 0 8px 18px rgba(0, 0, 0, 0.22);
+  transition: transform var(--lib-ease), box-shadow var(--lib-ease);
 }
 
 .list-row {
