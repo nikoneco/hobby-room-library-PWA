@@ -2794,11 +2794,18 @@ function flattenShelfBooksForPopup_(groups) {
   return orderedItems;
 }
 
-function createShelfBookElement_(book, originalIndex, data) {
+function setBookRevealIndex_(element, index) {
+  if (!element) return;
+  const safeIndex = Math.min(Math.max(Number(index) || 0, 0), 14);
+  element.style.setProperty('--book-reveal-index', String(safeIndex));
+}
+
+function createShelfBookElement_(book, originalIndex, data, revealIndex) {
   const button = document.createElement('button');
   button.type = 'button';
   button.className = 'shelf-book';
   button.title = book && book.title ? book.title : 'タイトルなし';
+  setBookRevealIndex_(button, revealIndex);
 
   const imgWrap = document.createElement('span');
   imgWrap.className = 'shelf-book-cover-wrap';
@@ -2847,6 +2854,8 @@ function renderShelfView_(data) {
     currentShelfRoomMapGroups = groups;
   }
 
+  let shelfRevealIndex = 0;
+
   const summary = document.createElement('div');
   summary.className = 'shelf-view-summary';
   summary.textContent = `本棚ビュー：${data.length}件を配置中 / ${groups.length}グループ`;
@@ -2886,7 +2895,8 @@ function renderShelfView_(data) {
           const popupIndex = shelfPopupIndexByOriginalIndex.has(item.originalIndex)
             ? shelfPopupIndexByOriginalIndex.get(item.originalIndex)
             : item.originalIndex;
-          strip.appendChild(createShelfBookElement_(item.book, popupIndex, shelfPopupData));
+          strip.appendChild(createShelfBookElement_(item.book, popupIndex, shelfPopupData, shelfRevealIndex));
+          shelfRevealIndex += 1;
         });
 
         levelWrap.appendChild(strip);
@@ -2938,6 +2948,7 @@ function showResult(data) {
     data.forEach((book, idx) => {
       const card = document.createElement('div');
       card.className = 'book-card';
+      setBookRevealIndex_(card, idx);
       setupBookOpenSurface_(card, book, idx, data);
 
       const img = document.createElement('img');
@@ -2984,6 +2995,7 @@ function showResult(data) {
     data.forEach((book, idx) => {
       const card = document.createElement('div');
       card.className = 'book-card list';
+      setBookRevealIndex_(card, idx);
 
       const thumb = document.createElement('img');
       thumb.alt = '表紙';

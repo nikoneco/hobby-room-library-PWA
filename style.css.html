@@ -1071,6 +1071,23 @@ button:hover {
   transition: opacity 0.25s ease, transform 0.25s ease;
 }
 
+.result-fade.show .book-card,
+.result-fade.show .shelf-book {
+  animation: book-result-settle 240ms ease-out both;
+  animation-delay: calc(var(--book-reveal-index, 0) * 22ms);
+}
+
+@keyframes book-result-settle {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 
 /* スマホ等メディアクエリ */
 @media (max-width: 850px) {
@@ -4209,6 +4226,24 @@ body.shelf-immersive-active .shelf-room-map-fab:focus-visible {
 
   .advanced-search-area {
     border-radius: var(--lib-radius-md);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .result-fade,
+  .result-fade.show {
+    transform: none;
+    transition: none;
+  }
+
+  .result-fade.show .book-card,
+  .result-fade.show .shelf-book,
+  .book-cover.book-image-loaded,
+  .list-thumb.book-image-loaded,
+  .shelf-book-cover.book-image-loaded,
+  #image-popup-img.book-image-loaded,
+  #cover-fullscreen-img.book-image-loaded {
+    animation: none;
   }
 }
 
