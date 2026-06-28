@@ -6,10 +6,14 @@ let currentShelfRoomMapGroups = []; // 没入本棚モード用の現在のマ�
 let isCardView = true; // 既存コード互換用。card/list切替に同期する。
 let lastResult = null;
 let coverFullscreenPreviousKeydown = null;
+let preferredResultViewMode = '';
+let resultViewModeChangedLocally = false;
 
 const NO_IMAGE_URL = "https://i.imgur.com/Q80wBRc.jpeg";
 const SENSITIVE_THEME_NAME = '18禁';
 const SENSITIVE_COVER_STORAGE_KEY = 'shumiLibrary.showSensitiveCovers';
+const RESULT_VIEW_MODE_STORAGE_KEY = 'shumiLibrary.resultViewMode';
+const RESULT_VIEW_MODES = ['card', 'list', 'shelf'];
 
 const UI_ICONS = {
   search: '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"></circle><path d="M16 16l4 4"></path></svg>',
@@ -66,6 +70,52 @@ function setSensitiveCoverVisible_(visible) {
   } catch (e) {
     // localStorageが使えない環境では、その場の表示だけ切り替える。
   }
+}
+
+function normalizeResultViewMode_(mode) {
+  return RESULT_VIEW_MODES.includes(mode) ? mode : 'card';
+}
+
+function loadPreferredResultViewMode_() {
+  if (RESULT_VIEW_MODES.includes(preferredResultViewMode)) {
+    return preferredResultViewMode;
+  }
+
+  try {
+    return normalizeResultViewMode_(localStorage.getItem(RESULT_VIEW_MODE_STORAGE_KEY));
+  } catch (e) {
+    return 'card';
+  }
+}
+
+function hydratePreferredResultViewMode_(mode) {
+  const normalized = normalizeResultViewMode_(mode);
+  preferredResultViewMode = normalized;
+  try {
+    localStorage.setItem(RESULT_VIEW_MODE_STORAGE_KEY, normalized);
+  } catch (e) {
+    // localStorageが使えない環境では、その場の表示だけ切り替える。
+  }
+  return normalized;
+}
+
+function savePreferredResultViewModeToServer_(mode) {
+  if (!window.google || !google.script || !google.script.run) return;
+
+  google.script.run
+    .withFailureHandler(function(err) {
+      console.warn('saveWebAppUserPreferences failed:', err);
+    })
+    .saveWebAppUserPreferences({
+      resultViewMode: normalizeResultViewMode_(mode)
+    });
+}
+
+function savePreferredResultViewMode_(mode) {
+  const normalized = hydratePreferredResultViewMode_(mode);
+  resultViewModeChangedLocally = true;
+  savePreferredResultViewModeToServer_(normalized);
+  return normalized;
 }
 
 function isSensitiveBook_(book) {
@@ -546,6 +596,13 @@ function applyInitialSearchData_(data) {
   ADVANCED_OPTIONS = payload.advancedOptions || getEmptyAdvancedOptions_();
   PREVIEW_INDEX = Array.isArray(payload.previewIndex) ? payload.previewIndex : [];
   PREVIEW_INDEX_READY = true;
+
+  if (!resultViewModeChangedLocally && payload.userPreferences) {
+    const initialViewMode = hydratePreferredResultViewMode_(payload.userPreferences.resultViewMode);
+    currentViewMode = initialViewMode;
+    isCardView = initialViewMode === 'card';
+    updateViewToggleButtons_();
+  }
 
   populateAdvancedOptions();
   syncSearchStatusPreviewFromForm_();
@@ -1541,13 +1598,13 @@ function hasAnyAdvancedCondition_(params) {
 }
 
 function rerunSearchWithParams_(params) {
-  resetViewModeToCardForNewSearch_();
-
   if (!hasAnySearchCondition_(params)) {
     hideSpinner();
     syncSearchStatusPreviewFromForm_();
     return;
   }
+
+  resetViewModeForNewResults_();
 
   const container = document.getElementById('searchContainer');
   container.classList.remove('centered');
@@ -1720,7 +1777,7 @@ function search() {
       return;
     }
 
-    resetViewModeToCardForNewSearch_();
+    resetViewModeForNewResults_();
 
     const container = document.getElementById('searchContainer');
     container.classList.remove('centered');
@@ -1764,7 +1821,7 @@ function search() {
     return;
   }
 
-  resetViewModeToCardForNewSearch_();
+  resetViewModeForNewResults_();
 
   const container = document.getElementById('searchContainer');
   container.classList.remove('centered');
@@ -1787,7 +1844,7 @@ function search() {
 }
 
 function showRandomBooks() {
-  resetViewModeToCardForNewSearch_();
+  resetViewModeForNewResults_();
   clearSearchFormValuesForBrowse_();
   closeAdvancedSearchPanel_();
 
@@ -2083,31 +2140,34 @@ function isPopupSummaryScrollTarget_(target) {
 
 
 function getCurrentViewMode_() {
-  if (currentViewMode === 'card' || currentViewMode === 'list' || currentViewMode === 'shelf') {
+  if (RESULT_VIEW_MODES.includes(currentViewMode)) {
     return currentViewMode;
   }
   return isCardView ? 'card' : 'list';
 }
 
-function resetViewModeToCardForNewSearch_() {
-  currentViewMode = 'card';
-  isCardView = true;
+function applyResultViewMode_(mode) {
+  const nextMode = normalizeResultViewMode_(mode);
+  currentViewMode = nextMode;
+  isCardView = nextMode === 'card';
   isShelfImmersiveMode = false;
   currentShelfRoomMapGroups = [];
   closeShelfRoomMapOverlay_();
   updateViewToggleButtons_();
-  syncShelfViewUiState_('card');
+  syncShelfViewUiState_(nextMode);
+}
+
+function resetViewModeToCardForNewSearch_() {
+  applyResultViewMode_('card');
+}
+
+function resetViewModeForNewResults_() {
+  applyResultViewMode_(loadPreferredResultViewMode_());
 }
 
 function setViewMode_(mode) {
-  isShelfImmersiveMode = false;
-  currentShelfRoomMapGroups = [];
-  closeShelfRoomMapOverlay_();
-  const nextMode = ['card', 'list', 'shelf'].includes(mode) ? mode : 'card';
-  currentViewMode = nextMode;
-  isCardView = nextMode === 'card';
-  updateViewToggleButtons_();
-  syncShelfViewUiState_(nextMode);
+  const nextMode = savePreferredResultViewMode_(mode);
+  applyResultViewMode_(nextMode);
 
   if (lastResult) {
     showResult(lastResult);
@@ -3475,6 +3535,8 @@ window.addEventListener('DOMContentLoaded', function() {
       setViewMode_('shelf');
     };
   }
+  currentViewMode = loadPreferredResultViewMode_();
+  isCardView = currentViewMode === 'card';
   updateViewToggleButtons_();
 
   document.addEventListener('click', function(event) {

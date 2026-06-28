@@ -411,10 +411,52 @@ function buildPreviewIndexPayload_(dataset) {
 }
 
 /**
+ * Webアプリの個人用表示設定を保存するScript Propertiesキー。
+ * このWebアプリは個人利用かつ executeAs USER_DEPLOYING のため、アプリ単位設定として扱う。
+ */
+const WEBAPP_PREF_RESULT_VIEW_MODE_KEY = 'webapp.pref.resultViewMode';
+const WEBAPP_RESULT_VIEW_MODES = ['card', 'list', 'shelf'];
+
+function normalizeWebAppResultViewMode_(mode) {
+  return WEBAPP_RESULT_VIEW_MODES.includes(mode) ? mode : 'card';
+}
+
+function getWebAppUserPreferences() {
+  try {
+    const props = PropertiesService.getScriptProperties();
+    return {
+      resultViewMode: normalizeWebAppResultViewMode_(props.getProperty(WEBAPP_PREF_RESULT_VIEW_MODE_KEY))
+    };
+  } catch (e) {
+    console.warn('getWebAppUserPreferences error:', e);
+    return {
+      resultViewMode: 'card'
+    };
+  }
+}
+
+function saveWebAppUserPreferences(preferences) {
+  try {
+    const prefs = preferences || {};
+    const resultViewMode = normalizeWebAppResultViewMode_(prefs.resultViewMode);
+    PropertiesService
+      .getScriptProperties()
+      .setProperty(WEBAPP_PREF_RESULT_VIEW_MODE_KEY, resultViewMode);
+    return {
+      resultViewMode
+    };
+  } catch (e) {
+    console.warn('saveWebAppUserPreferences error:', e);
+    return getWebAppUserPreferences();
+  }
+}
+
+/**
  * Webアプリ初期表示用データをまとめて返す
  * - サジェスト
  * - 詳細検索ドロップダウン候補
  * - 件数プレビュー用軽量インデックス
+ * - 表示設定
  *
  * 目的:
  * 初期表示時の google.script.run を3本から1本に統合し、
@@ -430,7 +472,8 @@ function buildPreviewIndexPayload_(dataset) {
  *     statusGenres: string[],
  *     releaseYears: string[]
  *   },
- *   previewIndex: Object[]
+ *   previewIndex: Object[],
+ *   userPreferences: {resultViewMode: string}
  * }}
  */
 function getInitialSearchData() {
@@ -440,14 +483,16 @@ function getInitialSearchData() {
     return {
       suggest: buildSuggestDataPayload_(dataset),
       advancedOptions: buildAdvancedSearchOptionsPayload_(dataset),
-      previewIndex: buildPreviewIndexPayload_(dataset)
+      previewIndex: buildPreviewIndexPayload_(dataset),
+      userPreferences: getWebAppUserPreferences()
     };
   } catch (e) {
     console.error('getInitialSearchData error:', e);
     return {
       suggest: buildEmptySuggestData_(),
       advancedOptions: buildEmptyAdvancedSearchOptions_(),
-      previewIndex: []
+      previewIndex: [],
+      userPreferences: getWebAppUserPreferences()
     };
   }
 }
