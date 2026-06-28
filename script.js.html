@@ -2013,6 +2013,28 @@ function formatShelfLabel_(book) {
   return shelf || location || '';
 }
 
+function buildBookAuthorLineHtml_(book) {
+  const author = hasDisplayValue_(book && book.author) ? String(book.author).trim() : '';
+  const publisher = hasDisplayValue_(book && book.publisher) ? String(book.publisher).trim() : '';
+  if (!author && !publisher) return '';
+
+  return `
+    <div class="book-author-line">
+      ${author ? `<span class="book-author-name">${escapeHtml(author)}</span>` : ''}
+      ${publisher ? `<span class="book-publisher-name">${escapeHtml(publisher)}</span>` : ''}
+    </div>
+  `;
+}
+
+function buildListBookMetaHtml_(book) {
+  const publisher = hasDisplayValue_(book && book.publisher) ? String(book.publisher).trim() : '';
+  const shelfLabel = formatShelfLabel_(book);
+  const parts = [];
+  if (publisher) parts.push(publisher);
+  parts.push(shelfLabel || '棚未定');
+  return `<div class="list-book-meta">${parts.map(part => escapeHtml(part)).join(' / ')}</div>`;
+}
+
 function buildBookMetaPillsHtml_(book, options) {
   const opt = options || {};
   const items = [];
@@ -2062,10 +2084,14 @@ function buildBookDetailsHtml_(book) {
     ['価格', book && book.price],
     ['レーベル', book && book.brand],
     ['備考', book && book.memo]
-  ];
+  ].filter(([, value]) => hasDisplayValue_(value));
+
+  if (!rows.length) {
+    return '<div class="book-details-empty">詳細情報はまだ入っていません</div>';
+  }
 
   return rows.map(([label, value]) => `
-    <div><span>${escapeHtml(label)}</span>${escapeHtml(hasDisplayValue_(value) ? value : '-')}</div>
+    <div><span>${escapeHtml(label)}</span>${escapeHtml(value)}</div>
   `).join('');
 }
 
@@ -2973,7 +2999,7 @@ function showResult(data) {
       info.className = 'card-info';
       info.innerHTML = `
         <div class="book-title">${escapeHtml(book.title || '(タイトルなし)')}</div>
-        <div class="book-author-line">${escapeHtml(book.author || '-')}<span>${escapeHtml(book.publisher || '-')}</span></div>
+        ${buildBookAuthorLineHtml_(book)}
         <div class="genre-chip-wrap">${buildGenreChips(book)}</div>
         ${buildBookMetaPillsHtml_(book, { includeIsbn: true })}
         ${buildBookMemoHtml_(book)}
@@ -3024,7 +3050,7 @@ function showResult(data) {
       titleBlock.className = 'list-title-block';
       titleBlock.innerHTML = `
         <div class="book-title">${escapeHtml(book.title || '(タイトルなし)')}</div>
-        <div class="list-book-meta">${escapeHtml(book.publisher || '-')} / ${escapeHtml(formatShelfLabel_(book) || '棚未定')}</div>
+        ${buildListBookMetaHtml_(book)}
         <div class="genre-chip-wrap compact">${buildGenreChips(book)}</div>
         ${buildBookMetaPillsHtml_(book, { compact: true })}
       `;
@@ -3032,12 +3058,13 @@ function showResult(data) {
       appendSummaryAccordion_(titleBlock.querySelector('.genre-chip-wrap'), book);
       setupBookKeyboardOpenSurface_(titleBlock.querySelector('.book-title'), book, idx, data);
 
-      const authorDiv = document.createElement('div');
-      authorDiv.className = 'list-title-author';
-      authorDiv.textContent = `著: ${book.author || '-'}`;
-
       titleRow.appendChild(titleBlock);
-      titleRow.appendChild(authorDiv);
+      if (hasDisplayValue_(book && book.author)) {
+        const authorDiv = document.createElement('div');
+        authorDiv.className = 'list-title-author';
+        authorDiv.textContent = String(book.author).trim();
+        titleRow.appendChild(authorDiv);
+      }
 
       row.appendChild(thumb);
       row.appendChild(titleRow);

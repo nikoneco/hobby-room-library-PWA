@@ -3344,6 +3344,11 @@ button.quiet-action:hover,
   font-weight: 750;
 }
 
+.book-details .book-details-empty {
+  display: block;
+  color: var(--lib-muted);
+}
+
 .genre-chip {
   padding: 0.18rem 0.54rem;
   background: rgba(104, 191, 215, 0.09);
@@ -3841,6 +3846,11 @@ button.quiet-action:hover,
 .popup-arrow:hover {
   background: rgba(255, 255, 255, 0.08);
   color: var(--lib-text);
+}
+
+button.popup-arrow:hover,
+button.popup-arrow:focus-visible {
+  transform: translateY(-50%);
 }
 
 .popup-arrow .ui-icon {
