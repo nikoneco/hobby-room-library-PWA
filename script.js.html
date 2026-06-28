@@ -1105,6 +1105,62 @@ function applyQuickBrowseCondition_(field, value) {
   rerunSearchWithParams_(getAdvancedSearchParams_(), 'この入口の棚を開いています');
 }
 
+function getGenreSearchField_(category) {
+  switch (category) {
+    case 'story':
+      return 'detailStory';
+    case 'theme':
+      return 'detailTheme';
+    case 'mood':
+      return 'detailMood';
+    case 'status':
+      return 'detailStatus';
+    default:
+      return '';
+  }
+}
+
+function getGenreCategoryLabel_(category) {
+  switch (category) {
+    case 'story':
+      return 'ストーリー';
+    case 'theme':
+      return '題材';
+    case 'mood':
+      return '雰囲気';
+    case 'status':
+      return '状況';
+    default:
+      return '条件';
+  }
+}
+
+function closeActiveBookPopup_() {
+  const overlay = document.getElementById('image-popup-overlay');
+  if (!overlay || overlay.style.display === 'none') return;
+
+  closeCoverFullscreen_();
+  clearPopupTouchHandlers_();
+  overlay.style.display = 'none';
+  document.body.classList.remove('modal-open');
+  document.onkeydown = null;
+}
+
+function applyGenreChipSearch_(field, value) {
+  const select = document.getElementById(field);
+  if (!select || !value) return;
+
+  const hasOption = Array.from(select.options || []).some(option => option.value === value);
+  if (!hasOption) return;
+
+  closeActiveBookPopup_();
+  clearSearchFormValuesForBrowse_();
+  select.value = value;
+  closeAdvancedSearchPanel_();
+  syncSearchStatusPreviewFromForm_();
+  rerunSearchWithParams_(getAdvancedSearchParams_(), `${value} の棚をたどっています`);
+}
+
 
 function clearAdvancedFields() {
   const ids = [
@@ -2291,7 +2347,20 @@ function buildGenreChips(book) {
 
   return meta.map(item => {
     const cls = item.category === 'status' ? 'genre-chip status' : 'genre-chip';
-    return `<span class="${cls}">${escapeHtml(item.name)}</span>`;
+    const field = getGenreSearchField_(item.category);
+    const label = getGenreCategoryLabel_(item.category);
+    if (!field || !hasDisplayValue_(item.name)) return '';
+
+    return `
+      <button
+        type="button"
+        class="${cls}"
+        data-genre-field="${escapeHtml(field)}"
+        data-genre-value="${escapeHtml(item.name)}"
+        aria-label="${escapeHtml(label + ': ' + item.name + 'で探す')}"
+        title="${escapeHtml(label + ': ' + item.name + 'で探す')}"
+      >${escapeHtml(item.name)}</button>
+    `;
   }).join('');
 }
 
@@ -3256,7 +3325,7 @@ function shouldIgnoreBookOpenSurfaceClick_(target) {
   return !!(
     target &&
     typeof target.closest === 'function' &&
-    target.closest('button, a, input, select, textarea, label, .summary-text')
+    target.closest('button, a, input, select, textarea, label, .summary-text, .genre-chip')
   );
 }
 
@@ -4081,6 +4150,15 @@ window.addEventListener('DOMContentLoaded', function() {
       applyQuickBrowseCondition_(chip.dataset.field || '', chip.dataset.value || '');
     });
   }
+
+  document.addEventListener('click', function(event) {
+    const chip = event.target.closest('.genre-chip[data-genre-field]');
+    if (!chip) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    applyGenreChipSearch_(chip.dataset.genreField || '', chip.dataset.genreValue || '');
+  });
 
 
 

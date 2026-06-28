@@ -642,6 +642,7 @@ button:hover {
 .genre-chip {
   display: inline-flex;
   align-items: center;
+  min-height: 0;
   padding: 0.18em 0.72em;
   border-radius: 999px;
   background: rgba(46, 194, 248, 0.16);
@@ -650,12 +651,32 @@ button:hover {
   font-size: 0.82em;
   line-height: 1.35;
   white-space: nowrap;
+  box-shadow: none;
 }
 
 .genre-chip.status {
   background: rgba(255, 183, 70, 0.13);
   border: 1px solid rgba(255, 199, 100, 0.42);
   color: #ffe7b2;
+}
+
+button.genre-chip {
+  cursor: pointer;
+  font-weight: 750;
+}
+
+button.genre-chip:hover,
+button.genre-chip:focus-visible {
+  border-color: rgba(146, 220, 236, 0.54);
+  background: rgba(104, 191, 215, 0.16);
+  color: #ffffff;
+  box-shadow: none;
+}
+
+button.genre-chip.status:hover,
+button.genre-chip.status:focus-visible {
+  border-color: rgba(240, 195, 122, 0.56);
+  background: rgba(214, 164, 95, 0.18);
 }
 
 .summary-chip-toggle {
@@ -3436,17 +3457,38 @@ button.quick-browse-chip:focus-visible {
 }
 
 .genre-chip {
+  min-height: 0;
   padding: 0.18rem 0.54rem;
   background: rgba(104, 191, 215, 0.09);
   border-color: rgba(104, 191, 215, 0.22);
   color: #ccebf2;
   font-size: 0.72rem;
+  box-shadow: none;
 }
 
 .genre-chip.status {
   background: rgba(214, 164, 95, 0.11);
   border-color: rgba(214, 164, 95, 0.26);
   color: #f4dfbd;
+}
+
+button.genre-chip {
+  cursor: pointer;
+  font-weight: 750;
+}
+
+button.genre-chip:hover,
+button.genre-chip:focus-visible {
+  border-color: rgba(146, 220, 236, 0.50);
+  background: rgba(104, 191, 215, 0.16);
+  color: #ffffff;
+  box-shadow: none;
+}
+
+button.genre-chip.status:hover,
+button.genre-chip.status:focus-visible {
+  border-color: rgba(240, 195, 122, 0.54);
+  background: rgba(214, 164, 95, 0.18);
 }
 
 .summary-chip-toggle {
