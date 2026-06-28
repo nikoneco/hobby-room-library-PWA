@@ -3441,7 +3441,7 @@ function setupPopupNavButton_(button, targetIndex, directionLabel) {
   const targetTitle = getPopupNavBookLabel_(targetIndex);
   const accessibleLabel = targetTitle ? `${directionLabel}: ${targetTitle}` : directionLabel;
   button.setAttribute('aria-label', accessibleLabel);
-  button.title = accessibleLabel;
+  button.removeAttribute('title');
 
   if (targetTitle) {
     button.classList.add('has-nav-label');
