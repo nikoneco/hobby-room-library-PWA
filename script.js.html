@@ -3195,25 +3195,50 @@ function clearPopupTouchHandlers_() {
   overlay.ontouchstart = null;
   overlay.ontouchmove = null;
   overlay.ontouchend = null;
+  overlay.onpointerdown = null;
+  overlay.onpointermove = null;
+  overlay.onpointerup = null;
+  overlay.onpointercancel = null;
+  overlay.onmousedown = null;
+  overlay.onmousemove = null;
+  overlay.onmouseup = null;
+  overlay.onmouseleave = null;
 }
 
 function closeCoverFullscreen_() {
   const overlay = document.getElementById('cover-fullscreen-overlay');
   const img = document.getElementById('cover-fullscreen-img');
+  const caption = document.getElementById('cover-fullscreen-caption');
   if (!overlay || overlay.style.display === 'none') return;
 
   overlay.style.display = 'none';
   overlay.setAttribute('aria-hidden', 'true');
+  overlay.onclick = null;
+  overlay.ontouchstart = null;
+  overlay.ontouchmove = null;
+  overlay.ontouchend = null;
+  overlay.onpointerdown = null;
+  overlay.onpointermove = null;
+  overlay.onpointerup = null;
+  overlay.onpointercancel = null;
+  overlay.onmousedown = null;
+  overlay.onmousemove = null;
+  overlay.onmouseup = null;
+  overlay.onmouseleave = null;
+  overlay.style.removeProperty('--cover-drag-y');
+  overlay.style.removeProperty('--cover-drag-opacity');
   document.body.classList.remove('cover-fullscreen-open');
   if (img) {
     img.removeAttribute('src');
     img.removeAttribute('role');
     img.removeAttribute('tabindex');
     img.removeAttribute('aria-label');
+    img.removeAttribute('draggable');
     img.onclick = null;
     img.onkeydown = null;
     img.classList.remove('book-image-loading', 'book-image-loaded');
   }
+  if (caption) caption.textContent = '';
   document.onkeydown = coverFullscreenPreviousKeydown || null;
   coverFullscreenPreviousKeydown = null;
 }
@@ -3229,6 +3254,7 @@ function openCoverFullscreen_(book) {
   img.setAttribute('role', 'button');
   img.setAttribute('tabindex', '0');
   img.setAttribute('aria-label', '拡大表示を閉じる');
+  img.setAttribute('draggable', 'false');
   setupBookImageElement_(img, book, {
     track: false,
     loading: 'eager',
@@ -3250,6 +3276,84 @@ function openCoverFullscreen_(book) {
   overlay.onclick = function(e) {
     if (e.target === overlay) closeCoverFullscreen_();
   };
+
+  let coverPointerStartX = 0;
+  let coverPointerStartY = 0;
+  let coverPointerDragging = false;
+  let coverPointerSource = '';
+
+  function startCoverDrag_(source, x, y) {
+    if (coverPointerDragging && coverPointerSource !== source) return false;
+
+    coverPointerStartX = x;
+    coverPointerStartY = y;
+    coverPointerDragging = true;
+    coverPointerSource = source;
+    return true;
+  }
+
+  function updateCoverDrag_(x, y) {
+    const diffY = Math.max(0, y - coverPointerStartY);
+    if (diffY < 6) return false;
+
+    const dragY = Math.min(diffY, 150);
+    const opacity = Math.max(0.48, 1 - dragY / 260);
+    overlay.style.setProperty('--cover-drag-y', `${dragY}px`);
+    overlay.style.setProperty('--cover-drag-opacity', String(opacity));
+    return true;
+  }
+
+  function resetCoverDrag_() {
+    coverPointerDragging = false;
+    coverPointerSource = '';
+    overlay.style.removeProperty('--cover-drag-y');
+    overlay.style.removeProperty('--cover-drag-opacity');
+  }
+
+  function endCoverDrag_(x, y) {
+    const diffX = x - coverPointerStartX;
+    const diffY = y - coverPointerStartY;
+    resetCoverDrag_();
+
+    if (diffY > 76 && Math.abs(diffY) > Math.abs(diffX) * 1.15) {
+      closeCoverFullscreen_();
+    }
+  }
+
+  overlay.onpointerdown = function(e) {
+    if (!e.isPrimary) return;
+    if (!startCoverDrag_('pointer', e.clientX, e.clientY)) return;
+    if (typeof overlay.setPointerCapture === 'function') {
+      overlay.setPointerCapture(e.pointerId);
+    }
+  };
+  overlay.onpointermove = function(e) {
+    if (!coverPointerDragging || coverPointerSource !== 'pointer' || !e.isPrimary) return;
+    if (updateCoverDrag_(e.clientX, e.clientY)) e.preventDefault();
+  };
+  overlay.onpointerup = function(e) {
+    if (!coverPointerDragging || coverPointerSource !== 'pointer' || !e.isPrimary) return;
+    endCoverDrag_(e.clientX, e.clientY);
+  };
+  overlay.onpointercancel = function() {
+    if (coverPointerSource === 'pointer') resetCoverDrag_();
+  };
+  overlay.onmousedown = function(e) {
+    if (e.button !== 0) return;
+    startCoverDrag_('mouse', e.clientX, e.clientY);
+  };
+  overlay.onmousemove = function(e) {
+    if (!coverPointerDragging || coverPointerSource !== 'mouse') return;
+    if (updateCoverDrag_(e.clientX, e.clientY)) e.preventDefault();
+  };
+  overlay.onmouseup = function(e) {
+    if (!coverPointerDragging || coverPointerSource !== 'mouse') return;
+    endCoverDrag_(e.clientX, e.clientY);
+  };
+  overlay.onmouseleave = function() {
+    if (coverPointerSource === 'mouse') resetCoverDrag_();
+  };
+
   img.onclick = function(e) {
     e.stopPropagation();
     closeCoverFullscreen_();
