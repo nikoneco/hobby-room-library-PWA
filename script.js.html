@@ -1360,6 +1360,7 @@ function renderSearchStatus_() {
   }).join('');
 
   if (searchStatusState.mode === 'random') {
+    const rerollBusyAttrs = isRandomBooksLoading ? 'disabled aria-busy="true"' : 'aria-busy="false"';
     els.chips.insertAdjacentHTML('beforeend', `
       <button
         type="button"
@@ -1367,9 +1368,18 @@ function renderSearchStatus_() {
         data-action="random-reroll"
         aria-label="ランダムで別の10冊を表示"
         title="別の10冊を表示"
+        ${rerollBusyAttrs}
       >もう一度ひく</button>
     `);
   }
+}
+
+function setRandomRerollLoading_(loading) {
+  const rerollBtn = document.querySelector('.search-status-reroll');
+  if (!rerollBtn) return;
+
+  rerollBtn.disabled = Boolean(loading);
+  rerollBtn.setAttribute('aria-busy', loading ? 'true' : 'false');
 }
 
 function showSearchStatusPreview_(mode, params, previewCount, previewReady) {
@@ -1866,6 +1876,7 @@ function search() {
 function showRandomBooks() {
   if (isRandomBooksLoading) return;
   isRandomBooksLoading = true;
+  setRandomRerollLoading_(true);
   resetViewModeForNewResults_();
   clearSearchFormValuesForBrowse_();
   closeAdvancedSearchPanel_();
@@ -1884,6 +1895,7 @@ function showRandomBooks() {
     })
     .withFailureHandler(function(err) {
       isRandomBooksLoading = false;
+      setRandomRerollLoading_(false);
       console.error('showRandomBooks failed:', err);
       hideSpinner();
       alert('ランダム検索中にエラーが発生しました。時間をおいて再度お試しください。');
