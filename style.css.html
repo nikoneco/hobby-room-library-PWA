@@ -3414,6 +3414,9 @@ button.quiet-action:hover,
   border-radius: var(--lib-radius-lg);
   background: rgba(22, 28, 38, 0.96);
   box-shadow: var(--lib-shadow-md);
+  opacity: var(--popup-drag-opacity, 1);
+  transform: translateY(var(--popup-drag-y, 0));
+  transition: transform 170ms ease, opacity 170ms ease;
 }
 
 #image-popup-content.series-mode {

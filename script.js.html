@@ -6,6 +6,7 @@ let currentShelfRoomMapGroups = []; // 没入本棚モード用の現在のマ�
 let isCardView = true; // 既存コード互換用。card/list切替に同期する。
 let lastResult = null;
 let coverFullscreenPreviousKeydown = null;
+let popupDragSuppressNextClick = false;
 let isRandomBooksLoading = false;
 let preferredResultViewMode = '';
 let resultViewModeChangedLocally = false;
@@ -3191,18 +3192,24 @@ function setupPopupNavButton_(button, targetIndex, directionLabel) {
 
 function clearPopupTouchHandlers_() {
   const overlay = document.getElementById('image-popup-overlay');
-  if (!overlay) return;
-  overlay.ontouchstart = null;
-  overlay.ontouchmove = null;
-  overlay.ontouchend = null;
-  overlay.onpointerdown = null;
-  overlay.onpointermove = null;
-  overlay.onpointerup = null;
-  overlay.onpointercancel = null;
-  overlay.onmousedown = null;
-  overlay.onmousemove = null;
-  overlay.onmouseup = null;
-  overlay.onmouseleave = null;
+  const popupContent = document.getElementById('image-popup-content');
+  if (overlay) {
+    overlay.ontouchstart = null;
+    overlay.ontouchmove = null;
+    overlay.ontouchend = null;
+    overlay.onpointerdown = null;
+    overlay.onpointermove = null;
+    overlay.onpointerup = null;
+    overlay.onpointercancel = null;
+    overlay.onmousedown = null;
+    overlay.onmousemove = null;
+    overlay.onmouseup = null;
+    overlay.onmouseleave = null;
+  }
+  if (popupContent) {
+    popupContent.style.removeProperty('--popup-drag-y');
+    popupContent.style.removeProperty('--popup-drag-opacity');
+  }
 }
 
 function closeCoverFullscreen_() {
@@ -3525,6 +3532,11 @@ function showPopup(book, index, dataArr, seriesContext) {
   });
   img.onclick = function(e) {
     e.stopPropagation();
+    if (popupDragSuppressNextClick) {
+      e.preventDefault();
+      popupDragSuppressNextClick = false;
+      return;
+    }
     openCoverFullscreen_(book);
   };
   img.onkeydown = function(e) {
@@ -3557,6 +3569,7 @@ info.innerHTML = `
 
   function hide() {
     closeCoverFullscreen_();
+    clearPopupTouchHandlers_();
     overlay.style.display = 'none';
     document.body.classList.remove('modal-open');
     document.onkeydown = null;
@@ -3580,27 +3593,96 @@ info.innerHTML = `
   prevBtn.onclick = function(e) { e.stopPropagation(); popupMove(-1); };
   nextBtn.onclick = function(e) { e.stopPropagation(); popupMove(1); };
 
-  let touchStartX = 0;
-  let touchStartY = 0;
+  let popupDragStartX = 0;
+  let popupDragStartY = 0;
+  let popupDragging = false;
+  let popupDragSource = '';
+  let popupDragScrollTarget = false;
+
+  function startPopupDrag_(source, x, y, target) {
+    if (popupDragging && popupDragSource !== source) return false;
+
+    popupDragStartX = x;
+    popupDragStartY = y;
+    popupDragging = true;
+    popupDragSource = source;
+    popupDragScrollTarget = isPopupSummaryScrollTarget_(target);
+    return true;
+  }
+
+  function updatePopupDrag_(x, y) {
+    if (popupDragScrollTarget) return false;
+
+    const diffY = Math.max(0, y - popupDragStartY);
+    if (diffY < 8) return false;
+
+    const dragY = Math.min(diffY, 130);
+    const opacity = Math.max(0.56, 1 - dragY / 260);
+    popupContent.style.setProperty('--popup-drag-y', `${dragY}px`);
+    popupContent.style.setProperty('--popup-drag-opacity', String(opacity));
+    return true;
+  }
+
+  function resetPopupDrag_() {
+    popupDragging = false;
+    popupDragSource = '';
+    popupDragScrollTarget = false;
+    popupContent.style.removeProperty('--popup-drag-y');
+    popupContent.style.removeProperty('--popup-drag-opacity');
+  }
+
+  function endPopupDrag_(x, y) {
+    const diffX = x - popupDragStartX;
+    const diffY = y - popupDragStartY;
+    const shouldClose = !popupDragScrollTarget && diffY > 92 && Math.abs(diffY) > Math.abs(diffX) * 1.12;
+    const shouldMove = !popupDragScrollTarget && Math.abs(diffX) > 48 && Math.abs(diffX) > Math.abs(diffY);
+
+    resetPopupDrag_();
+
+    if (shouldClose) {
+      popupDragSuppressNextClick = true;
+      hide();
+      window.setTimeout(function() {
+        popupDragSuppressNextClick = false;
+      }, 260);
+    } else if (shouldMove) {
+      popupMove(diffX > 0 ? -1 : 1);
+    }
+  }
 
   overlay.ontouchstart = function(e) {
     if (e.touches.length === 1) {
-      touchStartX = e.touches[0].clientX;
-      touchStartY = e.touches[0].clientY;
+      startPopupDrag_('touch', e.touches[0].clientX, e.touches[0].clientY, e.target);
     }
   };
   overlay.ontouchmove = function(e) {
-    if (isPopupSummaryScrollTarget_(e.target)) return;
+    if (!popupDragging || popupDragSource !== 'touch' || !e.touches || e.touches.length !== 1) return;
+    if (popupDragScrollTarget) return;
     e.preventDefault();
+    updatePopupDrag_(e.touches[0].clientX, e.touches[0].clientY);
   };
   overlay.ontouchend = function(e) {
+    if (!popupDragging || popupDragSource !== 'touch') return;
     if (e.changedTouches && e.changedTouches.length === 1) {
-      const diffX = e.changedTouches[0].clientX - touchStartX;
-      const diffY = e.changedTouches[0].clientY - touchStartY;
-      if (Math.abs(diffX) > 48 && Math.abs(diffX) > Math.abs(diffY)) {
-        popupMove(diffX > 0 ? -1 : 1);
-      }
+      endPopupDrag_(e.changedTouches[0].clientX, e.changedTouches[0].clientY);
+    } else {
+      resetPopupDrag_();
     }
+  };
+  overlay.onmousedown = function(e) {
+    if (e.button !== 0) return;
+    startPopupDrag_('mouse', e.clientX, e.clientY, e.target);
+  };
+  overlay.onmousemove = function(e) {
+    if (!popupDragging || popupDragSource !== 'mouse') return;
+    if (updatePopupDrag_(e.clientX, e.clientY)) e.preventDefault();
+  };
+  overlay.onmouseup = function(e) {
+    if (!popupDragging || popupDragSource !== 'mouse') return;
+    endPopupDrag_(e.clientX, e.clientY);
+  };
+  overlay.onmouseleave = function() {
+    if (popupDragSource === 'mouse') resetPopupDrag_();
   };
 }
 
