@@ -1559,8 +1559,7 @@ function renderSearchStatus_() {
         data-action="remove-chip"
         data-key="${escapeHtml(chip.key || '')}"
         aria-label="${escapeHtml(visibleLabel + ' を削除')}"
-        title="この条件を削除"
-      >×</button>
+      >${uiIcon_('close', 'ui-icon-inline')}</button>
     ` : '';
 
     return `
@@ -1583,9 +1582,8 @@ function renderSearchStatus_() {
         class="search-status-reroll"
         data-action="random-reroll"
         aria-label="ランダムで別の10冊を表示"
-        title="別の10冊を表示"
         ${rerollBusyAttrs}
-      >もう一度ひく</button>
+      >${uiIcon_('shuffle', 'ui-icon-inline')}<span>もう一度ひく</span></button>
     `);
   }
 }
