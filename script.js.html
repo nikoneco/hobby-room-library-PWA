@@ -2332,8 +2332,17 @@ function renderEmptyResult_(result) {
     resetSearch();
   };
 
+  const randomButton = document.createElement('button');
+  randomButton.type = 'button';
+  randomButton.className = 'quiet-action empty-result-action empty-result-random';
+  randomButton.innerHTML = `${uiIcon_('shuffle', 'ui-icon-inline')}<span>ランダムで眺める</span>`;
+  randomButton.onclick = function() {
+    showRandomBooks();
+  };
+
   actions.appendChild(focusButton);
   actions.appendChild(clearButton);
+  actions.appendChild(randomButton);
 
   empty.appendChild(title);
   empty.appendChild(text);
