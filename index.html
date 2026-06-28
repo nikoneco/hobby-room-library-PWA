@@ -209,6 +209,14 @@
     </div>
   </div>
 
+  <div id="cover-fullscreen-overlay" style="display:none;" aria-hidden="true">
+    <button id="cover-fullscreen-close" class="ui-icon" aria-label="拡大画像を閉じる" type="button">
+      <svg viewBox="0 0 24 24"><path d="M6 6l12 12"></path><path d="M18 6L6 18"></path></svg>
+    </button>
+    <img id="cover-fullscreen-img" src="" alt="表紙の拡大画像">
+    <div id="cover-fullscreen-caption"></div>
+  </div>
+
   <?!= HtmlService.createHtmlOutputFromFile('script.js.html').getContent(); ?>
 </body>
 </html>

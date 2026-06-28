@@ -5,6 +5,7 @@ let isShelfImmersiveMode = false; // true: トップの「本棚を見る」専�
 let currentShelfRoomMapGroups = []; // 没入本棚モード用の現在のマップ集計
 let isCardView = true; // 既存コード互換用。card/list切替に同期する。
 let lastResult = null;
+let coverFullscreenPreviousKeydown = null;
 
 const NO_IMAGE_URL = "https://i.imgur.com/Q80wBRc.jpeg";
 const SENSITIVE_THEME_NAME = '18禁';
@@ -3039,6 +3040,57 @@ function clearPopupTouchHandlers_() {
   overlay.ontouchend = null;
 }
 
+function closeCoverFullscreen_() {
+  const overlay = document.getElementById('cover-fullscreen-overlay');
+  const img = document.getElementById('cover-fullscreen-img');
+  if (!overlay || overlay.style.display === 'none') return;
+
+  overlay.style.display = 'none';
+  overlay.setAttribute('aria-hidden', 'true');
+  document.body.classList.remove('cover-fullscreen-open');
+  if (img) {
+    img.removeAttribute('src');
+    img.classList.remove('book-image-loading', 'book-image-loaded');
+  }
+  document.onkeydown = coverFullscreenPreviousKeydown || null;
+  coverFullscreenPreviousKeydown = null;
+}
+
+function openCoverFullscreen_(book) {
+  const overlay = document.getElementById('cover-fullscreen-overlay');
+  const img = document.getElementById('cover-fullscreen-img');
+  const caption = document.getElementById('cover-fullscreen-caption');
+  const closeBtn = document.getElementById('cover-fullscreen-close');
+  if (!overlay || !img || !closeBtn || !book) return;
+
+  img.alt = `${book.title || '表紙'} の拡大画像`;
+  setupBookImageElement_(img, book, {
+    track: false,
+    loading: 'eager',
+    fetchPriority: 'high'
+  });
+  if (caption) caption.textContent = book.title || '';
+
+  overlay.style.display = 'flex';
+  overlay.setAttribute('aria-hidden', 'false');
+  document.body.classList.add('cover-fullscreen-open');
+
+  coverFullscreenPreviousKeydown = document.onkeydown;
+  document.onkeydown = function(e) {
+    if (e.key === 'Escape') {
+      closeCoverFullscreen_();
+    }
+  };
+
+  overlay.onclick = function(e) {
+    if (e.target === overlay) closeCoverFullscreen_();
+  };
+  closeBtn.onclick = function(e) {
+    e.stopPropagation();
+    closeCoverFullscreen_();
+  };
+}
+
 function openSeriesPanel(sourceBook) {
   if (!sourceBook || !sourceBook.seriesKeyAuto) return;
 
@@ -3184,11 +3236,24 @@ function showPopup(book, index, dataArr, seriesContext) {
   img.style.display = '';
   if (popupContent) popupContent.classList.remove('series-mode');
   img.alt = book.title || '表紙';
+  img.setAttribute('role', 'button');
+  img.setAttribute('tabindex', '0');
+  img.setAttribute('aria-label', '表紙を全画面で表示');
   setupBookImageElement_(img, book, {
     track: false,
     loading: 'eager',
     fetchPriority: 'high'
   });
+  img.onclick = function(e) {
+    e.stopPropagation();
+    openCoverFullscreen_(book);
+  };
+  img.onkeydown = function(e) {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      openCoverFullscreen_(book);
+    }
+  };
 
   const actionsHtml = buildPopupActionsHtml(book, popupSeriesContext);
 info.innerHTML = `
@@ -3212,6 +3277,7 @@ info.innerHTML = `
   popupContent.classList.remove('popup-slide-next', 'popup-slide-prev');
 
   function hide() {
+    closeCoverFullscreen_();
     overlay.style.display = 'none';
     document.body.classList.remove('modal-open');
     document.onkeydown = null;

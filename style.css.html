@@ -3083,14 +3083,16 @@ button.quiet-action:hover,
 .book-cover.book-image-loading,
 .list-thumb.book-image-loading,
 .shelf-book-cover.book-image-loading,
-#image-popup-img.book-image-loading {
+#image-popup-img.book-image-loading,
+#cover-fullscreen-img.book-image-loading {
   opacity: 0.18;
 }
 
 .book-cover.book-image-loaded,
 .list-thumb.book-image-loaded,
 .shelf-book-cover.book-image-loaded,
-#image-popup-img.book-image-loaded {
+#image-popup-img.book-image-loaded,
+#cover-fullscreen-img.book-image-loaded {
   animation: book-image-reveal 220ms ease-out both;
 }
 
@@ -3382,6 +3384,73 @@ button.quiet-action:hover,
   border-radius: var(--lib-radius-md);
   background: rgba(0, 0, 0, 0.24);
   box-shadow: 0 18px 42px rgba(0, 0, 0, 0.35);
+}
+
+#image-popup-img[role="button"] {
+  cursor: zoom-in;
+}
+
+#image-popup-img[role="button"]:focus-visible {
+  outline: 3px solid rgba(89, 210, 255, 0.72);
+  outline-offset: 4px;
+}
+
+#cover-fullscreen-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10050;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: clamp(0.8rem, 3vw, 2rem);
+  background: rgba(4, 7, 12, 0.9);
+  backdrop-filter: blur(12px);
+}
+
+#cover-fullscreen-img {
+  width: auto;
+  max-width: min(92vw, 760px);
+  max-height: 86vh;
+  border-radius: var(--lib-radius-md);
+  background: rgba(0, 0, 0, 0.28);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.48);
+  object-fit: contain;
+}
+
+#cover-fullscreen-caption {
+  max-width: min(92vw, 760px);
+  color: rgba(246, 241, 229, 0.86);
+  font-size: 0.95rem;
+  line-height: 1.45;
+  text-align: center;
+}
+
+#cover-fullscreen-close {
+  position: fixed;
+  top: clamp(12px, 2vw, 22px);
+  right: clamp(12px, 2vw, 22px);
+  z-index: 10051;
+  width: 42px;
+  height: 42px;
+  min-width: 42px;
+  min-height: 42px;
+  padding: 0;
+  border: 1px solid rgba(246, 241, 229, 0.22);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(246, 241, 229, 0.9);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+#cover-fullscreen-close:hover,
+#cover-fullscreen-close:focus-visible {
+  background: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
 }
 
 #image-popup-close {
@@ -3822,6 +3891,15 @@ body.shelf-immersive-active .shelf-room-map-fab:focus-visible {
     max-width: min(220px, 70vw);
     max-height: 38vh;
     justify-self: center;
+  }
+
+  #cover-fullscreen-img {
+    max-width: 94vw;
+    max-height: 82vh;
+  }
+
+  #cover-fullscreen-caption {
+    font-size: 0.86rem;
   }
 
   .popup-meta-grid {
