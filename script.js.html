@@ -1233,6 +1233,7 @@ function getSearchStatusElements_() {
 
 function getSearchStatusModeClass_(mode) {
   if (mode === 'random') return 'is-random';
+  if (mode === 'shelf') return 'is-shelf';
   if (mode === 'result') return 'is-result';
   if (mode === 'notice') return 'is-notice';
   return 'is-preview';
@@ -1362,6 +1363,17 @@ function buildSearchStatusChips_(mode, params) {
     return chips;
   }
 
+  if (mode === 'shelf') {
+    chips.push({
+      key: 'shelf',
+      value: 'all',
+      label: '本棚全体',
+      className: 'shelf',
+      removable: false
+    });
+    return chips;
+  }
+
   if (mode !== 'advanced') return chips;
 
   if (params.keyword) {
@@ -1481,6 +1493,10 @@ function getSearchStatusCountText_() {
     return `${searchStatusState.resultCount}冊を選びました`;
   }
 
+  if (searchStatusState.mode === 'shelf') {
+    return `全${searchStatusState.resultCount}冊を表示中`;
+  }
+
   if (searchStatusState.mode === 'result') {
     return `${searchStatusState.resultCount}冊見つかりました`;
   }
@@ -1506,7 +1522,7 @@ function renderSearchStatus_() {
 
   if (!searchStatusState.visible) {
     els.area.hidden = true;
-    els.area.classList.remove('is-preview', 'is-result', 'is-random', 'is-notice');
+    els.area.classList.remove('is-preview', 'is-result', 'is-random', 'is-shelf', 'is-notice');
     els.count.textContent = '';
     els.count.classList.remove('loading-dots');
     els.chips.innerHTML = '';
@@ -1514,7 +1530,7 @@ function renderSearchStatus_() {
   }
 
   els.area.hidden = false;
-  els.area.classList.remove('is-preview', 'is-result', 'is-random', 'is-notice');
+  els.area.classList.remove('is-preview', 'is-result', 'is-random', 'is-shelf', 'is-notice');
   els.area.classList.add(getSearchStatusModeClass_(searchStatusState.mode));
   els.count.textContent = getSearchStatusCountText_();
   els.count.classList.toggle('loading-dots', searchStatusState.previewPending);
@@ -1597,7 +1613,7 @@ function showSearchStatusPreview_(mode, params, previewCount, previewReady) {
 
 function showSearchStatusResult_(mode, resultCount, params) {
   searchStatusState.visible = true;
-  searchStatusState.mode = mode === 'random' ? 'random' : 'result';
+  searchStatusState.mode = mode === 'random' || mode === 'shelf' ? mode : 'result';
   searchStatusState.resultCount = Array.isArray(resultCount) ? resultCount.length : Number(resultCount) || 0;
   searchStatusState.chips = buildSearchStatusChips_(mode, params || {});
   searchStatusState.previewCount = null;
@@ -2131,7 +2147,7 @@ function showAllBookshelf() {
         const books = Array.isArray(data) ? data : [];
         lastResult = books;
         showResult(books);
-        showSearchStatusResult_('normal', books.length, {});
+        showSearchStatusResult_('shelf', books.length, {});
         scrollToBookshelfTop_();
       })
       .withFailureHandler(function(err) {
