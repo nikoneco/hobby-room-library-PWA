@@ -228,4 +228,76 @@ assertEqual(
   'new results preserve non-shelf preferred mode'
 );
 
+function createClassList() {
+  const values = new Set();
+  return {
+    add(value) {
+      values.add(value);
+    },
+    remove(value) {
+      values.delete(value);
+    },
+    contains(value) {
+      return values.has(value);
+    }
+  };
+}
+
+function createElement() {
+  const attributes = {};
+  return {
+    style: {},
+    classList: createClassList(),
+    hidden: false,
+    textContent: '',
+    setAttribute(name, value) {
+      attributes[name] = String(value);
+    },
+    getAttribute(name) {
+      return attributes[name];
+    }
+  };
+}
+
+const spinnerElements = {
+  'spinner-overlay': createElement(),
+  'spinner-label': createElement(),
+  'spinner-detail': createElement()
+};
+
+sandbox.document.getElementById = function getElementById(id) {
+  return spinnerElements[id] || null;
+};
+sandbox.document.querySelector = function querySelector(selector) {
+  return selector === '.spinner-label' ? spinnerElements['spinner-label'] : null;
+};
+
+vm.runInContext("showSpinner('本棚を探しています', { kind: 'search' });", sandbox);
+assertEqual(spinnerElements['spinner-overlay'].style.display, 'flex', 'showSpinner displays overlay');
+assertEqual(spinnerElements['spinner-label'].textContent, '本棚を探しています', 'showSpinner sets label');
+assertEqual(
+  spinnerElements['spinner-detail'].textContent,
+  'タイトル・作者・読みから候補を集めています',
+  'showSpinner sets default detail for kind'
+);
+assert(spinnerElements['spinner-overlay'].classList.contains('spinner-kind-search'), 'showSpinner sets kind class');
+assertEqual(spinnerElements['spinner-overlay'].getAttribute('aria-busy'), 'true', 'showSpinner marks overlay busy');
+
+vm.runInContext('hideSpinner();', sandbox);
+assertEqual(spinnerElements['spinner-overlay'].style.display, 'none', 'hideSpinner hides overlay');
+assertEqual(spinnerElements['spinner-detail'].textContent, '', 'hideSpinner clears detail');
+assert(spinnerElements['spinner-detail'].hidden, 'hideSpinner hides detail');
+assert(
+  !spinnerElements['spinner-overlay'].classList.contains('spinner-kind-search'),
+  'hideSpinner clears kind class'
+);
+assertEqual(spinnerElements['spinner-overlay'].getAttribute('aria-busy'), 'false', 'hideSpinner clears busy state');
+
+vm.runInContext("showSpinner('この入口の棚を開いています', getSearchSpinnerOptions_({ detailStory: 'ファンタジー' }, 'この入口の棚を開いています'));", sandbox);
+assertEqual(
+  spinnerElements['spinner-detail'].textContent,
+  '選んだ入口に合う本を集めています',
+  'quick browse uses browse spinner detail'
+);
+
 console.log('client js checks ok');

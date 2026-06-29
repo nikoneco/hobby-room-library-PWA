@@ -1467,11 +1467,12 @@ function rerunSearchWithParams_(params, loadingMessage) {
   container.classList.remove('centered');
   container.classList.add('shrink');
   document.getElementById('viewToggle').style.display = 'flex';
-  showSpinner(loadingMessage || (hasAnyAdvancedCondition_(params)
+  const hasAdvancedCondition = hasAnyAdvancedCondition_(params);
+  showSpinner(loadingMessage || (hasAdvancedCondition
     ? '条件に合う棚を探しています'
-    : '本棚を探しています'));
+    : '本棚を探しています'), getSearchSpinnerOptions_(params, loadingMessage));
 
-  if (hasAnyAdvancedCondition_(params)) {
+  if (hasAdvancedCondition) {
     google.script.run
       .withSuccessHandler(function(data) {
         lastResult = data;
@@ -1537,7 +1538,7 @@ function removeSearchCondition_(key) {
 
   searchStatusState.removingChipKey = key;
   if (remainingChipCount > 0 && (searchStatusState.mode === 'result' || searchStatusState.mode === 'random')) {
-    showSpinner('条件を外して並べ直しています');
+    showSpinner('条件を外して並べ直しています', { kind: 'refine' });
   }
   renderSearchStatus_();
 
@@ -1642,7 +1643,7 @@ function search() {
     container.classList.remove('centered');
     container.classList.add('shrink');
     document.getElementById('viewToggle').style.display = 'flex';
-    showSpinner('条件に合う棚を探しています');
+    showSpinner('条件に合う棚を探しています', { kind: 'advanced' });
 
     google.script.run
       .withSuccessHandler(function(data) {
@@ -1686,7 +1687,7 @@ function search() {
   container.classList.remove('centered');
   container.classList.add('shrink');
   document.getElementById('viewToggle').style.display = 'flex';
-  showSpinner('本棚を探しています');
+  showSpinner('本棚を探しています', { kind: 'search' });
 
   google.script.run
     .withSuccessHandler(function(data) {
@@ -1710,7 +1711,7 @@ function showRandomBooks() {
   clearSearchFormValuesForBrowse_();
   closeAdvancedSearchPanel_();
 
-  showSpinner('棚から10冊抜き出しています');
+  showSpinner('棚から10冊抜き出しています', { kind: 'random' });
   google.script.run
     .withSuccessHandler(function(data) {
       isRandomBooksLoading = false;
@@ -1751,7 +1752,7 @@ function showAllBookshelf() {
     isCardView = false;
     updateViewToggleButtons_();
 
-    showSpinner('本棚を広げています');
+    showSpinner('本棚を広げています', { kind: 'shelf' });
 
     google.script.run
       .withSuccessHandler(function(data) {
@@ -1803,19 +1804,73 @@ function resetSearch() {
   syncQuickBrowseRailVisibility_();
 }
 
-function setSpinnerLabel_(message) {
-  const label = document.getElementById('spinner-label') || document.querySelector('.spinner-label');
-  if (!label) return;
-  label.textContent = message || '検索中...';
+const SPINNER_DEFAULT_LABEL_ = '検索中...';
+const SPINNER_KIND_CLASSES_ = ['search', 'advanced', 'random', 'shelf', 'browse', 'refine'];
+const SPINNER_DETAIL_BY_KIND_ = {
+  search: 'タイトル・作者・読みから候補を集めています',
+  advanced: 'ジャンルや発売日の条件を照らし合わせています',
+  random: '今の気分に合う寄り道を作っています',
+  shelf: '蔵書全体と棚マップを並べています',
+  browse: '選んだ入口に合う本を集めています',
+  refine: '外した条件を反映して、棚を並べ直しています'
+};
+
+function getSearchSpinnerOptions_(params, loadingMessage) {
+  if (loadingMessage === '条件を外して並べ直しています') return { kind: 'refine' };
+  if (loadingMessage) return { kind: 'browse' };
+  return { kind: hasAnyAdvancedCondition_(params) ? 'advanced' : 'search' };
 }
 
-function showSpinner(message) {
-  setSpinnerLabel_(message);
-  document.getElementById('spinner-overlay').style.display = 'flex';
+function normalizeSpinnerOptions_(options) {
+  return options && typeof options === 'object' ? options : {};
+}
+
+function setSpinnerKind_(overlay, kind) {
+  if (!overlay || !overlay.classList) return;
+  SPINNER_KIND_CLASSES_.forEach(function(name) {
+    overlay.classList.remove('spinner-kind-' + name);
+  });
+  if (kind && SPINNER_KIND_CLASSES_.indexOf(kind) !== -1) {
+    overlay.classList.add('spinner-kind-' + kind);
+  }
+}
+
+function setSpinnerLabel_(message, options) {
+  const spinnerOptions = normalizeSpinnerOptions_(options);
+  const label = document.getElementById('spinner-label') || document.querySelector('.spinner-label');
+  if (label) {
+    label.textContent = message || SPINNER_DEFAULT_LABEL_;
+  }
+
+  const detail = document.getElementById('spinner-detail');
+  if (!detail) return;
+
+  const fallbackDetail = SPINNER_DETAIL_BY_KIND_[spinnerOptions.kind] || '';
+  const detailText = spinnerOptions.detail !== undefined ? spinnerOptions.detail : fallbackDetail;
+  detail.textContent = detailText || '';
+  detail.hidden = !detailText;
+}
+
+function showSpinner(message, options) {
+  const overlay = document.getElementById('spinner-overlay');
+  if (!overlay) return;
+
+  const spinnerOptions = normalizeSpinnerOptions_(options);
+  setSpinnerLabel_(message, spinnerOptions);
+  setSpinnerKind_(overlay, spinnerOptions.kind);
+  if (overlay.classList) overlay.classList.add('is-visible');
+  overlay.setAttribute('aria-busy', 'true');
+  overlay.style.display = 'flex';
 }
 
 function hideSpinner() {
-  document.getElementById('spinner-overlay').style.display = 'none';
-  setSpinnerLabel_('検索中...');
+  const overlay = document.getElementById('spinner-overlay');
+  if (!overlay) return;
+
+  overlay.style.display = 'none';
+  overlay.setAttribute('aria-busy', 'false');
+  if (overlay.classList) overlay.classList.remove('is-visible');
+  setSpinnerKind_(overlay, '');
+  setSpinnerLabel_(SPINNER_DEFAULT_LABEL_, { detail: '' });
 }
 </script>

@@ -47,6 +47,8 @@ function assertBalancedBraces(source) {
 const indexSource = fs.readFileSync(indexPath, 'utf8');
 
 assert(!indexSource.includes("HtmlService.createHtmlOutputFromFile('style.css.html')"), 'index.html does not load style.css.html directly');
+assert(indexSource.includes('id="spinner-detail"'), 'index.html includes spinner detail element');
+assert(indexSource.includes('class="spinner-shelf"'), 'index.html includes spinner shelf motif');
 
 let previousIndex = -1;
 const cssSources = cssFiles.map(fileName => {
@@ -62,6 +64,15 @@ const cssSources = cssFiles.map(fileName => {
 
 const combinedCss = cssSources.join('\n');
 assertBalancedBraces(combinedCss);
+
+[
+  /\.spinner-panel\b/,
+  /\.spinner-shelf\b/,
+  /@keyframes\s+shelf-wait\b/,
+  /\.spinner-detail\b/
+].forEach(pattern => {
+  assert(pattern.test(combinedCss), `spinner waiting style is present: ${pattern}`);
+});
 
 [
   /\.book-summary\b/,

@@ -194,8 +194,18 @@
   </div>
 
   <div id="spinner-overlay" role="status" aria-live="polite" aria-busy="true" style="display: none;">
-    <div class="spinner"></div>
-    <div id="spinner-label" class="spinner-label">検索中...</div>
+    <div class="spinner-panel">
+      <div class="spinner-shelf" aria-hidden="true">
+        <span></span>
+        <span></span>
+        <span></span>
+        <span></span>
+        <span></span>
+      </div>
+      <div class="spinner"></div>
+      <div id="spinner-label" class="spinner-label">検索中...</div>
+      <div id="spinner-detail" class="spinner-detail" hidden></div>
+    </div>
   </div>
 
   <div id="result"></div>
