@@ -53,6 +53,17 @@ const sandbox = {
   clearTimeout,
   localStorage: createStorage(),
   document: {
+    body: {
+      classList: {
+        add() {},
+        remove() {},
+        toggle() {},
+        contains() {
+          return false;
+        }
+      },
+      appendChild() {}
+    },
     getElementById() {
       return null;
     },
@@ -193,6 +204,28 @@ assert(quickBrowseVariants.size >= 1, 'quick browse renders at least one valid v
 assert(
   sandbox.buildPopupBookLeadHtml_({ author: '<著者>', publisher: '出版社' }).includes('&lt;著者&gt;'),
   'popup lead escapes author text'
+);
+
+vm.runInContext(`
+hydratePreferredResultViewMode_('shelf');
+currentViewMode = 'shelf';
+resetViewModeForNewResults_();
+`, sandbox);
+assertEqual(
+  vm.runInContext('currentViewMode', sandbox),
+  'card',
+  'new results fall back to card when previous/preferred mode is shelf'
+);
+
+vm.runInContext(`
+hydratePreferredResultViewMode_('list');
+currentViewMode = 'list';
+resetViewModeForNewResults_();
+`, sandbox);
+assertEqual(
+  vm.runInContext('currentViewMode', sandbox),
+  'list',
+  'new results preserve non-shelf preferred mode'
 );
 
 console.log('client js checks ok');

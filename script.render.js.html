@@ -281,7 +281,12 @@ function resetViewModeToCardForNewSearch_() {
 }
 
 function resetViewModeForNewResults_() {
-  applyResultViewMode_(loadPreferredResultViewMode_());
+  const preferredMode = loadPreferredResultViewMode_();
+  const currentMode = getCurrentViewMode_();
+  const nextMode = currentMode === 'shelf' || preferredMode === 'shelf'
+    ? 'card'
+    : preferredMode;
+  applyResultViewMode_(nextMode);
 }
 
 function setViewMode_(mode) {
