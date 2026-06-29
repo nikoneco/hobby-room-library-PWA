@@ -1,0 +1,1821 @@
+<script>
+let popupIndex = 0;
+let popupData = [];
+let popupSeriesContext = null;
+
+let SUGGEST_DATA = { titles: [], yomis: [], authors: [] };
+let ADVANCED_OPTIONS = {
+  publishers: [],
+  storyGenres: [],
+  themeGenres: [],
+  moodGenres: [],
+  statusGenres: [],
+  releaseYears: []
+};
+
+let currentSuggestList = {
+  keyword: [],
+  detailTitle: []
+};
+let currentSuggestIndex = {
+  keyword: -1,
+  detailTitle: -1
+};
+let searchStatusState = {
+  visible: false,
+  mode: 'none',
+  resultCount: 0,
+  chips: [],
+  previewCount: null,
+  previewReady: false,
+  previewPending: false,
+  removingChipKey: '',
+  message: ''
+};
+
+let PREVIEW_INDEX = [];
+let PREVIEW_INDEX_READY = false;
+let PREVIEW_COUNT_REQUEST_SEQ = 0;
+let PREVIEW_COUNT_DEBOUNCE_TIMER = null;
+
+const QUICK_BROWSE_CONFIG = [
+  {
+    field: 'detailMood',
+    source: 'moodGenres',
+    genreKey: 'mood',
+    label: '雰囲気',
+    priority: ['シリアス', '日常コメディ', 'ほのぼの', '癒し', '明るい', '泣ける', 'ダーク']
+  },
+  {
+    field: 'detailTheme',
+    source: 'themeGenres',
+    genreKey: 'theme',
+    label: '題材',
+    priority: ['青春', '学園', '恋愛', '魔法', 'ファンタジー', 'ミステリー', '家族', '仕事']
+  },
+  {
+    field: 'detailStory',
+    source: 'storyGenres',
+    genreKey: 'story',
+    label: 'ストーリー',
+    priority: ['4コマ／短編集', 'ファンタジー', 'ラブコメ', 'ミステリー', 'ホラー', 'SF']
+  },
+  {
+    field: 'detailStatus',
+    source: 'statusGenres',
+    genreKey: 'status',
+    label: '状況',
+    priority: ['単巻', '完結', '連載中', '完結(全巻未所持)']
+  }
+];
+
+function hiraToKana(str) {
+  return (str || '').replace(/[\u3041-\u3096]/g, function(match) {
+    return String.fromCharCode(match.charCodeAt(0) + 0x60);
+  });
+}
+
+function normalizeKana(str) {
+  return (str || '').toLowerCase().normalize("NFKC")
+    .replace(/[\u30a1-\u30f6]/g, function(match) {
+      return String.fromCharCode(match.charCodeAt(0) - 0x60);
+    })
+    .replace(/[\s　]/g, '');
+}
+
+function titleYomiMixedMatch_(query, title, yomi) {
+  const q = normalizeKana(query || '');
+  if (!q) return true;
+
+  const t = normalizeKana(title || '');
+  const y = normalizeKana(yomi || '');
+
+  if ((t && t.includes(q)) || (y && y.includes(q))) return true;
+  if (!t || !y) return false;
+
+  const chunks = splitMixedSearchQuery_(q);
+  if (chunks.length <= 1) return false;
+
+  let progress = 0;
+
+  for (let i = 0; i < chunks.length; i++) {
+    const chunk = chunks[i];
+    const target = chunk.type === 'kana' ? y : t;
+    const match = findChunkMixedMatch_(chunk.text, target, progress);
+
+    if (!match) return false;
+
+    progress = match.progress;
+  }
+
+  return true;
+}
+
+function splitMixedSearchQuery_(query) {
+  const q = normalizeKana(query || '');
+  if (!q) return [];
+
+  const chunks = [];
+  let currentType = '';
+  let currentText = '';
+
+  for (let i = 0; i < q.length; i++) {
+    const char = q[i];
+    const type = isKanaChar_(char) ? 'kana' : 'title';
+
+    if (currentText && type !== currentType) {
+      chunks.push({ type: currentType, text: currentText });
+      currentText = '';
+    }
+
+    currentType = type;
+    currentText += char;
+  }
+
+  if (currentText) {
+    chunks.push({ type: currentType, text: currentText });
+  }
+
+  return chunks;
+}
+
+function isKanaChar_(char) {
+  return /^[\u3041-\u3096\u30fc]$/.test(char || '');
+}
+
+function findChunkMixedMatch_(chunk, text, minProgress) {
+  if (!chunk || !text) return null;
+
+  const step = 1 / Math.max(text.length, 1);
+
+  for (let index = text.indexOf(chunk); index >= 0; index = text.indexOf(chunk, index + 1)) {
+    const progress = index * step;
+    if (progress + 0.000001 < minProgress) continue;
+
+    return {
+      index,
+      progress,
+      progressAfter: (index + chunk.length) * step
+    };
+  }
+
+  return null;
+}
+
+function keywordMixedMatch_(query, idx) {
+  const q = normalizeKana(query || '');
+  if (!q) return true;
+  if (idx && idx.searchKey && idx.searchKey.includes(q)) return true;
+  return titleYomiMixedMatch_(q, idx && idx.title, idx && idx.yomi);
+}
+
+const SEARCH_CONDITION_KEYS = [
+  'keyword',
+  'detailTitle',
+  'detailYomi',
+  'detailAuthor',
+  'detailPublisher',
+  'detailStory',
+  'detailTheme',
+  'detailMood',
+  'detailStatus',
+  'detailReleasedFromYear',
+  'detailReleasedFromMonth',
+  'detailReleasedToYear',
+  'detailReleasedToMonth'
+];
+
+const ADVANCED_SEARCH_CONDITION_KEYS = SEARCH_CONDITION_KEYS.filter(key => key !== 'keyword');
+
+function createEmptySearchParams_() {
+  return SEARCH_CONDITION_KEYS.reduce((params, key) => {
+    params[key] = '';
+    return params;
+  }, {});
+}
+
+function normalizeSearchParams_(params) {
+  const source = params || {};
+  return SEARCH_CONDITION_KEYS.reduce((normalized, key) => {
+    normalized[key] = String(source[key] || '').trim();
+    return normalized;
+  }, {});
+}
+
+function buildClientSearchCriteria_(params) {
+  const normalized = normalizeSearchParams_(params);
+  return {
+    params: normalized,
+    nKeyword: normalizeKana(normalized.keyword),
+    nTitle: normalizeKana(normalized.detailTitle),
+    nYomi: normalizeKana(normalized.detailYomi),
+    nAuthor: normalizeKana(normalized.detailAuthor),
+    selectedPublisher: normalized.detailPublisher,
+    selectedStory: normalized.detailStory,
+    selectedTheme: normalized.detailTheme,
+    selectedMood: normalized.detailMood,
+    selectedStatus: normalized.detailStatus,
+    fromYm: normalizeReleasedYmClient_(
+      normalized.detailReleasedFromYear,
+      normalized.detailReleasedFromMonth,
+      true
+    ),
+    toYm: normalizeReleasedYmClient_(
+      normalized.detailReleasedToYear,
+      normalized.detailReleasedToMonth,
+      false
+    )
+  };
+}
+
+function getDefaultPreviewIndexItem_() {
+  return {
+    title: '',
+    yomi: '',
+    author: '',
+    searchKey: '',
+    publisher: '',
+    releasedYm: 0,
+    genres: { story: [], theme: [], mood: [], status: [] }
+  };
+}
+
+function matchesSearchCriteria_(idx, criteria) {
+  const item = idx || getDefaultPreviewIndexItem_();
+  const c = criteria || buildClientSearchCriteria_({});
+
+  const keywordMatch = !c.nKeyword || keywordMixedMatch_(c.nKeyword, item);
+  const titleMatch = !c.nTitle || titleYomiMixedMatch_(c.nTitle, item.title, item.yomi);
+  const yomiMatch = !c.nYomi || titleYomiMixedMatch_(c.nYomi, item.title, item.yomi);
+  const authorMatch = !c.nAuthor || (item.author && item.author.includes(c.nAuthor));
+  const publisherMatch = !c.selectedPublisher || item.publisher === c.selectedPublisher;
+  const storyMatch = !c.selectedStory || (item.genres.story || []).includes(c.selectedStory);
+  const themeMatch = !c.selectedTheme || (item.genres.theme || []).includes(c.selectedTheme);
+  const moodMatch = !c.selectedMood || (item.genres.mood || []).includes(c.selectedMood);
+  const statusMatch = !c.selectedStatus || (item.genres.status || []).includes(c.selectedStatus);
+
+  const releasedYm = Number(item.releasedYm || 0);
+  const releasedFromMatch = !c.fromYm || (releasedYm && releasedYm >= c.fromYm);
+  const releasedToMatch = !c.toYm || (releasedYm && releasedYm <= c.toYm);
+
+  return Boolean(
+    keywordMatch &&
+    titleMatch &&
+    yomiMatch &&
+    authorMatch &&
+    publisherMatch &&
+    storyMatch &&
+    themeMatch &&
+    moodMatch &&
+    statusMatch &&
+    releasedFromMatch &&
+    releasedToMatch
+  );
+}
+
+function getEmptySuggestData_() {
+  return {
+    titles: [],
+    yomis: [],
+    authors: [],
+    genres: []
+  };
+}
+
+function getEmptyAdvancedOptions_() {
+  return {
+    publishers: [],
+    storyGenres: [],
+    themeGenres: [],
+    moodGenres: [],
+    statusGenres: [],
+    releaseYears: []
+  };
+}
+
+function applyInitialSearchData_(data) {
+  const payload = data || {};
+
+  SUGGEST_DATA = payload.suggest || getEmptySuggestData_();
+  ADVANCED_OPTIONS = payload.advancedOptions || getEmptyAdvancedOptions_();
+  PREVIEW_INDEX = Array.isArray(payload.previewIndex) ? payload.previewIndex : [];
+  PREVIEW_INDEX_READY = true;
+
+  if (!resultViewModeChangedLocally && payload.userPreferences) {
+    const initialViewMode = hydratePreferredResultViewMode_(payload.userPreferences.resultViewMode);
+    currentViewMode = initialViewMode;
+    isCardView = initialViewMode === 'card';
+    updateViewToggleButtons_();
+  }
+
+  populateAdvancedOptions();
+  renderQuickBrowseRail_();
+  syncSearchStatusPreviewFromForm_();
+}
+
+function fetchInitialSearchData() {
+  google.script.run
+    .withSuccessHandler(function(data) {
+      applyInitialSearchData_(data);
+    })
+    .withFailureHandler(function(err) {
+      console.error('getInitialSearchData failed:', err);
+
+      // 統合API側で失敗した場合だけ、旧3APIにフォールバックする。
+      // 既存関数を残す理由はここにもある。
+      fetchSuggestData();
+      fetchAdvancedOptions();
+      fetchPreviewIndex();
+    })
+    .getInitialSearchData();
+}
+
+function fetchSuggestData() {
+  google.script.run
+    .withSuccessHandler(function(data) {
+      SUGGEST_DATA = data || getEmptySuggestData_();
+    })
+    .withFailureHandler(function(err) {
+      console.error('getSuggestData failed:', err);
+      SUGGEST_DATA = getEmptySuggestData_();
+    })
+    .getSuggestData();
+}
+
+function fetchAdvancedOptions() {
+  google.script.run
+    .withSuccessHandler(function(data) {
+      ADVANCED_OPTIONS = data || getEmptyAdvancedOptions_();
+      populateAdvancedOptions();
+      renderQuickBrowseRail_();
+    })
+    .withFailureHandler(function(err) {
+      console.error('getAdvancedSearchOptions failed:', err);
+      ADVANCED_OPTIONS = getEmptyAdvancedOptions_();
+      populateAdvancedOptions();
+      renderQuickBrowseRail_();
+    })
+    .getAdvancedSearchOptions();
+}
+
+function fetchPreviewIndex() {
+  google.script.run
+    .withSuccessHandler(function(data) {
+      PREVIEW_INDEX = Array.isArray(data) ? data : [];
+      PREVIEW_INDEX_READY = true;
+      renderQuickBrowseRail_();
+      syncSearchStatusPreviewFromForm_();
+    })
+    .withFailureHandler(function(err) {
+      console.error('getPreviewIndex failed:', err);
+      PREVIEW_INDEX = [];
+      PREVIEW_INDEX_READY = false;
+      renderQuickBrowseRail_();
+      syncSearchStatusPreviewFromForm_();
+    })
+    .getPreviewIndex();
+}
+
+function populateSelect(selectId, values) {
+  const select = document.getElementById(selectId);
+  if (!select) return;
+
+  const current = select.value;
+  select.innerHTML = '<option value="">すべて</option>';
+
+  (values || []).forEach(value => {
+    const option = document.createElement('option');
+    option.value = value;
+    option.textContent = value;
+    select.appendChild(option);
+  });
+
+  select.value = current || '';
+}
+
+function populateReleaseSelect_(selectId, values, placeholder, formatter) {
+  const select = document.getElementById(selectId);
+  if (!select) return;
+
+  const current = String(select.value || '');
+  select.innerHTML = `<option value="">${placeholder}</option>`;
+
+  (values || []).forEach(value => {
+    const normalized = String(value);
+    const option = document.createElement('option');
+    option.value = normalized;
+    option.textContent = typeof formatter === 'function'
+      ? formatter(normalized)
+      : normalized;
+    select.appendChild(option);
+  });
+
+  select.value = current;
+  if (String(select.value || '') !== current) {
+    select.value = '';
+  }
+}
+
+function getReleaseMonthValues_() {
+  return ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'];
+}
+
+function syncReleasedRangeOptions_() {
+  const fromYearEl = document.getElementById('detailReleasedFromYear');
+  const fromMonthEl = document.getElementById('detailReleasedFromMonth');
+  const toYearEl = document.getElementById('detailReleasedToYear');
+  const toMonthEl = document.getElementById('detailReleasedToMonth');
+
+  if (!fromYearEl || !fromMonthEl || !toYearEl || !toMonthEl) return;
+
+  const allYears = Array.isArray(ADVANCED_OPTIONS.releaseYears)
+    ? ADVANCED_OPTIONS.releaseYears.map(String)
+    : [];
+  const allMonths = getReleaseMonthValues_();
+
+  toggleMonthEnabled_('detailReleasedFromYear', 'detailReleasedFromMonth');
+
+  const fromYear = String(fromYearEl.value || '');
+  const fromMonth = String(fromMonthEl.value || '');
+
+  const filteredToYears = allYears.filter(year => {
+    return !fromYear || Number(year) >= Number(fromYear);
+  });
+
+  populateReleaseSelect_('detailReleasedToYear', filteredToYears, '年');
+
+  const currentToYear = String(toYearEl.value || '');
+  const filteredToMonths = allMonths.filter(month => {
+    if (!currentToYear) return true;
+    if (!fromYear) return true;
+    if (Number(currentToYear) !== Number(fromYear)) return true;
+    if (!fromMonth) return true;
+    return Number(month) >= Number(fromMonth);
+  });
+
+  populateReleaseSelect_(
+    'detailReleasedToMonth',
+    filteredToMonths,
+    '月',
+    value => `${Number(value)}月`
+  );
+
+  toggleMonthEnabled_('detailReleasedToYear', 'detailReleasedToMonth');
+
+  if (!toYearEl.value) {
+    toMonthEl.value = '';
+  }
+}
+
+function populateAdvancedOptions() {
+  populateSelect('detailPublisher', ADVANCED_OPTIONS.publishers);
+  populateSelect('detailStory', ADVANCED_OPTIONS.storyGenres);
+  populateSelect('detailTheme', ADVANCED_OPTIONS.themeGenres);
+  populateSelect('detailMood', ADVANCED_OPTIONS.moodGenres);
+  populateSelect('detailStatus', ADVANCED_OPTIONS.statusGenres);
+
+  populateReleaseSelect_('detailReleasedFromYear', ADVANCED_OPTIONS.releaseYears, '年');
+  populateReleaseSelect_('detailReleasedToYear', ADVANCED_OPTIONS.releaseYears, '年');
+
+  populateReleaseSelect_(
+    'detailReleasedFromMonth',
+    getReleaseMonthValues_(),
+    '月',
+    value => `${Number(value)}月`
+  );
+  populateReleaseSelect_(
+    'detailReleasedToMonth',
+    getReleaseMonthValues_(),
+    '月',
+    value => `${Number(value)}月`
+  );
+
+  syncReleasedRangeOptions_();
+}
+
+function suggest(input, type) {
+  if (!input || input.length < 1) return [];
+  const nInput = normalizeKana(input);
+
+  let arr = [];
+  if (type === 'keyword') {
+    arr = Array.from(new Set([
+      ...(SUGGEST_DATA.titles || []),
+      ...(SUGGEST_DATA.yomis || []),
+      ...(SUGGEST_DATA.authors || [])
+    ]));
+  } else if (type === 'detailTitle') {
+    arr = SUGGEST_DATA.titles || [];
+  }
+
+  return arr.filter(v => normalizeKana(v).includes(nInput)).slice(0, 20);
+}
+
+function showSuggestList(inputId, suggestId, type) {
+  const input = document.getElementById(inputId);
+  const suggestBox = document.getElementById(suggestId);
+  const value = input.value;
+  const list = suggest(value, type);
+
+  currentSuggestList[type] = list;
+  currentSuggestIndex[type] = -1;
+  suggestBox.innerHTML = '';
+
+  if (list.length === 0 || !value) {
+    suggestBox.style.display = 'none';
+    return;
+  }
+
+  suggestBox.style.display = 'block';
+  list.forEach(item => {
+    const div = document.createElement('div');
+    div.className = 'suggest-item';
+    div.innerHTML = highlightMatch(item, value);
+    div.onclick = function() {
+      input.value = item;
+      suggestBox.style.display = 'none';
+      input.focus();
+    };
+    suggestBox.appendChild(div);
+  });
+}
+
+function updateSuggestActive(suggestId, type) {
+  const suggestBox = document.getElementById(suggestId);
+  const items = suggestBox.querySelectorAll('.suggest-item');
+  items.forEach((el, idx) => {
+    if (idx === currentSuggestIndex[type]) {
+      el.classList.add('active');
+    } else {
+      el.classList.remove('active');
+    }
+  });
+}
+
+function hideSuggestBox(suggestId) {
+  setTimeout(() => {
+    const box = document.getElementById(suggestId);
+    if (box) box.style.display = 'none';
+  }, 150);
+}
+
+function hideAllSuggest() {
+  ['keyword-suggest', 'detailTitle-suggest'].forEach(id => {
+    const box = document.getElementById(id);
+    if (box) box.style.display = 'none';
+  });
+}
+
+function addSuggestKeyHandler(inputId, suggestId, type) {
+  const input = document.getElementById(inputId);
+  input.addEventListener('keydown', function(event) {
+    const suggestBox = document.getElementById(suggestId);
+    if (suggestBox.style.display === 'block') {
+      if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        if (currentSuggestIndex[type] < currentSuggestList[type].length - 1) {
+          currentSuggestIndex[type]++;
+        } else {
+          currentSuggestIndex[type] = 0;
+        }
+        updateSuggestActive(suggestId, type);
+      } else if (event.key === 'ArrowUp') {
+        event.preventDefault();
+        if (currentSuggestIndex[type] > 0) {
+          currentSuggestIndex[type]--;
+        } else {
+          currentSuggestIndex[type] = currentSuggestList[type].length - 1;
+        }
+        updateSuggestActive(suggestId, type);
+      } else if (event.key === 'Enter') {
+        if (currentSuggestIndex[type] >= 0 && currentSuggestList[type][currentSuggestIndex[type]]) {
+          event.preventDefault();
+          input.value = currentSuggestList[type][currentSuggestIndex[type]];
+          suggestBox.style.display = 'none';
+          input.focus();
+        }
+      } else if (event.key === 'Escape') {
+        suggestBox.style.display = 'none';
+      }
+    }
+  });
+}
+
+function highlightMatch(text, input) {
+  if (!input) return text;
+
+  const nText = normalizeKana(text);
+  const nInput = normalizeKana(input);
+  const index = nText.indexOf(nInput);
+  if (index === -1) return text;
+
+  let origStart = 0;
+  let origLen = 0;
+  let normCount = 0;
+
+  for (let i = 0; i < text.length; i++) {
+    const cNorm = normalizeKana(text[i]);
+    if (normCount === index) origStart = i;
+    normCount += cNorm.length;
+    if (normCount >= index + nInput.length) {
+      origLen = i - origStart + 1;
+      break;
+    }
+  }
+
+  if (origLen <= 0) return text;
+
+  const before = text.slice(0, origStart);
+  const match = text.slice(origStart, origStart + origLen);
+  const after = text.slice(origStart + origLen);
+  return `${before}<span class="highlight-match">${match}</span>${after}`;
+}
+
+function isAdvancedOpen() {
+  const area = document.getElementById('advancedSearchArea');
+  return area && area.style.display !== 'none';
+}
+
+function toggleAdvancedSearch() {
+  const area = document.getElementById('advancedSearchArea');
+  const btn = document.getElementById('advancedToggleBtn');
+  if (!area || !btn) return;
+
+  const opening = area.style.display === 'none' || area.style.display === '';
+  if (opening) {
+    area.style.display = 'block';
+    btn.classList.add('active');
+    btn.textContent = '詳細検索を閉じる';
+  } else {
+    closeAdvancedSearchPanel_();
+  }
+
+  syncBookshelfCtaVisibility_();
+
+  const preservingAppliedStatus =
+    searchStatusState.visible &&
+    (searchStatusState.mode === 'result' || searchStatusState.mode === 'random');
+
+  if (!preservingAppliedStatus) {
+    syncSearchStatusPreviewFromForm_();
+  }
+}
+
+function closeAdvancedSearchPanel_() {
+  const area = document.getElementById('advancedSearchArea');
+  const btn = document.getElementById('advancedToggleBtn');
+
+  if (area) area.style.display = 'none';
+  if (btn) {
+    btn.classList.remove('active');
+    btn.textContent = '詳細検索';
+  }
+  syncBookshelfCtaVisibility_();
+}
+
+function syncBookshelfCtaVisibility_() {
+  const bookshelfCta = document.querySelector('.bookshelf-cta-wrap');
+  if (bookshelfCta) {
+    bookshelfCta.style.display = isAdvancedOpen() ? 'none' : '';
+  }
+  syncQuickBrowseRailVisibility_();
+}
+
+function isSensitiveQuickBrowseValue_(value) {
+  return /18|成人|成年|アダルト|r-?18/i.test(String(value || ''));
+}
+
+function shouldExcludeQuickBrowseValue_(config, value) {
+  if (config && config.genreKey === 'theme' && String(value || '').trim() === SENSITIVE_THEME_NAME) {
+    return true;
+  }
+  return isSensitiveQuickBrowseValue_(value);
+}
+
+function shuffledCopy_(items) {
+  const result = Array.isArray(items) ? items.slice() : [];
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const tmp = result[i];
+    result[i] = result[j];
+    result[j] = tmp;
+  }
+  return result;
+}
+
+function countQuickBrowseMatches_(config, value) {
+  if (!Array.isArray(PREVIEW_INDEX) || !PREVIEW_INDEX.length) return 0;
+
+  return PREVIEW_INDEX.reduce((count, item) => {
+    const genres = item && item.genres ? item.genres : {};
+    const values = Array.isArray(genres[config.genreKey]) ? genres[config.genreKey] : [];
+    return values.includes(value) ? count + 1 : count;
+  }, 0);
+}
+
+function buildQuickBrowseItems_() {
+  const items = [];
+  const used = new Set();
+
+  QUICK_BROWSE_CONFIG.forEach(config => {
+    const values = Array.isArray(ADVANCED_OPTIONS[config.source])
+      ? ADVANCED_OPTIONS[config.source].filter(value => hasDisplayValue_(value) && !shouldExcludeQuickBrowseValue_(config, value))
+      : [];
+    if (!values.length) return;
+
+    const counts = new Map(values.map(value => [value, countQuickBrowseMatches_(config, value)]));
+    const candidates = values
+      .map(value => ({
+        config,
+        value,
+        count: counts.get(value) || 0,
+        preferred: config.priority.includes(value)
+      }))
+      .filter(item => item.count > 0);
+
+    shuffledCopy_(candidates).some(item => {
+      const key = `${item.config.field}:${item.value}`;
+      if (used.has(key)) return false;
+      used.add(key);
+      items.push(item);
+      return true;
+    });
+  });
+
+  return shuffledCopy_(items).slice(0, 7);
+}
+
+function syncQuickBrowseRailVisibility_() {
+  const rail = document.getElementById('quickBrowseRail');
+  if (!rail) return;
+
+  const ready = rail.dataset.ready === 'true';
+  rail.hidden = !ready || isAdvancedOpen();
+}
+
+function renderQuickBrowseRail_() {
+  const rail = document.getElementById('quickBrowseRail');
+  const chips = document.getElementById('quickBrowseChips');
+  if (!rail || !chips) return;
+
+  const items = buildQuickBrowseItems_();
+  chips.innerHTML = items.map(item => `
+    <button
+      type="button"
+      class="quick-browse-chip"
+      data-field="${escapeHtml(item.config.field)}"
+      data-value="${escapeHtml(item.value)}"
+      aria-label="${escapeHtml(item.config.label + ': ' + item.value + 'で開く')}"
+    >
+      <span class="quick-browse-chip-type">${escapeHtml(item.config.label)}</span>
+      <span class="quick-browse-chip-value">${escapeHtml(item.value)}</span>
+      <span class="quick-browse-chip-count">${escapeHtml(item.count)}冊</span>
+    </button>
+  `).join('');
+
+  rail.dataset.ready = items.length ? 'true' : 'false';
+  syncQuickBrowseRailVisibility_();
+}
+
+function applyQuickBrowseCondition_(field, value) {
+  const select = document.getElementById(field);
+  if (!select || !value) return;
+
+  const hasOption = Array.from(select.options || []).some(option => option.value === value);
+  if (!hasOption) return;
+
+  clearSearchFormValuesForBrowse_();
+  select.value = value;
+  closeAdvancedSearchPanel_();
+  syncSearchStatusPreviewFromForm_();
+  rerunSearchWithParams_(getAdvancedSearchParams_(), 'この入口の棚を開いています');
+}
+
+function getGenreSearchField_(category) {
+  switch (category) {
+    case 'story':
+      return 'detailStory';
+    case 'theme':
+      return 'detailTheme';
+    case 'mood':
+      return 'detailMood';
+    case 'status':
+      return 'detailStatus';
+    default:
+      return '';
+  }
+}
+
+function getGenreCategoryLabel_(category) {
+  switch (category) {
+    case 'story':
+      return 'ストーリー';
+    case 'theme':
+      return '題材';
+    case 'mood':
+      return '雰囲気';
+    case 'status':
+      return '状況';
+    default:
+      return '条件';
+  }
+}
+
+function closeActiveBookPopup_() {
+  const overlay = document.getElementById('image-popup-overlay');
+  if (!overlay || overlay.style.display === 'none') return;
+
+  closeCoverFullscreen_();
+  clearPopupTouchHandlers_();
+  overlay.style.display = 'none';
+  document.body.classList.remove('modal-open');
+  document.onkeydown = null;
+}
+
+function applyGenreChipSearch_(field, value) {
+  const select = document.getElementById(field);
+  if (!select || !value) return;
+
+  const hasOption = Array.from(select.options || []).some(option => option.value === value);
+  if (!hasOption) return;
+
+  closeActiveBookPopup_();
+  clearSearchFormValuesForBrowse_();
+  select.value = value;
+  closeAdvancedSearchPanel_();
+  syncSearchStatusPreviewFromForm_();
+  rerunSearchWithParams_(getAdvancedSearchParams_(), `${value} の棚をたどっています`);
+}
+
+
+function clearAdvancedFields() {
+  const ids = [
+    'detailTitle',
+    'detailYomi',
+    'detailAuthor',
+    'detailPublisher',
+    'detailStory',
+    'detailTheme',
+    'detailMood',
+    'detailStatus',
+    'detailReleasedFromYear',
+    'detailReleasedFromMonth',
+    'detailReleasedToYear',
+    'detailReleasedToMonth'
+  ];
+
+  ids.forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.value = '';
+  });
+
+  syncReleasedRangeOptions_();
+}
+
+function clearSearchConditions() {
+  document.getElementById('keyword').value = '';
+  clearAdvancedFields();
+  hideAllSuggest();
+  syncSearchStatusPreviewFromForm_();
+}
+
+function clearSearchFormValuesForBrowse_() {
+  if (typeof hideAllSuggest === 'function') hideAllSuggest();
+
+  const keywordEl = document.getElementById('keyword');
+  if (keywordEl) keywordEl.value = '';
+
+  [
+    'detailTitle',
+    'detailYomi',
+    'detailAuthor',
+    'detailPublisher',
+    'detailStory',
+    'detailTheme',
+    'detailMood',
+    'detailStatus',
+    'detailReleasedFromYear',
+    'detailReleasedFromMonth',
+    'detailReleasedToYear',
+    'detailReleasedToMonth'
+  ].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+
+  if (typeof syncReleasedRangeOptions_ === 'function') {
+    syncReleasedRangeOptions_();
+  }
+}
+
+function getSearchStatusElements_() {
+  return {
+    area: document.getElementById('searchStatusArea'),
+    count: document.getElementById('searchStatusCount'),
+    chips: document.getElementById('searchStatusChips')
+  };
+}
+
+function getSearchStatusModeClass_(mode) {
+  if (mode === 'random') return 'is-random';
+  if (mode === 'shelf') return 'is-shelf';
+  if (mode === 'result') return 'is-result';
+  if (mode === 'notice') return 'is-notice';
+  return 'is-preview';
+}
+
+function getAdvancedSearchParams_() {
+  return {
+    keyword: document.getElementById('keyword').value || '',
+    detailTitle: document.getElementById('detailTitle').value || '',
+    detailYomi: document.getElementById('detailYomi').value || '',
+    detailAuthor: document.getElementById('detailAuthor').value || '',
+    detailPublisher: document.getElementById('detailPublisher').value || '',
+    detailStory: document.getElementById('detailStory').value || '',
+    detailTheme: document.getElementById('detailTheme').value || '',
+    detailMood: document.getElementById('detailMood').value || '',
+    detailStatus: document.getElementById('detailStatus').value || '',
+    detailReleasedFromYear: document.getElementById('detailReleasedFromYear').value || '',
+    detailReleasedFromMonth: document.getElementById('detailReleasedFromMonth').value || '',
+    detailReleasedToYear: document.getElementById('detailReleasedToYear').value || '',
+    detailReleasedToMonth: document.getElementById('detailReleasedToMonth').value || ''
+  };
+}
+
+
+function getEffectiveSearchParams_() {
+  const params = getAdvancedSearchParams_();
+  if (isAdvancedOpen()) return params;
+
+  return {
+    keyword: params.keyword,
+    detailTitle: '',
+    detailYomi: '',
+    detailAuthor: '',
+    detailPublisher: '',
+    detailStory: '',
+    detailTheme: '',
+    detailMood: '',
+    detailStatus: '',
+    detailReleasedFromYear: '',
+    detailReleasedFromMonth: '',
+    detailReleasedToYear: '',
+    detailReleasedToMonth: ''
+  };
+}
+
+
+function getStickyActionSearchParams_() {
+  const fullParams = getAdvancedSearchParams_();
+  const preservingAppliedStatus =
+    searchStatusState.visible &&
+    (searchStatusState.mode === 'result' || searchStatusState.mode === 'random');
+
+  if (preservingAppliedStatus) {
+    return fullParams;
+  }
+  return getEffectiveSearchParams_();
+}
+
+function formatReleasedChipPart_(year, month) {
+  if (!year) return '';
+  return month ? `${year}年${Number(month)}月` : `${year}年`;
+}
+
+function buildReleasedChipLabel_(params) {
+  const fromYear = params.detailReleasedFromYear || '';
+  const fromMonth = params.detailReleasedFromMonth || '';
+  const toYear = params.detailReleasedToYear || '';
+  const toMonth = params.detailReleasedToMonth || '';
+
+  if (!fromYear && !toYear) return '';
+
+  const fromLabel = formatReleasedChipPart_(fromYear, fromMonth);
+  const toLabel = formatReleasedChipPart_(toYear, toMonth);
+
+  if (fromYear && toYear) {
+    return `${fromLabel}〜${toLabel}`;
+  }
+  if (fromYear) {
+    return `${fromLabel}以降`;
+  }
+  return `${toLabel}以前`;
+}
+
+function normalizeReleasedYmClient_(year, month, isFrom) {
+  if (!year) return 0;
+  return Number(year) * 100 + Number(month || (isFrom ? '01' : '12'));
+}
+
+function toggleMonthEnabled_(yearId, monthId) {
+  const year = document.getElementById(yearId);
+  const month = document.getElementById(monthId);
+  if (!year || !month) return;
+
+  const hasYear = Boolean(year.value);
+  month.disabled = !hasYear;
+
+  if (!hasYear) {
+    month.value = '';
+  }
+}
+
+function buildSearchStatusChips_(mode, params) {
+  const chips = [];
+
+  if (mode === 'normal') {
+    if (params.keyword) {
+      chips.push({
+        key: 'keyword',
+        value: params.keyword,
+        labelPrefix: '検索',
+        label: params.keyword,
+        className: '',
+        removable: true
+      });
+    }
+    return chips;
+  }
+
+  if (mode === 'random') {
+    chips.push({
+      key: 'random',
+      value: 'random',
+      label: 'ランダム',
+      className: 'random',
+      removable: false
+    });
+    return chips;
+  }
+
+  if (mode === 'shelf') {
+    chips.push({
+      key: 'shelf',
+      value: 'all',
+      label: '本棚全体',
+      className: 'shelf',
+      removable: false
+    });
+    return chips;
+  }
+
+  if (mode !== 'advanced') return chips;
+
+  if (params.keyword) {
+    chips.push({
+      key: 'keyword',
+      value: params.keyword,
+      labelPrefix: '検索',
+      label: params.keyword,
+      className: '',
+      removable: true
+    });
+  }
+  if (params.detailTitle) {
+    chips.push({
+      key: 'detailTitle',
+      value: params.detailTitle,
+      labelPrefix: 'タイトル',
+      label: params.detailTitle,
+      className: '',
+      removable: true
+    });
+  }
+  if (params.detailYomi) {
+    chips.push({
+      key: 'detailYomi',
+      value: params.detailYomi,
+      labelPrefix: '読み',
+      label: params.detailYomi,
+      className: '',
+      removable: true
+    });
+  }
+  if (params.detailAuthor) {
+    chips.push({
+      key: 'detailAuthor',
+      value: params.detailAuthor,
+      labelPrefix: '作者',
+      label: params.detailAuthor,
+      className: '',
+      removable: true
+    });
+  }
+  if (params.detailPublisher) {
+    chips.push({
+      key: 'detailPublisher',
+      value: params.detailPublisher,
+      labelPrefix: '出版社',
+      label: params.detailPublisher,
+      className: '',
+      removable: true
+    });
+  }
+  if (params.detailStory) {
+    chips.push({
+      key: 'detailStory',
+      value: params.detailStory,
+      labelPrefix: 'ストーリー',
+      label: params.detailStory,
+      className: '',
+      removable: true
+    });
+  }
+  if (params.detailTheme) {
+    chips.push({
+      key: 'detailTheme',
+      value: params.detailTheme,
+      labelPrefix: '題材',
+      label: params.detailTheme,
+      className: '',
+      removable: true
+    });
+  }
+  if (params.detailMood) {
+    chips.push({
+      key: 'detailMood',
+      value: params.detailMood,
+      labelPrefix: '雰囲気',
+      label: params.detailMood,
+      className: '',
+      removable: true
+    });
+  }
+  if (params.detailStatus) {
+    chips.push({
+      key: 'detailStatus',
+      value: params.detailStatus,
+      labelPrefix: '状況',
+      label: params.detailStatus,
+      className: '',
+      removable: true
+    });
+  }
+
+  const releasedLabel = buildReleasedChipLabel_(params);
+  if (releasedLabel) {
+    chips.push({
+      key: 'detailReleased',
+      value: releasedLabel,
+      labelPrefix: '発売',
+      label: releasedLabel,
+      className: '',
+      removable: true
+    });
+  }
+
+  return chips;
+}
+
+function getSearchStatusCountText_() {
+  const hasConditions = searchStatusState.chips.length > 0;
+
+  if (searchStatusState.message) {
+    return searchStatusState.message;
+  }
+
+  if (searchStatusState.mode === 'random') {
+    return `${searchStatusState.resultCount}冊を選びました`;
+  }
+
+  if (searchStatusState.mode === 'shelf') {
+    return `全${searchStatusState.resultCount}冊を表示中`;
+  }
+
+  if (searchStatusState.mode === 'result') {
+    return `${searchStatusState.resultCount}冊見つかりました`;
+  }
+
+  if (!hasConditions) {
+    return '検索前';
+  }
+
+  if (searchStatusState.previewPending) {
+    return '候補を確認中';
+  }
+
+  if (searchStatusState.previewReady && Number.isFinite(searchStatusState.previewCount)) {
+    return `この条件なら${searchStatusState.previewCount}冊`;
+  }
+
+  return '検索前';
+}
+
+function renderSearchStatus_() {
+  const els = getSearchStatusElements_();
+  if (!els.area || !els.count || !els.chips) return;
+
+  if (!searchStatusState.visible) {
+    els.area.hidden = true;
+    els.area.classList.remove('is-preview', 'is-result', 'is-random', 'is-shelf', 'is-notice');
+    els.count.textContent = '';
+    els.count.classList.remove('loading-dots');
+    els.chips.innerHTML = '';
+    return;
+  }
+
+  els.area.hidden = false;
+  els.area.classList.remove('is-preview', 'is-result', 'is-random', 'is-shelf', 'is-notice');
+  els.area.classList.add(getSearchStatusModeClass_(searchStatusState.mode));
+  els.count.textContent = getSearchStatusCountText_();
+  els.count.classList.toggle('loading-dots', searchStatusState.previewPending);
+
+  const removableChipCount = searchStatusState.chips.filter(chip => chip && chip.removable).length;
+
+  els.chips.innerHTML = searchStatusState.chips.map(chip => {
+    const canRemoveChip = chip.removable && removableChipCount > 1;
+    const classNames = ['search-status-chip'];
+    if (chip.className) classNames.push(chip.className);
+    if (canRemoveChip) classNames.push('removable');
+    if (chip.key && chip.key === searchStatusState.removingChipKey) classNames.push('is-removing');
+
+    const visibleLabel = chip.labelPrefix
+      ? `${chip.labelPrefix}: ${chip.label || ''}`
+      : (chip.label || '');
+    const chipLabelHtml = chip.labelPrefix ? `
+        <span class="search-status-chip-key">${escapeHtml(chip.labelPrefix)}</span>
+        <span class="search-status-chip-value">${escapeHtml(chip.label || '')}</span>
+      ` : `<span class="search-status-chip-value">${escapeHtml(chip.label || '')}</span>`;
+
+    const removeButton = canRemoveChip ? `
+      <button
+        type="button"
+        class="search-status-chip-remove"
+        data-action="remove-chip"
+        data-key="${escapeHtml(chip.key || '')}"
+        aria-label="${escapeHtml(visibleLabel + ' を削除')}"
+      >${uiIcon_('close', 'ui-icon-inline')}</button>
+    ` : '';
+
+    return `
+      <span
+        class="${classNames.join(' ')}"
+        data-key="${escapeHtml(chip.key || '')}"
+        data-value="${escapeHtml(chip.value || '')}"
+      >
+        <span class="search-status-chip-label">${chipLabelHtml}</span>
+        ${removeButton}
+      </span>
+    `;
+  }).join('');
+
+  if (searchStatusState.mode === 'random') {
+    const rerollBusyAttrs = isRandomBooksLoading ? 'disabled aria-busy="true"' : 'aria-busy="false"';
+    els.chips.insertAdjacentHTML('beforeend', `
+      <button
+        type="button"
+        class="search-status-reroll"
+        data-action="random-reroll"
+        aria-label="ランダムで別の10冊を表示"
+        ${rerollBusyAttrs}
+      >${uiIcon_('shuffle', 'ui-icon-inline')}<span>もう一度ひく</span></button>
+    `);
+  }
+}
+
+function setRandomRerollLoading_(loading) {
+  const rerollBtn = document.querySelector('.search-status-reroll');
+  if (!rerollBtn) return;
+
+  rerollBtn.disabled = Boolean(loading);
+  rerollBtn.setAttribute('aria-busy', loading ? 'true' : 'false');
+}
+
+function showSearchStatusPreview_(mode, params, previewCount, previewReady) {
+  searchStatusState.visible = true;
+  searchStatusState.mode = mode || 'preview';
+  searchStatusState.resultCount = 0;
+  searchStatusState.chips = buildSearchStatusChips_(mode, params || {});
+  searchStatusState.previewCount = Number.isFinite(previewCount) ? Number(previewCount) : null;
+  searchStatusState.previewReady = Boolean(previewReady);
+  searchStatusState.previewPending = !searchStatusState.previewReady && searchStatusState.chips.length > 0;
+  searchStatusState.removingChipKey = '';
+  searchStatusState.message = '';
+  renderSearchStatus_();
+}
+
+function showSearchStatusResult_(mode, resultCount, params) {
+  searchStatusState.visible = true;
+  searchStatusState.mode = mode === 'random' || mode === 'shelf' ? mode : 'result';
+  searchStatusState.resultCount = Array.isArray(resultCount) ? resultCount.length : Number(resultCount) || 0;
+  searchStatusState.chips = buildSearchStatusChips_(mode, params || {});
+  searchStatusState.previewCount = null;
+  searchStatusState.previewReady = false;
+  searchStatusState.previewPending = false;
+  searchStatusState.removingChipKey = '';
+  searchStatusState.message = '';
+  renderSearchStatus_();
+}
+
+function showSearchStatusNotice_(message) {
+  searchStatusState.visible = true;
+  searchStatusState.mode = 'notice';
+  searchStatusState.resultCount = 0;
+  searchStatusState.chips = [];
+  searchStatusState.previewCount = null;
+  searchStatusState.previewReady = false;
+  searchStatusState.previewPending = false;
+  searchStatusState.removingChipKey = '';
+  searchStatusState.message = message || '';
+  renderSearchStatus_();
+}
+
+function hideSearchStatus_() {
+  searchStatusState.visible = false;
+  searchStatusState.mode = 'none';
+  searchStatusState.resultCount = 0;
+  searchStatusState.chips = [];
+  searchStatusState.previewCount = null;
+  searchStatusState.previewReady = false;
+  searchStatusState.previewPending = false;
+  searchStatusState.removingChipKey = '';
+  searchStatusState.message = '';
+  renderSearchStatus_();
+}
+
+function countPreviewMatches_(params) {
+  if (!Array.isArray(PREVIEW_INDEX) || !PREVIEW_INDEX.length) {
+    return null;
+  }
+
+  const criteria = buildClientSearchCriteria_(params);
+  let count = 0;
+
+  for (let i = 0; i < PREVIEW_INDEX.length; i++) {
+    if (matchesSearchCriteria_(PREVIEW_INDEX[i], criteria)) {
+      count++;
+    }
+  }
+
+  return count;
+}
+
+
+function buildPreviewCountRequestKey_(params, mode) {
+  return JSON.stringify({ mode: mode || '', params: params || {} });
+}
+
+function requestAuthoritativePreviewCount_(mode, params) {
+  if (PREVIEW_COUNT_DEBOUNCE_TIMER) {
+    clearTimeout(PREVIEW_COUNT_DEBOUNCE_TIMER);
+  }
+
+  const requestSeq = ++PREVIEW_COUNT_REQUEST_SEQ;
+  const requestKey = buildPreviewCountRequestKey_(params, mode);
+
+  searchStatusState.previewPending = true;
+  searchStatusState.previewReady = false;
+  renderSearchStatus_();
+
+  PREVIEW_COUNT_DEBOUNCE_TIMER = setTimeout(function() {
+    google.script.run
+      .withSuccessHandler(function(count) {
+        if (requestSeq !== PREVIEW_COUNT_REQUEST_SEQ) return;
+
+        const currentParams = getEffectiveSearchParams_();
+        const currentMode = isAdvancedOpen() ? 'advanced' : 'normal';
+        const currentKey = buildPreviewCountRequestKey_(currentParams, currentMode);
+        if (currentKey !== requestKey) return;
+
+        showSearchStatusPreview_(currentMode, currentParams, Number(count) || 0, true);
+      })
+      .withFailureHandler(function(err) {
+        if (requestSeq !== PREVIEW_COUNT_REQUEST_SEQ) return;
+        console.error('countPreviewMatchesAuthoritative failed:', err);
+      })
+      .countPreviewMatchesAuthoritative(
+        params.keyword,
+        params.detailTitle,
+        params.detailYomi,
+        params.detailAuthor,
+        params.detailPublisher,
+        params.detailStory,
+        params.detailTheme,
+        params.detailMood,
+        params.detailStatus,
+        params.detailReleasedFromYear,
+        params.detailReleasedFromMonth,
+        params.detailReleasedToYear,
+        params.detailReleasedToMonth
+      );
+  }, 120);
+}
+
+function syncSearchStatusPreviewFromForm_() {
+  const params = getEffectiveSearchParams_();
+  const mode = isAdvancedOpen() ? 'advanced' : 'normal';
+
+  if (!hasAnySearchCondition_(params)) {
+    PREVIEW_COUNT_REQUEST_SEQ++;
+    if (PREVIEW_COUNT_DEBOUNCE_TIMER) {
+      clearTimeout(PREVIEW_COUNT_DEBOUNCE_TIMER);
+      PREVIEW_COUNT_DEBOUNCE_TIMER = null;
+    }
+    showSearchStatusPreview_('normal', {}, null, false);
+    return;
+  }
+
+  if (!PREVIEW_INDEX_READY) {
+    showSearchStatusPreview_(mode, params, null, false);
+    return;
+  }
+
+  const count = countPreviewMatches_(params);
+  showSearchStatusPreview_(mode, params, count, Number.isFinite(count));
+
+  const hasTextCondition = Boolean(
+    params.keyword ||
+    params.detailTitle ||
+    params.detailYomi ||
+    params.detailAuthor
+  );
+
+  if (hasTextCondition) {
+    requestAuthoritativePreviewCount_(mode, params);
+  }
+}
+
+function hasAnySearchCondition_(params) {
+  if (!params) return false;
+  const normalized = normalizeSearchParams_(params);
+  return SEARCH_CONDITION_KEYS.some(key => {
+    if (key === 'detailReleasedFromMonth' || key === 'detailReleasedToMonth') return false;
+    return Boolean(normalized[key]);
+  });
+}
+
+function hasAnyAdvancedCondition_(params) {
+  if (!params) return false;
+  const normalized = normalizeSearchParams_(params);
+  return ADVANCED_SEARCH_CONDITION_KEYS.some(key => {
+    if (key === 'detailReleasedFromMonth' || key === 'detailReleasedToMonth') return false;
+    return Boolean(normalized[key]);
+  });
+}
+
+function rerunSearchWithParams_(params, loadingMessage) {
+  if (!hasAnySearchCondition_(params)) {
+    hideSpinner();
+    syncSearchStatusPreviewFromForm_();
+    return;
+  }
+
+  resetViewModeForNewResults_();
+
+  const container = document.getElementById('searchContainer');
+  container.classList.remove('centered');
+  container.classList.add('shrink');
+  document.getElementById('viewToggle').style.display = 'flex';
+  showSpinner(loadingMessage || (hasAnyAdvancedCondition_(params)
+    ? '条件に合う棚を探しています'
+    : '本棚を探しています'));
+
+  if (hasAnyAdvancedCondition_(params)) {
+    google.script.run
+      .withSuccessHandler(function(data) {
+        lastResult = data;
+        showResult(data);
+        showSearchStatusResult_('advanced', data.length, params);
+      })
+      .withFailureHandler(function(err) {
+        console.error('rerun advanced search failed:', err);
+        hideSpinner();
+        alert('検索中にエラーが発生しました。時間をおいて再度お試しください。');
+      })
+      .searchBooksAdvanced(
+        params.keyword,
+        params.detailTitle,
+        params.detailYomi,
+        params.detailAuthor,
+        params.detailPublisher,
+        params.detailStory,
+        params.detailTheme,
+        params.detailMood,
+        params.detailStatus,
+        params.detailReleasedFromYear,
+        params.detailReleasedFromMonth,
+        params.detailReleasedToYear,
+        params.detailReleasedToMonth
+      );
+    return;
+  }
+
+  google.script.run
+    .withSuccessHandler(function(data) {
+      lastResult = data;
+      showResult(data);
+      showSearchStatusResult_('normal', data.length, { keyword: params.keyword });
+    })
+    .withFailureHandler(function(err) {
+      console.error('rerun simple search failed:', err);
+      hideSpinner();
+      alert('検索中にエラーが発生しました。時間をおいて再度お試しください。');
+    })
+    .searchBooksSimple(params.keyword);
+}
+
+function rerunSearchFromCurrentConditions_() {
+  const params = getEffectiveSearchParams_();
+  rerunSearchWithParams_(params);
+}
+
+function removeSearchCondition_(key) {
+  if (searchStatusState.removingChipKey) {
+    return;
+  }
+
+  const currentChips = Array.isArray(searchStatusState.chips) ? searchStatusState.chips.slice() : [];
+  const targetChip = currentChips.find(chip => chip && chip.key === key && chip.removable);
+  if (!targetChip) {
+    return;
+  }
+
+  hideAllSuggest();
+
+  const remainingChipCount = currentChips.filter(chip => chip && chip.removable && chip.key !== key).length;
+
+  searchStatusState.removingChipKey = key;
+  if (remainingChipCount > 0 && (searchStatusState.mode === 'result' || searchStatusState.mode === 'random')) {
+    showSpinner('条件を外して並べ直しています');
+  }
+  renderSearchStatus_();
+
+  window.setTimeout(function() {
+    switch (key) {
+      case 'keyword':
+        document.getElementById('keyword').value = '';
+        break;
+      case 'detailTitle':
+        document.getElementById('detailTitle').value = '';
+        break;
+      case 'detailYomi':
+        document.getElementById('detailYomi').value = '';
+        break;
+      case 'detailAuthor':
+        document.getElementById('detailAuthor').value = '';
+        break;
+      case 'detailPublisher':
+        document.getElementById('detailPublisher').value = '';
+        break;
+      case 'detailStory':
+        document.getElementById('detailStory').value = '';
+        break;
+      case 'detailTheme':
+        document.getElementById('detailTheme').value = '';
+        break;
+      case 'detailMood':
+        document.getElementById('detailMood').value = '';
+        break;
+      case 'detailStatus':
+        document.getElementById('detailStatus').value = '';
+        break;
+      case 'detailReleased':
+        document.getElementById('detailReleasedFromYear').value = '';
+        document.getElementById('detailReleasedFromMonth').value = '';
+        document.getElementById('detailReleasedToYear').value = '';
+        document.getElementById('detailReleasedToMonth').value = '';
+        syncReleasedRangeOptions_();
+        break;
+      default:
+        searchStatusState.removingChipKey = '';
+        hideSpinner();
+        renderSearchStatus_();
+        return;
+    }
+
+    searchStatusState.removingChipKey = '';
+
+    const nextParams = getStickyActionSearchParams_();
+    const nextMode = hasAnyAdvancedCondition_(nextParams) ? 'advanced' : 'normal';
+    const nextChipCount = buildSearchStatusChips_(nextMode, nextParams).length;
+
+    if (nextChipCount <= 0) {
+      hideSpinner();
+      syncSearchStatusPreviewFromForm_();
+      return;
+    }
+
+    rerunSearchWithParams_(nextParams, '条件を外して並べ直しています');
+  }, 180);
+}
+
+function showEmptySearchNotice_(message) {
+  hideSpinner();
+  hideAllSuggest();
+  resetViewModeToCardForNewSearch_();
+
+  const result = document.getElementById('result');
+  if (result) result.innerHTML = '';
+
+  const viewToggle = document.getElementById('viewToggle');
+  if (viewToggle) viewToggle.style.display = 'none';
+
+  if (!isAdvancedOpen()) {
+    const container = document.getElementById('searchContainer');
+    if (container) {
+      container.classList.remove('shrink');
+      container.classList.add('centered');
+    }
+  }
+
+  lastResult = null;
+  showSearchStatusNotice_(message);
+}
+
+function search() {
+  hideAllSuggest();
+
+  const keywordEl = document.getElementById('keyword');
+  const keyword = keywordEl ? (keywordEl.value || '') : '';
+
+  if (isAdvancedOpen()) {
+    const params = getAdvancedSearchParams_();
+    if (!hasAnySearchCondition_(params)) {
+      showEmptySearchNotice_('検索条件を入力してください');
+      return;
+    }
+
+    resetViewModeForNewResults_();
+
+    const container = document.getElementById('searchContainer');
+    container.classList.remove('centered');
+    container.classList.add('shrink');
+    document.getElementById('viewToggle').style.display = 'flex';
+    showSpinner('条件に合う棚を探しています');
+
+    google.script.run
+      .withSuccessHandler(function(data) {
+        closeAdvancedSearchPanel_();
+        lastResult = data;
+        showResult(data);
+        showSearchStatusResult_('advanced', data.length, params);
+      })
+      .withFailureHandler(function(err) {
+        console.error('searchBooksAdvanced failed:', err);
+        hideSpinner();
+        alert('検索中にエラーが発生しました。時間をおいて再度お試しください。');
+      })
+      .searchBooksAdvanced(
+        params.keyword,
+        params.detailTitle,
+        params.detailYomi,
+        params.detailAuthor,
+        params.detailPublisher,
+        params.detailStory,
+        params.detailTheme,
+        params.detailMood,
+        params.detailStatus,
+        params.detailReleasedFromYear,
+        params.detailReleasedFromMonth,
+        params.detailReleasedToYear,
+        params.detailReleasedToMonth
+      );
+    return;
+  }
+
+  if (!String(keyword).trim()) {
+    showEmptySearchNotice_('検索語を入力してください');
+    if (keywordEl) keywordEl.focus();
+    return;
+  }
+
+  resetViewModeForNewResults_();
+
+  const container = document.getElementById('searchContainer');
+  container.classList.remove('centered');
+  container.classList.add('shrink');
+  document.getElementById('viewToggle').style.display = 'flex';
+  showSpinner('本棚を探しています');
+
+  google.script.run
+    .withSuccessHandler(function(data) {
+      lastResult = data;
+      showResult(data);
+      showSearchStatusResult_('normal', data.length, { keyword: keyword });
+    })
+    .withFailureHandler(function(err) {
+      console.error('searchBooksSimple failed:', err);
+      hideSpinner();
+      alert('検索中にエラーが発生しました。時間をおいて再度お試しください。');
+    })
+    .searchBooksSimple(keyword);
+}
+
+function showRandomBooks() {
+  if (isRandomBooksLoading) return;
+  isRandomBooksLoading = true;
+  setRandomRerollLoading_(true);
+  resetViewModeForNewResults_();
+  clearSearchFormValuesForBrowse_();
+  closeAdvancedSearchPanel_();
+
+  showSpinner('棚から10冊抜き出しています');
+  google.script.run
+    .withSuccessHandler(function(data) {
+      isRandomBooksLoading = false;
+      lastResult = data;
+      showResult(data);
+      showSearchStatusResult_('random', data.length, {});
+      document.getElementById('viewToggle').style.display = 'flex';
+      const container = document.getElementById('searchContainer');
+      container.classList.remove('centered');
+      container.classList.add('shrink');
+    })
+    .withFailureHandler(function(err) {
+      isRandomBooksLoading = false;
+      setRandomRerollLoading_(false);
+      console.error('showRandomBooks failed:', err);
+      hideSpinner();
+      alert('ランダム検索中にエラーが発生しました。時間をおいて再度お試しください。');
+    })
+    .getRandomBooks(10);
+}
+
+function showAllBookshelf() {
+  try {
+    clearSearchFormValuesForBrowse_();
+    closeAdvancedSearchPanel_();
+
+    const container = document.getElementById('searchContainer');
+    if (container) {
+      container.classList.remove('centered');
+      container.classList.add('shrink');
+    }
+
+    const viewToggle = document.getElementById('viewToggle');
+    if (viewToggle) viewToggle.style.display = 'flex';
+
+    currentViewMode = 'shelf';
+    isShelfImmersiveMode = true;
+    isCardView = false;
+    updateViewToggleButtons_();
+
+    showSpinner('本棚を広げています');
+
+    google.script.run
+      .withSuccessHandler(function(data) {
+        const books = Array.isArray(data) ? data : [];
+        lastResult = books;
+        showResult(books);
+        showSearchStatusResult_('shelf', books.length, {});
+        scrollToBookshelfTop_();
+      })
+      .withFailureHandler(function(err) {
+        console.error('showAllBookshelf failed:', err);
+        hideSpinner();
+        alert('本棚表示の読み込み中にエラーが発生しました。時間をおいて再度お試しください。');
+      })
+      .searchBooksSimple('');
+  } catch (e) {
+    console.error('showAllBookshelf client error:', e);
+    hideSpinner();
+    alert('本棚表示の準備中にエラーが発生しました。Consoleを確認してください。');
+  }
+}
+
+// HtmlService内の inline onclick から確実に呼べるよう、明示的に window へ公開する。
+window.showAllBookshelf = showAllBookshelf;
+
+function scrollToBookshelfTop_() {
+  window.requestAnimationFrame(function() {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+}
+
+function resetSearch() {
+  document.getElementById('keyword').value = '';
+  clearAdvancedFields();
+
+  closeAdvancedSearchPanel_();
+
+  document.getElementById('result').innerHTML = '';
+  document.getElementById('viewToggle').style.display = 'none';
+
+  const container = document.getElementById('searchContainer');
+  container.classList.remove('shrink');
+  container.classList.add('centered');
+  resetViewModeToCardForNewSearch_();
+
+  lastResult = null;
+  hideAllSuggest();
+  syncSearchStatusPreviewFromForm_();
+  syncQuickBrowseRailVisibility_();
+}
+
+function setSpinnerLabel_(message) {
+  const label = document.getElementById('spinner-label') || document.querySelector('.spinner-label');
+  if (!label) return;
+  label.textContent = message || '検索中...';
+}
+
+function showSpinner(message) {
+  setSpinnerLabel_(message);
+  document.getElementById('spinner-overlay').style.display = 'flex';
+}
+
+function hideSpinner() {
+  document.getElementById('spinner-overlay').style.display = 'none';
+  setSpinnerLabel_('検索中...');
+}
+</script>

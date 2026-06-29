@@ -3,15 +3,24 @@ const path = require('path');
 const vm = require('vm');
 
 const root = path.resolve(__dirname, '..');
-const scriptPath = path.join(root, 'script.js.html');
+const clientScriptFiles = [
+  'script.state.js.html',
+  'script.images.js.html',
+  'script.search.js.html',
+  'script.render.js.html',
+  'script.shelf.js.html',
+  'script.modal.js.html',
+  'script.boot.js.html'
+];
 const indexPath = path.join(root, 'index.html');
 const serverPath = path.join(root, 'Webアプリ.js');
 const indexSource = fs.readFileSync(indexPath, 'utf8');
 const serverSource = fs.readFileSync(serverPath, 'utf8');
-const source = fs
-  .readFileSync(scriptPath, 'utf8')
-  .replace(/^\s*<script>\s*/, '')
-  .replace(/\s*<\/script>\s*$/, '');
+const clientScriptSources = clientScriptFiles
+  .map(fileName => fs
+    .readFileSync(path.join(root, fileName), 'utf8')
+    .replace(/^\s*<script>\s*/, '')
+    .replace(/\s*<\/script>\s*$/, ''));
 
 function createStorage() {
   const values = new Map();
@@ -71,7 +80,9 @@ const sandbox = {
 
 sandbox.globalThis = sandbox;
 vm.createContext(sandbox);
-vm.runInContext(source, sandbox, { filename: 'script.js.html' });
+clientScriptSources.forEach((source, index) => {
+  vm.runInContext(source, sandbox, { filename: clientScriptFiles[index] });
+});
 
 function assert(condition, message) {
   if (!condition) {
@@ -88,6 +99,9 @@ function assertEqual(actual, expected, message) {
 assert(!/\son(?:click|change|input|submit|keydown)=/i.test(indexSource), 'index.html has no inline event handlers');
 ['search', 'random', 'toggle-advanced', 'clear-conditions', 'reset-search'].forEach(action => {
   assert(indexSource.includes(`data-action="${action}"`), `index.html exposes data-action="${action}"`);
+});
+clientScriptFiles.forEach(fileName => {
+  assert(indexSource.includes(`'${fileName}'`), `index.html includes ${fileName}`);
 });
 assert(serverSource.includes('WEB_APP_API_REGISTRY_'), 'Webアプリ.js has API registry');
 assert(serverSource.includes('currentWebApp'), 'Webアプリ.js registry classifies current Web App API');
