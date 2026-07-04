@@ -36,6 +36,7 @@ let PREVIEW_INDEX = [];
 let PREVIEW_INDEX_READY = false;
 let PREVIEW_COUNT_REQUEST_SEQ = 0;
 let PREVIEW_COUNT_DEBOUNCE_TIMER = null;
+let QUICK_BROWSE_COUNTS = null;
 
 const QUICK_BROWSE_CONFIG = [
   {
@@ -298,6 +299,9 @@ function applyInitialSearchData_(data) {
   SUGGEST_DATA = payload.suggest || getEmptySuggestData_();
   ADVANCED_OPTIONS = payload.advancedOptions || getEmptyAdvancedOptions_();
   PREVIEW_INDEX = Array.isArray(payload.previewIndex) ? payload.previewIndex : [];
+  QUICK_BROWSE_COUNTS = payload.quickBrowseCounts && typeof payload.quickBrowseCounts === 'object'
+    ? payload.quickBrowseCounts
+    : null;
   PREVIEW_INDEX_READY = true;
 
   if (!resultViewModeChangedLocally && payload.userPreferences) {
@@ -703,6 +707,18 @@ function shuffledCopy_(items) {
 }
 
 function countQuickBrowseMatches_(config, value) {
+  const category = config && config.genreKey ? config.genreKey : '';
+  const key = String(value || '').trim();
+  if (
+    QUICK_BROWSE_COUNTS &&
+    category &&
+    key &&
+    QUICK_BROWSE_COUNTS[category] &&
+    Object.prototype.hasOwnProperty.call(QUICK_BROWSE_COUNTS[category], key)
+  ) {
+    return Number(QUICK_BROWSE_COUNTS[category][key]) || 0;
+  }
+
   if (!Array.isArray(PREVIEW_INDEX) || !PREVIEW_INDEX.length) return 0;
 
   return PREVIEW_INDEX.reduce((count, item) => {
@@ -1167,6 +1183,10 @@ function buildSearchStatusChips_(mode, params) {
   return chips;
 }
 
+function isPwaShell_() {
+  return Boolean(window.ShumiLibraryPwa && window.ShumiLibraryPwa.isPwaShell);
+}
+
 function getSearchStatusCountText_() {
   const hasConditions = searchStatusState.chips.length > 0;
 
@@ -1192,6 +1212,10 @@ function getSearchStatusCountText_() {
 
   if (searchStatusState.previewPending) {
     return '候補を確認中';
+  }
+
+  if (isPwaShell_() && hasConditions) {
+    return '検索条件';
   }
 
   if (searchStatusState.previewReady && Number.isFinite(searchStatusState.previewCount)) {
@@ -1288,7 +1312,7 @@ function showSearchStatusPreview_(mode, params, previewCount, previewReady) {
   searchStatusState.chips = buildSearchStatusChips_(mode, params || {});
   searchStatusState.previewCount = Number.isFinite(previewCount) ? Number(previewCount) : null;
   searchStatusState.previewReady = Boolean(previewReady);
-  searchStatusState.previewPending = !searchStatusState.previewReady && searchStatusState.chips.length > 0;
+  searchStatusState.previewPending = !isPwaShell_() && !searchStatusState.previewReady && searchStatusState.chips.length > 0;
   searchStatusState.removingChipKey = '';
   searchStatusState.message = '';
   renderSearchStatus_();
@@ -1430,8 +1454,7 @@ function syncSearchStatusPreviewFromForm_() {
     params.detailAuthor
   );
 
-  const isPwaShell = Boolean(window.ShumiLibraryPwa && window.ShumiLibraryPwa.isPwaShell);
-  if (hasTextCondition && !isPwaShell) {
+  if (hasTextCondition && !isPwaShell_()) {
     requestAuthoritativePreviewCount_(mode, params);
   }
 }

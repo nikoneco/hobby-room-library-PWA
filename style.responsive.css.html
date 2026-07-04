@@ -109,8 +109,8 @@
   .search-container.shrink.compact .search-status-area,
   .search-container.centered .search-status-area {
     position: static;
-    width: min(100%, 520px);
-    max-width: 100%;
+    width: fit-content;
+    max-width: min(100%, 520px);
     margin: 0.2rem auto 0.72rem;
     flex-wrap: wrap;
     justify-content: center;
@@ -148,19 +148,19 @@
   }
 
   .view-toggle {
-    position: sticky;
+    position: fixed;
     top: max(8px, env(safe-area-inset-top));
-    right: auto;
-    z-index: 900;
+    right: 10px;
+    z-index: 2000;
     width: fit-content;
     max-width: calc(100vw - 24px);
-    margin: 0.55rem 0.75rem 0.2rem auto;
+    margin: 0;
     transform: none;
   }
 
   .toggle-btn {
-    min-width: 62px;
-    padding: 0.42rem 0.52rem;
+    min-width: 56px;
+    padding: 0.38rem 0.48rem;
   }
 
   .card-view {
@@ -229,14 +229,14 @@
 
 @media (max-width: 420px) {
   .view-toggle {
-    width: calc(100vw - 28px);
-    margin-right: auto;
-    justify-content: space-between;
+    width: fit-content;
+    max-width: calc(100vw - 20px);
+    right: 8px;
   }
 
   .toggle-btn {
-    flex: 1 1 0;
-    min-width: 0;
+    flex: 0 0 auto;
+    min-width: 54px;
   }
 
   .toggle-label {

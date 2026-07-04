@@ -19,6 +19,7 @@ assert(source.includes('WEBAPP_JSONP_CALLBACK_PATTERN_'), 'JSONP validates callb
 assert(source.includes('stringifyForJsonp_'), 'JSONP escapes script-sensitive separators');
 assert(source.includes('decodeWebAppJsonpParams_'), 'JSONP decodes Base64URL parameters');
 assert(source.includes('Utilities.base64DecodeWebSafe'), 'JSONP uses web-safe Base64 decoding');
+assert(source.includes('buildQuickBrowseCountsPayload_'), 'PWA initial data includes quick browse counts');
 
 [
   'initial',

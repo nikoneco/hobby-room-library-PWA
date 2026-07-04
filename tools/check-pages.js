@@ -26,15 +26,20 @@ const sw = read(path.join(docs, 'sw.js'));
   'assets/css/pwa.css',
   'assets/js/gas-run-shim.js',
   'assets/js/pwa-client.js',
+  'assets/logo.png',
   'assets/icons/icon-192.png',
   'assets/icons/icon-512.png'
 ].forEach(relativePath => {
   assert(fs.existsSync(path.join(docs, relativePath)), `${relativePath} exists`);
 });
 
-['icon-192.png', 'icon-512.png'].forEach(fileName => {
-  const signature = fs.readFileSync(path.join(docs, 'assets', 'icons', fileName)).subarray(0, 8);
-  assert(signature.equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])), `${fileName} is a PNG`);
+[
+  path.join('assets', 'logo.png'),
+  path.join('assets', 'icons', 'icon-192.png'),
+  path.join('assets', 'icons', 'icon-512.png')
+].forEach(relativePath => {
+  const signature = fs.readFileSync(path.join(docs, relativePath)).subarray(0, 8);
+  assert(signature.equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])), `${relativePath} is a PNG`);
 });
 
 assert(!index.includes('HtmlService.createHtmlOutputFromFile'), 'static index has no GAS template includes');
@@ -43,6 +48,7 @@ assert(index.includes('id="pwaNetworkBanner"'), 'static index includes offline/n
 assert(index.includes('./assets/js/gas-run-shim.js'), 'static index loads GAS JSONP shim');
 assert(index.includes('./assets/js/pwa-client.js'), 'static index loads PWA client');
 assert(index.includes('./assets/css/pwa.css'), 'static index loads PWA CSS');
+assert(index.includes('src="./assets/logo.png"'), 'static index uses local logo asset');
 
 [
   'style.legacy-core.css',
@@ -78,7 +84,8 @@ assert(manifest.start_url === './', 'manifest start_url stays within docs scope'
 assert(Array.isArray(manifest.icons) && manifest.icons.length >= 2, 'manifest has install icons');
 
 assert(sw.includes('offline.html'), 'service worker caches offline fallback');
-assert(sw.includes('shumi-library-pwa-v3'), 'service worker has versioned cache');
+assert(sw.includes('shumi-library-pwa-v4'), 'service worker has versioned cache');
+assert(sw.includes('./assets/logo.png'), 'service worker caches local logo');
 
 const appendedScripts = [];
 const timeouts = [];

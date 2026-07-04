@@ -442,6 +442,37 @@ function buildPreviewIndexPayload_(dataset) {
 }
 
 /**
+ * PWAの「気分で開く」用に、ジャンルカテゴリ別の件数だけを返す。
+ * 全件プレビューインデックスより小さく、初期表示のチップ生成に必要な情報に絞る。
+ *
+ * @param {{index:Object[]}=} dataset
+ * @returns {{story:Object<string, number>, theme:Object<string, number>, mood:Object<string, number>, status:Object<string, number>}}
+ */
+function buildQuickBrowseCountsPayload_(dataset) {
+  const counts = {
+    story: {},
+    theme: {},
+    mood: {},
+    status: {}
+  };
+  const index = dataset && Array.isArray(dataset.index) ? dataset.index : [];
+
+  index.forEach(item => {
+    const genres = item && item.genres ? item.genres : {};
+    Object.keys(counts).forEach(category => {
+      const values = Array.isArray(genres[category]) ? genres[category] : [];
+      values.forEach(value => {
+        const key = String(value || '').trim();
+        if (!key) return;
+        counts[category][key] = (counts[category][key] || 0) + 1;
+      });
+    });
+  });
+
+  return counts;
+}
+
+/**
  * Webアプリの個人用表示設定を保存するScript Propertiesキー。
  * このWebアプリは個人利用かつ executeAs USER_DEPLOYING のため、アプリ単位設定として扱う。
  */
@@ -555,6 +586,7 @@ function getInitialSearchDataForPwa_() {
       suggest: buildSuggestDataPayload_(dataset),
       advancedOptions: buildAdvancedSearchOptionsPayload_(dataset),
       previewIndex: [],
+      quickBrowseCounts: buildQuickBrowseCountsPayload_(dataset),
       userPreferences: getWebAppUserPreferences()
     };
   } catch (e) {
@@ -563,6 +595,7 @@ function getInitialSearchDataForPwa_() {
       suggest: buildEmptySuggestData_(),
       advancedOptions: buildEmptyAdvancedSearchOptions_(),
       previewIndex: [],
+      quickBrowseCounts: buildQuickBrowseCountsPayload_(null),
       userPreferences: getWebAppUserPreferences()
     };
   }
