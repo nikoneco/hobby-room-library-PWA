@@ -365,6 +365,68 @@ button.popup-arrow:focus-visible {
   color: rgba(255, 224, 212, 0.86);
 }
 
+.popup-detail-loading {
+  display: grid;
+  gap: 0.52rem;
+  margin-top: 0.55rem;
+}
+
+.popup-detail-state.loading {
+  width: fit-content;
+}
+
+.popup-detail-skeleton {
+  display: grid;
+  gap: 0.42rem;
+  width: min(100%, 360px);
+}
+
+.popup-detail-skeleton-line,
+.popup-detail-skeleton-chip-row span {
+  position: relative;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(246, 241, 229, 0.08);
+}
+
+.popup-detail-skeleton-line {
+  display: block;
+  width: 72%;
+  height: 0.68rem;
+}
+
+.popup-detail-skeleton-line.wide {
+  width: 92%;
+}
+
+.popup-detail-skeleton-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.36rem;
+}
+
+.popup-detail-skeleton-chip-row span {
+  width: 4.8rem;
+  height: 1.52rem;
+  border: 1px solid rgba(246, 241, 229, 0.06);
+}
+
+.popup-detail-skeleton-line::after,
+.popup-detail-skeleton-chip-row span::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.12), transparent);
+  animation: popup-detail-shimmer 1.35s ease-in-out infinite;
+}
+
+@keyframes popup-detail-shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
 .popup-book-kicker {
   display: flex;
   flex-wrap: wrap;

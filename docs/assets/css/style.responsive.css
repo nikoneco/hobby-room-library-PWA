@@ -635,6 +635,8 @@
   #cover-fullscreen-img.book-image-loaded,
   .spinner,
   .spinner-shelf span,
+  .popup-detail-skeleton-line::after,
+  .popup-detail-skeleton-chip-row span::after,
   .mobile-app-dock {
     animation: none;
     transition: none;

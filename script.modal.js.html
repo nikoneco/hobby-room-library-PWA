@@ -560,7 +560,20 @@ function buildPopupDetailLoadingHtml_(book) {
   if (book.detailError) {
     return `<div class="popup-detail-state error">${escapeHtml(book.detailError)}</div>`;
   }
-  return '<div class="popup-detail-state">詳細を読み込んでいます...</div>';
+  return `
+    <div class="popup-detail-loading" aria-live="polite">
+      <div class="popup-detail-state loading">詳細を準備中</div>
+      <div class="popup-detail-skeleton" aria-hidden="true">
+        <span class="popup-detail-skeleton-line wide"></span>
+        <span class="popup-detail-skeleton-line"></span>
+        <span class="popup-detail-skeleton-chip-row">
+          <span></span>
+          <span></span>
+          <span></span>
+        </span>
+      </div>
+    </div>
+  `;
 }
 
 function closeCoverFullscreen_() {
