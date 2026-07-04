@@ -529,6 +529,46 @@ function getInitialSearchData() {
 }
 
 /**
+ * PWA(JSONP)向け初期表示用データを返す。
+ * 件数プレビュー用インデックスは全件分の転送が重いため、PWAでは初期ロードから外す。
+ * 入力中の件数確認は countPreview API で必要時だけ行う。
+ *
+ * @returns {{
+ *   suggest: {titles: string[], yomis: string[], authors: string[], genres: string[]},
+ *   advancedOptions: {
+ *     publishers: string[],
+ *     storyGenres: string[],
+ *     themeGenres: string[],
+ *     moodGenres: string[],
+ *     statusGenres: string[],
+ *     releaseYears: string[]
+ *   },
+ *   previewIndex: Object[],
+ *   userPreferences: {resultViewMode: string}
+ * }}
+ */
+function getInitialSearchDataForPwa_() {
+  try {
+    const dataset = getLibraryDataset_();
+
+    return {
+      suggest: buildSuggestDataPayload_(dataset),
+      advancedOptions: buildAdvancedSearchOptionsPayload_(dataset),
+      previewIndex: [],
+      userPreferences: getWebAppUserPreferences()
+    };
+  } catch (e) {
+    console.error('getInitialSearchDataForPwa_ error:', e);
+    return {
+      suggest: buildEmptySuggestData_(),
+      advancedOptions: buildEmptyAdvancedSearchOptions_(),
+      previewIndex: [],
+      userPreferences: getWebAppUserPreferences()
+    };
+  }
+}
+
+/**
  * 詳細検索のドロップダウン候補を返す
  * @returns {{
  *   publishers: string[],
@@ -677,15 +717,18 @@ function normalizeReleasedYm_(value) {
  * 行データをWebアプリ返却用オブジェクトへ変換
  * @param {string[][]} rows
  * @param {Object[]=} indexData
+ * @param {{compact?: boolean}=} options
  * @returns {Object[]}
  */
-function mapRowsToBooks_(rows, indexData) {
+function mapRowsToBooks_(rows, indexData, options) {
+  const compact = Boolean(options && options.compact);
+
   return rows.map((row, i) => {
     const isbn = normalizeIsbn_(row[CONFIG.IDX.ISBN]);
     const idx = Array.isArray(indexData) ? indexData[i] : null;
     const summary = row[CONFIG.IDX.SUMMARY] || '';
 
-    return {
+    const book = {
       title    : row[CONFIG.IDX.TITLE]     || '',
       img      : buildHanmotoImageUrlFromIsbn_(isbn, 600),
       img400   : buildHanmotoImageUrlFromIsbn_(isbn, 400),
@@ -701,7 +744,6 @@ function mapRowsToBooks_(rows, indexData) {
       isbn     : isbn,
       memo     : row[CONFIG.IDX.MEMO]      || '',
       yomi     : row[CONFIG.IDX.YOMIGANA]  || '',
-      summary       : summary,
       genre         : row[CONFIG.IDX.GENRE]     || '',
       genreMeta     : idx ? (idx.genreMeta || []) : [],
       seriesKeyAuto   : idx ? (idx.seriesKeyAuto || '') : '',
@@ -709,9 +751,15 @@ function mapRowsToBooks_(rows, indexData) {
       seriesSearchTitle: idx ? (idx.seriesSearchTitle || '') : '',
       isExtraSeries   : idx ? Boolean(idx.isExtraSeries) : false,
       volume          : idx ? (idx.volume || 0) : 0,
-      ownedMaxVolume  : idx ? (idx.ownedMaxVolume || 0) : 0,
-      links: idx ? (idx.links || null) : null
+      ownedMaxVolume  : idx ? (idx.ownedMaxVolume || 0) : 0
     };
+
+    if (!compact) {
+      book.summary = summary;
+      book.links = idx ? (idx.links || null) : null;
+    }
+
+    return book;
   });
 }
 
@@ -1390,7 +1438,7 @@ function searchBooksSimple(keyword) {
     const nKeyword = normalizeKana(keyword || '');
 
     if (!nKeyword) {
-      return mapRowsToBooks_(rows, index);
+      return mapRowsToBooks_(rows, index, { compact: true });
     }
 
     const matchedRows = [];
@@ -1405,7 +1453,9 @@ function searchBooksSimple(keyword) {
       }
     }
 
-    return mapRowsToBooks_(matchedRows, matchedIndex);
+    return mapRowsToBooks_(matchedRows, matchedIndex, {
+      compact: matchedRows.length > 80
+    });
   } catch (e) {
     console.error('searchBooksSimple error:', e);
     return [];
@@ -1512,11 +1562,19 @@ function getSuggestData() {
 function getAllBooks() {
   try {
     const dataset = getLibraryDataset_();
-    return mapRowsToBooks_(dataset.rows || [], dataset.index || []);
+    return mapRowsToBooks_(dataset.rows || [], dataset.index || [], { compact: true });
   } catch (e) {
     console.error('getAllBooks error:', e);
     return [];
   }
+}
+
+/**
+ * PWA本棚表示向けの軽量全件取得。
+ * あらすじ全文と外部検索リンクは全件JSONPでは重くなるため省く。
+ */
+function getBookshelfBooks() {
+  return getAllBooks();
 }
 
 /**
@@ -1579,12 +1637,55 @@ function doGet(e) {
  */
 function handleWebAppJsonpRequest_(apiName, params) {
   const callback = normalizeWebAppJsonpCallback_(params.callback);
-  const envelope = buildWebAppJsonpEnvelope_(apiName, params || {});
+  const decodedParams = decodeWebAppJsonpParams_(params || {});
+  const envelope = buildWebAppJsonpEnvelope_(apiName, decodedParams);
   const body = `${callback}(${stringifyForJsonp_(envelope)});`;
 
   return ContentService
     .createTextOutput(body)
     .setMimeType(ContentService.MimeType.JAVASCRIPT);
+}
+
+/**
+ * JSONPのURLパラメータを復元する。
+ * PWA側は日本語検索語をURLへ直接載せず、`keywordB64` のようなBase64URL値で送る。
+ * ここで `B64` 接尾辞を外した通常パラメータ名へ戻す。
+ *
+ * @param {Object<string, string>} params
+ * @returns {Object<string, string>}
+ */
+function decodeWebAppJsonpParams_(params) {
+  const decoded = {};
+  const source = params || {};
+
+  Object.keys(source).forEach(key => {
+    decoded[key] = source[key];
+  });
+
+  Object.keys(source).forEach(key => {
+    if (!/B64$/.test(key)) return;
+
+    const targetKey = key.slice(0, -3);
+    if (!targetKey) return;
+
+    decoded[targetKey] = decodeWebAppJsonpBase64Url_(source[key]);
+  });
+
+  return decoded;
+}
+
+/**
+ * @param {string} value
+ * @returns {string}
+ */
+function decodeWebAppJsonpBase64Url_(value) {
+  try {
+    const bytes = Utilities.base64DecodeWebSafe(String(value || ''));
+    return Utilities.newBlob(bytes).getDataAsString('UTF-8');
+  } catch (e) {
+    console.error('decodeWebAppJsonpBase64Url_ error:', e);
+    return '';
+  }
 }
 
 /**
@@ -1642,7 +1743,7 @@ function buildWebAppJsonpEnvelope_(apiName, params) {
 function dispatchWebAppJsonpApi_(apiName, params) {
   switch (String(apiName || '').trim()) {
     case 'initial':
-      return getInitialSearchData();
+      return getInitialSearchDataForPwa_();
 
     case 'suggest':
       return getSuggestData();
@@ -1651,7 +1752,7 @@ function dispatchWebAppJsonpApi_(apiName, params) {
       return getAdvancedSearchOptions();
 
     case 'previewIndex':
-      return getPreviewIndex();
+      return [];
 
     case 'countPreview':
       return countPreviewMatchesAuthoritative(
@@ -1692,6 +1793,9 @@ function dispatchWebAppJsonpApi_(apiName, params) {
 
     case 'random':
       return getRandomBooks(params.count || 10);
+
+    case 'shelf':
+      return getBookshelfBooks();
 
     case 'series':
       return getBooksBySeriesKey(params.seriesKeyAuto || params.seriesKey || '');

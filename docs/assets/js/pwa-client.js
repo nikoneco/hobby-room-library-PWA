@@ -32,6 +32,7 @@
   }
 
   window.ShumiLibraryPwa = {
+    isPwaShell: true,
     handleApiFailure: function(error) {
       if (error && error.code === 'OFFLINE') {
         setBanner_(OFFLINE_MESSAGE, 'error');

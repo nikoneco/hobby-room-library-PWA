@@ -1430,7 +1430,8 @@ function syncSearchStatusPreviewFromForm_() {
     params.detailAuthor
   );
 
-  if (hasTextCondition) {
+  const isPwaShell = Boolean(window.ShumiLibraryPwa && window.ShumiLibraryPwa.isPwaShell);
+  if (hasTextCondition && !isPwaShell) {
     requestAuthoritativePreviewCount_(mode, params);
   }
 }
@@ -1766,7 +1767,7 @@ function showAllBookshelf() {
         hideSpinner();
         alert('本棚表示の読み込み中にエラーが発生しました。時間をおいて再度お試しください。');
       })
-      .searchBooksSimple('');
+      .getAllBooks();
   } catch (e) {
     console.error('showAllBookshelf client error:', e);
     hideSpinner();

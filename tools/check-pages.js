@@ -78,7 +78,7 @@ assert(manifest.start_url === './', 'manifest start_url stays within docs scope'
 assert(Array.isArray(manifest.icons) && manifest.icons.length >= 2, 'manifest has install icons');
 
 assert(sw.includes('offline.html'), 'service worker caches offline fallback');
-assert(sw.includes('shumi-library-pwa-v1'), 'service worker has versioned cache');
+assert(sw.includes('shumi-library-pwa-v3'), 'service worker has versioned cache');
 
 const appendedScripts = [];
 const timeouts = [];
@@ -124,6 +124,7 @@ vm.runInNewContext(read(path.join(docs, 'assets', 'js', 'gas-run-shim.js')), {
   document: sandboxDocument,
   navigator: sandboxNavigator,
   URLSearchParams,
+  btoa: value => Buffer.from(String(value), 'binary').toString('base64'),
   Proxy,
   Error,
   Date,
@@ -146,13 +147,29 @@ sandboxWindow.google.script.run
 assert(appendedScripts.length === 1, 'JSONP shim appends one script for search');
 const searchUrl = new URL(appendedScripts[0].src);
 assert(searchUrl.searchParams.get('api') === 'searchSimple', 'JSONP shim maps searchBooksSimple');
-assert(searchUrl.searchParams.get('keyword') === '葬送', 'JSONP shim serializes keyword');
+assert(!searchUrl.searchParams.has('keyword'), 'JSONP shim avoids direct keyword transfer');
+assert(searchUrl.searchParams.get('keywordB64') === '6JGs6YCB', 'JSONP shim serializes keyword as Base64URL');
 const callbackName = searchUrl.searchParams.get('callback');
 assert(callbackName && typeof sandboxWindow[callbackName] === 'function', 'JSONP callback is registered');
 sandboxWindow[callbackName]({ ok: true, data: [{ title: '葬送のフリーレン' }], error: null });
 assert(Array.isArray(successPayload) && successPayload[0].title === '葬送のフリーレン', 'JSONP shim delivers success payload');
 assert(failureCode === '', 'JSONP shim does not call failure on success');
 assert(sandboxWindow.ShumiLibraryPwa.cleared === 1, 'JSONP shim clears network warning on success');
+
+sandboxWindow.google.script.run
+  .withSuccessHandler(() => {})
+  .getAllBooks();
+assert(appendedScripts.length === 2, 'JSONP shim appends one script for shelf');
+const shelfUrl = new URL(appendedScripts[1].src);
+assert(shelfUrl.searchParams.get('api') === 'shelf', 'JSONP shim maps getAllBooks to shelf');
+
+sandboxWindow.google.script.run
+  .withSuccessHandler(() => {})
+  .searchBooksSimple('');
+assert(appendedScripts.length === 3, 'JSONP shim appends one script for blank search');
+const blankSearchUrl = new URL(appendedScripts[2].src);
+assert(blankSearchUrl.searchParams.get('api') === 'shelf', 'JSONP shim maps blank search to shelf');
+assert(!blankSearchUrl.searchParams.has('keyword'), 'JSONP shim omits blank keyword');
 
 sandboxNavigator.onLine = false;
 sandboxWindow.google.script.run

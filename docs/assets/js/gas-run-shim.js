@@ -2,7 +2,7 @@
   'use strict';
 
   const GAS_JSONP_ENDPOINT = "https://script.google.com/macros/s/AKfycbzAfn1SJqfKCRExekRlBMsbo9w4ZwcLNH_W6OJ-1ekS9LUJudAISNhtaGt6kPzAwEWYeQ/exec";
-  const JSONP_TIMEOUT_MS = 25000;
+  const JSONP_TIMEOUT_MS = 60000;
 
   const METHOD_CONFIG = {
     getInitialSearchData: { api: 'initial', argNames: [] },
@@ -47,6 +47,7 @@
       ]
     },
     getRandomBooks: { api: 'random', argNames: ['count'] },
+    getAllBooks: { api: 'shelf', argNames: [] },
     getBooksBySeriesKey: { api: 'series', argNames: ['seriesKeyAuto'] }
   };
 
@@ -87,16 +88,31 @@
     }
   }
 
+  function encodeParamValue_(value) {
+    const utf8Binary = encodeURIComponent(String(value)).replace(/%([0-9A-F]{2})/g, function(match, hex) {
+      return String.fromCharCode(parseInt(hex, 16));
+    });
+
+    return btoa(utf8Binary)
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/g, '');
+  }
+
   function appendArgs_(params, argNames, args) {
     (argNames || []).forEach(function(name, index) {
       const value = args[index];
       if (value === undefined || value === null) return;
-      params.set(name, String(value));
+      params.set(name + 'B64', encodeParamValue_(value));
     });
   }
 
   function invokeJsonp_(methodName, args, successHandler, failureHandler) {
-    const config = METHOD_CONFIG[methodName];
+    let config = METHOD_CONFIG[methodName];
+    if (methodName === 'searchBooksSimple' && !String(args[0] || '').trim()) {
+      config = METHOD_CONFIG.getAllBooks;
+      args = [];
+    }
     if (!config) {
       if (methodName === 'saveWebAppUserPreferences') {
         if (typeof successHandler === 'function') {

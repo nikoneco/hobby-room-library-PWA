@@ -72,12 +72,20 @@
 }
 
 @media (max-width: 600px) {
+  html,
+  body {
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
   .search-container.centered {
     top: 7vh;
   }
 
   .search-container {
     padding: 1rem 0.6rem 1.25rem;
+    max-width: 100%;
+    overflow-x: hidden;
   }
 
   .sensitive-toggle {
@@ -91,11 +99,42 @@
   .search-container.shrink .sensitive-toggle,
   .search-container.shrink.compact .sensitive-toggle,
   .search-container.shrink.shelf-view-active .sensitive-toggle {
+    top: auto;
     right: auto;
+  }
+
+  .search-status-area,
+  .search-container.shrink .search-status-area,
+  .search-container.shrink.compact .search-status-area,
+  .search-container.centered .search-status-area {
+    position: static;
+    width: min(100%, 520px);
+    max-width: 100%;
+    margin: 0.2rem auto 0.72rem;
+    flex-wrap: wrap;
+    justify-content: center;
+    text-align: center;
+    white-space: normal;
+  }
+
+  .search-status-count {
+    white-space: normal;
+    text-align: center;
+  }
+
+  .search-status-chips {
+    justify-content: center;
   }
 
   .logo {
     height: 104px;
+  }
+
+  .search-form,
+  .input-group,
+  #result {
+    width: 100%;
+    max-width: 100%;
   }
 
   .button-group {
@@ -107,9 +146,26 @@
     padding: 0.58rem 0.55rem;
   }
 
+  .view-toggle {
+    position: sticky;
+    top: max(8px, env(safe-area-inset-top));
+    right: auto;
+    z-index: 900;
+    width: fit-content;
+    max-width: calc(100vw - 24px);
+    margin: 0.55rem 0.75rem 0.2rem auto;
+    transform: none;
+  }
+
+  .toggle-btn {
+    min-width: 62px;
+    padding: 0.42rem 0.52rem;
+  }
+
   .card-view {
     grid-template-columns: 1fr;
     padding: 0.75rem;
+    max-width: 100%;
   }
 
   .book-cover {
@@ -126,7 +182,64 @@
   }
 
   .advanced-search-area {
+    width: 100%;
+    max-width: 100%;
+    padding: 0.9rem 0.78rem;
     border-radius: var(--lib-radius-md);
+    overflow-x: hidden;
+  }
+
+  .advanced-grid {
+    grid-template-columns: 1fr;
+    min-width: 0;
+    gap: 0.9rem;
+  }
+
+  .advanced-grid .input-group,
+  .released-range-row {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .input-group input,
+  .input-group select,
+  .released-range-controls select {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .released-range-row {
+    display: block;
+  }
+
+  .released-range-controls {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 0.86fr);
+    gap: 0.55rem;
+  }
+
+  .released-range-separator {
+    grid-column: 1 / -1;
+    justify-self: center;
+    line-height: 1;
+    margin: -0.1rem 0;
+  }
+}
+
+@media (max-width: 420px) {
+  .view-toggle {
+    width: calc(100vw - 28px);
+    margin-right: auto;
+    justify-content: space-between;
+  }
+
+  .toggle-btn {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .toggle-label {
+    font-size: 0.68rem;
   }
 }
 

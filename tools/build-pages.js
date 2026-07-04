@@ -161,7 +161,7 @@ function writeGasRunShim() {
   'use strict';
 
   const GAS_JSONP_ENDPOINT = ${JSON.stringify(gasEndpoint)};
-  const JSONP_TIMEOUT_MS = 25000;
+  const JSONP_TIMEOUT_MS = 60000;
 
   const METHOD_CONFIG = {
     getInitialSearchData: { api: 'initial', argNames: [] },
@@ -206,6 +206,7 @@ function writeGasRunShim() {
       ]
     },
     getRandomBooks: { api: 'random', argNames: ['count'] },
+    getAllBooks: { api: 'shelf', argNames: [] },
     getBooksBySeriesKey: { api: 'series', argNames: ['seriesKeyAuto'] }
   };
 
@@ -246,16 +247,31 @@ function writeGasRunShim() {
     }
   }
 
+  function encodeParamValue_(value) {
+    const utf8Binary = encodeURIComponent(String(value)).replace(/%([0-9A-F]{2})/g, function(match, hex) {
+      return String.fromCharCode(parseInt(hex, 16));
+    });
+
+    return btoa(utf8Binary)
+      .replace(/\\+/g, '-')
+      .replace(/\\//g, '_')
+      .replace(/=+$/g, '');
+  }
+
   function appendArgs_(params, argNames, args) {
     (argNames || []).forEach(function(name, index) {
       const value = args[index];
       if (value === undefined || value === null) return;
-      params.set(name, String(value));
+      params.set(name + 'B64', encodeParamValue_(value));
     });
   }
 
   function invokeJsonp_(methodName, args, successHandler, failureHandler) {
-    const config = METHOD_CONFIG[methodName];
+    let config = METHOD_CONFIG[methodName];
+    if (methodName === 'searchBooksSimple' && !String(args[0] || '').trim()) {
+      config = METHOD_CONFIG.getAllBooks;
+      args = [];
+    }
     if (!config) {
       if (methodName === 'saveWebAppUserPreferences') {
         if (typeof successHandler === 'function') {
@@ -421,6 +437,7 @@ function writePwaClient() {
   }
 
   window.ShumiLibraryPwa = {
+    isPwaShell: true,
     handleApiFailure: function(error) {
       if (error && error.code === 'OFFLINE') {
         setBanner_(OFFLINE_MESSAGE, 'error');
@@ -541,7 +558,7 @@ function writePwaFiles() {
   fs.writeFileSync(path.join(docsDir, 'offline.html'), offlineHtml, 'utf8');
 
   const sw = `
-const CACHE_NAME = 'shumi-library-pwa-v1';
+const CACHE_NAME = 'shumi-library-pwa-v3';
 const APP_SHELL = [
   './',
   './index.html',
@@ -609,14 +626,13 @@ self.addEventListener('fetch', event => {
   }
 
   event.respondWith(
-    caches.match(request).then(cached => {
-      if (cached) return cached;
-      return fetch(request).then(response => {
+    fetch(request)
+      .then(response => {
         const copy = response.clone();
         caches.open(CACHE_NAME).then(cache => cache.put(request, copy));
         return response;
-      });
-    })
+      })
+      .catch(() => caches.match(request).then(cached => cached || caches.match('./offline.html')))
   );
 });
 `.trim();
