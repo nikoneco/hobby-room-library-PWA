@@ -236,20 +236,23 @@
     width: fit-content;
     max-width: calc(100vw - 24px);
     margin: 0;
-    padding: 0.18rem;
+    padding: 0.14rem;
+    gap: 0.12rem;
+    border-radius: 16px;
+    background: rgba(12, 16, 23, 0.78);
     transform: none;
   }
 
   .toggle-btn {
-    min-width: 42px;
-    min-height: 42px;
-    padding: 0.24rem;
+    min-width: 34px;
+    min-height: 34px;
+    padding: 0.18rem;
     gap: 0;
   }
 
   .toggle-icon {
-    width: 1.08rem;
-    height: 1.08rem;
+    width: 0.96rem;
+    height: 0.96rem;
   }
 
   .toggle-label {
@@ -262,7 +265,9 @@
   }
 
   .toggle-btn::after {
-    bottom: 0.18rem;
+    bottom: 0.12rem;
+    width: 3px;
+    height: 3px;
   }
 
   .card-view {
@@ -512,13 +517,19 @@
   .view-toggle {
     width: fit-content;
     max-width: calc(100vw - 20px);
-    right: 8px;
+    right: 7px;
+    padding: 0.12rem;
   }
 
   .toggle-btn {
     flex: 0 0 auto;
-    min-width: 40px;
-    min-height: 40px;
+    min-width: 32px;
+    min-height: 32px;
+  }
+
+  .toggle-icon {
+    width: 0.9rem;
+    height: 0.9rem;
   }
 }
 
