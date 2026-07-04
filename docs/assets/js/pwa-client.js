@@ -157,8 +157,16 @@
       const button = document.createElement('button');
       button.type = 'button';
       button.className = 'pwa-recent-book';
+      if (index === 0) button.classList.add('continue');
       button.setAttribute('data-index', String(index));
       button.setAttribute('aria-label', (book.title || 'タイトルなし') + ' を開く');
+
+      if (index === 0) {
+        const kicker = document.createElement('span');
+        kicker.className = 'pwa-recent-book-kicker';
+        kicker.textContent = '続きから';
+        button.appendChild(kicker);
+      }
 
       const title = document.createElement('span');
       title.className = 'pwa-recent-book-title';

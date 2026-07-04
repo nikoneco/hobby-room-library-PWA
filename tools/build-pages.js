@@ -190,7 +190,10 @@ body.pwa-standalone .mobile-app-dock {
 }
 
 .pwa-recent-list {
-  display: flex;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(140px, 168px);
+  grid-template-rows: auto;
   gap: 0.42rem;
   overflow-x: auto;
   padding: 0.08rem 0.1rem 0.28rem;
@@ -203,7 +206,6 @@ body.pwa-standalone .mobile-app-dock {
 }
 
 .pwa-recent-book {
-  flex: 0 0 min(46vw, 168px);
   min-width: 0;
   padding: 0.48rem 0.56rem;
   border: 1px solid rgba(167, 183, 204, 0.20);
@@ -215,9 +217,25 @@ body.pwa-standalone .mobile-app-dock {
   cursor: pointer;
 }
 
+.pwa-recent-book.continue {
+  grid-column: span 2;
+  min-height: 72px;
+  padding: 0.68rem 0.78rem;
+  border-color: rgba(255, 206, 129, 0.28);
+  background: linear-gradient(135deg, rgba(98, 69, 36, 0.42), rgba(20, 43, 52, 0.52));
+}
+
 .pwa-recent-book:focus-visible {
   outline: 3px solid rgba(104, 191, 215, 0.54);
   outline-offset: 3px;
+}
+
+.pwa-recent-book-kicker {
+  display: block;
+  margin-bottom: 0.18rem;
+  color: rgba(255, 225, 177, 0.76);
+  font-size: 0.62rem;
+  font-weight: 850;
 }
 
 .pwa-recent-book-title,
@@ -234,11 +252,19 @@ body.pwa-standalone .mobile-app-dock {
   line-height: 1.3;
 }
 
+.pwa-recent-book.continue .pwa-recent-book-title {
+  font-size: 0.86rem;
+}
+
 .pwa-recent-book-meta {
   margin-top: 0.18rem;
   color: rgba(234, 241, 248, 0.56);
   font-size: 0.64rem;
   font-weight: 750;
+}
+
+.pwa-recent-book.continue .pwa-recent-book-meta {
+  color: rgba(234, 241, 248, 0.68);
 }
 
 body.pwa-network-visible {
@@ -707,8 +733,16 @@ function writePwaClient() {
       const button = document.createElement('button');
       button.type = 'button';
       button.className = 'pwa-recent-book';
+      if (index === 0) button.classList.add('continue');
       button.setAttribute('data-index', String(index));
       button.setAttribute('aria-label', (book.title || 'タイトルなし') + ' を開く');
+
+      if (index === 0) {
+        const kicker = document.createElement('span');
+        kicker.className = 'pwa-recent-book-kicker';
+        kicker.textContent = '続きから';
+        button.appendChild(kicker);
+      }
 
       const title = document.createElement('span');
       title.className = 'pwa-recent-book-title';
@@ -954,7 +988,7 @@ function writePwaFiles() {
   fs.writeFileSync(path.join(docsDir, 'offline.html'), offlineHtml, 'utf8');
 
   const sw = `
-const CACHE_NAME = 'shumi-library-pwa-v34';
+const CACHE_NAME = 'shumi-library-pwa-v35';
 const APP_SHELL = [
   './',
   './index.html',
