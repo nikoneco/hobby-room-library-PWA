@@ -208,6 +208,23 @@ function getCachedBookDetail_(book) {
   return null;
 }
 
+function canPrefetchBookDetails_() {
+  if (typeof navigator !== 'undefined' && navigator && navigator.onLine === false) return false;
+
+  const connection = typeof navigator !== 'undefined'
+    ? (navigator.connection || navigator.mozConnection || navigator.webkitConnection)
+    : null;
+  if (!connection) return true;
+  if (connection.saveData) return false;
+
+  const effectiveType = String(connection.effectiveType || '').toLowerCase();
+  return effectiveType !== 'slow-2g' && effectiveType !== '2g';
+}
+
+function getBookDetailPrefetchConcurrency_() {
+  return canPrefetchBookDetails_() ? BOOK_DETAIL_PREFETCH_CONCURRENCY : 1;
+}
+
 function readPersistentBookDetailCache_() {
   try {
     if (!window.localStorage) return null;
@@ -354,10 +371,11 @@ function fetchDeferredBookDetails_(book, index, dataArr, seriesContext, options)
 }
 
 function processBookDetailPrefetchQueue_() {
-  if (bookDetailPrefetchActive >= BOOK_DETAIL_PREFETCH_CONCURRENCY) return;
+  if (!canPrefetchBookDetails_()) return;
+  if (bookDetailPrefetchActive >= getBookDetailPrefetchConcurrency_()) return;
 
   const batch = [];
-  while (bookDetailPrefetchQueue.length && batch.length < 8) {
+  while (bookDetailPrefetchQueue.length && batch.length < BOOK_DETAIL_PREFETCH_BATCH_SIZE) {
     const item = bookDetailPrefetchQueue.shift();
     if (!item) continue;
     item.detailQueued = false;
@@ -420,9 +438,14 @@ function processBookDetailPrefetchQueue_() {
       window.setTimeout(processBookDetailPrefetchQueue_, 80);
     }
   }, 120);
+
+  if (bookDetailPrefetchQueue.length && bookDetailPrefetchActive < getBookDetailPrefetchConcurrency_()) {
+    window.setTimeout(processBookDetailPrefetchQueue_, 80);
+  }
 }
 
 function queueBookDetailPrefetch_(book, priority) {
+  if (!canPrefetchBookDetails_()) return;
   if (!shouldFetchDeferredBookDetails_(book) || getCachedBookDetail_(book)) return;
 
   if (!book.detailQueued) {
@@ -446,6 +469,30 @@ function queueBookDetailPrefetch_(book, priority) {
 
   if (bookDetailPrefetchTimer) window.clearTimeout(bookDetailPrefetchTimer);
   bookDetailPrefetchTimer = window.setTimeout(processBookDetailPrefetchQueue_, priority ? 20 : 320);
+}
+
+function warmBookDetailPrefetch_(books, options) {
+  if (!Array.isArray(books) || !books.length || !canPrefetchBookDetails_()) return;
+
+  const opt = options || {};
+  const limit = Math.max(0, Number(opt.limit || BOOK_DETAIL_PREFETCH_WARM_LIMIT));
+  const targets = books
+    .filter(book => shouldFetchDeferredBookDetails_(book) && !getCachedBookDetail_(book))
+    .slice(0, limit);
+
+  if (!targets.length) return;
+
+  const run = function() {
+    targets.forEach((book, index) => {
+      queueBookDetailPrefetch_(book, index < 4);
+    });
+  };
+
+  if ('requestIdleCallback' in window) {
+    window.requestIdleCallback(run, { timeout: Math.max(500, Number(opt.timeout || 1000)) });
+  } else {
+    window.setTimeout(run, Math.max(220, Number(opt.delay || 480)));
+  }
 }
 
 function resetBookDetailPrefetchObserver_() {

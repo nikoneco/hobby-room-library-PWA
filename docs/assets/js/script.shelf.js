@@ -776,6 +776,12 @@ function renderShelfView_(data) {
     container.appendChild(groupSection);
   });
 
+  warmBookDetailPrefetch_(shelfPopupData, {
+    limit: BOOK_DETAIL_PREFETCH_WARM_LIMIT,
+    timeout: 1200,
+    delay: 520
+  });
+
   return container;
 }
 
