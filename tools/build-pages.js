@@ -723,6 +723,7 @@ function main() {
   writePwaFiles();
   writeIcons();
   fs.writeFileSync(path.join(docsDir, 'index.html'), buildStaticIndex(), 'utf8');
+  fs.writeFileSync(path.join(docsDir, '.nojekyll'), '', 'utf8');
   console.log('GitHub Pages PWA files generated in docs/');
 }
 
