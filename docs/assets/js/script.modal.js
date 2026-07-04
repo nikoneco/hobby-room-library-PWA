@@ -763,7 +763,6 @@ function showPopup(book, index, dataArr, seriesContext) {
   info.innerHTML = `
     <div class="popup-book-detail">
       <div class="popup-book-head">
-        ${buildPopupBookContextHtml_(book)}
         <div class="popup-book-title">${escapeHtml(book.title || '(タイトルなし)')}</div>
         ${buildPopupBookLeadHtml_(book)}
         ${buildPopupDetailLoadingHtml_(book)}

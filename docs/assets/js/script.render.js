@@ -80,10 +80,6 @@ function buildPopupBookLeadHtml_(book) {
   return `<div class="popup-book-lead">${parts.join('<span></span>')}</div>`;
 }
 
-function buildPopupBookContextHtml_(book) {
-  return '';
-}
-
 function buildBookDetailsHtml_(book) {
   const rows = [
     ['著者', book && book.author],
