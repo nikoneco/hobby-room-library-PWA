@@ -48,6 +48,7 @@
     },
     getRandomBooks: { api: 'random', argNames: ['count'] },
     getAllBooks: { api: 'shelf', argNames: [] },
+    getBookshelfBooks: { api: 'shelf', argNames: [] },
     getBookshelfBooksChunk: { api: 'shelfChunk', argNames: ['offset', 'limit'] },
     getBooksBySeriesKey: { api: 'series', argNames: ['seriesKeyAuto'] }
   };

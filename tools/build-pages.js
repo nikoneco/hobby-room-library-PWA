@@ -212,6 +212,7 @@ function writeGasRunShim() {
     },
     getRandomBooks: { api: 'random', argNames: ['count'] },
     getAllBooks: { api: 'shelf', argNames: [] },
+    getBookshelfBooks: { api: 'shelf', argNames: [] },
     getBookshelfBooksChunk: { api: 'shelfChunk', argNames: ['offset', 'limit'] },
     getBooksBySeriesKey: { api: 'series', argNames: ['seriesKeyAuto'] }
   };
@@ -564,7 +565,7 @@ function writePwaFiles() {
   fs.writeFileSync(path.join(docsDir, 'offline.html'), offlineHtml, 'utf8');
 
   const sw = `
-const CACHE_NAME = 'shumi-library-pwa-v7';
+const CACHE_NAME = 'shumi-library-pwa-v8';
 const APP_SHELL = [
   './',
   './index.html',

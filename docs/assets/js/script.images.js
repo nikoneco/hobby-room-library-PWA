@@ -16,6 +16,20 @@ function normalizeImageCandidateUrl_(url) {
   return /^https:\/\//i.test(value) ? value : '';
 }
 
+function normalizeBookImageIsbn_(value) {
+  const digits = String(value || '').replace(/[^0-9Xx]/g, '').toUpperCase();
+  if (digits.length === 10 || digits.length === 13) return digits;
+  return '';
+}
+
+function buildHanmotoImageUrlFromBook_(book, size) {
+  const isbn = normalizeBookImageIsbn_(book && book.isbn);
+  if (!isbn) return '';
+
+  const imageSize = Number(size) === 400 ? 400 : 600;
+  return `https://hanmoto.com/bd/img/${isbn}_${imageSize}.jpg`;
+}
+
 function isSensitiveCoverVisible_() {
   try {
     return localStorage.getItem(SENSITIVE_COVER_STORAGE_KEY) === '1';
@@ -302,9 +316,12 @@ function buildBookImageCandidates_(book) {
     });
   }
 
+  const hanmoto600 = normalizeImageCandidateUrl_(book && book.img) ||
+    buildHanmotoImageUrlFromBook_(book, 600);
+
   // 通常はHanmotoをブラウザで直接試す。GAS側で存在確認しない。
   candidates.push({
-    url: normalizeImageCandidateUrl_(book && book.img), // Hanmoto 600
+    url: hanmoto600, // Hanmoto 600
     label: 'Hanmoto600',
     detail: 'Hanmoto'
   });

@@ -803,7 +803,7 @@ function isSensitiveIndexItem_(idx) {
 
 /**
  * PWA本棚表示専用の最小データへ変換する。
- * 全件JSONPで落ちないよう、棚配置・表紙・タイトル以外の重い情報は返さない。
+ * 画像URLはクライアント側でISBNから組み立て、初回JSONPは文字データ優先にする。
  *
  * @param {string[][]} rows
  * @param {Object[]=} indexData
@@ -816,9 +816,7 @@ function mapRowsToShelfBooks_(rows, indexData) {
 
     return {
       title: row[CONFIG.IDX.TITLE] || '',
-      img: buildHanmotoImageUrlFromIsbn_(isbn, 600),
-      fallbackImg: normalizeBookFallbackImageUrl_(row[CONFIG.IDX.FALLBACK_IMAGE_URL]),
-      fallbackImageSource: row[CONFIG.IDX.FALLBACK_IMAGE_SOURCE] || '',
+      isbn,
       shelf: row[CONFIG.IDX.SHELF] || '',
       location: row[CONFIG.IDX.LOCATION] || '',
       isSensitive: isSensitiveIndexItem_(idx)
