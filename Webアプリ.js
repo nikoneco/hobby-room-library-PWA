@@ -756,6 +756,8 @@ function normalizeReleasedYm_(value) {
 function mapRowsToBooks_(rows, indexData, options) {
   const compact = Boolean(options && options.compact);
   const includeImages = !(options && options.includeImages === false);
+  const hasRowOffset = options && Number.isFinite(Number(options.rowOffset));
+  const rowOffset = hasRowOffset ? Number(options.rowOffset) : 0;
 
   return rows.map((row, i) => {
     const isbn = normalizeIsbn_(row[CONFIG.IDX.ISBN]);
@@ -781,8 +783,13 @@ function mapRowsToBooks_(rows, indexData, options) {
       seriesSearchTitle: idx ? (idx.seriesSearchTitle || '') : '',
       isExtraSeries   : idx ? Boolean(idx.isExtraSeries) : false,
       volume          : idx ? (idx.volume || 0) : 0,
-      ownedMaxVolume  : idx ? (idx.ownedMaxVolume || 0) : 0
+      ownedMaxVolume  : idx ? (idx.ownedMaxVolume || 0) : 0,
+      detailLoaded    : true
     };
+
+    if (hasRowOffset) {
+      book.rowIndex = rowOffset + i;
+    }
 
     if (includeImages) {
       book.img = buildHanmotoImageUrlFromIsbn_(isbn, 600);
@@ -806,16 +813,31 @@ function isSensitiveIndexItem_(idx) {
 }
 
 /**
- * PWA本棚表示専用データへ変換する。
- * 本の詳細情報は維持し、重い画像URLだけクライアント側生成へ逃がす。
+ * PWA本棚表示専用の軽量データへ変換する。
+ * 詳細情報はモーダルを開いた時に1冊ずつ取得する。
  * 画像URLはクライアント側でISBNから組み立て、初回JSONPは文字データ優先にする。
  *
  * @param {string[][]} rows
  * @param {Object[]=} indexData
  * @returns {Object[]}
  */
-function mapRowsToShelfBooks_(rows, indexData) {
-  return mapRowsToBooks_(rows, indexData, { includeImages: false });
+function mapRowsToShelfBooks_(rows, indexData, rowOffset) {
+  const offset = Math.max(0, Number(rowOffset || 0));
+
+  return rows.map((row, i) => {
+    const isbn = normalizeIsbn_(row[CONFIG.IDX.ISBN]);
+    const idx = Array.isArray(indexData) ? indexData[i] : null;
+
+    return {
+      rowIndex: offset + i,
+      detailLoaded: false,
+      title: row[CONFIG.IDX.TITLE] || '',
+      isbn,
+      shelf: row[CONFIG.IDX.SHELF] || '',
+      location: row[CONFIG.IDX.LOCATION] || '',
+      isSensitive: isSensitiveIndexItem_(idx)
+    };
+  });
 }
 
 /**
@@ -1631,7 +1653,7 @@ function getAllBooks() {
 function getBookshelfBooks() {
   try {
     const dataset = getLibraryDataset_();
-    return mapRowsToShelfBooks_(dataset.rows || [], dataset.index || []);
+    return mapRowsToShelfBooks_(dataset.rows || [], dataset.index || [], 0);
   } catch (e) {
     console.error('getBookshelfBooks error:', e);
     return [];
@@ -1649,7 +1671,7 @@ function getBookshelfBooksChunk(offset, limit) {
     const end = Math.min(start + size, total);
 
     return {
-      books: mapRowsToShelfBooks_(rows.slice(start, end), index.slice(start, end)),
+      books: mapRowsToShelfBooks_(rows.slice(start, end), index.slice(start, end), start),
       total,
       offset: start,
       nextOffset: end,
@@ -1665,6 +1687,30 @@ function getBookshelfBooksChunk(offset, limit) {
       done: true,
       error: e && e.message ? e.message : String(e)
     };
+  }
+}
+
+function getBookDetailByRowIndex(rowIndex) {
+  try {
+    const dataset = getLibraryDataset_();
+    const rows = dataset.rows || [];
+    const index = dataset.index || [];
+    const targetIndex = Math.floor(Number(rowIndex));
+
+    if (!Number.isFinite(targetIndex) || targetIndex < 0 || targetIndex >= rows.length) {
+      throw new Error(`Invalid book row index: ${rowIndex}`);
+    }
+
+    const books = mapRowsToBooks_(
+      [rows[targetIndex]],
+      [index[targetIndex] || {}],
+      { includeImages: false, rowOffset: targetIndex }
+    );
+
+    return books[0] || null;
+  } catch (e) {
+    console.error('getBookDetailByRowIndex error:', e);
+    return null;
   }
 }
 
@@ -1890,6 +1936,9 @@ function dispatchWebAppJsonpApi_(apiName, params) {
 
     case 'shelfChunk':
       return getBookshelfBooksChunk(params.offset, params.limit);
+
+    case 'bookDetail':
+      return getBookDetailByRowIndex(params.rowIndex);
 
     case 'series':
       return getBooksBySeriesKey(params.seriesKeyAuto || params.seriesKey || '');

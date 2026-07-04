@@ -32,6 +32,7 @@ assert(source.includes('buildQuickBrowseCountsPayload_'), 'PWA initial data incl
   'random',
   'shelf',
   'shelfChunk',
+  'bookDetail',
   'series'
 ].forEach(apiName => {
   assert(source.includes(`case '${apiName}':`), `JSONP API includes ${apiName}`);
@@ -47,6 +48,7 @@ assert(source.includes('buildQuickBrowseCountsPayload_'), 'PWA initial data incl
   'getRandomBooks(',
   'getBookshelfBooks()',
   'getBookshelfBooksChunk(',
+  'getBookDetailByRowIndex(',
   'getBooksBySeriesKey('
 ].forEach(call => {
   assert(source.includes(call), `JSONP dispatch calls ${call}`);

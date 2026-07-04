@@ -1778,7 +1778,7 @@ function showAllBookshelf() {
 
     showSpinner('本棚を広げています', { kind: 'shelf' });
 
-    const chunkSize = 700;
+    const chunkSize = 1000;
     const books = [];
 
     function finishBookshelfLoad_(loadedBooks) {
@@ -1831,7 +1831,20 @@ function showAllBookshelf() {
         .getBookshelfBooksChunk(offset, chunkSize);
     }
 
-    loadBookshelfChunk_(0);
+    google.script.run
+      .withSuccessHandler(function(payload) {
+        if (Array.isArray(payload)) {
+          finishBookshelfLoad_(payload);
+          return;
+        }
+
+        loadBookshelfChunk_(0);
+      })
+      .withFailureHandler(function(err) {
+        console.warn('getBookshelfBooks failed; falling back to chunked loading:', err);
+        loadBookshelfChunk_(0);
+      })
+      .getBookshelfBooks();
   } catch (e) {
     console.error('showAllBookshelf client error:', e);
     hideSpinner();

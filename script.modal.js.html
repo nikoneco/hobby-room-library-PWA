@@ -150,6 +150,58 @@ function clearPopupTouchHandlers_() {
   }
 }
 
+function shouldFetchDeferredBookDetails_(book) {
+  return !!(
+    book &&
+    book.detailLoaded === false &&
+    book.rowIndex !== undefined &&
+    book.rowIndex !== null &&
+    !book.detailLoading
+  );
+}
+
+function mergeDeferredBookDetails_(book, detail) {
+  if (!book || !detail || typeof detail !== 'object') return book;
+
+  Object.keys(detail).forEach(key => {
+    book[key] = detail[key];
+  });
+  book.detailLoaded = true;
+  book.detailLoading = false;
+  book.detailError = '';
+  return book;
+}
+
+function fetchDeferredBookDetails_(book, index, dataArr, seriesContext) {
+  if (!shouldFetchDeferredBookDetails_(book)) return;
+
+  book.detailLoading = true;
+
+  google.script.run
+    .withSuccessHandler(function(detail) {
+      book.detailLoading = false;
+      if (!detail) {
+        book.detailError = '詳細データを取得できませんでした。';
+        return;
+      }
+
+      const merged = mergeDeferredBookDetails_(book, detail);
+      if (Array.isArray(dataArr) && dataArr[index] === book) {
+        dataArr[index] = merged;
+      }
+      if (Array.isArray(popupData) && popupData[popupIndex] === book) {
+        popupData[popupIndex] = merged;
+        showPopup(merged, popupIndex, popupData, popupSeriesContext || seriesContext);
+      }
+    })
+    .withFailureHandler(function(err) {
+      console.warn('getBookDetailByRowIndex failed:', err);
+      book.detailLoading = false;
+      book.detailError = '詳細データを取得できませんでした。';
+    })
+    .getBookDetailByRowIndex(book.rowIndex);
+}
+
 function closeCoverFullscreen_() {
   const overlay = document.getElementById('cover-fullscreen-overlay');
   const img = document.getElementById('cover-fullscreen-img');
@@ -504,6 +556,7 @@ function showPopup(book, index, dataArr, seriesContext) {
 
   appendPopupSummaryAccordion_(info.querySelector('.genre-chip-wrap.popup'), book);
   attachPopupActionHandlers(book, popupSeriesContext);
+  fetchDeferredBookDetails_(book, index, dataArr, popupSeriesContext);
 
   overlay.style.display = 'flex';
   document.body.classList.add('modal-open');

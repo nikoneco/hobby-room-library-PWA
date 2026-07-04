@@ -50,6 +50,7 @@
     getAllBooks: { api: 'shelf', argNames: [] },
     getBookshelfBooks: { api: 'shelf', argNames: [] },
     getBookshelfBooksChunk: { api: 'shelfChunk', argNames: ['offset', 'limit'] },
+    getBookDetailByRowIndex: { api: 'bookDetail', argNames: ['rowIndex'] },
     getBooksBySeriesKey: { api: 'series', argNames: ['seriesKeyAuto'] }
   };
 
