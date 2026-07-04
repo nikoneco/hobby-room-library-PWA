@@ -9,8 +9,22 @@
   let reloadForUpdate = false;
   let currentBannerKind = '';
 
+  function isStandalone_() {
+    return Boolean(
+      window.matchMedia &&
+      window.matchMedia('(display-mode: standalone)').matches
+    ) || window.navigator.standalone === true;
+  }
+
   function getBanner_() {
     return document.getElementById('pwaNetworkBanner');
+  }
+
+  function syncBodyState_() {
+    if (!document.body) return;
+    document.body.classList.add('pwa-shell');
+    document.body.classList.toggle('pwa-standalone', isStandalone_());
+    document.body.classList.toggle('pwa-network-visible', Boolean(currentBannerKind));
   }
 
   function setBanner_(message, kind) {
@@ -23,6 +37,7 @@
     currentBannerKind = text ? (kind || '') : '';
     banner.classList.toggle('is-error', kind === 'error');
     banner.classList.toggle('is-update', kind === 'update');
+    syncBodyState_();
   }
 
   function clearBanner_() {
@@ -41,6 +56,7 @@
     currentBannerKind = 'update';
     banner.classList.remove('is-error');
     banner.classList.add('is-update');
+    syncBodyState_();
 
     const text = document.createElement('span');
     text.textContent = UPDATE_MESSAGE;
@@ -106,6 +122,12 @@
 
   window.addEventListener('online', syncOnlineState_);
   window.addEventListener('offline', syncOnlineState_);
+  if (window.matchMedia) {
+    const standaloneMedia = window.matchMedia('(display-mode: standalone)');
+    if (standaloneMedia && typeof standaloneMedia.addEventListener === 'function') {
+      standaloneMedia.addEventListener('change', syncBodyState_);
+    }
+  }
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.addEventListener('controllerchange', function() {
       if (reloadForUpdate) {
@@ -115,6 +137,7 @@
   }
 
   window.addEventListener('DOMContentLoaded', function() {
+    syncBodyState_();
     syncOnlineState_();
 
     if ('serviceWorker' in navigator) {

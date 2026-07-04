@@ -14,6 +14,45 @@
   line-height: 1.55;
 }
 
+body.pwa-shell .mobile-app-dock {
+  touch-action: manipulation;
+}
+
+body.pwa-standalone {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+body.pwa-standalone input,
+body.pwa-standalone textarea,
+body.pwa-standalone select,
+body.pwa-standalone #result,
+body.pwa-standalone #image-popup-info {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+body.pwa-standalone .search-container.centered {
+  min-height: calc(100svh - 96px - env(safe-area-inset-bottom));
+}
+
+body.pwa-standalone .mobile-app-dock {
+  border-radius: 22px;
+  background: rgba(9, 13, 19, 0.90);
+}
+
+body.pwa-network-visible {
+  --pwa-network-banner-offset: 78px;
+}
+
+body.pwa-network-visible .mobile-app-dock {
+  transform: translateY(calc(-1 * var(--pwa-network-banner-offset)));
+}
+
+body.pwa-network-visible.mobile-input-active .mobile-app-dock {
+  transform: translateY(calc(100% + 16px));
+}
+
 .pwa-network-banner.is-error {
   border-color: rgba(166, 73, 58, 0.28);
   color: #5f2f26;
@@ -37,8 +76,18 @@
 }
 
 @media (max-width: 640px) {
+  body.pwa-network-visible {
+    padding-bottom: calc(154px + env(safe-area-inset-bottom));
+  }
+
   .pwa-network-banner {
     font-size: 0.86rem;
     padding: 10px 12px;
+  }
+}
+
+@media (min-width: 641px) {
+  body.pwa-network-visible .mobile-app-dock {
+    transform: none;
   }
 }

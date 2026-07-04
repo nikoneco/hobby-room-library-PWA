@@ -144,6 +144,45 @@ function writePwaCss() {
   line-height: 1.55;
 }
 
+body.pwa-shell .mobile-app-dock {
+  touch-action: manipulation;
+}
+
+body.pwa-standalone {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+body.pwa-standalone input,
+body.pwa-standalone textarea,
+body.pwa-standalone select,
+body.pwa-standalone #result,
+body.pwa-standalone #image-popup-info {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+body.pwa-standalone .search-container.centered {
+  min-height: calc(100svh - 96px - env(safe-area-inset-bottom));
+}
+
+body.pwa-standalone .mobile-app-dock {
+  border-radius: 22px;
+  background: rgba(9, 13, 19, 0.90);
+}
+
+body.pwa-network-visible {
+  --pwa-network-banner-offset: 78px;
+}
+
+body.pwa-network-visible .mobile-app-dock {
+  transform: translateY(calc(-1 * var(--pwa-network-banner-offset)));
+}
+
+body.pwa-network-visible.mobile-input-active .mobile-app-dock {
+  transform: translateY(calc(100% + 16px));
+}
+
 .pwa-network-banner.is-error {
   border-color: rgba(166, 73, 58, 0.28);
   color: #5f2f26;
@@ -167,9 +206,19 @@ function writePwaCss() {
 }
 
 @media (max-width: 640px) {
+  body.pwa-network-visible {
+    padding-bottom: calc(154px + env(safe-area-inset-bottom));
+  }
+
   .pwa-network-banner {
     font-size: 0.86rem;
     padding: 10px 12px;
+  }
+}
+
+@media (min-width: 641px) {
+  body.pwa-network-visible .mobile-app-dock {
+    transform: none;
   }
 }
 `.trim();
@@ -440,8 +489,22 @@ function writePwaClient() {
   let reloadForUpdate = false;
   let currentBannerKind = '';
 
+  function isStandalone_() {
+    return Boolean(
+      window.matchMedia &&
+      window.matchMedia('(display-mode: standalone)').matches
+    ) || window.navigator.standalone === true;
+  }
+
   function getBanner_() {
     return document.getElementById('pwaNetworkBanner');
+  }
+
+  function syncBodyState_() {
+    if (!document.body) return;
+    document.body.classList.add('pwa-shell');
+    document.body.classList.toggle('pwa-standalone', isStandalone_());
+    document.body.classList.toggle('pwa-network-visible', Boolean(currentBannerKind));
   }
 
   function setBanner_(message, kind) {
@@ -454,6 +517,7 @@ function writePwaClient() {
     currentBannerKind = text ? (kind || '') : '';
     banner.classList.toggle('is-error', kind === 'error');
     banner.classList.toggle('is-update', kind === 'update');
+    syncBodyState_();
   }
 
   function clearBanner_() {
@@ -472,6 +536,7 @@ function writePwaClient() {
     currentBannerKind = 'update';
     banner.classList.remove('is-error');
     banner.classList.add('is-update');
+    syncBodyState_();
 
     const text = document.createElement('span');
     text.textContent = UPDATE_MESSAGE;
@@ -537,6 +602,12 @@ function writePwaClient() {
 
   window.addEventListener('online', syncOnlineState_);
   window.addEventListener('offline', syncOnlineState_);
+  if (window.matchMedia) {
+    const standaloneMedia = window.matchMedia('(display-mode: standalone)');
+    if (standaloneMedia && typeof standaloneMedia.addEventListener === 'function') {
+      standaloneMedia.addEventListener('change', syncBodyState_);
+    }
+  }
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.addEventListener('controllerchange', function() {
       if (reloadForUpdate) {
@@ -546,6 +617,7 @@ function writePwaClient() {
   }
 
   window.addEventListener('DOMContentLoaded', function() {
+    syncBodyState_();
     syncOnlineState_();
 
     if ('serviceWorker' in navigator) {
@@ -678,7 +750,7 @@ function writePwaFiles() {
   fs.writeFileSync(path.join(docsDir, 'offline.html'), offlineHtml, 'utf8');
 
   const sw = `
-const CACHE_NAME = 'shumi-library-pwa-v32';
+const CACHE_NAME = 'shumi-library-pwa-v33';
 const APP_SHELL = [
   './',
   './index.html',
