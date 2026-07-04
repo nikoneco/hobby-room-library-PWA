@@ -208,6 +208,11 @@ assert(
   sandbox.buildPopupBookLeadHtml_({ author: '<著者>', publisher: '出版社' }).includes('&lt;著者&gt;'),
   'popup lead escapes author text'
 );
+assert(
+  clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('function isBookPopupOpen_()') &&
+    clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('if (isBookPopupOpen_() && Array.isArray(popupData)'),
+  'deferred detail refresh only rerenders an open popup'
+);
 
 const cachedShelfBook = sandbox.sanitizeBookshelfCacheBook_({
   rowIndex: 12,
