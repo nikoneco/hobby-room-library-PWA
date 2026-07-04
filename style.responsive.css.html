@@ -164,14 +164,79 @@
   }
 
   .card-view {
-    grid-template-columns: 1fr;
-    padding: 0.75rem;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.7rem;
+    padding: 0.7rem;
     max-width: 100%;
   }
 
+  .card-view .book-card {
+    padding: 0.68rem 0.58rem;
+    border-radius: 12px;
+    align-items: stretch;
+  }
+
   .book-cover {
-    max-width: 132px;
-    max-height: 192px;
+    max-width: min(112px, 72%);
+    max-height: 164px;
+    align-self: center;
+  }
+
+  .card-view .book-title {
+    min-height: 2.7em;
+    margin-top: 0.58rem;
+    margin-bottom: 0.28rem;
+    font-size: 0.82rem;
+    line-height: 1.35;
+    -webkit-line-clamp: 2;
+  }
+
+  .card-view .book-author-line {
+    gap: 0.12rem 0.38rem;
+    margin-top: 0.18rem;
+    font-size: 0.68rem;
+    line-height: 1.35;
+  }
+
+  .card-view .genre-chip-wrap {
+    gap: 0.22rem;
+    margin: 0.34rem 0 0.38rem;
+  }
+
+  .card-view .genre-chip,
+  .card-view .summary-chip-toggle {
+    max-width: 100%;
+    padding: 0.12rem 0.38rem;
+    font-size: 0.62rem;
+    line-height: 1.25;
+  }
+
+  .card-view .genre-chip {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .card-view .book-meta-pills {
+    gap: 0.2rem;
+    margin-top: 0.34rem;
+  }
+
+  .card-view .book-meta-pill {
+    max-width: 100%;
+    padding: 0.12rem 0.34rem;
+    gap: 0.2rem;
+    font-size: 0.58rem;
+    line-height: 1.25;
+  }
+
+  .card-view .book-meta-pill-value {
+    max-width: 8.8em;
+  }
+
+  .card-view .book-note,
+  .card-view .book-details {
+    display: none;
   }
 
   .list-row {
@@ -241,6 +306,92 @@
 
   .toggle-label {
     font-size: 0.68rem;
+  }
+}
+
+@media (min-width: 400px) and (max-width: 600px) {
+  .card-view {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.52rem;
+    padding: 0.58rem;
+  }
+
+  .card-view .book-card {
+    padding: 0.52rem 0.42rem;
+    border-radius: 10px;
+  }
+
+  .card-view .book-cover {
+    max-width: min(82px, 78%);
+    max-height: 122px;
+  }
+
+  .card-view .book-title {
+    min-height: 2.58em;
+    margin-top: 0.46rem;
+    font-size: 0.68rem;
+    line-height: 1.28;
+  }
+
+  .card-view .book-author-line {
+    display: block;
+    margin-top: 0.14rem;
+    font-size: 0.56rem;
+    line-height: 1.25;
+  }
+
+  .card-view .book-author-line span {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .card-view .genre-chip-wrap {
+    gap: 0.16rem;
+    margin: 0.24rem 0 0.26rem;
+  }
+
+  .card-view .genre-chip,
+  .card-view .summary-chip-toggle {
+    padding: 0.1rem 0.3rem;
+    font-size: 0.52rem;
+    line-height: 1.2;
+  }
+
+  .card-view .genre-chip-wrap .genre-chip:nth-of-type(n+4),
+  .card-view .summary-chip-toggle {
+    display: none;
+  }
+
+  .card-view .book-meta-pills {
+    gap: 0.14rem;
+    margin-top: 0.24rem;
+  }
+
+  .card-view .book-meta-pill {
+    padding: 0.09rem 0.26rem;
+    font-size: 0.49rem;
+    line-height: 1.18;
+  }
+
+  .card-view .book-meta-pill:nth-child(n+4) {
+    display: none;
+  }
+
+  .card-view .book-meta-pill-value {
+    max-width: 6.2em;
+  }
+}
+
+@media (max-width: 340px) {
+  .card-view {
+    grid-template-columns: 1fr;
+  }
+
+  .book-cover {
+    max-width: 128px;
+    max-height: 188px;
   }
 }
 
