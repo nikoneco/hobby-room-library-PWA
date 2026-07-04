@@ -12,6 +12,7 @@ window.addEventListener('DOMContentLoaded', function() {
   fetchInitialSearchData();
   bindSensitiveToggle_();
   bindStaticActionHandlers_();
+  bindMobileAppDockInputState_();
 
   const keywordInput = document.getElementById('keyword');
   keywordInput.addEventListener('input', function() {
@@ -246,6 +247,42 @@ function syncMobileAppDockState_(activeAction) {
     const isActive = (btn.dataset.action || '') === active;
     btn.classList.toggle('active', isActive);
     btn.setAttribute('aria-current', isActive ? 'true' : 'false');
+  });
+}
+
+function setMobileAppDockInputActive_(active) {
+  if (!document.body) return;
+  document.body.classList.toggle('mobile-input-active', Boolean(active));
+}
+
+function isMobileAppDockInputTarget_(element) {
+  if (!element || !element.matches) return false;
+  return element.matches('.search-form input, .search-form select, .search-form textarea');
+}
+
+function bindMobileAppDockInputState_() {
+  const fields = document.querySelectorAll('.search-form input, .search-form select, .search-form textarea');
+  if (!fields.length) return;
+
+  fields.forEach(field => {
+    field.addEventListener('pointerdown', function() {
+      setMobileAppDockInputActive_(true);
+    }, { passive: true });
+    field.addEventListener('focus', function() {
+      setMobileAppDockInputActive_(true);
+    });
+    field.addEventListener('input', function() {
+      setMobileAppDockInputActive_(true);
+    });
+  });
+
+  document.addEventListener('pointerdown', function(event) {
+    if (isMobileAppDockInputTarget_(event.target)) return;
+    setMobileAppDockInputActive_(false);
+  }, { passive: true });
+
+  document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') setMobileAppDockInputActive_(false);
   });
 }
 

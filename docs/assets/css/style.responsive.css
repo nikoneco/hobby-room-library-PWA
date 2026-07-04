@@ -102,12 +102,19 @@
     background: rgba(12, 16, 23, 0.86);
     box-shadow: 0 14px 36px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.08);
     backdrop-filter: blur(18px);
+    transition: opacity 160ms ease, transform 180ms ease;
   }
 
   body.modal-open .mobile-app-dock,
   body.cover-fullscreen-open .mobile-app-dock,
   body.shelf-room-map-modal-open .mobile-app-dock {
     display: none;
+  }
+
+  body.mobile-input-active .mobile-app-dock {
+    pointer-events: none;
+    opacity: 0;
+    transform: translateY(calc(100% + 16px));
   }
 
   .mobile-app-dock-btn {
@@ -616,7 +623,9 @@
   #image-popup-img.book-image-loaded,
   #cover-fullscreen-img.book-image-loaded,
   .spinner,
-  .spinner-shelf span {
+  .spinner-shelf span,
+  .mobile-app-dock {
     animation: none;
+    transition: none;
   }
 }
