@@ -713,14 +713,36 @@ function writePwaClient() {
         : null;
       if (!button) return;
       const index = Number(button.getAttribute('data-index'));
-      const items = readRecentBooks_();
-      const item = items[index];
-      if (!item || !item.book || typeof window.showPopup !== 'function') return;
-      window.showPopup(item.book, index, items.map(entry => entry.book));
+      openRecentBook_(index);
     });
 
     quickRail.insertAdjacentElement('afterend', rail);
     return rail;
+  }
+
+  function openRecentBook_(index) {
+    const items = readRecentBooks_();
+    const safeIndex = Number.isFinite(Number(index)) ? Number(index) : 0;
+    const item = items[safeIndex];
+    if (!item || !item.book || typeof window.showPopup !== 'function') return false;
+    window.showPopup(item.book, safeIndex, items.map(entry => entry.book));
+    return true;
+  }
+
+  function getPwaLaunchAction_() {
+    try {
+      const params = new URLSearchParams(window.location.search || '');
+      return String(params.get('launch') || '').trim().toLowerCase();
+    } catch (e) {
+      return '';
+    }
+  }
+
+  function runPwaLaunchAction_() {
+    if (getPwaLaunchAction_() !== 'recent') return;
+    window.setTimeout(function() {
+      openRecentBook_(0);
+    }, 260);
   }
 
   function renderRecentBooks_() {
@@ -862,6 +884,7 @@ function writePwaClient() {
     syncBodyState_();
     syncOnlineState_();
     renderRecentBooks_();
+    runPwaLaunchAction_();
 
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('./sw.js')
@@ -889,6 +912,19 @@ function writePwaFiles() {
     theme_color: '#2f5f4a',
     orientation: 'portrait',
     shortcuts: [
+      {
+        name: '続きから読む',
+        short_name: '続きから',
+        description: '最近開いた本に戻る',
+        url: './?launch=recent',
+        icons: [
+          {
+            src: './assets/icons/icon-192.png',
+            sizes: '192x192',
+            type: 'image/png'
+          }
+        ]
+      },
       {
         name: '本棚を見る',
         short_name: '本棚',
@@ -993,7 +1029,7 @@ function writePwaFiles() {
   fs.writeFileSync(path.join(docsDir, 'offline.html'), offlineHtml, 'utf8');
 
   const sw = `
-const CACHE_NAME = 'shumi-library-pwa-v36';
+const CACHE_NAME = 'shumi-library-pwa-v37';
 const APP_SHELL = [
   './',
   './index.html',

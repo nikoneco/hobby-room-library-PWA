@@ -137,14 +137,36 @@
         : null;
       if (!button) return;
       const index = Number(button.getAttribute('data-index'));
-      const items = readRecentBooks_();
-      const item = items[index];
-      if (!item || !item.book || typeof window.showPopup !== 'function') return;
-      window.showPopup(item.book, index, items.map(entry => entry.book));
+      openRecentBook_(index);
     });
 
     quickRail.insertAdjacentElement('afterend', rail);
     return rail;
+  }
+
+  function openRecentBook_(index) {
+    const items = readRecentBooks_();
+    const safeIndex = Number.isFinite(Number(index)) ? Number(index) : 0;
+    const item = items[safeIndex];
+    if (!item || !item.book || typeof window.showPopup !== 'function') return false;
+    window.showPopup(item.book, safeIndex, items.map(entry => entry.book));
+    return true;
+  }
+
+  function getPwaLaunchAction_() {
+    try {
+      const params = new URLSearchParams(window.location.search || '');
+      return String(params.get('launch') || '').trim().toLowerCase();
+    } catch (e) {
+      return '';
+    }
+  }
+
+  function runPwaLaunchAction_() {
+    if (getPwaLaunchAction_() !== 'recent') return;
+    window.setTimeout(function() {
+      openRecentBook_(0);
+    }, 260);
   }
 
   function renderRecentBooks_() {
@@ -286,6 +308,7 @@
     syncBodyState_();
     syncOnlineState_();
     renderRecentBooks_();
+    runPwaLaunchAction_();
 
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('./sw.js')
