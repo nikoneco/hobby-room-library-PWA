@@ -83,12 +83,12 @@ assert(manifest.display === 'standalone', 'manifest display is standalone');
 assert(manifest.start_url === './', 'manifest start_url stays within docs scope');
 assert(Array.isArray(manifest.icons) && manifest.icons.length >= 2, 'manifest has install icons');
 assert(Array.isArray(manifest.shortcuts) && manifest.shortcuts.length >= 2, 'manifest has app shortcuts');
-assert(manifest.shortcuts.some(item => item.url === './?launch=recent'), 'manifest has recent-book shortcut');
+assert(!manifest.shortcuts.some(item => item.url === './?launch=recent'), 'manifest omits recent-book shortcut');
 assert(manifest.shortcuts.some(item => item.url === './?launch=bookshelf'), 'manifest has bookshelf shortcut');
 assert(manifest.shortcuts.some(item => item.url === './?launch=random'), 'manifest has random shortcut');
 
 assert(sw.includes('offline.html'), 'service worker caches offline fallback');
-assert(sw.includes('shumi-library-pwa-v42'), 'service worker has versioned cache');
+assert(sw.includes('shumi-library-pwa-v43'), 'service worker has versioned cache');
 assert(sw.includes('./assets/logo.png'), 'service worker caches local logo');
 assert(sw.includes('SKIP_WAITING'), 'service worker supports update activation');
 
@@ -96,18 +96,13 @@ const pwaCss = read(path.join(docs, 'assets', 'css', 'pwa.css'));
 const pwaClient = read(path.join(docs, 'assets', 'js', 'pwa-client.js'));
 assert(pwaCss.includes('body.pwa-standalone .mobile-app-dock'), 'PWA CSS styles standalone dock');
 assert(pwaCss.includes('body.pwa-network-visible .mobile-app-dock'), 'PWA CSS offsets dock while network banner is visible');
-assert(pwaCss.includes('.pwa-recent-rail'), 'PWA CSS styles recent book rail');
-assert(pwaCss.includes('.pwa-recent-book.continue'), 'PWA CSS highlights continue-reading book');
+assert(!pwaCss.includes('.pwa-recent-rail'), 'PWA CSS omits recent book rail');
+assert(!pwaCss.includes('.pwa-recent-book'), 'PWA CSS omits recent book cards');
 assert(pwaClient.includes("document.body.classList.add('pwa-shell')"), 'PWA client marks shell body');
 assert(pwaClient.includes("window.matchMedia('(display-mode: standalone)')"), 'PWA client detects standalone display mode');
-assert(pwaClient.includes('shumi-library:book-opened'), 'PWA client listens for opened-book events');
-assert(pwaClient.includes('shumiLibrary.pwaRecentBooks.v1'), 'PWA client persists recent books locally');
-assert(pwaClient.includes("kicker.textContent = '続きから'"), 'PWA client labels most recent book as continuation');
-assert(pwaClient.includes("return '端末に保存済み'"), 'PWA client marks detailed recent books as stored on device');
-assert(pwaClient.includes("getPwaLaunchAction_() !== 'recent'"), 'PWA client handles recent launch shortcut');
-assert(pwaClient.includes('openRecentBook_(0)'), 'PWA client opens most recent book from shortcut');
-assert(pwaClient.includes('最近開いた本はまだありません'), 'PWA client reports empty recent shortcut');
-assert(pwaClient.includes('window.focusSearchEntry_'), 'PWA client returns to search when recent shortcut is empty');
+assert(!pwaClient.includes('shumiLibrary.pwaRecentBooks.v1'), 'PWA client does not persist recent books');
+assert(!pwaClient.includes('pwaRecentRail'), 'PWA client does not render recent book rail');
+assert(!pwaClient.includes('launch=recent'), 'PWA client omits recent launch flow');
 assert(pwaCss.includes('.pwa-network-banner.is-notice'), 'PWA CSS styles notice banner');
 
 const appendedScripts = [];

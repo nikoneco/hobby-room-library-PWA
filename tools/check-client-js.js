@@ -229,10 +229,8 @@ assert(
   'persistent detail cache is memoized for the current app session'
 );
 assert(
-  clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('function notifyBookOpened_') &&
-    clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('shumi-library:book-opened') &&
-    clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('notifyBookOpened_(book)'),
-  'book popup emits opened-book event for PWA affordances'
+  !clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('shumi-library:book-opened'),
+  'book popup omits removed recent-book event'
 );
 assert(
   clientScriptSources[clientScriptFiles.indexOf('script.boot.js.html')].includes("document.querySelectorAll('[data-view-mode]')") &&

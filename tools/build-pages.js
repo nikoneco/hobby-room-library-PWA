@@ -171,102 +171,6 @@ body.pwa-standalone .mobile-app-dock {
   background: rgba(9, 13, 19, 0.90);
 }
 
-.pwa-recent-rail {
-  width: min(100%, 620px);
-  margin: 0.7rem auto 0;
-  color: rgba(234, 241, 248, 0.78);
-}
-
-.pwa-recent-rail[hidden] {
-  display: none;
-}
-
-.pwa-recent-title {
-  margin: 0 0 0.34rem;
-  color: rgba(234, 241, 248, 0.70);
-  font-size: 0.72rem;
-  font-weight: 850;
-  text-align: center;
-}
-
-.pwa-recent-list {
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(140px, 168px);
-  grid-template-rows: auto;
-  gap: 0.42rem;
-  overflow-x: auto;
-  padding: 0.08rem 0.1rem 0.28rem;
-  scrollbar-width: none;
-  -webkit-overflow-scrolling: touch;
-}
-
-.pwa-recent-list::-webkit-scrollbar {
-  display: none;
-}
-
-.pwa-recent-book {
-  min-width: 0;
-  padding: 0.48rem 0.56rem;
-  border: 1px solid rgba(167, 183, 204, 0.20);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.052);
-  color: rgba(234, 241, 248, 0.88);
-  text-align: left;
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
-  cursor: pointer;
-}
-
-.pwa-recent-book.continue {
-  grid-column: span 2;
-  min-height: 72px;
-  padding: 0.68rem 0.78rem;
-  border-color: rgba(255, 206, 129, 0.28);
-  background: linear-gradient(135deg, rgba(98, 69, 36, 0.42), rgba(20, 43, 52, 0.52));
-}
-
-.pwa-recent-book:focus-visible {
-  outline: 3px solid rgba(104, 191, 215, 0.54);
-  outline-offset: 3px;
-}
-
-.pwa-recent-book-kicker {
-  display: block;
-  margin-bottom: 0.18rem;
-  color: rgba(255, 225, 177, 0.76);
-  font-size: 0.62rem;
-  font-weight: 850;
-}
-
-.pwa-recent-book-title,
-.pwa-recent-book-meta {
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.pwa-recent-book-title {
-  font-size: 0.76rem;
-  font-weight: 850;
-  line-height: 1.3;
-}
-
-.pwa-recent-book.continue .pwa-recent-book-title {
-  font-size: 0.86rem;
-}
-
-.pwa-recent-book-meta {
-  margin-top: 0.18rem;
-  color: rgba(234, 241, 248, 0.56);
-  font-size: 0.64rem;
-  font-weight: 750;
-}
-
-.pwa-recent-book.continue .pwa-recent-book-meta {
-  color: rgba(234, 241, 248, 0.68);
-}
-
 body.pwa-network-visible {
   --pwa-network-banner-offset: 118px;
 }
@@ -593,8 +497,6 @@ function writePwaClient() {
   const OFFLINE_MESSAGE = '端末がオフラインです。通信が戻ったら、もう一度検索してください。';
   const API_ERROR_MESSAGE = '蔵書データを取得できませんでした。通信状態を確認して再試行してください。';
   const UPDATE_MESSAGE = '新しい版があります。';
-  const RECENT_BOOKS_STORAGE_KEY = 'shumiLibrary.pwaRecentBooks.v1';
-  const RECENT_BOOKS_LIMIT = 8;
 
   let updateWaitingWorker = null;
   let reloadForUpdate = false;
@@ -609,10 +511,6 @@ function writePwaClient() {
 
   function getBanner_() {
     return document.getElementById('pwaNetworkBanner');
-  }
-
-  function getRecentRail_() {
-    return document.getElementById('pwaRecentRail');
   }
 
   function syncBodyState_() {
@@ -638,169 +536,6 @@ function writePwaClient() {
 
   function clearBanner_() {
     setBanner_('', '');
-  }
-
-  function getRecentBookKey_(book) {
-    if (!book || typeof book !== 'object') return '';
-    if (book.rowIndex !== undefined && book.rowIndex !== null) return 'row:' + book.rowIndex;
-    if (book.isbn) return 'isbn:' + String(book.isbn).trim();
-    return book.title ? 'title:' + String(book.title).trim() : '';
-  }
-
-  function sanitizeRecentBook_(book) {
-    try {
-      const copy = JSON.parse(JSON.stringify(book || {}));
-      delete copy.detailLoading;
-      delete copy.detailPrefetching;
-      delete copy.detailQueued;
-      delete copy.detailError;
-      return copy && copy.title ? copy : null;
-    } catch (e) {
-      return null;
-    }
-  }
-
-  function readRecentBooks_() {
-    try {
-      const raw = window.localStorage && window.localStorage.getItem(RECENT_BOOKS_STORAGE_KEY);
-      if (!raw) return [];
-      const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed.filter(item => item && item.book && item.key) : [];
-    } catch (e) {
-      return [];
-    }
-  }
-
-  function writeRecentBooks_(items) {
-    try {
-      if (!window.localStorage) return;
-      window.localStorage.setItem(RECENT_BOOKS_STORAGE_KEY, JSON.stringify(items.slice(0, RECENT_BOOKS_LIMIT)));
-    } catch (e) {
-      // 最近開いた本は補助UIなので、保存できない時は表示だけ諦める。
-    }
-  }
-
-  function getRecentBookMetaText_(book, index) {
-    if (index === 0 && book && book.detailLoaded === true) return '端末に保存済み';
-    return book.author || book.publisher || book.shelf || '詳細をすぐ開く';
-  }
-
-  function rememberRecentBook_(book) {
-    const sanitized = sanitizeRecentBook_(book);
-    const key = getRecentBookKey_(sanitized);
-    if (!sanitized || !key) return;
-
-    const items = readRecentBooks_().filter(item => item.key !== key);
-    items.unshift({
-      key,
-      savedAt: Date.now(),
-      book: sanitized
-    });
-    writeRecentBooks_(items);
-    renderRecentBooks_();
-  }
-
-  function createRecentRail_() {
-    if (getRecentRail_()) return getRecentRail_();
-
-    const quickRail = document.getElementById('quickBrowseRail');
-    if (!quickRail || !quickRail.parentNode) return null;
-
-    const rail = document.createElement('section');
-    rail.id = 'pwaRecentRail';
-    rail.className = 'pwa-recent-rail';
-    rail.setAttribute('aria-label', '最近開いた本');
-    rail.hidden = true;
-
-    const title = document.createElement('div');
-    title.className = 'pwa-recent-title';
-    title.textContent = '最近開いた本';
-    rail.appendChild(title);
-
-    const list = document.createElement('div');
-    list.className = 'pwa-recent-list';
-    rail.appendChild(list);
-
-    list.addEventListener('click', function(event) {
-      const button = event.target && event.target.closest
-        ? event.target.closest('.pwa-recent-book')
-        : null;
-      if (!button) return;
-      const index = Number(button.getAttribute('data-index'));
-      openRecentBook_(index);
-    });
-
-    quickRail.insertAdjacentElement('afterend', rail);
-    return rail;
-  }
-
-  function openRecentBook_(index) {
-    const items = readRecentBooks_();
-    const safeIndex = Number.isFinite(Number(index)) ? Number(index) : 0;
-    const item = items[safeIndex];
-    if (!item || !item.book || typeof window.showPopup !== 'function') return false;
-    window.showPopup(item.book, safeIndex, items.map(entry => entry.book));
-    return true;
-  }
-
-  function getPwaLaunchAction_() {
-    try {
-      const params = new URLSearchParams(window.location.search || '');
-      return String(params.get('launch') || '').trim().toLowerCase();
-    } catch (e) {
-      return '';
-    }
-  }
-
-  function runPwaLaunchAction_() {
-    if (getPwaLaunchAction_() !== 'recent') return;
-    window.setTimeout(function() {
-      if (openRecentBook_(0)) return;
-      setBanner_('最近開いた本はまだありません。', 'notice');
-      if (typeof window.focusSearchEntry_ === 'function') {
-        window.focusSearchEntry_();
-      }
-    }, 260);
-  }
-
-  function renderRecentBooks_() {
-    const rail = createRecentRail_();
-    if (!rail) return;
-
-    const list = rail.querySelector('.pwa-recent-list');
-    const items = readRecentBooks_().slice(0, RECENT_BOOKS_LIMIT);
-    rail.hidden = items.length === 0;
-    if (!list) return;
-
-    list.innerHTML = '';
-    items.forEach((item, index) => {
-      const book = item.book || {};
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.className = 'pwa-recent-book';
-      if (index === 0) button.classList.add('continue');
-      button.setAttribute('data-index', String(index));
-      button.setAttribute('aria-label', (book.title || 'タイトルなし') + ' を開く');
-
-      if (index === 0) {
-        const kicker = document.createElement('span');
-        kicker.className = 'pwa-recent-book-kicker';
-        kicker.textContent = '続きから';
-        button.appendChild(kicker);
-      }
-
-      const title = document.createElement('span');
-      title.className = 'pwa-recent-book-title';
-      title.textContent = book.title || '(タイトルなし)';
-      button.appendChild(title);
-
-      const meta = document.createElement('span');
-      meta.className = 'pwa-recent-book-meta';
-      meta.textContent = getRecentBookMetaText_(book, index);
-      button.appendChild(meta);
-
-      list.appendChild(button);
-    });
   }
 
   function showUpdateBanner_(worker) {
@@ -882,9 +617,6 @@ function writePwaClient() {
 
   window.addEventListener('online', syncOnlineState_);
   window.addEventListener('offline', syncOnlineState_);
-  window.addEventListener('shumi-library:book-opened', function(event) {
-    rememberRecentBook_(event && event.detail ? event.detail.book : null);
-  });
   if (window.matchMedia) {
     const standaloneMedia = window.matchMedia('(display-mode: standalone)');
     if (standaloneMedia && typeof standaloneMedia.addEventListener === 'function') {
@@ -902,8 +634,6 @@ function writePwaClient() {
   window.addEventListener('DOMContentLoaded', function() {
     syncBodyState_();
     syncOnlineState_();
-    renderRecentBooks_();
-    runPwaLaunchAction_();
 
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('./sw.js')
@@ -931,19 +661,6 @@ function writePwaFiles() {
     theme_color: '#2f5f4a',
     orientation: 'portrait',
     shortcuts: [
-      {
-        name: '続きから読む',
-        short_name: '続きから',
-        description: '最近開いた本に戻る',
-        url: './?launch=recent',
-        icons: [
-          {
-            src: './assets/icons/icon-192.png',
-            sizes: '192x192',
-            type: 'image/png'
-          }
-        ]
-      },
       {
         name: '本棚を見る',
         short_name: '本棚',
@@ -1048,7 +765,7 @@ function writePwaFiles() {
   fs.writeFileSync(path.join(docsDir, 'offline.html'), offlineHtml, 'utf8');
 
   const sw = `
-const CACHE_NAME = 'shumi-library-pwa-v42';
+const CACHE_NAME = 'shumi-library-pwa-v43';
 const APP_SHELL = [
   './',
   './index.html',

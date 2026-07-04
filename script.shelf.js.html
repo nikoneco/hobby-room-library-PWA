@@ -666,6 +666,7 @@ function createShelfBookElement_(book, originalIndex, data, revealIndex) {
   setBookRevealIndex_(button, revealIndex);
   let tapStart = null;
   let suppressNextClick = false;
+  const TAP_MOVE_LIMIT = 18;
 
   function openShelfBook_(event) {
     if (event) {
@@ -674,6 +675,30 @@ function createShelfBookElement_(book, originalIndex, data, revealIndex) {
     }
     queueBookDetailPrefetch_(book, true);
     showPopup(book, originalIndex, data);
+  }
+
+  function startShelfTap_(x, y) {
+    tapStart = { x, y };
+  }
+
+  function clearShelfTap_() {
+    tapStart = null;
+  }
+
+  function finishShelfTap_(event, x, y) {
+    if (!tapStart) return false;
+    const diffX = Math.abs(x - tapStart.x);
+    const diffY = Math.abs(y - tapStart.y);
+    tapStart = null;
+
+    if (diffX > TAP_MOVE_LIMIT || diffY > TAP_MOVE_LIMIT) return false;
+
+    suppressNextClick = true;
+    window.setTimeout(function() {
+      suppressNextClick = false;
+    }, 420);
+    openShelfBook_(event);
+    return true;
   }
 
   const imgWrap = document.createElement('span');
@@ -704,26 +729,33 @@ function createShelfBookElement_(book, originalIndex, data, revealIndex) {
 
   button.addEventListener('pointerdown', function(e) {
     if (e.pointerType === 'mouse') return;
-    tapStart = { x: e.clientX, y: e.clientY };
+    startShelfTap_(e.clientX, e.clientY);
   }, { passive: true });
 
   button.addEventListener('pointerup', function(e) {
     if (e.pointerType === 'mouse' || !tapStart) return;
-    const diffX = Math.abs(e.clientX - tapStart.x);
-    const diffY = Math.abs(e.clientY - tapStart.y);
-    tapStart = null;
-
-    if (diffX > 10 || diffY > 10) return;
-    suppressNextClick = true;
-    window.setTimeout(function() {
-      suppressNextClick = false;
-    }, 420);
-    openShelfBook_(e);
+    finishShelfTap_(e, e.clientX, e.clientY);
   });
 
   button.addEventListener('pointercancel', function() {
-    tapStart = null;
+    clearShelfTap_();
   });
+
+  if (!window.PointerEvent) {
+    button.addEventListener('touchstart', function(e) {
+      const touch = e.changedTouches && e.changedTouches[0];
+      if (!touch) return;
+      startShelfTap_(touch.clientX, touch.clientY);
+    }, { passive: true });
+
+    button.addEventListener('touchend', function(e) {
+      const touch = e.changedTouches && e.changedTouches[0];
+      if (!touch) return;
+      finishShelfTap_(e, touch.clientX, touch.clientY);
+    });
+
+    button.addEventListener('touchcancel', clearShelfTap_);
+  }
 
   button.onkeydown = function(e) {
     if (e.key !== 'Enter' && e.key !== ' ') return;
