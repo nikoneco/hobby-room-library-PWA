@@ -1551,11 +1551,154 @@ function getBooksBySeriesKey(seriesKeyAuto) {
   }
 }
 
+const WEBAPP_JSONP_CALLBACK_PATTERN_ = /^[A-Za-z_$][0-9A-Za-z_$]*(?:\.[A-Za-z_$][0-9A-Za-z_$]*)*$/;
+const WEBAPP_JSONP_DEFAULT_CALLBACK_ = '__shumiLibraryJsonpCallback';
+
 /**
- * WebアプリHTML入口。
+ * JSONP APIまたはWebアプリHTML入口。
+ *
+ * `api` パラメータがある場合はGitHub Pages版PWA向けの読み取りAPIとして動作する。
+ * `api` がない従来アクセスでは、これまでどおりGAS版HTMLを返す。
  */
-function doGet() {
+function doGet(e) {
+  const params = e && e.parameter ? e.parameter : {};
+  const apiName = String(params.api || '').trim();
+
+  if (apiName) {
+    return handleWebAppJsonpRequest_(apiName, params);
+  }
+
   return HtmlService.createTemplateFromFile('index').evaluate();
+}
+
+/**
+ * GitHub Pages版PWA向けJSONP APIを返す。
+ * @param {string} apiName
+ * @param {Object<string, string>} params
+ * @returns {GoogleAppsScript.Content.TextOutput}
+ */
+function handleWebAppJsonpRequest_(apiName, params) {
+  const callback = normalizeWebAppJsonpCallback_(params.callback);
+  const envelope = buildWebAppJsonpEnvelope_(apiName, params || {});
+  const body = `${callback}(${stringifyForJsonp_(envelope)});`;
+
+  return ContentService
+    .createTextOutput(body)
+    .setMimeType(ContentService.MimeType.JAVASCRIPT);
+}
+
+/**
+ * JSONP内で安全に埋め込めるJSON文字列を返す。
+ * @param {*} value
+ * @returns {string}
+ */
+function stringifyForJsonp_(value) {
+  return JSON.stringify(value)
+    .replace(/\u2028/g, '\\u2028')
+    .replace(/\u2029/g, '\\u2029');
+}
+
+/**
+ * @param {*} callback
+ * @returns {string}
+ */
+function normalizeWebAppJsonpCallback_(callback) {
+  const name = String(callback || '').trim();
+  return WEBAPP_JSONP_CALLBACK_PATTERN_.test(name)
+    ? name
+    : WEBAPP_JSONP_DEFAULT_CALLBACK_;
+}
+
+/**
+ * @param {string} apiName
+ * @param {Object<string, string>} params
+ * @returns {{ok:boolean,data:*,error:Object|null}}
+ */
+function buildWebAppJsonpEnvelope_(apiName, params) {
+  try {
+    return {
+      ok: true,
+      data: dispatchWebAppJsonpApi_(apiName, params),
+      error: null
+    };
+  } catch (e) {
+    console.error('buildWebAppJsonpEnvelope_ error:', e);
+    return {
+      ok: false,
+      data: null,
+      error: {
+        message: e && e.message ? e.message : 'API request failed',
+        api: String(apiName || '')
+      }
+    };
+  }
+}
+
+/**
+ * @param {string} apiName
+ * @param {Object<string, string>} params
+ * @returns {*}
+ */
+function dispatchWebAppJsonpApi_(apiName, params) {
+  switch (String(apiName || '').trim()) {
+    case 'initial':
+      return getInitialSearchData();
+
+    case 'suggest':
+      return getSuggestData();
+
+    case 'advancedOptions':
+      return getAdvancedSearchOptions();
+
+    case 'previewIndex':
+      return getPreviewIndex();
+
+    case 'countPreview':
+      return countPreviewMatchesAuthoritative(
+        params.keyword,
+        params.detailTitle,
+        params.detailYomi,
+        params.detailAuthor,
+        params.detailPublisher,
+        params.detailStory,
+        params.detailTheme,
+        params.detailMood,
+        params.detailStatus,
+        params.detailReleasedFromYear,
+        params.detailReleasedFromMonth,
+        params.detailReleasedToYear,
+        params.detailReleasedToMonth
+      );
+
+    case 'searchSimple':
+      return searchBooksSimple(params.keyword || '');
+
+    case 'searchAdvanced':
+      return searchBooksAdvanced(
+        params.keyword,
+        params.detailTitle,
+        params.detailYomi,
+        params.detailAuthor,
+        params.detailPublisher,
+        params.detailStory,
+        params.detailTheme,
+        params.detailMood,
+        params.detailStatus,
+        params.detailReleasedFromYear,
+        params.detailReleasedFromMonth,
+        params.detailReleasedToYear,
+        params.detailReleasedToMonth
+      );
+
+    case 'random':
+      return getRandomBooks(params.count || 10);
+
+    case 'series':
+      return getBooksBySeriesKey(params.seriesKeyAuto || params.seriesKey || '');
+
+    default:
+      throw new Error(`Unknown API: ${apiName}`);
+  }
 }
 
 

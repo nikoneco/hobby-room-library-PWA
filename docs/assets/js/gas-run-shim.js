@@ -1,0 +1,223 @@
+(function() {
+  'use strict';
+
+  const GAS_JSONP_ENDPOINT = "https://script.google.com/macros/s/AKfycbzAfn1SJqfKCRExekRlBMsbo9w4ZwcLNH_W6OJ-1ekS9LUJudAISNhtaGt6kPzAwEWYeQ/exec";
+  const JSONP_TIMEOUT_MS = 25000;
+
+  const METHOD_CONFIG = {
+    getInitialSearchData: { api: 'initial', argNames: [] },
+    getSuggestData: { api: 'suggest', argNames: [] },
+    getAdvancedSearchOptions: { api: 'advancedOptions', argNames: [] },
+    getPreviewIndex: { api: 'previewIndex', argNames: [] },
+    countPreviewMatchesAuthoritative: {
+      api: 'countPreview',
+      argNames: [
+        'keyword',
+        'detailTitle',
+        'detailYomi',
+        'detailAuthor',
+        'detailPublisher',
+        'detailStory',
+        'detailTheme',
+        'detailMood',
+        'detailStatus',
+        'detailReleasedFromYear',
+        'detailReleasedFromMonth',
+        'detailReleasedToYear',
+        'detailReleasedToMonth'
+      ]
+    },
+    searchBooksSimple: { api: 'searchSimple', argNames: ['keyword'] },
+    searchBooksAdvanced: {
+      api: 'searchAdvanced',
+      argNames: [
+        'keyword',
+        'detailTitle',
+        'detailYomi',
+        'detailAuthor',
+        'detailPublisher',
+        'detailStory',
+        'detailTheme',
+        'detailMood',
+        'detailStatus',
+        'detailReleasedFromYear',
+        'detailReleasedFromMonth',
+        'detailReleasedToYear',
+        'detailReleasedToMonth'
+      ]
+    },
+    getRandomBooks: { api: 'random', argNames: ['count'] },
+    getBooksBySeriesKey: { api: 'series', argNames: ['seriesKeyAuto'] }
+  };
+
+  let requestSeq = 0;
+  const runnerState = {
+    successHandler: null,
+    failureHandler: null
+  };
+
+  function resetRunnerState_() {
+    runnerState.successHandler = null;
+    runnerState.failureHandler = null;
+  }
+
+  function createError_(message, code, details) {
+    const error = new Error(message || '通信に失敗しました');
+    error.code = code || 'JSONP_ERROR';
+    if (details) error.details = details;
+    return error;
+  }
+
+  function notifyFailure_(error) {
+    if (window.ShumiLibraryPwa && typeof window.ShumiLibraryPwa.handleApiFailure === 'function') {
+      window.ShumiLibraryPwa.handleApiFailure(error);
+    }
+  }
+
+  function notifySuccess_() {
+    if (window.ShumiLibraryPwa && typeof window.ShumiLibraryPwa.clearApiFailure === 'function') {
+      window.ShumiLibraryPwa.clearApiFailure();
+    }
+  }
+
+  function invokeFailure_(handler, error) {
+    notifyFailure_(error);
+    if (typeof handler === 'function') {
+      handler(error);
+    }
+  }
+
+  function appendArgs_(params, argNames, args) {
+    (argNames || []).forEach(function(name, index) {
+      const value = args[index];
+      if (value === undefined || value === null) return;
+      params.set(name, String(value));
+    });
+  }
+
+  function invokeJsonp_(methodName, args, successHandler, failureHandler) {
+    const config = METHOD_CONFIG[methodName];
+    if (!config) {
+      if (methodName === 'saveWebAppUserPreferences') {
+        if (typeof successHandler === 'function') {
+          window.setTimeout(function() {
+            successHandler(args[0] || {});
+          }, 0);
+        }
+        return;
+      }
+
+      invokeFailure_(
+        failureHandler,
+        createError_('未対応のAPIです: ' + methodName, 'UNSUPPORTED_API')
+      );
+      return;
+    }
+
+    if (navigator && navigator.onLine === false) {
+      invokeFailure_(
+        failureHandler,
+        createError_('端末がオフラインです。通信が戻ってから再試行してください。', 'OFFLINE')
+      );
+      return;
+    }
+
+    const callbackName = '__shumiLibraryJsonp_' + Date.now() + '_' + (++requestSeq);
+    const params = new URLSearchParams();
+    const script = document.createElement('script');
+    let finished = false;
+    let timeoutId = 0;
+
+    params.set('api', config.api);
+    params.set('callback', callbackName);
+    params.set('rq', String(Date.now()));
+    appendArgs_(params, config.argNames, args);
+
+    function cleanup_() {
+      if (timeoutId) window.clearTimeout(timeoutId);
+      try {
+        delete window[callbackName];
+      } catch (e) {
+        window[callbackName] = undefined;
+      }
+      if (script.parentNode) {
+        script.parentNode.removeChild(script);
+      }
+    }
+
+    window[callbackName] = function(envelope) {
+      if (finished) return;
+      finished = true;
+      cleanup_();
+
+      if (!envelope || envelope.ok === false) {
+        const errorInfo = envelope && envelope.error ? envelope.error : {};
+        invokeFailure_(
+          failureHandler,
+          createError_(errorInfo.message || 'APIからエラーが返りました。', 'API_ERROR', errorInfo)
+        );
+        return;
+      }
+
+      notifySuccess_();
+      if (typeof successHandler === 'function') {
+        successHandler(envelope.data);
+      }
+    };
+
+    timeoutId = window.setTimeout(function() {
+      if (finished) return;
+      finished = true;
+      cleanup_();
+      invokeFailure_(
+        failureHandler,
+        createError_('通信がタイムアウトしました。時間を置いて再度お試しください。', 'TIMEOUT')
+      );
+    }, JSONP_TIMEOUT_MS);
+
+    script.async = true;
+    script.src = GAS_JSONP_ENDPOINT + '?' + params.toString();
+    script.onerror = function() {
+      if (finished) return;
+      finished = true;
+      cleanup_();
+      invokeFailure_(
+        failureHandler,
+        createError_('APIを読み込めませんでした。通信状態を確認してください。', 'SCRIPT_ERROR')
+      );
+    };
+
+    document.head.appendChild(script);
+  }
+
+  const runnerProxy = new Proxy({}, {
+    get: function(target, property) {
+      if (property === 'withSuccessHandler') {
+        return function(handler) {
+          runnerState.successHandler = handler;
+          return runnerProxy;
+        };
+      }
+
+      if (property === 'withFailureHandler') {
+        return function(handler) {
+          runnerState.failureHandler = handler;
+          return runnerProxy;
+        };
+      }
+
+      return function() {
+        const args = Array.prototype.slice.call(arguments);
+        const successHandler = runnerState.successHandler;
+        const failureHandler = runnerState.failureHandler;
+        resetRunnerState_();
+        invokeJsonp_(String(property), args, successHandler, failureHandler);
+        return runnerProxy;
+      };
+    }
+  });
+
+  window.google = window.google || {};
+  window.google.script = window.google.script || {};
+  window.google.script.run = runnerProxy;
+})();

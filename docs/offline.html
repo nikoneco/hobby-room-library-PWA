@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#2f5f4a">
+  <title>オフライン | 趣味部屋図書館</title>
+  <link rel="stylesheet" href="./assets/css/pwa.css">
+  <style>
+    body {
+      min-height: 100vh;
+      margin: 0;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      background: #f7f4ed;
+      color: #1d352b;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    main {
+      width: min(520px, 100%);
+    }
+    h1 {
+      margin: 0 0 12px;
+      font-size: clamp(1.5rem, 8vw, 2.25rem);
+      letter-spacing: 0;
+    }
+    p {
+      margin: 0 0 18px;
+      line-height: 1.75;
+    }
+    button {
+      min-height: 44px;
+      padding: 10px 16px;
+      border: 0;
+      border-radius: 8px;
+      background: #2f5f4a;
+      color: #fff;
+      font-weight: 700;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>通信が切れています</h1>
+    <p>趣味部屋図書館の検索と本棚データ取得には通信が必要です。回線が戻ったら、もう一度開いてください。</p>
+    <button type="button" onclick="location.reload()">再読み込み</button>
+  </main>
+</body>
+</html>

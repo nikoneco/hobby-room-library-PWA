@@ -1,0 +1,412 @@
+const IMAGE_LOAD_STATS_QUERY_KEY = 'debugImageStats';
+const IMAGE_LOAD_STATS_STORAGE_KEY = 'shumiLibrary.debugImageStats';
+
+let IMAGE_LOAD_STATS = null;
+let IMAGE_LOAD_STATS_RUN_ID = 0;
+
+
+function normalizeImageCandidateUrl_(url) {
+  const value = String(url || '').trim();
+  if (!value) return '';
+
+  if (/^http:\/\//i.test(value)) {
+    return value.replace(/^http:/i, 'https:');
+  }
+
+  return /^https:\/\//i.test(value) ? value : '';
+}
+
+function isSensitiveCoverVisible_() {
+  try {
+    return localStorage.getItem(SENSITIVE_COVER_STORAGE_KEY) === '1';
+  } catch (e) {
+    return false;
+  }
+}
+
+function setSensitiveCoverVisible_(visible) {
+  try {
+    localStorage.setItem(SENSITIVE_COVER_STORAGE_KEY, visible ? '1' : '0');
+  } catch (e) {
+    // localStorageが使えない環境では、その場の表示だけ切り替える。
+  }
+}
+
+function normalizeResultViewMode_(mode) {
+  return RESULT_VIEW_MODES.includes(mode) ? mode : 'card';
+}
+
+function loadPreferredResultViewMode_() {
+  if (RESULT_VIEW_MODES.includes(preferredResultViewMode)) {
+    return preferredResultViewMode;
+  }
+
+  try {
+    return normalizeResultViewMode_(localStorage.getItem(RESULT_VIEW_MODE_STORAGE_KEY));
+  } catch (e) {
+    return 'card';
+  }
+}
+
+function hydratePreferredResultViewMode_(mode) {
+  const normalized = normalizeResultViewMode_(mode);
+  preferredResultViewMode = normalized;
+  try {
+    localStorage.setItem(RESULT_VIEW_MODE_STORAGE_KEY, normalized);
+  } catch (e) {
+    // localStorageが使えない環境では、その場の表示だけ切り替える。
+  }
+  return normalized;
+}
+
+function savePreferredResultViewModeToServer_(mode) {
+  if (!window.google || !google.script || !google.script.run) return;
+
+  google.script.run
+    .withFailureHandler(function(err) {
+      console.warn('saveWebAppUserPreferences failed:', err);
+    })
+    .saveWebAppUserPreferences({
+      resultViewMode: normalizeResultViewMode_(mode)
+    });
+}
+
+function savePreferredResultViewMode_(mode) {
+  const normalized = hydratePreferredResultViewMode_(mode);
+  resultViewModeChangedLocally = true;
+  savePreferredResultViewModeToServer_(normalized);
+  return normalized;
+}
+
+function isSensitiveBook_(book) {
+  if (!book) return false;
+
+  const themes = book.genres && Array.isArray(book.genres.theme)
+    ? book.genres.theme
+    : [];
+  if (themes.includes(SENSITIVE_THEME_NAME)) return true;
+
+  const meta = Array.isArray(book.genreMeta) ? book.genreMeta : [];
+  return meta.some(item => item && item.category === 'theme' && item.name === SENSITIVE_THEME_NAME);
+}
+
+function syncSensitiveToggleUi_() {
+  const toggle = document.getElementById('sensitiveToggle');
+  if (!toggle) return;
+  toggle.checked = isSensitiveCoverVisible_();
+}
+
+function refreshSensitiveCoverVisibility_() {
+  if (Array.isArray(lastResult) && lastResult.length) {
+    showResult(lastResult);
+  }
+
+  const overlay = document.getElementById('image-popup-overlay');
+  const popupOpen = overlay && overlay.style.display !== 'none';
+  if (popupOpen && Array.isArray(popupData) && popupData[popupIndex]) {
+    showPopup(popupData[popupIndex], popupIndex, popupData, popupSeriesContext);
+  }
+}
+
+function bindSensitiveToggle_() {
+  const toggle = document.getElementById('sensitiveToggle');
+  if (!toggle) return;
+  const wrapper = toggle.closest('.sensitive-toggle');
+
+  syncSensitiveToggleUi_();
+
+  function applySensitiveToggleState_(visible) {
+    toggle.checked = Boolean(visible);
+    setSensitiveCoverVisible_(toggle.checked);
+    refreshSensitiveCoverVisibility_();
+  }
+
+  if (wrapper) {
+    wrapper.addEventListener('click', function(event) {
+      if (event.target === toggle) {
+        setSensitiveCoverVisible_(toggle.checked);
+        refreshSensitiveCoverVisibility_();
+        return;
+      }
+
+      event.preventDefault();
+      applySensitiveToggleState_(!toggle.checked);
+    });
+  }
+
+  toggle.addEventListener('change', function() {
+    setSensitiveCoverVisible_(toggle.checked);
+    refreshSensitiveCoverVisibility_();
+  });
+
+  toggle.addEventListener('keydown', function(event) {
+    if (event.key !== ' ' && event.key !== 'Enter') return;
+    event.preventDefault();
+    applySensitiveToggleState_(!toggle.checked);
+  });
+}
+
+function bindStaticActionHandlers_() {
+  document.querySelectorAll('[data-action]').forEach(element => {
+    const action = element.dataset.action || '';
+    const handler = STATIC_ACTION_HANDLERS[action];
+    if (typeof handler !== 'function') return;
+
+    element.addEventListener('click', function(event) {
+      event.preventDefault();
+      handler();
+    });
+
+    if (element.tagName !== 'BUTTON') {
+      element.addEventListener('keydown', function(event) {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault();
+        handler();
+      });
+    }
+  });
+}
+
+function isImageLoadStatsEnabled_() {
+  try {
+    const params = new URLSearchParams(window.location.search || '');
+    if (params.get(IMAGE_LOAD_STATS_QUERY_KEY) === '1') return true;
+    if (params.get(IMAGE_LOAD_STATS_QUERY_KEY) === 'true') return true;
+  } catch (e) {
+    // URLSearchParamsが使えない環境ではlocalStorage判定だけに落とす。
+  }
+
+  try {
+    return localStorage.getItem(IMAGE_LOAD_STATS_STORAGE_KEY) === '1';
+  } catch (e) {
+    return false;
+  }
+}
+
+function resetImageLoadStats_(books) {
+  IMAGE_LOAD_STATS_RUN_ID++;
+
+  if (!isImageLoadStatsEnabled_()) {
+    IMAGE_LOAD_STATS = null;
+    return;
+  }
+
+  IMAGE_LOAD_STATS = {
+    runId: IMAGE_LOAD_STATS_RUN_ID,
+    total: Array.isArray(books) ? books.length : 0,
+    settledKeys: new Set(),
+    loaded: 0,
+    noImage: 0,
+    bySource: {
+      Manual: 0,
+      Hanmoto600: 0,
+      Hanmoto400: 0,
+      Fallback: 0,
+      NO_IMAGE: 0
+    },
+    fallbackBySource: {},
+    startedAt: Date.now(),
+    lastUpdatedAt: null
+  };
+}
+
+function getBookImageTrackKey_(book, index) {
+  return [
+    String(book && book.isbn || ''),
+    String(book && book.title || ''),
+    String(index || '')
+  ].join('|');
+}
+
+function recordImageLoadResult_(key, candidate, runId) {
+  if (!IMAGE_LOAD_STATS || !key) return;
+  if (runId !== IMAGE_LOAD_STATS.runId) return;
+  if (IMAGE_LOAD_STATS.settledKeys.has(key)) return;
+
+  IMAGE_LOAD_STATS.settledKeys.add(key);
+
+  const sourceLabel = candidate && candidate.label ? candidate.label : 'NO_IMAGE';
+  const sourceDetail = candidate && candidate.detail ? candidate.detail : '';
+
+  if (sourceLabel === 'NO_IMAGE') {
+    IMAGE_LOAD_STATS.noImage++;
+  } else {
+    IMAGE_LOAD_STATS.loaded++;
+  }
+
+  if (!Object.prototype.hasOwnProperty.call(IMAGE_LOAD_STATS.bySource, sourceLabel)) {
+    IMAGE_LOAD_STATS.bySource[sourceLabel] = 0;
+  }
+  IMAGE_LOAD_STATS.bySource[sourceLabel]++;
+
+  if (sourceLabel === 'Fallback') {
+    const detailKey = sourceDetail || 'Unknown';
+    if (!Object.prototype.hasOwnProperty.call(IMAGE_LOAD_STATS.fallbackBySource, detailKey)) {
+      IMAGE_LOAD_STATS.fallbackBySource[detailKey] = 0;
+    }
+    IMAGE_LOAD_STATS.fallbackBySource[detailKey]++;
+  }
+
+  IMAGE_LOAD_STATS.lastUpdatedAt = Date.now();
+
+  if (IMAGE_LOAD_STATS.settledKeys.size >= IMAGE_LOAD_STATS.total) {
+    logImageLoadStats_();
+  }
+}
+
+function logImageLoadStats_() {
+  if (!IMAGE_LOAD_STATS) return;
+
+  const total = IMAGE_LOAD_STATS.total || 0;
+  const loaded = IMAGE_LOAD_STATS.loaded || 0;
+  const noImage = IMAGE_LOAD_STATS.noImage || 0;
+  const settled = IMAGE_LOAD_STATS.settledKeys ? IMAGE_LOAD_STATS.settledKeys.size : 0;
+  const elapsedMs = (IMAGE_LOAD_STATS.lastUpdatedAt || Date.now()) - IMAGE_LOAD_STATS.startedAt;
+
+  const output = {
+    total,
+    settled,
+    pending: Math.max(total - settled, 0),
+    loaded,
+    noImage,
+    rate: total ? ((loaded / total) * 100).toFixed(1) + '%' : '0.0%',
+    elapsedMs,
+    bySource: IMAGE_LOAD_STATS.bySource,
+    fallbackBySource: IMAGE_LOAD_STATS.fallbackBySource
+  };
+
+  console.log('[IMAGE_LOAD_STATS]', JSON.stringify(output, null, 2));
+  return output;
+}
+
+function buildBookImageCandidates_(book) {
+  if (isSensitiveBook_(book) && !isSensitiveCoverVisible_()) {
+    return [{
+      url: NO_IMAGE_URL,
+      label: 'NO_IMAGE',
+      detail: 'SensitiveHidden'
+    }];
+  }
+
+  const candidates = [];
+  const fallback = normalizeImageCandidateUrl_(book && book.fallbackImg);
+  const source = String(book && book.fallbackImageSource || '').trim();
+
+  // Manualだけはユーザー指定画像として最優先。
+  if (source === 'Manual' && fallback) {
+    candidates.push({
+      url: fallback,
+      label: 'Manual',
+      detail: 'Manual'
+    });
+  }
+
+  // 通常はHanmotoをブラウザで直接試す。GAS側で存在確認しない。
+  candidates.push({
+    url: normalizeImageCandidateUrl_(book && book.img), // Hanmoto 600
+    label: 'Hanmoto600',
+    detail: 'Hanmoto'
+  });
+
+//  candidates.push({
+//    url: normalizeImageCandidateUrl_(book && book.img400), // Hanmoto 400
+//    label: 'Hanmoto400',
+//    detail: 'Hanmoto'
+//  });
+
+  // 自動取得fallbackはHanmoto失敗時だけ使う。
+  if (source !== 'Manual' && fallback) {
+    candidates.push({
+      url: fallback,
+      label: 'Fallback',
+      detail: source || 'Unknown'
+    });
+  }
+
+  candidates.push({
+    url: NO_IMAGE_URL,
+    label: 'NO_IMAGE',
+    detail: 'NO_IMAGE'
+  });
+
+  const seen = {};
+  return candidates.filter(item => {
+    if (!item || !item.url) return false;
+    if (seen[item.url]) return false;
+    seen[item.url] = true;
+    return true;
+  });
+}
+
+function setupBookImageElement_(img, book, options) {
+  const opt = options || {};
+  const candidates = buildBookImageCandidates_(book);
+  const track = Boolean(opt.track);
+  const trackKey = opt.trackKey || '';
+  const trackRunId = IMAGE_LOAD_STATS_RUN_ID;
+  const loading = opt.loading || 'lazy';
+  const fetchPriority = opt.fetchPriority || (loading === 'eager' ? 'high' : 'low');
+
+  let currentIndex = -1;
+  let settled = false;
+
+  img.classList.remove('book-image-loaded');
+  img.classList.add('book-image-loading');
+  img.loading = loading;
+  img.decoding = 'async';
+  img.setAttribute('fetchpriority', fetchPriority);
+
+  function setCandidate(index) {
+    if (index < 0 || index >= candidates.length) return;
+    currentIndex = index;
+    img.src = candidates[currentIndex].url;
+  }
+
+  function settleCurrentCandidate() {
+    if (settled) return;
+    settled = true;
+    img.classList.remove('book-image-loading');
+    img.classList.add('book-image-loaded');
+
+    if (track) {
+      recordImageLoadResult_(trackKey, candidates[currentIndex], trackRunId);
+    }
+  }
+
+  function moveNextCandidate() {
+    const nextIndex = currentIndex + 1;
+    if (nextIndex < candidates.length) {
+      setCandidate(nextIndex);
+      return;
+    }
+
+    settleCurrentCandidate();
+  }
+
+  img.onerror = function() {
+    moveNextCandidate();
+  };
+
+  img.onload = function() {
+    const current = candidates[currentIndex];
+
+    if (!current) {
+      settleCurrentCandidate();
+      return;
+    }
+
+    // Hanmoto等が返す小さいダミー画像対策。NO_IMAGE自身ではループさせない。
+    if (
+      img.naturalWidth === 50 &&
+      img.naturalHeight === 71 &&
+      current.label !== 'NO_IMAGE'
+    ) {
+      moveNextCandidate();
+      return;
+    }
+
+    settleCurrentCandidate();
+  };
+
+  setCandidate(0);
+}

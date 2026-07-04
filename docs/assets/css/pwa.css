@@ -1,0 +1,27 @@
+.pwa-network-banner {
+  position: fixed;
+  left: max(12px, env(safe-area-inset-left));
+  right: max(12px, env(safe-area-inset-right));
+  bottom: max(12px, env(safe-area-inset-bottom));
+  z-index: 12000;
+  padding: 12px 14px;
+  border: 1px solid rgba(47, 95, 74, 0.22);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.96);
+  color: #1d352b;
+  box-shadow: 0 10px 26px rgba(26, 37, 32, 0.16);
+  font-size: 0.92rem;
+  line-height: 1.55;
+}
+
+.pwa-network-banner.is-error {
+  border-color: rgba(166, 73, 58, 0.28);
+  color: #5f2f26;
+}
+
+@media (max-width: 640px) {
+  .pwa-network-banner {
+    font-size: 0.86rem;
+    padding: 10px 12px;
+  }
+}
