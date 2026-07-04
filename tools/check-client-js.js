@@ -237,6 +237,7 @@ assert(
 assert(
   clientScriptSources[clientScriptFiles.indexOf('script.boot.js.html')].includes("document.querySelectorAll('[data-view-mode]')") &&
     clientScriptSources[clientScriptFiles.indexOf('script.boot.js.html')].includes('setViewMode_(btn.dataset.viewMode') &&
+    clientScriptSources[clientScriptFiles.indexOf('script.boot.js.html')].includes('mobile-dock-has-results') &&
     clientScriptSources[clientScriptFiles.indexOf('script.render.js.html')].includes("document.querySelectorAll('[data-view-mode]") &&
     clientScriptSources[clientScriptFiles.indexOf('script.render.js.html')].includes("btn.setAttribute('aria-pressed'"),
   'mobile dock view-mode controls are wired and synced'

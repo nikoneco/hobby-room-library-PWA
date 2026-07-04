@@ -271,6 +271,10 @@ body.pwa-network-visible {
   --pwa-network-banner-offset: 118px;
 }
 
+body.pwa-network-visible:not(.mobile-dock-has-results) {
+  --pwa-network-banner-offset: 78px;
+}
+
 body.pwa-network-visible .mobile-app-dock {
   transform: translateY(calc(-1 * var(--pwa-network-banner-offset)));
 }
@@ -309,6 +313,10 @@ body.pwa-network-visible.mobile-input-active .mobile-app-dock {
 @media (max-width: 640px) {
   body.pwa-network-visible {
     padding-bottom: calc(196px + env(safe-area-inset-bottom));
+  }
+
+  body.pwa-network-visible:not(.mobile-dock-has-results) {
+    padding-bottom: calc(154px + env(safe-area-inset-bottom));
   }
 
   .pwa-network-banner {
@@ -1040,7 +1048,7 @@ function writePwaFiles() {
   fs.writeFileSync(path.join(docsDir, 'offline.html'), offlineHtml, 'utf8');
 
   const sw = `
-const CACHE_NAME = 'shumi-library-pwa-v41';
+const CACHE_NAME = 'shumi-library-pwa-v42';
 const APP_SHELL = [
   './',
   './index.html',

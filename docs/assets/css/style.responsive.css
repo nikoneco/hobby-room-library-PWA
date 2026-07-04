@@ -197,6 +197,18 @@
     outline: none;
   }
 
+  body:not(.mobile-dock-has-results) {
+    padding-bottom: calc(78px + env(safe-area-inset-bottom));
+  }
+
+  body:not(.mobile-dock-has-results) .mobile-app-dock {
+    min-height: 58px;
+  }
+
+  body:not(.mobile-dock-has-results) .mobile-dock-view-switch {
+    display: none;
+  }
+
   .search-container.centered {
     top: 7vh;
   }

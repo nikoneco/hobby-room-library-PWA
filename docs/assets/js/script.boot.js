@@ -251,6 +251,12 @@ function syncMobileAppDockState_(activeAction) {
   const dock = document.getElementById('mobileAppDock');
   if (!dock) return;
 
+  const hasResults = Array.isArray(lastResult) && lastResult.length > 0;
+  dock.classList.toggle('has-results', hasResults);
+  if (document.body) {
+    document.body.classList.toggle('mobile-dock-has-results', hasResults);
+  }
+
   const active = activeAction || getMobileAppDockActiveAction_();
   dock.querySelectorAll('.mobile-app-dock-btn').forEach(btn => {
     const isActive = (btn.dataset.action || '') === active;

@@ -1684,6 +1684,7 @@ function showEmptySearchNotice_(message) {
   }
 
   lastResult = null;
+  if (typeof syncMobileAppDockState_ === 'function') syncMobileAppDockState_();
   showSearchStatusNotice_(message);
 }
 
@@ -2029,6 +2030,7 @@ function resetSearch() {
   resetViewModeToCardForNewSearch_();
 
   lastResult = null;
+  if (typeof syncMobileAppDockState_ === 'function') syncMobileAppDockState_();
   hideAllSuggest();
   syncSearchStatusPreviewFromForm_();
   syncQuickBrowseRailVisibility_();

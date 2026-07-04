@@ -832,6 +832,7 @@ function renderShelfView_(data) {
 
 function showResult(data) {
   hideSpinner();
+  if (typeof syncMobileAppDockState_ === 'function') syncMobileAppDockState_();
 
   const result = document.getElementById('result');
   result.innerHTML = '';
