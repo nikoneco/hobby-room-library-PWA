@@ -232,6 +232,13 @@ assert(
   'book popup emits opened-book event for PWA affordances'
 );
 assert(
+  clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('function fetchPopupContextBookDetails_') &&
+    clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('function collectPopupContextDetailTargets_') &&
+    clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('getBookDetailsByRowIndexes(rowIndexes)') &&
+    clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('fetchPopupContextBookDetails_(book, index, dataArr, popupSeriesContext)'),
+  'book popup fetches current and nearby details in one priority batch'
+);
+assert(
   clientScriptSources[clientScriptFiles.indexOf('script.shelf.js.html')].includes("button.addEventListener('pointerup'") &&
     clientScriptSources[clientScriptFiles.indexOf('script.shelf.js.html')].includes('function openShelfBook_') &&
     clientScriptSources[clientScriptFiles.indexOf('script.shelf.js.html')].includes('showPopup(book, originalIndex, data)'),

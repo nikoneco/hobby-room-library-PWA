@@ -462,6 +462,128 @@ function fetchDeferredBookDetails_(book, index, dataArr, seriesContext, options)
     .getBookDetailByRowIndex(book.rowIndex);
 }
 
+function removeBookDetailPrefetchItems_(books) {
+  if (!Array.isArray(books) || !books.length || !bookDetailPrefetchQueue.length) return;
+  const targets = new Set(books.filter(Boolean));
+  if (!targets.size) return;
+
+  bookDetailPrefetchQueue = bookDetailPrefetchQueue.filter(item => {
+    if (!targets.has(item)) return true;
+    item.detailQueued = false;
+    return false;
+  });
+}
+
+function collectPopupContextDetailTargets_(book, index, dataArr) {
+  const targets = [];
+  const seen = new Set();
+  const baseIndex = Math.floor(Number(index));
+
+  function addTarget_(targetBook, targetIndex, isCurrent) {
+    if (!targetBook) return;
+    const key = getBookDetailCacheKey_(targetBook);
+    const id = key || `idx:${targetIndex}`;
+    if (seen.has(id)) return;
+    seen.add(id);
+    targets.push({
+      book: targetBook,
+      index: targetIndex,
+      options: { prefetch: !isCurrent }
+    });
+  }
+
+  addTarget_(book, Number.isFinite(baseIndex) ? baseIndex : index, true);
+  if (!Array.isArray(dataArr) || !Number.isFinite(baseIndex)) return targets;
+
+  for (let step = 1; step <= POPUP_DETAIL_PREFETCH_RADIUS; step += 1) {
+    addTarget_(dataArr[baseIndex + step], baseIndex + step, false);
+    addTarget_(dataArr[baseIndex - step], baseIndex - step, false);
+  }
+
+  return targets;
+}
+
+function fetchPopupContextBookDetails_(book, index, dataArr, seriesContext) {
+  const targets = collectPopupContextDetailTargets_(book, index, dataArr);
+  if (!targets.length) return;
+
+  const requestTargets = [];
+
+  targets.forEach(target => {
+    const targetBook = target.book;
+    const cached = getCachedBookDetail_(targetBook);
+    if (cached) {
+      const mergedFromCache = mergeDeferredBookDetails_(targetBook, cached);
+      replaceDeferredBookReference_(targetBook, mergedFromCache, target.index, dataArr, seriesContext);
+      return;
+    }
+
+    const key = getBookDetailCacheKey_(targetBook);
+    if (key && bookDetailInFlightCallbacks.has(key)) {
+      targetBook.detailLoading = true;
+      targetBook.detailPrefetching = Boolean(target.options.prefetch);
+      addBookDetailInFlightCallback_(key, function(detail, error) {
+        handleDeferredBookDetailResult_(targetBook, target.index, dataArr, seriesContext, target.options, detail, error);
+      });
+      return;
+    }
+
+    if (!shouldFetchDeferredBookDetails_(targetBook)) return;
+    requestTargets.push(target);
+  });
+
+  if (!requestTargets.length) return;
+  removeBookDetailPrefetchItems_(requestTargets.map(target => target.book));
+
+  requestTargets.forEach(target => {
+    target.book.detailLoading = true;
+    target.book.detailPrefetching = Boolean(target.options.prefetch);
+    const key = getBookDetailCacheKey_(target.book);
+    if (key) {
+      addBookDetailInFlightCallback_(key, function(detail, error) {
+        handleDeferredBookDetailResult_(target.book, target.index, dataArr, seriesContext, target.options, detail, error);
+      });
+    }
+  });
+
+  const rowIndexes = requestTargets
+    .map(target => target.book && target.book.rowIndex)
+    .filter(value => value !== undefined && value !== null)
+    .join(',');
+
+  google.script.run
+    .withSuccessHandler(function(details) {
+      const detailByRowIndex = new Map();
+      (Array.isArray(details) ? details : []).forEach(detail => {
+        if (detail && detail.rowIndex !== undefined && detail.rowIndex !== null) {
+          detailByRowIndex.set(String(detail.rowIndex), detail);
+        }
+      });
+
+      requestTargets.forEach(target => {
+        const detail = detailByRowIndex.get(String(target.book.rowIndex));
+        const key = getBookDetailCacheKey_(target.book);
+        if (detail) rememberBookDetail_(target.book, detail);
+        if (key) {
+          settleBookDetailInFlight_(key, detail || null, null);
+        } else {
+          handleDeferredBookDetailResult_(target.book, target.index, dataArr, seriesContext, target.options, detail || null, null);
+        }
+      });
+    })
+    .withFailureHandler(function(err) {
+      requestTargets.forEach(target => {
+        const key = getBookDetailCacheKey_(target.book);
+        if (key) {
+          settleBookDetailInFlight_(key, null, err);
+        } else {
+          handleDeferredBookDetailResult_(target.book, target.index, dataArr, seriesContext, target.options, null, err);
+        }
+      });
+    })
+    .getBookDetailsByRowIndexes(rowIndexes);
+}
+
 function processBookDetailPrefetchQueue_() {
   if (!canPrefetchBookDetails_()) return;
   if (bookDetailPrefetchActive >= getBookDetailPrefetchConcurrency_()) return;
@@ -1069,8 +1191,7 @@ function showPopup(book, index, dataArr, seriesContext) {
   appendPopupSummaryAccordion_(info.querySelector('.genre-chip-wrap.popup'), book);
   attachPopupActionHandlers(book, popupSeriesContext);
   notifyBookOpened_(book);
-  fetchDeferredBookDetails_(book, index, dataArr, popupSeriesContext);
-  warmPopupNeighborDetails_(index, dataArr);
+  fetchPopupContextBookDetails_(book, index, dataArr, popupSeriesContext);
 
   overlay.style.display = 'flex';
   document.body.classList.add('modal-open');
