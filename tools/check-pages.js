@@ -84,7 +84,7 @@ assert(manifest.start_url === './', 'manifest start_url stays within docs scope'
 assert(Array.isArray(manifest.icons) && manifest.icons.length >= 2, 'manifest has install icons');
 
 assert(sw.includes('offline.html'), 'service worker caches offline fallback');
-assert(sw.includes('shumi-library-pwa-v16'), 'service worker has versioned cache');
+assert(sw.includes('shumi-library-pwa-v17'), 'service worker has versioned cache');
 assert(sw.includes('./assets/logo.png'), 'service worker caches local logo');
 
 const appendedScripts = [];
