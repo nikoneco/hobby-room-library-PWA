@@ -796,6 +796,36 @@ function mapRowsToBooks_(rows, indexData, options) {
   });
 }
 
+function isSensitiveIndexItem_(idx) {
+  const meta = Array.isArray(idx && idx.genreMeta) ? idx.genreMeta : [];
+  return meta.some(item => item && item.category === 'theme' && item.name === '18禁');
+}
+
+/**
+ * PWA本棚表示専用の最小データへ変換する。
+ * 全件JSONPで落ちないよう、棚配置・表紙・タイトル以外の重い情報は返さない。
+ *
+ * @param {string[][]} rows
+ * @param {Object[]=} indexData
+ * @returns {Object[]}
+ */
+function mapRowsToShelfBooks_(rows, indexData) {
+  return rows.map((row, i) => {
+    const isbn = normalizeIsbn_(row[CONFIG.IDX.ISBN]);
+    const idx = Array.isArray(indexData) ? indexData[i] : null;
+
+    return {
+      title: row[CONFIG.IDX.TITLE] || '',
+      img: buildHanmotoImageUrlFromIsbn_(isbn, 600),
+      fallbackImg: normalizeBookFallbackImageUrl_(row[CONFIG.IDX.FALLBACK_IMAGE_URL]),
+      fallbackImageSource: row[CONFIG.IDX.FALLBACK_IMAGE_SOURCE] || '',
+      shelf: row[CONFIG.IDX.SHELF] || '',
+      location: row[CONFIG.IDX.LOCATION] || '',
+      isSensitive: isSensitiveIndexItem_(idx)
+    };
+  });
+}
+
 /**
  * 通常検索用の横断検索キーを作る
  * title / yomi / author を連結した正規化済み文字列
@@ -1604,10 +1634,16 @@ function getAllBooks() {
 
 /**
  * PWA本棚表示向けの軽量全件取得。
- * あらすじ全文と外部検索リンクは全件JSONPでは重くなるため省く。
+ * 全件JSONPで落ちないよう、棚表示に必要な最小項目だけ返す。
  */
 function getBookshelfBooks() {
-  return getAllBooks();
+  try {
+    const dataset = getLibraryDataset_();
+    return mapRowsToShelfBooks_(dataset.rows || [], dataset.index || []);
+  } catch (e) {
+    console.error('getBookshelfBooks error:', e);
+    return [];
+  }
 }
 
 /**

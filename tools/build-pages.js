@@ -563,7 +563,7 @@ function writePwaFiles() {
   fs.writeFileSync(path.join(docsDir, 'offline.html'), offlineHtml, 'utf8');
 
   const sw = `
-const CACHE_NAME = 'shumi-library-pwa-v5';
+const CACHE_NAME = 'shumi-library-pwa-v6';
 const APP_SHELL = [
   './',
   './index.html',

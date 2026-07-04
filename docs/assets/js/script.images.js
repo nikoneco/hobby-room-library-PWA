@@ -80,6 +80,7 @@ function savePreferredResultViewMode_(mode) {
 
 function isSensitiveBook_(book) {
   if (!book) return false;
+  if (book.isSensitive === true) return true;
 
   const themes = book.genres && Array.isArray(book.genres.theme)
     ? book.genres.theme
