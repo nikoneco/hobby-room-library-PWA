@@ -313,7 +313,9 @@ function applyInitialSearchData_(data) {
 
   populateAdvancedOptions();
   renderQuickBrowseRail_();
-  syncSearchStatusPreviewFromForm_();
+  if (!lastResult) {
+    syncSearchStatusPreviewFromForm_();
+  }
 }
 
 function fetchInitialSearchData() {

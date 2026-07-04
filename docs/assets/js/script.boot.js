@@ -145,6 +145,7 @@ window.addEventListener('DOMContentLoaded', function() {
   isCardView = currentViewMode === 'card';
   updateViewToggleButtons_();
   syncMobileAppDockState_();
+  runLaunchActionFromUrl_();
 
   document.addEventListener('click', function(event) {
     const topShelfBtn = event.target && event.target.closest
@@ -284,6 +285,33 @@ function bindMobileAppDockInputState_() {
   document.addEventListener('keydown', function(event) {
     if (event.key === 'Escape') setMobileAppDockInputActive_(false);
   });
+}
+
+function getLaunchActionFromUrl_() {
+  try {
+    const params = new URLSearchParams(window.location.search || '');
+    const launch = String(params.get('launch') || '').trim().toLowerCase();
+    return ['bookshelf', 'random', 'search'].includes(launch) ? launch : '';
+  } catch (e) {
+    return '';
+  }
+}
+
+function runLaunchActionFromUrl_() {
+  const launch = getLaunchActionFromUrl_();
+  if (!launch) return;
+
+  window.setTimeout(function() {
+    if (launch === 'bookshelf') {
+      showAllBookshelf();
+      return;
+    }
+    if (launch === 'random') {
+      showRandomBooks();
+      return;
+    }
+    focusSearchEntry_();
+  }, 180);
 }
 
 let lastScrollY = window.scrollY || 0;

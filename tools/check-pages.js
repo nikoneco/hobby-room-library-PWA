@@ -82,9 +82,12 @@ assert(manifest.name === '趣味部屋図書館', 'manifest name is set');
 assert(manifest.display === 'standalone', 'manifest display is standalone');
 assert(manifest.start_url === './', 'manifest start_url stays within docs scope');
 assert(Array.isArray(manifest.icons) && manifest.icons.length >= 2, 'manifest has install icons');
+assert(Array.isArray(manifest.shortcuts) && manifest.shortcuts.length >= 2, 'manifest has app shortcuts');
+assert(manifest.shortcuts.some(item => item.url === './?launch=bookshelf'), 'manifest has bookshelf shortcut');
+assert(manifest.shortcuts.some(item => item.url === './?launch=random'), 'manifest has random shortcut');
 
 assert(sw.includes('offline.html'), 'service worker caches offline fallback');
-assert(sw.includes('shumi-library-pwa-v19'), 'service worker has versioned cache');
+assert(sw.includes('shumi-library-pwa-v20'), 'service worker has versioned cache');
 assert(sw.includes('./assets/logo.png'), 'service worker caches local logo');
 
 const appendedScripts = [];

@@ -490,6 +490,34 @@ function writePwaFiles() {
     background_color: '#f7f4ed',
     theme_color: '#2f5f4a',
     orientation: 'portrait',
+    shortcuts: [
+      {
+        name: '本棚を見る',
+        short_name: '本棚',
+        description: '棚マップから所蔵本を眺める',
+        url: './?launch=bookshelf',
+        icons: [
+          {
+            src: './assets/icons/icon-192.png',
+            sizes: '192x192',
+            type: 'image/png'
+          }
+        ]
+      },
+      {
+        name: 'ランダムに選ぶ',
+        short_name: 'ランダム',
+        description: '棚から10冊をランダムに表示する',
+        url: './?launch=random',
+        icons: [
+          {
+            src: './assets/icons/icon-192.png',
+            sizes: '192x192',
+            type: 'image/png'
+          }
+        ]
+      }
+    ],
     icons: [
       {
         src: './assets/icons/icon-192.png',
@@ -567,7 +595,7 @@ function writePwaFiles() {
   fs.writeFileSync(path.join(docsDir, 'offline.html'), offlineHtml, 'utf8');
 
   const sw = `
-const CACHE_NAME = 'shumi-library-pwa-v19';
+const CACHE_NAME = 'shumi-library-pwa-v20';
 const APP_SHELL = [
   './',
   './index.html',
