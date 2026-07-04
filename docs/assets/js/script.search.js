@@ -1876,7 +1876,11 @@ function showAllBookshelf() {
     resultViewModeChangedLocally = true;
     updateViewToggleButtons_();
 
-    showSpinner('本棚を広げています', { kind: 'shelf' });
+    const cachedBookshelf = readBookshelfCache_();
+    const hasCachedBookshelf = Boolean(cachedBookshelf && Array.isArray(cachedBookshelf.books));
+    if (!hasCachedBookshelf) {
+      showSpinner('本棚を広げています', { kind: 'shelf' });
+    }
     let renderedFromCache = false;
 
     function finishBookshelfLoad_(loadedBooks, options) {
@@ -1900,8 +1904,7 @@ function showAllBookshelf() {
       alert('本棚表示の読み込み中にエラーが発生しました。時間をおいて再度お試しください。');
     }
 
-    const cachedBookshelf = readBookshelfCache_();
-    if (cachedBookshelf && Array.isArray(cachedBookshelf.books)) {
+    if (hasCachedBookshelf) {
       renderedFromCache = true;
       finishBookshelfLoad_(cachedBookshelf.books, {
         fromCache: true,

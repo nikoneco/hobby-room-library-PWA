@@ -21,6 +21,7 @@ const clientScriptSources = clientScriptFiles
     .readFileSync(path.join(root, fileName), 'utf8')
     .replace(/^\s*<script>\s*/, '')
     .replace(/\s*<\/script>\s*$/, ''));
+const searchScriptSource = clientScriptSources[clientScriptFiles.indexOf('script.search.js.html')];
 
 function createStorage() {
   const values = new Map();
@@ -243,6 +244,11 @@ const shelfNetworkChips = sandbox.buildSearchStatusChips_('shelf', { source: 'ne
 assert(
   shelfNetworkChips.some(chip => chip.key === 'bookshelfNetwork' && chip.label === '更新済み'),
   'shelf status shows network refresh complete'
+);
+assert(
+  searchScriptSource.includes('if (!hasCachedBookshelf)') &&
+    searchScriptSource.includes("showSpinner('本棚を広げています'"),
+  'bookshelf cache path avoids blocking spinner'
 );
 
 vm.runInContext(`
