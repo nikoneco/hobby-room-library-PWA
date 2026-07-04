@@ -108,7 +108,7 @@ function assertEqual(actual, expected, message) {
 }
 
 assert(!/\son(?:click|change|input|submit|keydown)=/i.test(indexSource), 'index.html has no inline event handlers');
-['search', 'random', 'toggle-advanced', 'clear-conditions', 'reset-search'].forEach(action => {
+['search', 'focus-search', 'random', 'bookshelf', 'toggle-advanced', 'clear-conditions', 'reset-search'].forEach(action => {
   assert(indexSource.includes(`data-action="${action}"`), `index.html exposes data-action="${action}"`);
 });
 clientScriptFiles.forEach(fileName => {
@@ -121,7 +121,7 @@ assert(serverSource.includes('compatibility'), 'Webアプリ.js registry classif
 const actionKeys = vm.runInContext('Object.keys(STATIC_ACTION_HANDLERS).sort().join(",")', sandbox);
 assertEqual(
   actionKeys,
-  'clear-conditions,random,reset-search,search,toggle-advanced',
+  'bookshelf,clear-conditions,focus-search,random,reset-search,search,toggle-advanced',
   'STATIC_ACTION_HANDLERS maps static data-actions'
 );
 

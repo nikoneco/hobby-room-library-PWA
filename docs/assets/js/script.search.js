@@ -1329,6 +1329,7 @@ function showSearchStatusResult_(mode, resultCount, params) {
   searchStatusState.removingChipKey = '';
   searchStatusState.message = '';
   renderSearchStatus_();
+  if (typeof syncMobileAppDockState_ === 'function') syncMobileAppDockState_();
 }
 
 function showSearchStatusNotice_(message) {
@@ -1342,6 +1343,7 @@ function showSearchStatusNotice_(message) {
   searchStatusState.removingChipKey = '';
   searchStatusState.message = message || '';
   renderSearchStatus_();
+  if (typeof syncMobileAppDockState_ === 'function') syncMobileAppDockState_('focus-search');
 }
 
 function hideSearchStatus_() {

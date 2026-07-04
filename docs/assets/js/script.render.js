@@ -295,6 +295,10 @@ function updateViewToggleButtons_() {
     btn.setAttribute('aria-pressed', active ? 'true' : 'false');
     btn.setAttribute('data-state', active ? 'active' : 'idle');
   });
+
+  if (typeof syncMobileAppDockState_ === 'function') {
+    syncMobileAppDockState_();
+  }
 }
 
 function syncShelfViewUiState_(mode) {

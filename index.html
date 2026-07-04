@@ -210,6 +210,27 @@
 
   <div id="result"></div>
 
+  <nav id="mobileAppDock" class="mobile-app-dock" aria-label="主要操作">
+    <button type="button" class="mobile-app-dock-btn" data-action="focus-search" aria-label="検索欄へ移動">
+      <span class="ui-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"></circle><path d="M16 16l4 4"></path></svg>
+      </span>
+      <span>検索</span>
+    </button>
+    <button type="button" class="mobile-app-dock-btn" data-action="random" aria-label="ランダムに本を表示">
+      <span class="ui-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><path d="M4 7h4l3 10h3"></path><path d="M17 7h3v3"></path><path d="M20 7l-6 6"></path><path d="M17 17h3v-3"></path><path d="M20 17l-3-3"></path></svg>
+      </span>
+      <span>ランダム</span>
+    </button>
+    <button type="button" class="mobile-app-dock-btn primary" data-action="bookshelf" aria-label="本棚を見る">
+      <span class="ui-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><path d="M4 20h16"></path><path d="M5 4h3v13H5z"></path><path d="M10 4h3v13h-3z"></path><path d="M15 5l3-.8 3.4 12.8-3 .8z"></path></svg>
+      </span>
+      <span>本棚</span>
+    </button>
+  </nav>
+
   <div id="image-popup-overlay" style="display:none;">
     <div id="image-popup-content">
       <button id="image-popup-close" class="ui-icon" aria-label="閉じる" type="button">

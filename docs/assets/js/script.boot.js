@@ -1,6 +1,8 @@
 const STATIC_ACTION_HANDLERS = {
   'search': search,
+  'focus-search': focusSearchEntry_,
   'random': showRandomBooks,
+  'bookshelf': showAllBookshelf,
   'toggle-advanced': toggleAdvancedSearch,
   'clear-conditions': clearSearchConditions,
   'reset-search': resetSearch
@@ -141,6 +143,7 @@ window.addEventListener('DOMContentLoaded', function() {
   currentViewMode = loadPreferredResultViewMode_();
   isCardView = currentViewMode === 'card';
   updateViewToggleButtons_();
+  syncMobileAppDockState_();
 
   document.addEventListener('click', function(event) {
     const topShelfBtn = event.target && event.target.closest
@@ -202,6 +205,49 @@ window.addEventListener('DOMContentLoaded', function() {
 
 });
 
+
+function focusSearchEntry_() {
+  hideAllSuggest();
+
+  const container = document.getElementById('searchContainer');
+  const keywordInput = document.getElementById('keyword');
+
+  if (container) {
+    container.classList.remove('compact');
+    compactLocked = false;
+  }
+
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+
+  window.setTimeout(function() {
+    if (!keywordInput) return;
+    try {
+      keywordInput.focus({ preventScroll: true });
+    } catch (e) {
+      keywordInput.focus();
+    }
+  }, 180);
+
+  syncMobileAppDockState_('focus-search');
+}
+
+function getMobileAppDockActiveAction_() {
+  if (searchStatusState && searchStatusState.mode === 'random') return 'random';
+  if (currentViewMode === 'shelf') return 'bookshelf';
+  return 'focus-search';
+}
+
+function syncMobileAppDockState_(activeAction) {
+  const dock = document.getElementById('mobileAppDock');
+  if (!dock) return;
+
+  const active = activeAction || getMobileAppDockActiveAction_();
+  dock.querySelectorAll('.mobile-app-dock-btn').forEach(btn => {
+    const isActive = (btn.dataset.action || '') === active;
+    btn.classList.toggle('active', isActive);
+    btn.setAttribute('aria-current', isActive ? 'true' : 'false');
+  });
+}
 
 let lastScrollY = window.scrollY || 0;
 let compactLocked = false;
