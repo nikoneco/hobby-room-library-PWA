@@ -1760,6 +1760,66 @@ function showRandomBooks() {
     .getRandomBooks(10);
 }
 
+function sanitizeBookshelfCacheBook_(book) {
+  if (!book || typeof book !== 'object') return null;
+
+  return {
+    rowIndex: book.rowIndex,
+    detailLoaded: false,
+    title: book.title || '',
+    isbn: book.isbn || '',
+    shelf: book.shelf || '',
+    location: book.location || '',
+    isSensitive: Boolean(book.isSensitive),
+    fallbackImg: book.fallbackImg || '',
+    fallbackImageSource: book.fallbackImageSource || ''
+  };
+}
+
+function readBookshelfCache_() {
+  try {
+    if (!window.localStorage) return null;
+    const raw = window.localStorage.getItem(BOOKSHELF_CACHE_KEY);
+    if (!raw) return null;
+
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.books)) return null;
+
+    const savedAt = Number(parsed.savedAt || 0);
+    if (!savedAt || Date.now() - savedAt > BOOKSHELF_CACHE_TTL_MS) {
+      window.localStorage.removeItem(BOOKSHELF_CACHE_KEY);
+      return null;
+    }
+
+    const books = parsed.books
+      .map(sanitizeBookshelfCacheBook_)
+      .filter(Boolean);
+    if (!books.length) return null;
+
+    return {
+      savedAt,
+      books
+    };
+  } catch (e) {
+    return null;
+  }
+}
+
+function writeBookshelfCache_(books) {
+  try {
+    if (!window.localStorage || !Array.isArray(books) || !books.length) return;
+    const payload = {
+      savedAt: Date.now(),
+      books: books
+        .map(sanitizeBookshelfCacheBook_)
+        .filter(Boolean)
+    };
+    window.localStorage.setItem(BOOKSHELF_CACHE_KEY, JSON.stringify(payload));
+  } catch (e) {
+    // 容量不足やプライベートモードでは通常通信だけで動かす。
+  }
+}
+
 function showAllBookshelf() {
   try {
     clearSearchFormValuesForBrowse_();
@@ -1781,19 +1841,30 @@ function showAllBookshelf() {
     updateViewToggleButtons_();
 
     showSpinner('本棚を広げています', { kind: 'shelf' });
+    let renderedFromCache = false;
 
-    function finishBookshelfLoad_(loadedBooks) {
+    function finishBookshelfLoad_(loadedBooks, options) {
+      const opt = options || {};
       const resultBooks = Array.isArray(loadedBooks) ? loadedBooks : [];
+      if (!resultBooks.length && renderedFromCache) return;
+
       lastResult = resultBooks;
       showResult(resultBooks);
       showSearchStatusResult_('shelf', resultBooks.length, {});
-      scrollToBookshelfTop_();
+      if (!opt.keepScroll) scrollToBookshelfTop_();
     }
 
     function failBookshelfLoad_(err) {
       console.error('showAllBookshelf failed:', err);
+      if (renderedFromCache) return;
       hideSpinner();
       alert('本棚表示の読み込み中にエラーが発生しました。時間をおいて再度お試しください。');
+    }
+
+    const cachedBookshelf = readBookshelfCache_();
+    if (cachedBookshelf && Array.isArray(cachedBookshelf.books)) {
+      renderedFromCache = true;
+      finishBookshelfLoad_(cachedBookshelf.books, { fromCache: true });
     }
 
     google.script.run
@@ -1803,7 +1874,8 @@ function showAllBookshelf() {
           return;
         }
 
-        finishBookshelfLoad_(payload);
+        writeBookshelfCache_(payload);
+        finishBookshelfLoad_(payload, { keepScroll: renderedFromCache });
       })
       .withFailureHandler(failBookshelfLoad_)
       .getBookshelfBooks();

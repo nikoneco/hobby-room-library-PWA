@@ -78,6 +78,7 @@ const sandbox = {
   window: {
     scrollY: 0,
     location: { search: '' },
+    localStorage: null,
     addEventListener() {},
     setTimeout,
     clearTimeout
@@ -90,6 +91,7 @@ const sandbox = {
 };
 
 sandbox.globalThis = sandbox;
+sandbox.window.localStorage = sandbox.localStorage;
 vm.createContext(sandbox);
 clientScriptSources.forEach((source, index) => {
   vm.runInContext(source, sandbox, { filename: clientScriptFiles[index] });
@@ -205,6 +207,28 @@ assert(
   sandbox.buildPopupBookLeadHtml_({ author: '<著者>', publisher: '出版社' }).includes('&lt;著者&gt;'),
   'popup lead escapes author text'
 );
+
+const cachedShelfBook = sandbox.sanitizeBookshelfCacheBook_({
+  rowIndex: 12,
+  detailLoaded: true,
+  title: '棚の本',
+  isbn: '9780000000000',
+  shelf: '①-上',
+  location: '1',
+  isSensitive: true,
+  summary: '保存しない',
+  author: '保存しない'
+});
+assertEqual(cachedShelfBook.detailLoaded, false, 'bookshelf cache keeps details deferred');
+assertEqual(cachedShelfBook.title, '棚の本', 'bookshelf cache keeps title');
+assert(!('summary' in cachedShelfBook), 'bookshelf cache excludes summaries');
+assert(!('author' in cachedShelfBook), 'bookshelf cache excludes detail fields');
+
+sandbox.writeBookshelfCache_([cachedShelfBook]);
+const shelfCache = sandbox.readBookshelfCache_();
+assert(shelfCache && Array.isArray(shelfCache.books), 'bookshelf cache can be read back');
+assertEqual(shelfCache.books.length, 1, 'bookshelf cache preserves book count');
+assertEqual(shelfCache.books[0].detailLoaded, false, 'bookshelf cache read keeps detail deferred');
 
 vm.runInContext(`
 hydratePreferredResultViewMode_('shelf');
