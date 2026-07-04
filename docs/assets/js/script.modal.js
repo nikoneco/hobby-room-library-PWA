@@ -495,6 +495,20 @@ function warmBookDetailPrefetch_(books, options) {
   }
 }
 
+function warmPopupNeighborDetails_(index, dataArr) {
+  if (!Array.isArray(dataArr) || !dataArr.length || !canPrefetchBookDetails_()) return;
+
+  const baseIndex = Math.floor(Number(index));
+  if (!Number.isFinite(baseIndex)) return;
+
+  for (let step = 1; step <= POPUP_DETAIL_PREFETCH_RADIUS; step += 1) {
+    const nextBook = dataArr[baseIndex + step];
+    const prevBook = dataArr[baseIndex - step];
+    if (nextBook) queueBookDetailPrefetch_(nextBook, step === 1);
+    if (prevBook) queueBookDetailPrefetch_(prevBook, step === 1);
+  }
+}
+
 function resetBookDetailPrefetchObserver_() {
   if (bookDetailPrefetchObserver && typeof bookDetailPrefetchObserver.disconnect === 'function') {
     bookDetailPrefetchObserver.disconnect();
@@ -919,6 +933,7 @@ function showPopup(book, index, dataArr, seriesContext) {
   appendPopupSummaryAccordion_(info.querySelector('.genre-chip-wrap.popup'), book);
   attachPopupActionHandlers(book, popupSeriesContext);
   fetchDeferredBookDetails_(book, index, dataArr, popupSeriesContext);
+  warmPopupNeighborDetails_(index, dataArr);
 
   overlay.style.display = 'flex';
   document.body.classList.add('modal-open');
@@ -1052,6 +1067,9 @@ function popupMove(diff) {
   if (newIndex < 0 || newIndex >= popupData.length) return;
 
   popupIndex = newIndex;
+  queueBookDetailPrefetch_(popupData[popupIndex], true);
+  warmPopupNeighborDetails_(popupIndex, popupData);
+
   const popupContent = document.getElementById('image-popup-content');
   popupContent.classList.remove('popup-slide-next', 'popup-slide-prev');
   void popupContent.offsetWidth;
