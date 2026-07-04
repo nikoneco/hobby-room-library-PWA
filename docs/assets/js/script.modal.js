@@ -687,6 +687,17 @@ function buildPopupDetailLoadingHtml_(book) {
   `;
 }
 
+function notifyBookOpened_(book) {
+  if (!book || typeof window === 'undefined' || typeof window.dispatchEvent !== 'function') return;
+  try {
+    window.dispatchEvent(new CustomEvent('shumi-library:book-opened', {
+      detail: { book: book }
+    }));
+  } catch (e) {
+    // 古いブラウザでは最近開いた本の通知だけ諦める。
+  }
+}
+
 function closeCoverFullscreen_() {
   const overlay = document.getElementById('cover-fullscreen-overlay');
   const img = document.getElementById('cover-fullscreen-img');
@@ -1057,6 +1068,7 @@ function showPopup(book, index, dataArr, seriesContext) {
 
   appendPopupSummaryAccordion_(info.querySelector('.genre-chip-wrap.popup'), book);
   attachPopupActionHandlers(book, popupSeriesContext);
+  notifyBookOpened_(book);
   fetchDeferredBookDetails_(book, index, dataArr, popupSeriesContext);
   warmPopupNeighborDetails_(index, dataArr);
 

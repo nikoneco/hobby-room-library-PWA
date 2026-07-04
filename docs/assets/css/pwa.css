@@ -41,6 +41,76 @@ body.pwa-standalone .mobile-app-dock {
   background: rgba(9, 13, 19, 0.90);
 }
 
+.pwa-recent-rail {
+  width: min(100%, 620px);
+  margin: 0.7rem auto 0;
+  color: rgba(234, 241, 248, 0.78);
+}
+
+.pwa-recent-rail[hidden] {
+  display: none;
+}
+
+.pwa-recent-title {
+  margin: 0 0 0.34rem;
+  color: rgba(234, 241, 248, 0.70);
+  font-size: 0.72rem;
+  font-weight: 850;
+  text-align: center;
+}
+
+.pwa-recent-list {
+  display: flex;
+  gap: 0.42rem;
+  overflow-x: auto;
+  padding: 0.08rem 0.1rem 0.28rem;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.pwa-recent-list::-webkit-scrollbar {
+  display: none;
+}
+
+.pwa-recent-book {
+  flex: 0 0 min(46vw, 168px);
+  min-width: 0;
+  padding: 0.48rem 0.56rem;
+  border: 1px solid rgba(167, 183, 204, 0.20);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.052);
+  color: rgba(234, 241, 248, 0.88);
+  text-align: left;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
+  cursor: pointer;
+}
+
+.pwa-recent-book:focus-visible {
+  outline: 3px solid rgba(104, 191, 215, 0.54);
+  outline-offset: 3px;
+}
+
+.pwa-recent-book-title,
+.pwa-recent-book-meta {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pwa-recent-book-title {
+  font-size: 0.76rem;
+  font-weight: 850;
+  line-height: 1.3;
+}
+
+.pwa-recent-book-meta {
+  margin-top: 0.18rem;
+  color: rgba(234, 241, 248, 0.56);
+  font-size: 0.64rem;
+  font-weight: 750;
+}
+
 body.pwa-network-visible {
   --pwa-network-banner-offset: 78px;
 }

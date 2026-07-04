@@ -225,6 +225,12 @@ assert(
     clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('bookDetailPersistentCachePayload = payload'),
   'persistent detail cache is memoized for the current app session'
 );
+assert(
+  clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('function notifyBookOpened_') &&
+    clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('shumi-library:book-opened') &&
+    clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('notifyBookOpened_(book)'),
+  'book popup emits opened-book event for PWA affordances'
+);
 
 const cachedShelfBook = sandbox.sanitizeBookshelfCacheBook_({
   rowIndex: 12,
