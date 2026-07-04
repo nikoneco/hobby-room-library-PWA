@@ -750,11 +750,12 @@ function normalizeReleasedYm_(value) {
  * 行データをWebアプリ返却用オブジェクトへ変換
  * @param {string[][]} rows
  * @param {Object[]=} indexData
- * @param {{compact?: boolean}=} options
+ * @param {{compact?: boolean, includeImages?: boolean}=} options
  * @returns {Object[]}
  */
 function mapRowsToBooks_(rows, indexData, options) {
   const compact = Boolean(options && options.compact);
+  const includeImages = !(options && options.includeImages === false);
 
   return rows.map((row, i) => {
     const isbn = normalizeIsbn_(row[CONFIG.IDX.ISBN]);
@@ -763,10 +764,6 @@ function mapRowsToBooks_(rows, indexData, options) {
 
     const book = {
       title    : row[CONFIG.IDX.TITLE]     || '',
-      img      : buildHanmotoImageUrlFromIsbn_(isbn, 600),
-      img400   : buildHanmotoImageUrlFromIsbn_(isbn, 400),
-      fallbackImg: normalizeBookFallbackImageUrl_(row[CONFIG.IDX.FALLBACK_IMAGE_URL]),
-      fallbackImageSource: row[CONFIG.IDX.FALLBACK_IMAGE_SOURCE] || '',
       author   : row[CONFIG.IDX.AUTHOR]    || '',
       publisher: row[CONFIG.IDX.PUBLISHER] || '',
       shelf    : row[CONFIG.IDX.SHELF]     || '',
@@ -787,6 +784,13 @@ function mapRowsToBooks_(rows, indexData, options) {
       ownedMaxVolume  : idx ? (idx.ownedMaxVolume || 0) : 0
     };
 
+    if (includeImages) {
+      book.img = buildHanmotoImageUrlFromIsbn_(isbn, 600);
+      book.img400 = buildHanmotoImageUrlFromIsbn_(isbn, 400);
+      book.fallbackImg = normalizeBookFallbackImageUrl_(row[CONFIG.IDX.FALLBACK_IMAGE_URL]);
+      book.fallbackImageSource = row[CONFIG.IDX.FALLBACK_IMAGE_SOURCE] || '';
+    }
+
     if (!compact) {
       book.summary = summary;
       book.links = idx ? (idx.links || null) : null;
@@ -802,7 +806,8 @@ function isSensitiveIndexItem_(idx) {
 }
 
 /**
- * PWA本棚表示専用の最小データへ変換する。
+ * PWA本棚表示専用データへ変換する。
+ * 本の詳細情報は維持し、重い画像URLだけクライアント側生成へ逃がす。
  * 画像URLはクライアント側でISBNから組み立て、初回JSONPは文字データ優先にする。
  *
  * @param {string[][]} rows
@@ -810,18 +815,7 @@ function isSensitiveIndexItem_(idx) {
  * @returns {Object[]}
  */
 function mapRowsToShelfBooks_(rows, indexData) {
-  return rows.map((row, i) => {
-    const isbn = normalizeIsbn_(row[CONFIG.IDX.ISBN]);
-    const idx = Array.isArray(indexData) ? indexData[i] : null;
-
-    return {
-      title: row[CONFIG.IDX.TITLE] || '',
-      isbn,
-      shelf: row[CONFIG.IDX.SHELF] || '',
-      location: row[CONFIG.IDX.LOCATION] || '',
-      isSensitive: isSensitiveIndexItem_(idx)
-    };
-  });
+  return mapRowsToBooks_(rows, indexData, { includeImages: false });
 }
 
 /**

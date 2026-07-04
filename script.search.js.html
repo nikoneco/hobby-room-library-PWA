@@ -1831,20 +1831,7 @@ function showAllBookshelf() {
         .getBookshelfBooksChunk(offset, chunkSize);
     }
 
-    google.script.run
-      .withSuccessHandler(function(payload) {
-        if (Array.isArray(payload)) {
-          finishBookshelfLoad_(payload);
-          return;
-        }
-
-        loadBookshelfChunk_(0);
-      })
-      .withFailureHandler(function(err) {
-        console.warn('getBookshelfBooks failed; falling back to chunked loading:', err);
-        loadBookshelfChunk_(0);
-      })
-      .getBookshelfBooks();
+    loadBookshelfChunk_(0);
   } catch (e) {
     console.error('showAllBookshelf client error:', e);
     hideSpinner();
