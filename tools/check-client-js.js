@@ -252,6 +252,16 @@ assert(
 );
 
 vm.runInContext(`
+currentViewMode = 'shelf';
+isShelfImmersiveMode = true;
+lastResult = [{ title: '棚の本' }];
+window.scrollY = 480;
+saveCurrentBookshelfScroll_();
+`, sandbox);
+const shelfScrollState = sandbox.readBookshelfScrollState_();
+assert(shelfScrollState && shelfScrollState.scrollY === 480, 'bookshelf scroll state can be restored');
+
+vm.runInContext(`
 hydratePreferredResultViewMode_('shelf');
 currentViewMode = 'shelf';
 resetViewModeForNewResults_();

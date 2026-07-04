@@ -1856,6 +1856,72 @@ function writeBookshelfCache_(books) {
   }
 }
 
+function readBookshelfScrollState_() {
+  try {
+    if (!window.localStorage) return null;
+    const raw = window.localStorage.getItem(BOOKSHELF_SCROLL_STATE_KEY);
+    if (!raw) return null;
+
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return null;
+
+    const savedAt = Number(parsed.savedAt || 0);
+    const scrollY = Math.max(0, Number(parsed.scrollY || 0));
+    if (!savedAt || Date.now() - savedAt > BOOKSHELF_SCROLL_STATE_TTL_MS) {
+      window.localStorage.removeItem(BOOKSHELF_SCROLL_STATE_KEY);
+      return null;
+    }
+    if (scrollY < 120) return null;
+
+    return { savedAt, scrollY };
+  } catch (e) {
+    return null;
+  }
+}
+
+function saveCurrentBookshelfScroll_() {
+  try {
+    if (!window.localStorage) return;
+    if (currentViewMode !== 'shelf' || !isShelfImmersiveMode) return;
+    if (!Array.isArray(lastResult) || !lastResult.length) return;
+
+    window.localStorage.setItem(BOOKSHELF_SCROLL_STATE_KEY, JSON.stringify({
+      savedAt: Date.now(),
+      scrollY: Math.max(0, Math.round(window.scrollY || 0))
+    }));
+  } catch (e) {
+    // 保存できない環境では毎回先頭から表示するだけにする。
+  }
+}
+
+function scheduleBookshelfScrollSave_() {
+  if (bookshelfScrollSaveTimer) return;
+  bookshelfScrollSaveTimer = window.setTimeout(function() {
+    bookshelfScrollSaveTimer = 0;
+    saveCurrentBookshelfScroll_();
+  }, 450);
+}
+
+function bindBookshelfScrollMemory_() {
+  window.addEventListener('scroll', scheduleBookshelfScrollSave_, { passive: true });
+  window.addEventListener('pagehide', saveCurrentBookshelfScroll_);
+  window.addEventListener('beforeunload', saveCurrentBookshelfScroll_);
+}
+
+function restoreBookshelfScroll_() {
+  const state = readBookshelfScrollState_();
+  if (!state) {
+    scrollToBookshelfTop_();
+    return;
+  }
+
+  window.requestAnimationFrame(function() {
+    const maxY = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+    const targetY = Math.min(state.scrollY, maxY);
+    window.scrollTo({ top: targetY, behavior: 'auto' });
+  });
+}
+
 function showAllBookshelf() {
   try {
     clearSearchFormValuesForBrowse_();
@@ -1891,6 +1957,10 @@ function showAllBookshelf() {
       lastResult = resultBooks;
       showResult(resultBooks);
       showSearchStatusResult_('shelf', resultBooks.length, opt.statusParams || {});
+      if (opt.restoreScroll) {
+        restoreBookshelfScroll_();
+        return;
+      }
       if (!opt.keepScroll) scrollToBookshelfTop_();
     }
 
@@ -1908,6 +1978,7 @@ function showAllBookshelf() {
       renderedFromCache = true;
       finishBookshelfLoad_(cachedBookshelf.books, {
         fromCache: true,
+        restoreScroll: true,
         statusParams: { source: 'cache', refreshing: true }
       });
     }

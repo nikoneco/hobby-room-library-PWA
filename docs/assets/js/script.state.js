@@ -15,6 +15,7 @@ let bookDetailPrefetchQueue = [];
 let bookDetailPrefetchActive = 0;
 let bookDetailPrefetchTimer = 0;
 let bookDetailPrefetchObserver = null;
+let bookshelfScrollSaveTimer = 0;
 
 const NO_IMAGE_URL = "https://i.imgur.com/Q80wBRc.jpeg";
 const SENSITIVE_THEME_NAME = '18禁';
@@ -32,6 +33,8 @@ const RESULT_VIEW_MODE_STORAGE_KEY = 'shumiLibrary.resultViewMode';
 const RESULT_VIEW_MODES = ['card', 'list', 'shelf'];
 const BOOKSHELF_CACHE_KEY = 'shumiLibrary.bookshelfLiteCache.v1';
 const BOOKSHELF_CACHE_TTL_MS = 12 * 60 * 60 * 1000;
+const BOOKSHELF_SCROLL_STATE_KEY = 'shumiLibrary.bookshelfScrollState.v1';
+const BOOKSHELF_SCROLL_STATE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 const UI_ICONS = {
   search: '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"></circle><path d="M16 16l4 4"></path></svg>',

@@ -13,6 +13,7 @@ window.addEventListener('DOMContentLoaded', function() {
   bindSensitiveToggle_();
   bindStaticActionHandlers_();
   bindMobileAppDockInputState_();
+  bindBookshelfScrollMemory_();
 
   const keywordInput = document.getElementById('keyword');
   keywordInput.addEventListener('input', function() {
