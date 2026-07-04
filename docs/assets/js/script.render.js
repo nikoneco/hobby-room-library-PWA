@@ -81,21 +81,7 @@ function buildPopupBookLeadHtml_(book) {
 }
 
 function buildPopupBookContextHtml_(book) {
-  const parts = [];
-  const shelfLabel = formatShelfLabel_(book);
-  const seriesCount = Number(book && book.seriesCount || 0);
-  const ownedMaxVolume = Number(book && book.ownedMaxVolume || 0);
-
-  if (shelfLabel) parts.push(`棚 ${shelfLabel}`);
-  if (seriesCount >= 2) parts.push(`${seriesCount}冊のシリーズ`);
-  if (ownedMaxVolume > 0) parts.push(`所持 ${ownedMaxVolume}巻まで`);
-  if (!parts.length) return '';
-
-  return `
-    <div class="popup-book-kicker">
-      ${parts.map(part => `<span>${escapeHtml(part)}</span>`).join('')}
-    </div>
-  `;
+  return '';
 }
 
 function buildBookDetailsHtml_(book) {
