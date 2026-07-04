@@ -827,16 +827,23 @@ function mapRowsToShelfBooks_(rows, indexData, rowOffset) {
   return rows.map((row, i) => {
     const isbn = normalizeIsbn_(row[CONFIG.IDX.ISBN]);
     const idx = Array.isArray(indexData) ? indexData[i] : null;
-
-    return {
+    const isSensitive = isSensitiveIndexItem_(idx);
+    const book = {
       rowIndex: offset + i,
       detailLoaded: false,
       title: row[CONFIG.IDX.TITLE] || '',
       isbn,
       shelf: row[CONFIG.IDX.SHELF] || '',
       location: row[CONFIG.IDX.LOCATION] || '',
-      isSensitive: isSensitiveIndexItem_(idx)
+      isSensitive
     };
+
+    if (isSensitive) {
+      book.fallbackImg = normalizeBookFallbackImageUrl_(row[CONFIG.IDX.FALLBACK_IMAGE_URL]);
+      book.fallbackImageSource = row[CONFIG.IDX.FALLBACK_IMAGE_SOURCE] || '';
+    }
+
+    return book;
   });
 }
 

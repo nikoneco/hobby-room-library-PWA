@@ -127,6 +127,21 @@ function setupPopupNavButton_(button, targetIndex, directionLabel) {
   }
 }
 
+function updatePopupNavPlacement_() {
+  const popupContent = document.getElementById('image-popup-content');
+  const img = document.getElementById('image-popup-img');
+  if (!popupContent || !img || img.style.display === 'none') return;
+
+  window.requestAnimationFrame(function() {
+    const contentRect = popupContent.getBoundingClientRect();
+    const imgRect = img.getBoundingClientRect();
+    if (!contentRect.height || !imgRect.height) return;
+
+    const centerY = imgRect.top - contentRect.top + (imgRect.height / 2);
+    popupContent.style.setProperty('--popup-nav-y', `${Math.round(centerY)}px`);
+  });
+}
+
 function clearPopupTouchHandlers_() {
   const overlay = document.getElementById('image-popup-overlay');
   const popupContent = document.getElementById('image-popup-content');
@@ -496,6 +511,11 @@ function showSeriesPanel(sourceBook, seriesBooks, returnContext) {
 }
 
 function showPopup(book, index, dataArr, seriesContext) {
+  const wasPopupOpen = document.body.classList.contains('modal-open');
+  if (!wasPopupOpen) {
+    popupReturnScrollY = window.scrollY || 0;
+  }
+
   popupIndex = index;
   popupData = dataArr;
   popupSeriesContext = seriesContext || null;
@@ -517,8 +537,10 @@ function showPopup(book, index, dataArr, seriesContext) {
   setupBookImageElement_(img, book, {
     track: false,
     loading: 'eager',
-    fetchPriority: 'high'
+    fetchPriority: 'high',
+    onSettled: updatePopupNavPlacement_
   });
+  updatePopupNavPlacement_();
   img.onclick = function(e) {
     e.stopPropagation();
     if (popupDragSuppressNextClick) {
@@ -568,6 +590,9 @@ function showPopup(book, index, dataArr, seriesContext) {
     overlay.style.display = 'none';
     document.body.classList.remove('modal-open');
     document.onkeydown = null;
+    window.requestAnimationFrame(function() {
+      window.scrollTo({ top: popupReturnScrollY || 0, behavior: 'auto' });
+    });
   }
 
   overlay.onclick = function(e) {

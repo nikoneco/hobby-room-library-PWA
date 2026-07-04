@@ -1779,11 +1779,8 @@ function showAllBookshelf() {
 
     showSpinner('本棚を広げています', { kind: 'shelf' });
 
-    const chunkSize = 1000;
-    const books = [];
-
     function finishBookshelfLoad_(loadedBooks) {
-      const resultBooks = Array.isArray(loadedBooks) ? loadedBooks : books;
+      const resultBooks = Array.isArray(loadedBooks) ? loadedBooks : [];
       lastResult = resultBooks;
       showResult(resultBooks);
       showSearchStatusResult_('shelf', resultBooks.length, {});
@@ -1796,55 +1793,16 @@ function showAllBookshelf() {
       alert('本棚表示の読み込み中にエラーが発生しました。時間をおいて再度お試しください。');
     }
 
-    function loadBookshelfChunk_(offset) {
-      google.script.run
-        .withSuccessHandler(function(payload) {
-          if (Array.isArray(payload)) {
-            books.push.apply(books, payload);
-            finishBookshelfLoad_();
-            return;
-          }
-
-          const chunk = payload && Array.isArray(payload.books) ? payload.books : [];
-          const total = payload && Number(payload.total || 0);
-          const nextOffset = payload && Number(payload.nextOffset || 0);
-          const done = Boolean(payload && payload.done);
-
-          if (chunk.length) {
-            books.push.apply(books, chunk);
-          }
-
-          if (total > 0) {
-            showSpinner('本棚を広げています', {
-              kind: 'shelf',
-              detail: `蔵書データを分けて取得しています ${Math.min(books.length, total)} / ${total}冊`
-            });
-          }
-
-          if (done || !chunk.length || nextOffset <= offset) {
-            finishBookshelfLoad_();
-            return;
-          }
-
-          loadBookshelfChunk_(nextOffset);
-        })
-        .withFailureHandler(failBookshelfLoad_)
-        .getBookshelfBooksChunk(offset, chunkSize);
-    }
-
     google.script.run
       .withSuccessHandler(function(payload) {
-        if (Array.isArray(payload)) {
-          finishBookshelfLoad_(payload);
+        if (!Array.isArray(payload)) {
+          failBookshelfLoad_(new Error('Bookshelf API returned an unexpected payload.'));
           return;
         }
 
-        loadBookshelfChunk_(0);
+        finishBookshelfLoad_(payload);
       })
-      .withFailureHandler(function(err) {
-        console.warn('getBookshelfBooks failed; falling back to chunked loading:', err);
-        loadBookshelfChunk_(0);
-      })
+      .withFailureHandler(failBookshelfLoad_)
       .getBookshelfBooks();
   } catch (e) {
     console.error('showAllBookshelf client error:', e);

@@ -113,8 +113,12 @@ function syncSensitiveToggleUi_() {
 }
 
 function refreshSensitiveCoverVisibility_() {
+  const restoreY = window.scrollY || 0;
   if (Array.isArray(lastResult) && lastResult.length) {
     showResult(lastResult);
+    window.requestAnimationFrame(function() {
+      window.scrollTo({ top: restoreY, behavior: 'auto' });
+    });
   }
 
   const overlay = document.getElementById('image-popup-overlay');
@@ -365,6 +369,7 @@ function setupBookImageElement_(img, book, options) {
   const trackRunId = IMAGE_LOAD_STATS_RUN_ID;
   const loading = opt.loading || 'lazy';
   const fetchPriority = opt.fetchPriority || (loading === 'eager' ? 'high' : 'low');
+  const onSettled = typeof opt.onSettled === 'function' ? opt.onSettled : null;
 
   let currentIndex = -1;
   let settled = false;
@@ -389,6 +394,10 @@ function setupBookImageElement_(img, book, options) {
 
     if (track) {
       recordImageLoadResult_(trackKey, candidates[currentIndex], trackRunId);
+    }
+
+    if (onSettled) {
+      onSettled(img, candidates[currentIndex]);
     }
   }
 

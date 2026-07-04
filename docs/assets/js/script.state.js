@@ -9,6 +9,7 @@ let isRandomBooksLoading = false;
 let preferredResultViewMode = '';
 let resultViewModeChangedLocally = false;
 let shelfScrollSpyObserver = null;
+let popupReturnScrollY = 0;
 
 const NO_IMAGE_URL = "https://i.imgur.com/Q80wBRc.jpeg";
 const SENSITIVE_THEME_NAME = '18禁';

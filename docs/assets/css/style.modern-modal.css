@@ -381,6 +381,7 @@ button.popup-arrow:focus-visible {
 
 #popup-prev,
 #popup-next {
+  top: var(--popup-nav-y, 50%);
   transform: translateY(-50%);
 }
 
