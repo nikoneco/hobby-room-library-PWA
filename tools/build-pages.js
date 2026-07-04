@@ -289,6 +289,11 @@ body.pwa-network-visible.mobile-input-active .mobile-app-dock {
   color: #17343c;
 }
 
+.pwa-network-banner.is-notice {
+  border-color: rgba(214, 164, 95, 0.34);
+  color: #4c3820;
+}
+
 .pwa-network-banner-action {
   margin-left: 0.75em;
   padding: 0.34em 0.78em;
@@ -619,6 +624,7 @@ function writePwaClient() {
     currentBannerKind = text ? (kind || '') : '';
     banner.classList.toggle('is-error', kind === 'error');
     banner.classList.toggle('is-update', kind === 'update');
+    banner.classList.toggle('is-notice', kind === 'notice');
     syncBodyState_();
   }
 
@@ -741,7 +747,11 @@ function writePwaClient() {
   function runPwaLaunchAction_() {
     if (getPwaLaunchAction_() !== 'recent') return;
     window.setTimeout(function() {
-      openRecentBook_(0);
+      if (openRecentBook_(0)) return;
+      setBanner_('最近開いた本はまだありません。', 'notice');
+      if (typeof window.focusSearchEntry_ === 'function') {
+        window.focusSearchEntry_();
+      }
     }, 260);
   }
 
@@ -796,6 +806,7 @@ function writePwaClient() {
     banner.hidden = false;
     currentBannerKind = 'update';
     banner.classList.remove('is-error');
+    banner.classList.remove('is-notice');
     banner.classList.add('is-update');
     syncBodyState_();
 
@@ -1029,7 +1040,7 @@ function writePwaFiles() {
   fs.writeFileSync(path.join(docsDir, 'offline.html'), offlineHtml, 'utf8');
 
   const sw = `
-const CACHE_NAME = 'shumi-library-pwa-v37';
+const CACHE_NAME = 'shumi-library-pwa-v38';
 const APP_SHELL = [
   './',
   './index.html',

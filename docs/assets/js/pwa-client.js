@@ -43,6 +43,7 @@
     currentBannerKind = text ? (kind || '') : '';
     banner.classList.toggle('is-error', kind === 'error');
     banner.classList.toggle('is-update', kind === 'update');
+    banner.classList.toggle('is-notice', kind === 'notice');
     syncBodyState_();
   }
 
@@ -165,7 +166,11 @@
   function runPwaLaunchAction_() {
     if (getPwaLaunchAction_() !== 'recent') return;
     window.setTimeout(function() {
-      openRecentBook_(0);
+      if (openRecentBook_(0)) return;
+      setBanner_('最近開いた本はまだありません。', 'notice');
+      if (typeof window.focusSearchEntry_ === 'function') {
+        window.focusSearchEntry_();
+      }
     }, 260);
   }
 
@@ -220,6 +225,7 @@
     banner.hidden = false;
     currentBannerKind = 'update';
     banner.classList.remove('is-error');
+    banner.classList.remove('is-notice');
     banner.classList.add('is-update');
     syncBodyState_();
 

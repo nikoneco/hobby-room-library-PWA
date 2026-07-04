@@ -159,6 +159,11 @@ body.pwa-network-visible.mobile-input-active .mobile-app-dock {
   color: #17343c;
 }
 
+.pwa-network-banner.is-notice {
+  border-color: rgba(214, 164, 95, 0.34);
+  color: #4c3820;
+}
+
 .pwa-network-banner-action {
   margin-left: 0.75em;
   padding: 0.34em 0.78em;

@@ -88,7 +88,7 @@ assert(manifest.shortcuts.some(item => item.url === './?launch=bookshelf'), 'man
 assert(manifest.shortcuts.some(item => item.url === './?launch=random'), 'manifest has random shortcut');
 
 assert(sw.includes('offline.html'), 'service worker caches offline fallback');
-assert(sw.includes('shumi-library-pwa-v37'), 'service worker has versioned cache');
+assert(sw.includes('shumi-library-pwa-v38'), 'service worker has versioned cache');
 assert(sw.includes('./assets/logo.png'), 'service worker caches local logo');
 assert(sw.includes('SKIP_WAITING'), 'service worker supports update activation');
 
@@ -106,6 +106,9 @@ assert(pwaClient.includes("kicker.textContent = '続きから'"), 'PWA client la
 assert(pwaClient.includes("return '端末に保存済み'"), 'PWA client marks detailed recent books as stored on device');
 assert(pwaClient.includes("getPwaLaunchAction_() !== 'recent'"), 'PWA client handles recent launch shortcut');
 assert(pwaClient.includes('openRecentBook_(0)'), 'PWA client opens most recent book from shortcut');
+assert(pwaClient.includes('最近開いた本はまだありません'), 'PWA client reports empty recent shortcut');
+assert(pwaClient.includes('window.focusSearchEntry_'), 'PWA client returns to search when recent shortcut is empty');
+assert(pwaCss.includes('.pwa-network-banner.is-notice'), 'PWA CSS styles notice banner');
 
 const appendedScripts = [];
 const timeouts = [];
