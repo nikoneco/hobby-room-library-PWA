@@ -19,6 +19,23 @@
   color: #5f2f26;
 }
 
+.pwa-network-banner.is-update {
+  border-color: rgba(104, 191, 215, 0.34);
+  color: #17343c;
+}
+
+.pwa-network-banner-action {
+  margin-left: 0.75em;
+  padding: 0.34em 0.78em;
+  border: 1px solid rgba(47, 95, 74, 0.28);
+  border-radius: 999px;
+  background: #2f5f4a;
+  color: #fff;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
 @media (max-width: 640px) {
   .pwa-network-banner {
     font-size: 0.86rem;

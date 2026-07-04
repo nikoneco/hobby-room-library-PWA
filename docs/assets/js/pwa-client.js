@@ -3,6 +3,11 @@
 
   const OFFLINE_MESSAGE = '端末がオフラインです。通信が戻ったら、もう一度検索してください。';
   const API_ERROR_MESSAGE = '蔵書データを取得できませんでした。通信状態を確認して再試行してください。';
+  const UPDATE_MESSAGE = '新しい版があります。';
+
+  let updateWaitingWorker = null;
+  let reloadForUpdate = false;
+  let currentBannerKind = '';
 
   function getBanner_() {
     return document.getElementById('pwaNetworkBanner');
@@ -15,11 +20,42 @@
     const text = String(message || '').trim();
     banner.textContent = text;
     banner.hidden = !text;
+    currentBannerKind = text ? (kind || '') : '';
     banner.classList.toggle('is-error', kind === 'error');
+    banner.classList.toggle('is-update', kind === 'update');
   }
 
   function clearBanner_() {
     setBanner_('', '');
+  }
+
+  function showUpdateBanner_(worker) {
+    if (!worker) return;
+    updateWaitingWorker = worker;
+
+    const banner = getBanner_();
+    if (!banner) return;
+
+    banner.innerHTML = '';
+    banner.hidden = false;
+    currentBannerKind = 'update';
+    banner.classList.remove('is-error');
+    banner.classList.add('is-update');
+
+    const text = document.createElement('span');
+    text.textContent = UPDATE_MESSAGE;
+    banner.appendChild(text);
+
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'pwa-network-banner-action';
+    button.textContent = '更新';
+    button.addEventListener('click', function() {
+      if (!updateWaitingWorker) return;
+      reloadForUpdate = true;
+      updateWaitingWorker.postMessage({ type: 'SKIP_WAITING' });
+    });
+    banner.appendChild(button);
   }
 
   function syncOnlineState_() {
@@ -28,7 +64,28 @@
       return;
     }
 
-    clearBanner_();
+    if (currentBannerKind !== 'update') {
+      clearBanner_();
+    }
+  }
+
+  function watchServiceWorkerUpdate_(registration) {
+    if (!registration) return;
+
+    if (registration.waiting && navigator.serviceWorker.controller) {
+      showUpdateBanner_(registration.waiting);
+    }
+
+    registration.addEventListener('updatefound', function() {
+      const worker = registration.installing;
+      if (!worker) return;
+
+      worker.addEventListener('statechange', function() {
+        if (worker.state === 'installed' && navigator.serviceWorker.controller) {
+          showUpdateBanner_(worker);
+        }
+      });
+    });
   }
 
   window.ShumiLibraryPwa = {
@@ -41,7 +98,7 @@
       setBanner_(API_ERROR_MESSAGE, 'error');
     },
     clearApiFailure: function() {
-      if (!navigator || navigator.onLine !== false) {
+      if (currentBannerKind !== 'update' && (!navigator || navigator.onLine !== false)) {
         clearBanner_();
       }
     }
@@ -49,14 +106,23 @@
 
   window.addEventListener('online', syncOnlineState_);
   window.addEventListener('offline', syncOnlineState_);
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.addEventListener('controllerchange', function() {
+      if (reloadForUpdate) {
+        window.location.reload();
+      }
+    });
+  }
 
   window.addEventListener('DOMContentLoaded', function() {
     syncOnlineState_();
 
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('./sw.js').catch(function(error) {
-        console.warn('service worker registration failed:', error);
-      });
+      navigator.serviceWorker.register('./sw.js')
+        .then(watchServiceWorkerUpdate_)
+        .catch(function(error) {
+          console.warn('service worker registration failed:', error);
+        });
     }
   });
 })();
