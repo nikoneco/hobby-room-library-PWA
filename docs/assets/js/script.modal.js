@@ -204,20 +204,49 @@ function rememberBookDetail_(book, detail) {
   rememberPersistentBookDetail_(key, detail);
 }
 
+function touchMemoryBookDetail_(key, detail) {
+  if (!key || !detail) return;
+  bookDetailCache.delete(key);
+  bookDetailCache.set(key, detail);
+  while (bookDetailCache.size > BOOK_DETAIL_CACHE_LIMIT) {
+    const oldestKey = bookDetailCache.keys().next().value;
+    bookDetailCache.delete(oldestKey);
+  }
+}
+
 function getCachedBookDetail_(book) {
   const key = getBookDetailCacheKey_(book);
   if (!key) return null;
 
   const memoryDetail = bookDetailCache.get(key);
-  if (memoryDetail) return memoryDetail;
+  if (memoryDetail) {
+    touchMemoryBookDetail_(key, memoryDetail);
+    return memoryDetail;
+  }
 
   const persistentDetail = getPersistentBookDetail_(book, key);
   if (persistentDetail) {
-    bookDetailCache.set(key, persistentDetail);
+    touchMemoryBookDetail_(key, persistentDetail);
     return persistentDetail;
   }
 
   return null;
+}
+
+function addBookDetailInFlightCallback_(key, callback) {
+  if (!key || typeof callback !== 'function') return;
+  const callbacks = bookDetailInFlightCallbacks.get(key) || [];
+  callbacks.push(callback);
+  bookDetailInFlightCallbacks.set(key, callbacks);
+}
+
+function settleBookDetailInFlight_(key, detail, error) {
+  const callbacks = key ? bookDetailInFlightCallbacks.get(key) : null;
+  if (key) bookDetailInFlightCallbacks.delete(key);
+  if (!callbacks || !callbacks.length) return;
+  callbacks.forEach(callback => {
+    callback(detail, error);
+  });
 }
 
 function canPrefetchBookDetails_() {
@@ -339,6 +368,25 @@ function replaceDeferredBookReference_(book, merged, index, dataArr, seriesConte
   }
 }
 
+function handleDeferredBookDetailResult_(book, index, dataArr, seriesContext, options, detail, error) {
+  const opt = options || {};
+  book.detailLoading = false;
+  book.detailPrefetching = false;
+
+  if (detail) {
+    const merged = mergeDeferredBookDetails_(book, detail);
+    replaceDeferredBookReference_(book, merged, index, dataArr, seriesContext);
+    if (typeof opt.onDone === 'function') opt.onDone(merged);
+    return;
+  }
+
+  if (!opt.prefetch) {
+    if (error) console.warn('getBookDetailByRowIndex failed:', error);
+    book.detailError = '詳細データを取得できませんでした。';
+  }
+  if (typeof opt.onDone === 'function') opt.onDone(null);
+}
+
 function fetchDeferredBookDetails_(book, index, dataArr, seriesContext, options) {
   const opt = options || {};
   const cached = getCachedBookDetail_(book);
@@ -349,6 +397,16 @@ function fetchDeferredBookDetails_(book, index, dataArr, seriesContext, options)
     return;
   }
 
+  const key = getBookDetailCacheKey_(book);
+  if (key && bookDetailInFlightCallbacks.has(key)) {
+    book.detailLoading = true;
+    book.detailPrefetching = Boolean(opt.prefetch);
+    addBookDetailInFlightCallback_(key, function(detail, error) {
+      handleDeferredBookDetailResult_(book, index, dataArr, seriesContext, opt, detail, error);
+    });
+    return;
+  }
+
   if (!shouldFetchDeferredBookDetails_(book)) {
     if (typeof opt.onDone === 'function') opt.onDone(null);
     return;
@@ -356,28 +414,36 @@ function fetchDeferredBookDetails_(book, index, dataArr, seriesContext, options)
 
   book.detailLoading = true;
   book.detailPrefetching = Boolean(opt.prefetch);
+  if (key) {
+    addBookDetailInFlightCallback_(key, function(detail, error) {
+      handleDeferredBookDetailResult_(book, index, dataArr, seriesContext, opt, detail, error);
+    });
+  }
 
   google.script.run
     .withSuccessHandler(function(detail) {
-      book.detailLoading = false;
-      book.detailPrefetching = false;
       if (!detail) {
-        book.detailError = '詳細データを取得できませんでした。';
-        if (typeof opt.onDone === 'function') opt.onDone(null);
+        if (key) {
+          settleBookDetailInFlight_(key, null, null);
+        } else {
+          handleDeferredBookDetailResult_(book, index, dataArr, seriesContext, opt, null, null);
+        }
         return;
       }
 
       rememberBookDetail_(book, detail);
-      const merged = mergeDeferredBookDetails_(book, detail);
-      replaceDeferredBookReference_(book, merged, index, dataArr, seriesContext);
-      if (typeof opt.onDone === 'function') opt.onDone(merged);
+      if (key) {
+        settleBookDetailInFlight_(key, detail, null);
+      } else {
+        handleDeferredBookDetailResult_(book, index, dataArr, seriesContext, opt, detail, null);
+      }
     })
     .withFailureHandler(function(err) {
-      if (!opt.prefetch) console.warn('getBookDetailByRowIndex failed:', err);
-      book.detailLoading = false;
-      book.detailPrefetching = false;
-      if (!opt.prefetch) book.detailError = '詳細データを取得できませんでした。';
-      if (typeof opt.onDone === 'function') opt.onDone(null);
+      if (key) {
+        settleBookDetailInFlight_(key, null, err);
+      } else {
+        handleDeferredBookDetailResult_(book, index, dataArr, seriesContext, opt, null, err);
+      }
     })
     .getBookDetailByRowIndex(book.rowIndex);
 }
@@ -392,6 +458,15 @@ function processBookDetailPrefetchQueue_() {
     if (!item) continue;
     item.detailQueued = false;
     if (!shouldFetchDeferredBookDetails_(item) || getCachedBookDetail_(item)) continue;
+    const inFlightKey = getBookDetailCacheKey_(item);
+    if (inFlightKey && bookDetailInFlightCallbacks.has(inFlightKey)) {
+      item.detailLoading = true;
+      item.detailPrefetching = true;
+      addBookDetailInFlightCallback_(inFlightKey, function(detail, error) {
+        handleDeferredBookDetailResult_(item, -1, null, null, { prefetch: true }, detail, error);
+      });
+      continue;
+    }
     batch.push(item);
   }
 
@@ -404,6 +479,12 @@ function processBookDetailPrefetchQueue_() {
   batch.forEach(book => {
     book.detailLoading = true;
     book.detailPrefetching = true;
+    const key = getBookDetailCacheKey_(book);
+    if (key) {
+      addBookDetailInFlightCallback_(key, function(detail, error) {
+        handleDeferredBookDetailResult_(book, -1, null, null, { prefetch: true }, detail, error);
+      });
+    }
   });
 
   const rowIndexes = batch
@@ -421,19 +502,24 @@ function processBookDetailPrefetchQueue_() {
       });
 
       batch.forEach(book => {
-        book.detailLoading = false;
-        book.detailPrefetching = false;
         const detail = detailByRowIndex.get(String(book.rowIndex));
-        if (!detail) return;
-        rememberBookDetail_(book, detail);
-        const merged = mergeDeferredBookDetails_(book, detail);
-        replaceDeferredBookReference_(book, merged, -1, null, null);
+        const key = getBookDetailCacheKey_(book);
+        if (detail) rememberBookDetail_(book, detail);
+        if (key) {
+          settleBookDetailInFlight_(key, detail || null, null);
+        } else {
+          handleDeferredBookDetailResult_(book, -1, null, null, { prefetch: true }, detail || null, null);
+        }
       });
     })
-    .withFailureHandler(function() {
+    .withFailureHandler(function(err) {
       batch.forEach(book => {
-        book.detailLoading = false;
-        book.detailPrefetching = false;
+        const key = getBookDetailCacheKey_(book);
+        if (key) {
+          settleBookDetailInFlight_(key, null, err);
+        } else {
+          handleDeferredBookDetailResult_(book, -1, null, null, { prefetch: true }, null, err);
+        }
       });
     })
     .getBookDetailsByRowIndexes(rowIndexes);

@@ -213,6 +213,12 @@ assert(
     clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('if (isBookPopupOpen_() && Array.isArray(popupData)'),
   'deferred detail refresh only rerenders an open popup'
 );
+assert(
+  clientScriptSources[clientScriptFiles.indexOf('script.state.js.html')].includes('bookDetailInFlightCallbacks') &&
+    clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('settleBookDetailInFlight_') &&
+    clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('bookDetailInFlightCallbacks.has(key)'),
+  'deferred detail requests share in-flight row fetches'
+);
 
 const cachedShelfBook = sandbox.sanitizeBookshelfCacheBook_({
   rowIndex: 12,

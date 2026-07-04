@@ -15,6 +15,7 @@ let bookDetailPrefetchQueue = [];
 let bookDetailPrefetchActive = 0;
 let bookDetailPrefetchTimer = 0;
 let bookDetailPrefetchObserver = null;
+let bookDetailInFlightCallbacks = new Map();
 let bookshelfScrollSaveTimer = 0;
 
 const NO_IMAGE_URL = "https://i.imgur.com/Q80wBRc.jpeg";
