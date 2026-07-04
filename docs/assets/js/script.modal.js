@@ -188,11 +188,103 @@ function rememberBookDetail_(book, detail) {
     const oldestKey = bookDetailCache.keys().next().value;
     bookDetailCache.delete(oldestKey);
   }
+
+  rememberPersistentBookDetail_(key, detail);
 }
 
 function getCachedBookDetail_(book) {
   const key = getBookDetailCacheKey_(book);
-  return key ? bookDetailCache.get(key) || null : null;
+  if (!key) return null;
+
+  const memoryDetail = bookDetailCache.get(key);
+  if (memoryDetail) return memoryDetail;
+
+  const persistentDetail = getPersistentBookDetail_(book, key);
+  if (persistentDetail) {
+    bookDetailCache.set(key, persistentDetail);
+    return persistentDetail;
+  }
+
+  return null;
+}
+
+function readPersistentBookDetailCache_() {
+  try {
+    if (!window.localStorage) return null;
+    const raw = window.localStorage.getItem(BOOK_DETAIL_PERSISTENT_CACHE_KEY);
+    if (!raw) return { version: 1, items: {} };
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object' || !parsed.items || typeof parsed.items !== 'object') {
+      return { version: 1, items: {} };
+    }
+    return parsed;
+  } catch (e) {
+    return null;
+  }
+}
+
+function writePersistentBookDetailCache_(payload) {
+  try {
+    if (!window.localStorage || !payload) return;
+    window.localStorage.setItem(BOOK_DETAIL_PERSISTENT_CACHE_KEY, JSON.stringify(payload));
+  } catch (e) {
+    // 端末容量やプライベートモードでは失敗しても通常通信へフォールバックする。
+  }
+}
+
+function rememberPersistentBookDetail_(key, detail) {
+  const payload = readPersistentBookDetailCache_();
+  if (!payload || !key || !detail || typeof detail !== 'object') return;
+
+  const now = Date.now();
+  payload.version = 1;
+  payload.items[key] = {
+    savedAt: now,
+    detail: detail
+  };
+
+  const entries = Object.keys(payload.items)
+    .map(cacheKey => ({ key: cacheKey, entry: payload.items[cacheKey] }))
+    .filter(item => item.entry && now - Number(item.entry.savedAt || 0) <= BOOK_DETAIL_PERSISTENT_CACHE_TTL_MS)
+    .sort((a, b) => Number(b.entry.savedAt || 0) - Number(a.entry.savedAt || 0))
+    .slice(0, BOOK_DETAIL_PERSISTENT_CACHE_LIMIT);
+
+  payload.items = {};
+  entries.forEach(item => {
+    payload.items[item.key] = item.entry;
+  });
+  writePersistentBookDetailCache_(payload);
+}
+
+function isPersistentBookDetailMatch_(book, detail) {
+  if (!book || !detail) return false;
+
+  const bookTitle = String(book.title || '').trim();
+  const detailTitle = String(detail.title || '').trim();
+  if (bookTitle && detailTitle && bookTitle !== detailTitle) return false;
+
+  const bookIsbn = String(book.isbn || '').trim();
+  const detailIsbn = String(detail.isbn || '').trim();
+  if (bookIsbn && detailIsbn && bookIsbn !== detailIsbn) return false;
+
+  return true;
+}
+
+function getPersistentBookDetail_(book, key) {
+  const payload = readPersistentBookDetailCache_();
+  if (!payload || !key || !payload.items) return null;
+
+  const entry = payload.items[key];
+  if (!entry || !entry.detail || typeof entry.detail !== 'object') return null;
+
+  if (Date.now() - Number(entry.savedAt || 0) > BOOK_DETAIL_PERSISTENT_CACHE_TTL_MS) {
+    delete payload.items[key];
+    writePersistentBookDetailCache_(payload);
+    return null;
+  }
+
+  if (!isPersistentBookDetailMatch_(book, entry.detail)) return null;
+  return entry.detail;
 }
 
 function mergeDeferredBookDetails_(book, detail) {
