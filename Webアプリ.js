@@ -1721,6 +1721,45 @@ function getBookDetailByRowIndex(rowIndex) {
   }
 }
 
+function parseBookDetailRowIndexes_(rowIndexes) {
+  const seen = {};
+  return String(rowIndexes || '')
+    .split(/[,\s]+/)
+    .map(value => Math.floor(Number(value)))
+    .filter(value => Number.isFinite(value) && value >= 0)
+    .filter(value => {
+      if (seen[value]) return false;
+      seen[value] = true;
+      return true;
+    })
+    .slice(0, 12);
+}
+
+function getBookDetailsByRowIndexes(rowIndexes) {
+  try {
+    const targets = parseBookDetailRowIndexes_(rowIndexes);
+    if (!targets.length) return [];
+
+    const dataset = getLibraryDataset_();
+    const rows = dataset.rows || [];
+    const index = dataset.index || [];
+
+    return targets
+      .filter(targetIndex => targetIndex < rows.length)
+      .map(targetIndex => {
+        return mapRowsToBooks_(
+          [rows[targetIndex]],
+          [index[targetIndex] || {}],
+          { includeImages: false, rowOffset: targetIndex }
+        )[0] || null;
+      })
+      .filter(Boolean);
+  } catch (e) {
+    console.error('getBookDetailsByRowIndexes error:', e);
+    return [];
+  }
+}
+
 /**
  * 現行WebアプリAPI: 同一 series_key_auto の本を目録順で返す。
  * @param {string} seriesKeyAuto
@@ -1946,6 +1985,9 @@ function dispatchWebAppJsonpApi_(apiName, params) {
 
     case 'bookDetail':
       return getBookDetailByRowIndex(params.rowIndex);
+
+    case 'bookDetails':
+      return getBookDetailsByRowIndexes(params.rowIndexes || params.rowIndexesCsv || '');
 
     case 'series':
       return getBooksBySeriesKey(params.seriesKeyAuto || params.seriesKey || '');

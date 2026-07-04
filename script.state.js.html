@@ -11,9 +11,17 @@ let preferredResultViewMode = '';
 let resultViewModeChangedLocally = false;
 let shelfScrollSpyObserver = null;
 let popupReturnScrollY = 0;
+let bookDetailCache = new Map();
+let bookDetailPrefetchQueue = [];
+let bookDetailPrefetchActive = 0;
+let bookDetailPrefetchTimer = 0;
+let bookDetailPrefetchObserver = null;
 
 const NO_IMAGE_URL = "https://i.imgur.com/Q80wBRc.jpeg";
 const SENSITIVE_THEME_NAME = '18禁';
+const BOOK_DETAIL_CACHE_LIMIT = 96;
+const BOOK_DETAIL_PREFETCH_QUEUE_LIMIT = 36;
+const BOOK_DETAIL_PREFETCH_CONCURRENCY = 1;
 const SENSITIVE_COVER_STORAGE_KEY = 'shumiLibrary.showSensitiveCovers';
 const RESULT_VIEW_MODE_STORAGE_KEY = 'shumiLibrary.resultViewMode';
 const RESULT_VIEW_MODES = ['card', 'list', 'shelf'];

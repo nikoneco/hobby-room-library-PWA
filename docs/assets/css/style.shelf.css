@@ -115,6 +115,8 @@ body.shelf-immersive-active .bookshelf-group {
   background: linear-gradient(135deg, rgba(26, 34, 65, 0.78) 0%, rgba(20, 28, 47, 0.82) 100%);
   border: 1px solid rgba(71, 245, 255, 0.18);
   box-shadow: 0 2px 18px rgba(17, 161, 187, 0.10);
+  content-visibility: auto;
+  contain-intrinsic-size: 760px;
 }
 
 .bookshelf-group-title {

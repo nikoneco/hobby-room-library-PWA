@@ -175,6 +175,27 @@ function shouldFetchDeferredBookDetails_(book) {
   );
 }
 
+function getBookDetailCacheKey_(book) {
+  if (!book || book.rowIndex === undefined || book.rowIndex === null) return '';
+  return `row:${book.rowIndex}`;
+}
+
+function rememberBookDetail_(book, detail) {
+  const key = getBookDetailCacheKey_(book);
+  if (!key || !detail || typeof detail !== 'object') return;
+
+  bookDetailCache.set(key, detail);
+  while (bookDetailCache.size > BOOK_DETAIL_CACHE_LIMIT) {
+    const oldestKey = bookDetailCache.keys().next().value;
+    bookDetailCache.delete(oldestKey);
+  }
+}
+
+function getCachedBookDetail_(book) {
+  const key = getBookDetailCacheKey_(book);
+  return key ? bookDetailCache.get(key) || null : null;
+}
+
 function mergeDeferredBookDetails_(book, detail) {
   if (!book || !detail || typeof detail !== 'object') return book;
 
@@ -187,34 +208,206 @@ function mergeDeferredBookDetails_(book, detail) {
   return book;
 }
 
-function fetchDeferredBookDetails_(book, index, dataArr, seriesContext) {
-  if (!shouldFetchDeferredBookDetails_(book)) return;
+function replaceDeferredBookReference_(book, merged, index, dataArr, seriesContext) {
+  if (Array.isArray(dataArr) && dataArr[index] === book) {
+    dataArr[index] = merged;
+  }
+
+  if (Array.isArray(popupData) && popupData[popupIndex] === book) {
+    popupData[popupIndex] = merged;
+    showPopup(merged, popupIndex, popupData, popupSeriesContext || seriesContext);
+  }
+}
+
+function fetchDeferredBookDetails_(book, index, dataArr, seriesContext, options) {
+  const opt = options || {};
+  const cached = getCachedBookDetail_(book);
+  if (cached) {
+    const mergedFromCache = mergeDeferredBookDetails_(book, cached);
+    replaceDeferredBookReference_(book, mergedFromCache, index, dataArr, seriesContext);
+    if (typeof opt.onDone === 'function') opt.onDone(mergedFromCache);
+    return;
+  }
+
+  if (!shouldFetchDeferredBookDetails_(book)) {
+    if (typeof opt.onDone === 'function') opt.onDone(null);
+    return;
+  }
 
   book.detailLoading = true;
+  book.detailPrefetching = Boolean(opt.prefetch);
 
   google.script.run
     .withSuccessHandler(function(detail) {
       book.detailLoading = false;
+      book.detailPrefetching = false;
       if (!detail) {
         book.detailError = '詳細データを取得できませんでした。';
+        if (typeof opt.onDone === 'function') opt.onDone(null);
         return;
       }
 
+      rememberBookDetail_(book, detail);
       const merged = mergeDeferredBookDetails_(book, detail);
-      if (Array.isArray(dataArr) && dataArr[index] === book) {
-        dataArr[index] = merged;
-      }
-      if (Array.isArray(popupData) && popupData[popupIndex] === book) {
-        popupData[popupIndex] = merged;
-        showPopup(merged, popupIndex, popupData, popupSeriesContext || seriesContext);
-      }
+      replaceDeferredBookReference_(book, merged, index, dataArr, seriesContext);
+      if (typeof opt.onDone === 'function') opt.onDone(merged);
     })
     .withFailureHandler(function(err) {
-      console.warn('getBookDetailByRowIndex failed:', err);
+      if (!opt.prefetch) console.warn('getBookDetailByRowIndex failed:', err);
       book.detailLoading = false;
-      book.detailError = '詳細データを取得できませんでした。';
+      book.detailPrefetching = false;
+      if (!opt.prefetch) book.detailError = '詳細データを取得できませんでした。';
+      if (typeof opt.onDone === 'function') opt.onDone(null);
     })
     .getBookDetailByRowIndex(book.rowIndex);
+}
+
+function processBookDetailPrefetchQueue_() {
+  if (bookDetailPrefetchActive >= BOOK_DETAIL_PREFETCH_CONCURRENCY) return;
+
+  const batch = [];
+  while (bookDetailPrefetchQueue.length && batch.length < 8) {
+    const item = bookDetailPrefetchQueue.shift();
+    if (!item) continue;
+    item.detailQueued = false;
+    if (!shouldFetchDeferredBookDetails_(item) || getCachedBookDetail_(item)) continue;
+    batch.push(item);
+  }
+
+  if (!batch.length) {
+    if (bookDetailPrefetchQueue.length) window.setTimeout(processBookDetailPrefetchQueue_, 0);
+    return;
+  }
+
+  bookDetailPrefetchActive += 1;
+  batch.forEach(book => {
+    book.detailLoading = true;
+    book.detailPrefetching = true;
+  });
+
+  const rowIndexes = batch
+    .map(book => book && book.rowIndex)
+    .filter(value => value !== undefined && value !== null)
+    .join(',');
+
+  google.script.run
+    .withSuccessHandler(function(details) {
+      const detailByRowIndex = new Map();
+      (Array.isArray(details) ? details : []).forEach(detail => {
+        if (detail && detail.rowIndex !== undefined && detail.rowIndex !== null) {
+          detailByRowIndex.set(String(detail.rowIndex), detail);
+        }
+      });
+
+      batch.forEach(book => {
+        book.detailLoading = false;
+        book.detailPrefetching = false;
+        const detail = detailByRowIndex.get(String(book.rowIndex));
+        if (!detail) return;
+        rememberBookDetail_(book, detail);
+        const merged = mergeDeferredBookDetails_(book, detail);
+        replaceDeferredBookReference_(book, merged, -1, null, null);
+      });
+    })
+    .withFailureHandler(function() {
+      batch.forEach(book => {
+        book.detailLoading = false;
+        book.detailPrefetching = false;
+      });
+    })
+    .getBookDetailsByRowIndexes(rowIndexes);
+
+  window.setTimeout(function waitForPrefetchBatch_() {
+    const stillLoading = batch.some(book => book && book.detailLoading);
+    if (stillLoading) {
+      window.setTimeout(waitForPrefetchBatch_, 120);
+      return;
+    }
+
+    bookDetailPrefetchActive = Math.max(0, bookDetailPrefetchActive - 1);
+    if (bookDetailPrefetchQueue.length) {
+      window.setTimeout(processBookDetailPrefetchQueue_, 80);
+    }
+  }, 120);
+}
+
+function queueBookDetailPrefetch_(book, priority) {
+  if (!shouldFetchDeferredBookDetails_(book) || getCachedBookDetail_(book)) return;
+
+  if (!book.detailQueued) {
+    book.detailQueued = true;
+    if (priority) {
+      bookDetailPrefetchQueue.unshift(book);
+    } else {
+      bookDetailPrefetchQueue.push(book);
+    }
+  } else if (priority) {
+    bookDetailPrefetchQueue = bookDetailPrefetchQueue.filter(item => item !== book);
+    bookDetailPrefetchQueue.unshift(book);
+  }
+
+  if (bookDetailPrefetchQueue.length > BOOK_DETAIL_PREFETCH_QUEUE_LIMIT) {
+    const overflow = bookDetailPrefetchQueue.splice(BOOK_DETAIL_PREFETCH_QUEUE_LIMIT);
+    overflow.forEach(item => {
+      if (item) item.detailQueued = false;
+    });
+  }
+
+  if (bookDetailPrefetchTimer) window.clearTimeout(bookDetailPrefetchTimer);
+  bookDetailPrefetchTimer = window.setTimeout(processBookDetailPrefetchQueue_, priority ? 20 : 320);
+}
+
+function resetBookDetailPrefetchObserver_() {
+  if (bookDetailPrefetchObserver && typeof bookDetailPrefetchObserver.disconnect === 'function') {
+    bookDetailPrefetchObserver.disconnect();
+  }
+  bookDetailPrefetchObserver = null;
+}
+
+function getBookDetailPrefetchObserver_() {
+  if (!('IntersectionObserver' in window)) return null;
+  if (bookDetailPrefetchObserver) return bookDetailPrefetchObserver;
+
+  bookDetailPrefetchObserver = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (!entry.isIntersecting) return;
+      const book = entry.target && entry.target.__bookDetailPrefetchBook;
+      if (book) queueBookDetailPrefetch_(book, false);
+      if (bookDetailPrefetchObserver) bookDetailPrefetchObserver.unobserve(entry.target);
+    });
+  }, {
+    root: null,
+    rootMargin: '360px 80px',
+    threshold: 0.01
+  });
+
+  return bookDetailPrefetchObserver;
+}
+
+function observeBookDetailPrefetch_(element, book) {
+  if (!element || !shouldFetchDeferredBookDetails_(book)) return;
+
+  element.__bookDetailPrefetchBook = book;
+  const observer = getBookDetailPrefetchObserver_();
+  if (observer) observer.observe(element);
+
+  element.addEventListener('pointerenter', function() {
+    queueBookDetailPrefetch_(book, true);
+  }, { passive: true });
+  element.addEventListener('touchstart', function() {
+    queueBookDetailPrefetch_(book, true);
+  }, { passive: true });
+  element.addEventListener('focus', function() {
+    queueBookDetailPrefetch_(book, true);
+  }, { passive: true });
+}
+
+function buildPopupDetailLoadingHtml_(book) {
+  if (!book || book.detailLoaded !== false) return '';
+  if (book.detailError) {
+    return `<div class="popup-detail-state error">${escapeHtml(book.detailError)}</div>`;
+  }
+  return '<div class="popup-detail-state">詳細を読み込んでいます...</div>';
 }
 
 function closeCoverFullscreen_() {
@@ -517,6 +710,15 @@ function showPopup(book, index, dataArr, seriesContext) {
     popupReturnScrollY = window.scrollY || 0;
   }
 
+  const cachedDetail = getCachedBookDetail_(book);
+  if (cachedDetail && book && book.detailLoaded === false) {
+    const originalBook = book;
+    book = mergeDeferredBookDetails_(book, cachedDetail);
+    if (Array.isArray(dataArr) && dataArr[index] === originalBook) {
+      dataArr[index] = book;
+    }
+  }
+
   popupIndex = index;
   popupData = dataArr;
   popupSeriesContext = seriesContext || null;
@@ -565,6 +767,7 @@ function showPopup(book, index, dataArr, seriesContext) {
         ${buildPopupBookContextHtml_(book)}
         <div class="popup-book-title">${escapeHtml(book.title || '(タイトルなし)')}</div>
         ${buildPopupBookLeadHtml_(book)}
+        ${buildPopupDetailLoadingHtml_(book)}
       </div>
       <div class="genre-chip-wrap popup">${buildGenreChips(book)}</div>
       <div class="popup-book-primary-meta">

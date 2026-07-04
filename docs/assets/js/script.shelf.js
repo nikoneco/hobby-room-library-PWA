@@ -683,13 +683,17 @@ function createShelfBookElement_(book, originalIndex, data, revealIndex) {
   button.onclick = function(e) {
     e.preventDefault();
     e.stopPropagation();
+    queueBookDetailPrefetch_(book, true);
     showPopup(book, originalIndex, data);
   };
 
+  observeBookDetailPrefetch_(button, book);
   return button;
 }
 
 function renderShelfView_(data) {
+  resetBookDetailPrefetchObserver_();
+
   const groups = groupBooksByShelf_(data);
   const shelfPopupItems = flattenShelfBooksForPopup_(groups);
   const shelfPopupData = shelfPopupItems.map(item => item.book);
