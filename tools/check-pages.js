@@ -84,7 +84,7 @@ assert(manifest.start_url === './', 'manifest start_url stays within docs scope'
 assert(Array.isArray(manifest.icons) && manifest.icons.length >= 2, 'manifest has install icons');
 
 assert(sw.includes('offline.html'), 'service worker caches offline fallback');
-assert(sw.includes('shumi-library-pwa-v6'), 'service worker has versioned cache');
+assert(sw.includes('shumi-library-pwa-v7'), 'service worker has versioned cache');
 assert(sw.includes('./assets/logo.png'), 'service worker caches local logo');
 
 const appendedScripts = [];
@@ -172,9 +172,18 @@ assert(shelfUrl.searchParams.get('api') === 'shelf', 'JSONP shim maps getAllBook
 
 sandboxWindow.google.script.run
   .withSuccessHandler(() => {})
+  .getBookshelfBooksChunk(300, 300);
+assert(appendedScripts.length === 3, 'JSONP shim appends one script for shelf chunk');
+const shelfChunkUrl = new URL(appendedScripts[2].src);
+assert(shelfChunkUrl.searchParams.get('api') === 'shelfChunk', 'JSONP shim maps getBookshelfBooksChunk');
+assert(shelfChunkUrl.searchParams.has('offsetB64'), 'JSONP shim serializes shelf chunk offset');
+assert(shelfChunkUrl.searchParams.has('limitB64'), 'JSONP shim serializes shelf chunk limit');
+
+sandboxWindow.google.script.run
+  .withSuccessHandler(() => {})
   .searchBooksSimple('');
-assert(appendedScripts.length === 3, 'JSONP shim appends one script for blank search');
-const blankSearchUrl = new URL(appendedScripts[2].src);
+assert(appendedScripts.length === 4, 'JSONP shim appends one script for blank search');
+const blankSearchUrl = new URL(appendedScripts[3].src);
 assert(blankSearchUrl.searchParams.get('api') === 'shelf', 'JSONP shim maps blank search to shelf');
 assert(!blankSearchUrl.searchParams.has('keyword'), 'JSONP shim omits blank keyword');
 

@@ -1777,20 +1777,59 @@ function showAllBookshelf() {
 
     showSpinner('本棚を広げています', { kind: 'shelf' });
 
-    google.script.run
-      .withSuccessHandler(function(data) {
-        const books = Array.isArray(data) ? data : [];
-        lastResult = books;
-        showResult(books);
-        showSearchStatusResult_('shelf', books.length, {});
-        scrollToBookshelfTop_();
-      })
-      .withFailureHandler(function(err) {
-        console.error('showAllBookshelf failed:', err);
-        hideSpinner();
-        alert('本棚表示の読み込み中にエラーが発生しました。時間をおいて再度お試しください。');
-      })
-      .getAllBooks();
+    const chunkSize = 300;
+    const books = [];
+
+    function finishBookshelfLoad_() {
+      lastResult = books;
+      showResult(books);
+      showSearchStatusResult_('shelf', books.length, {});
+      scrollToBookshelfTop_();
+    }
+
+    function failBookshelfLoad_(err) {
+      console.error('showAllBookshelf failed:', err);
+      hideSpinner();
+      alert('本棚表示の読み込み中にエラーが発生しました。時間をおいて再度お試しください。');
+    }
+
+    function loadBookshelfChunk_(offset) {
+      google.script.run
+        .withSuccessHandler(function(payload) {
+          if (Array.isArray(payload)) {
+            books.push.apply(books, payload);
+            finishBookshelfLoad_();
+            return;
+          }
+
+          const chunk = payload && Array.isArray(payload.books) ? payload.books : [];
+          const total = payload && Number(payload.total || 0);
+          const nextOffset = payload && Number(payload.nextOffset || 0);
+          const done = Boolean(payload && payload.done);
+
+          if (chunk.length) {
+            books.push.apply(books, chunk);
+          }
+
+          if (total > 0) {
+            showSpinner('本棚を広げています', {
+              kind: 'shelf',
+              detail: `蔵書データを分けて取得しています ${Math.min(books.length, total)} / ${total}冊`
+            });
+          }
+
+          if (done || !chunk.length || nextOffset <= offset) {
+            finishBookshelfLoad_();
+            return;
+          }
+
+          loadBookshelfChunk_(nextOffset);
+        })
+        .withFailureHandler(failBookshelfLoad_)
+        .getBookshelfBooksChunk(offset, chunkSize);
+    }
+
+    loadBookshelfChunk_(0);
   } catch (e) {
     console.error('showAllBookshelf client error:', e);
     hideSpinner();

@@ -1646,6 +1646,36 @@ function getBookshelfBooks() {
   }
 }
 
+function getBookshelfBooksChunk(offset, limit) {
+  try {
+    const dataset = getLibraryDataset_();
+    const rows = dataset.rows || [];
+    const index = dataset.index || [];
+    const total = rows.length;
+    const start = Math.max(0, Number(offset || 0));
+    const size = Math.min(Math.max(Number(limit || 300), 1), 500);
+    const end = Math.min(start + size, total);
+
+    return {
+      books: mapRowsToShelfBooks_(rows.slice(start, end), index.slice(start, end)),
+      total,
+      offset: start,
+      nextOffset: end,
+      done: end >= total
+    };
+  } catch (e) {
+    console.error('getBookshelfBooksChunk error:', e);
+    return {
+      books: [],
+      total: 0,
+      offset: Math.max(0, Number(offset || 0)),
+      nextOffset: Math.max(0, Number(offset || 0)),
+      done: true,
+      error: e && e.message ? e.message : String(e)
+    };
+  }
+}
+
 /**
  * 現行WebアプリAPI: 同一 series_key_auto の本を目録順で返す。
  * @param {string} seriesKeyAuto
@@ -1865,6 +1895,9 @@ function dispatchWebAppJsonpApi_(apiName, params) {
 
     case 'shelf':
       return getBookshelfBooks();
+
+    case 'shelfChunk':
+      return getBookshelfBooksChunk(params.offset, params.limit);
 
     case 'series':
       return getBooksBySeriesKey(params.seriesKeyAuto || params.seriesKey || '');
