@@ -1773,6 +1773,7 @@ function showAllBookshelf() {
     currentViewMode = 'shelf';
     isShelfImmersiveMode = true;
     isCardView = false;
+    resultViewModeChangedLocally = true;
     updateViewToggleButtons_();
 
     showSpinner('本棚を広げています', { kind: 'shelf' });
