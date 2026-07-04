@@ -143,6 +143,13 @@ window.addEventListener('DOMContentLoaded', function() {
       setViewMode_('shelf');
     });
   }
+  document.querySelectorAll('[data-view-mode]').forEach(btn => {
+    btn.addEventListener('click', function(event) {
+      event.preventDefault();
+      event.stopPropagation();
+      setViewMode_(btn.dataset.viewMode || 'card');
+    });
+  });
   currentViewMode = loadPreferredResultViewMode_();
   isCardView = currentViewMode === 'card';
   updateViewToggleButtons_();

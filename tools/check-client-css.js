@@ -70,7 +70,10 @@ assertBalancedBraces(combinedCss);
   /\.spinner-shelf\b/,
   /@keyframes\s+shelf-wait\b/,
   /\.spinner-detail\b/,
-  /\.shelf-book\s*\{[\s\S]*?touch-action:\s*manipulation/
+  /\.shelf-book\s*\{[\s\S]*?touch-action:\s*manipulation/,
+  /\.mobile-dock-view-switch\s*\{/,
+  /\.mobile-dock-view-btn\.active\b/,
+  /\.view-toggle\s*\{[\s\S]*?display:\s*none/
 ].forEach(pattern => {
   assert(pattern.test(combinedCss), `required interactive style is present: ${pattern}`);
 });

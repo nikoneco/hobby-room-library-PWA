@@ -296,6 +296,13 @@ function updateViewToggleButtons_() {
     btn.setAttribute('data-state', active ? 'active' : 'idle');
   });
 
+  document.querySelectorAll('[data-view-mode]').forEach(btn => {
+    const active = (btn.dataset.viewMode || '') === mode;
+    btn.classList.toggle('active', active);
+    btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+    btn.setAttribute('data-state', active ? 'active' : 'idle');
+  });
+
   if (typeof syncMobileAppDockState_ === 'function') {
     syncMobileAppDockState_();
   }

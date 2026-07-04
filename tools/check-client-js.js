@@ -114,6 +114,9 @@ assert(!/\son(?:click|change|input|submit|keydown)=/i.test(indexSource), 'index.
 ['search', 'focus-search', 'random', 'bookshelf', 'toggle-advanced', 'clear-conditions', 'reset-search'].forEach(action => {
   assert(indexSource.includes(`data-action="${action}"`), `index.html exposes data-action="${action}"`);
 });
+['card', 'list', 'shelf'].forEach(mode => {
+  assert(indexSource.includes(`data-view-mode="${mode}"`), `mobile dock exposes data-view-mode="${mode}"`);
+});
 clientScriptFiles.forEach(fileName => {
   assert(indexSource.includes(`'${fileName}'`), `index.html includes ${fileName}`);
 });
@@ -230,6 +233,13 @@ assert(
     clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('shumi-library:book-opened') &&
     clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('notifyBookOpened_(book)'),
   'book popup emits opened-book event for PWA affordances'
+);
+assert(
+  clientScriptSources[clientScriptFiles.indexOf('script.boot.js.html')].includes("document.querySelectorAll('[data-view-mode]')") &&
+    clientScriptSources[clientScriptFiles.indexOf('script.boot.js.html')].includes('setViewMode_(btn.dataset.viewMode') &&
+    clientScriptSources[clientScriptFiles.indexOf('script.render.js.html')].includes("document.querySelectorAll('[data-view-mode]") &&
+    clientScriptSources[clientScriptFiles.indexOf('script.render.js.html')].includes("btn.setAttribute('aria-pressed'"),
+  'mobile dock view-mode controls are wired and synced'
 );
 assert(
   clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('function fetchPopupContextBookDetails_') &&
