@@ -69,9 +69,10 @@ assertBalancedBraces(combinedCss);
   /\.spinner-panel\b/,
   /\.spinner-shelf\b/,
   /@keyframes\s+shelf-wait\b/,
-  /\.spinner-detail\b/
+  /\.spinner-detail\b/,
+  /\.shelf-book\s*\{[\s\S]*?touch-action:\s*manipulation/
 ].forEach(pattern => {
-  assert(pattern.test(combinedCss), `spinner waiting style is present: ${pattern}`);
+  assert(pattern.test(combinedCss), `required interactive style is present: ${pattern}`);
 });
 
 [

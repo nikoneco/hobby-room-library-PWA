@@ -231,6 +231,12 @@ assert(
     clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('notifyBookOpened_(book)'),
   'book popup emits opened-book event for PWA affordances'
 );
+assert(
+  clientScriptSources[clientScriptFiles.indexOf('script.shelf.js.html')].includes("button.addEventListener('pointerup'") &&
+    clientScriptSources[clientScriptFiles.indexOf('script.shelf.js.html')].includes('function openShelfBook_') &&
+    clientScriptSources[clientScriptFiles.indexOf('script.shelf.js.html')].includes('showPopup(book, originalIndex, data)'),
+  'bookshelf book tiles have resilient tap-to-open detail handling'
+);
 
 const cachedShelfBook = sandbox.sanitizeBookshelfCacheBook_({
   rowIndex: 12,

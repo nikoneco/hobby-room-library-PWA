@@ -664,6 +664,17 @@ function createShelfBookElement_(book, originalIndex, data, revealIndex) {
   button.className = 'shelf-book';
   button.setAttribute('aria-label', `${book && book.title ? book.title : 'タイトルなし'} の詳細を開く`);
   setBookRevealIndex_(button, revealIndex);
+  let tapStart = null;
+  let suppressNextClick = false;
+
+  function openShelfBook_(event) {
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+    queueBookDetailPrefetch_(book, true);
+    showPopup(book, originalIndex, data);
+  }
 
   const imgWrap = document.createElement('span');
   imgWrap.className = 'shelf-book-cover-wrap';
@@ -682,10 +693,43 @@ function createShelfBookElement_(book, originalIndex, data, revealIndex) {
   button.appendChild(title);
 
   button.onclick = function(e) {
+    if (suppressNextClick) {
+      suppressNextClick = false;
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+    openShelfBook_(e);
+  };
+
+  button.addEventListener('pointerdown', function(e) {
+    if (e.pointerType === 'mouse') return;
+    tapStart = { x: e.clientX, y: e.clientY };
+  }, { passive: true });
+
+  button.addEventListener('pointerup', function(e) {
+    if (e.pointerType === 'mouse' || !tapStart) return;
+    const diffX = Math.abs(e.clientX - tapStart.x);
+    const diffY = Math.abs(e.clientY - tapStart.y);
+    tapStart = null;
+
+    if (diffX > 10 || diffY > 10) return;
+    suppressNextClick = true;
+    window.setTimeout(function() {
+      suppressNextClick = false;
+    }, 420);
+    openShelfBook_(e);
+  });
+
+  button.addEventListener('pointercancel', function() {
+    tapStart = null;
+  });
+
+  button.onkeydown = function(e) {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
     e.preventDefault();
     e.stopPropagation();
-    queueBookDetailPrefetch_(book, true);
-    showPopup(book, originalIndex, data);
+    openShelfBook_(e);
   };
 
   observeBookDetailPrefetch_(button, book);
