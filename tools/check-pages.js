@@ -87,7 +87,7 @@ assert(manifest.shortcuts.some(item => item.url === './?launch=bookshelf'), 'man
 assert(manifest.shortcuts.some(item => item.url === './?launch=random'), 'manifest has random shortcut');
 
 assert(sw.includes('offline.html'), 'service worker caches offline fallback');
-assert(sw.includes('shumi-library-pwa-v35'), 'service worker has versioned cache');
+assert(sw.includes('shumi-library-pwa-v36'), 'service worker has versioned cache');
 assert(sw.includes('./assets/logo.png'), 'service worker caches local logo');
 assert(sw.includes('SKIP_WAITING'), 'service worker supports update activation');
 
@@ -102,6 +102,7 @@ assert(pwaClient.includes("window.matchMedia('(display-mode: standalone)')"), 'P
 assert(pwaClient.includes('shumi-library:book-opened'), 'PWA client listens for opened-book events');
 assert(pwaClient.includes('shumiLibrary.pwaRecentBooks.v1'), 'PWA client persists recent books locally');
 assert(pwaClient.includes("kicker.textContent = '続きから'"), 'PWA client labels most recent book as continuation');
+assert(pwaClient.includes("return '端末に保存済み'"), 'PWA client marks detailed recent books as stored on device');
 
 const appendedScripts = [];
 const timeouts = [];

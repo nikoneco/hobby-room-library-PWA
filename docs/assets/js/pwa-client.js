@@ -90,6 +90,11 @@
     }
   }
 
+  function getRecentBookMetaText_(book, index) {
+    if (index === 0 && book && book.detailLoaded === true) return '端末に保存済み';
+    return book.author || book.publisher || book.shelf || '詳細をすぐ開く';
+  }
+
   function rememberRecentBook_(book) {
     const sanitized = sanitizeRecentBook_(book);
     const key = getRecentBookKey_(sanitized);
@@ -175,7 +180,7 @@
 
       const meta = document.createElement('span');
       meta.className = 'pwa-recent-book-meta';
-      meta.textContent = book.author || book.publisher || book.shelf || '詳細をすぐ開く';
+      meta.textContent = getRecentBookMetaText_(book, index);
       button.appendChild(meta);
 
       list.appendChild(button);

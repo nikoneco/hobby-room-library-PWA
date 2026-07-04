@@ -666,6 +666,11 @@ function writePwaClient() {
     }
   }
 
+  function getRecentBookMetaText_(book, index) {
+    if (index === 0 && book && book.detailLoaded === true) return '端末に保存済み';
+    return book.author || book.publisher || book.shelf || '詳細をすぐ開く';
+  }
+
   function rememberRecentBook_(book) {
     const sanitized = sanitizeRecentBook_(book);
     const key = getRecentBookKey_(sanitized);
@@ -751,7 +756,7 @@ function writePwaClient() {
 
       const meta = document.createElement('span');
       meta.className = 'pwa-recent-book-meta';
-      meta.textContent = book.author || book.publisher || book.shelf || '詳細をすぐ開く';
+      meta.textContent = getRecentBookMetaText_(book, index);
       button.appendChild(meta);
 
       list.appendChild(button);
@@ -988,7 +993,7 @@ function writePwaFiles() {
   fs.writeFileSync(path.join(docsDir, 'offline.html'), offlineHtml, 'utf8');
 
   const sw = `
-const CACHE_NAME = 'shumi-library-pwa-v35';
+const CACHE_NAME = 'shumi-library-pwa-v36';
 const APP_SHELL = [
   './',
   './index.html',
