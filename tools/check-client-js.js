@@ -230,6 +230,21 @@ assert(shelfCache && Array.isArray(shelfCache.books), 'bookshelf cache can be re
 assertEqual(shelfCache.books.length, 1, 'bookshelf cache preserves book count');
 assertEqual(shelfCache.books[0].detailLoaded, false, 'bookshelf cache read keeps detail deferred');
 
+const shelfCacheChips = sandbox.buildSearchStatusChips_('shelf', { source: 'cache', refreshing: true });
+assert(
+  shelfCacheChips.some(chip => chip.key === 'bookshelfCache' && chip.className === 'cache'),
+  'shelf status shows cache source'
+);
+assert(
+  shelfCacheChips.some(chip => chip.key === 'bookshelfRefreshing' && chip.className === 'sync'),
+  'shelf status shows background refresh'
+);
+const shelfNetworkChips = sandbox.buildSearchStatusChips_('shelf', { source: 'network' });
+assert(
+  shelfNetworkChips.some(chip => chip.key === 'bookshelfNetwork' && chip.label === '更新済み'),
+  'shelf status shows network refresh complete'
+);
+
 vm.runInContext(`
 hydratePreferredResultViewMode_('shelf');
 currentViewMode = 'shelf';

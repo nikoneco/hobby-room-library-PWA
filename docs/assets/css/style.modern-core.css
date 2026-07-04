@@ -310,6 +310,24 @@ body::before {
   color: #cdefdf;
 }
 
+.search-status-chip.cache {
+  background: rgba(246, 241, 229, 0.08);
+  border-color: rgba(246, 241, 229, 0.18);
+  color: rgba(246, 241, 229, 0.76);
+}
+
+.search-status-chip.sync {
+  background: rgba(104, 191, 215, 0.12);
+  border-color: rgba(104, 191, 215, 0.28);
+  color: #d7f8ff;
+}
+
+.search-status-chip.warning {
+  background: rgba(214, 164, 95, 0.12);
+  border-color: rgba(214, 164, 95, 0.30);
+  color: #f7dfba;
+}
+
 .search-status-reroll {
   min-height: 0;
   padding: 0.28rem 0.62rem;

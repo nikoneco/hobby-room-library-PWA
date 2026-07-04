@@ -1075,6 +1075,42 @@ function buildSearchStatusChips_(mode, params) {
       className: 'shelf',
       removable: false
     });
+
+    if (params && params.source === 'cache') {
+      chips.push({
+        key: 'bookshelfCache',
+        value: 'cache',
+        label: '端末保存から表示',
+        className: 'cache',
+        removable: false
+      });
+      if (params.refreshing) {
+        chips.push({
+          key: 'bookshelfRefreshing',
+          value: 'refreshing',
+          label: '更新中',
+          className: 'sync',
+          removable: false
+        });
+      }
+      if (params.refreshFailed) {
+        chips.push({
+          key: 'bookshelfRefreshFailed',
+          value: 'refreshFailed',
+          label: '通信復帰後に更新',
+          className: 'warning',
+          removable: false
+        });
+      }
+    } else if (params && params.source === 'network') {
+      chips.push({
+        key: 'bookshelfNetwork',
+        value: 'network',
+        label: '更新済み',
+        className: 'sync',
+        removable: false
+      });
+    }
     return chips;
   }
 
@@ -1851,13 +1887,16 @@ function showAllBookshelf() {
 
       lastResult = resultBooks;
       showResult(resultBooks);
-      showSearchStatusResult_('shelf', resultBooks.length, {});
+      showSearchStatusResult_('shelf', resultBooks.length, opt.statusParams || {});
       if (!opt.keepScroll) scrollToBookshelfTop_();
     }
 
     function failBookshelfLoad_(err) {
       console.error('showAllBookshelf failed:', err);
-      if (renderedFromCache) return;
+      if (renderedFromCache && Array.isArray(lastResult)) {
+        showSearchStatusResult_('shelf', lastResult.length, { source: 'cache', refreshFailed: true });
+        return;
+      }
       hideSpinner();
       alert('本棚表示の読み込み中にエラーが発生しました。時間をおいて再度お試しください。');
     }
@@ -1865,7 +1904,10 @@ function showAllBookshelf() {
     const cachedBookshelf = readBookshelfCache_();
     if (cachedBookshelf && Array.isArray(cachedBookshelf.books)) {
       renderedFromCache = true;
-      finishBookshelfLoad_(cachedBookshelf.books, { fromCache: true });
+      finishBookshelfLoad_(cachedBookshelf.books, {
+        fromCache: true,
+        statusParams: { source: 'cache', refreshing: true }
+      });
     }
 
     google.script.run
@@ -1876,7 +1918,10 @@ function showAllBookshelf() {
         }
 
         writeBookshelfCache_(payload);
-        finishBookshelfLoad_(payload, { keepScroll: renderedFromCache });
+        finishBookshelfLoad_(payload, {
+          keepScroll: renderedFromCache,
+          statusParams: { source: 'network' }
+        });
       })
       .withFailureHandler(failBookshelfLoad_)
       .getBookshelfBooks();
