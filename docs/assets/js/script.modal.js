@@ -267,23 +267,37 @@ function getBookDetailPrefetchConcurrency_() {
 }
 
 function readPersistentBookDetailCache_() {
+  if (bookDetailPersistentCachePayload !== undefined) {
+    return bookDetailPersistentCachePayload;
+  }
+
   try {
-    if (!window.localStorage) return null;
+    if (!window.localStorage) {
+      bookDetailPersistentCachePayload = null;
+      return bookDetailPersistentCachePayload;
+    }
     const raw = window.localStorage.getItem(BOOK_DETAIL_PERSISTENT_CACHE_KEY);
-    if (!raw) return { version: 1, items: {} };
+    if (!raw) {
+      bookDetailPersistentCachePayload = { version: 1, items: {} };
+      return bookDetailPersistentCachePayload;
+    }
     const parsed = JSON.parse(raw);
     if (!parsed || typeof parsed !== 'object' || !parsed.items || typeof parsed.items !== 'object') {
-      return { version: 1, items: {} };
+      bookDetailPersistentCachePayload = { version: 1, items: {} };
+      return bookDetailPersistentCachePayload;
     }
-    return parsed;
+    bookDetailPersistentCachePayload = parsed;
+    return bookDetailPersistentCachePayload;
   } catch (e) {
-    return null;
+    bookDetailPersistentCachePayload = null;
+    return bookDetailPersistentCachePayload;
   }
 }
 
 function writePersistentBookDetailCache_(payload) {
   try {
     if (!window.localStorage || !payload) return;
+    bookDetailPersistentCachePayload = payload;
     window.localStorage.setItem(BOOK_DETAIL_PERSISTENT_CACHE_KEY, JSON.stringify(payload));
   } catch (e) {
     // 端末容量やプライベートモードでは失敗しても通常通信へフォールバックする。

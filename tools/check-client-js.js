@@ -219,6 +219,12 @@ assert(
     clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('bookDetailInFlightCallbacks.has(key)'),
   'deferred detail requests share in-flight row fetches'
 );
+assert(
+  clientScriptSources[clientScriptFiles.indexOf('script.state.js.html')].includes('bookDetailPersistentCachePayload') &&
+    clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('if (bookDetailPersistentCachePayload !== undefined)') &&
+    clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('bookDetailPersistentCachePayload = payload'),
+  'persistent detail cache is memoized for the current app session'
+);
 
 const cachedShelfBook = sandbox.sanitizeBookshelfCacheBook_({
   rowIndex: 12,

@@ -87,7 +87,7 @@ assert(manifest.shortcuts.some(item => item.url === './?launch=bookshelf'), 'man
 assert(manifest.shortcuts.some(item => item.url === './?launch=random'), 'manifest has random shortcut');
 
 assert(sw.includes('offline.html'), 'service worker caches offline fallback');
-assert(sw.includes('shumi-library-pwa-v31'), 'service worker has versioned cache');
+assert(sw.includes('shumi-library-pwa-v32'), 'service worker has versioned cache');
 assert(sw.includes('./assets/logo.png'), 'service worker caches local logo');
 assert(sw.includes('SKIP_WAITING'), 'service worker supports update activation');
 

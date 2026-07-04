@@ -11,6 +11,7 @@ let resultViewModeChangedLocally = false;
 let shelfScrollSpyObserver = null;
 let popupReturnScrollY = 0;
 let bookDetailCache = new Map();
+let bookDetailPersistentCachePayload = undefined;
 let bookDetailPrefetchQueue = [];
 let bookDetailPrefetchActive = 0;
 let bookDetailPrefetchTimer = 0;
