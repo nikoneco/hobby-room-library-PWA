@@ -71,16 +71,15 @@ function renderShelfViewOverview_(groups, totalCount, immersive) {
 
   overview.appendChild(statGrid);
 
-  const note = document.createElement('div');
-  note.className = 'shelf-view-note';
-  const noteText = immersive
-    ? 'マップと棚ジャンプで、部屋の配置から本棚へ移動できます。'
-    : '検索結果だけを棚順に並べています。全体を眺めるときはトップの「本棚を見る」を使います。';
-  note.textContent = getPwaLibrarianText_(
-    immersive ? 'shelfOverview.note.immersive' : 'shelfOverview.note.result',
-    noteText
-  );
-  overview.appendChild(note);
+  if (!immersive) {
+    const note = document.createElement('div');
+    note.className = 'shelf-view-note';
+    note.textContent = getPwaLibrarianText_(
+      'shelfOverview.note.result',
+      '検索結果だけを棚順に並べています。全体を眺めるときはトップの「本棚を見る」を使います。'
+    );
+    overview.appendChild(note);
+  }
 
   if (immersive) {
     const librarianNoteText = getPwaLibrarianText_(
