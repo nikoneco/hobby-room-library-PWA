@@ -150,8 +150,12 @@ body.pwa-shell .mobile-app-dock {
 }
 
 body.pwa-standalone {
+  --pwa-safe-top: env(safe-area-inset-top, 0px);
   -webkit-user-select: none;
   user-select: none;
+  min-height: 100svh;
+  padding-top: var(--pwa-safe-top);
+  background-color: #0b111a;
 }
 
 body.pwa-standalone input,
@@ -164,7 +168,11 @@ body.pwa-standalone #image-popup-info {
 }
 
 body.pwa-standalone .search-container.centered {
-  min-height: calc(100svh - 96px - env(safe-area-inset-bottom));
+  min-height: calc(100svh - 96px - var(--pwa-safe-top) - env(safe-area-inset-bottom));
+}
+
+body.pwa-standalone .search-container:not(.centered) {
+  top: var(--pwa-safe-top);
 }
 
 body.pwa-standalone .mobile-app-dock {

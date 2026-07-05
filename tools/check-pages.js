@@ -102,6 +102,8 @@ assert(sw.includes('return cached || refresh.then'), 'service worker serves app 
 const pwaCss = read(path.join(docs, 'assets', 'css', 'pwa.css'));
 const pwaClient = read(path.join(docs, 'assets', 'js', 'pwa-client.js'));
 assert(pwaCss.includes('body.pwa-standalone .mobile-app-dock'), 'PWA CSS styles standalone dock');
+assert(pwaCss.includes('--pwa-safe-top: env(safe-area-inset-top'), 'PWA CSS defines standalone top safe-area');
+assert(pwaCss.includes('top: var(--pwa-safe-top)'), 'PWA CSS keeps sticky header below standalone status bar');
 assert(pwaCss.includes('body.pwa-network-visible .mobile-app-dock'), 'PWA CSS offsets dock while network banner is visible');
 assert(pwaCss.includes('body.pwa-update-visible .mobile-app-dock'), 'PWA CSS keeps dock stable while update toast is visible');
 assert(pwaClient.includes("currentBannerKind && currentBannerKind !== 'update'"), 'PWA client separates update toast from network banner state');
