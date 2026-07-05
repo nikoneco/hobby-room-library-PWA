@@ -69,7 +69,8 @@ function buildStaticIndex() {
       '<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">',
       '<link rel="manifest" href="./manifest.webmanifest">',
       '<link rel="apple-touch-icon" href="./assets/icons/icon-192.png">',
-      '<title>趣味部屋図書館</title>'
+      '<title>趣味部屋図書館</title>',
+      '<style id="pwa-critical-style">html{background:#0b111a;color-scheme:dark light;}body{margin:0;background:#0b111a;color:#edf5f7;}</style>'
     ].join('\n  ')
   );
 
