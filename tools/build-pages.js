@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
+const crypto = require('crypto');
 
 const root = path.resolve(__dirname, '..');
 const docsDir = path.join(root, 'docs');
@@ -800,9 +801,7 @@ function writePwaFiles() {
 
   fs.writeFileSync(path.join(docsDir, 'offline.html'), offlineHtml, 'utf8');
 
-  const sw = `
-const CACHE_NAME = 'shumi-library-pwa-v44';
-const APP_SHELL = [
+  const appShell = [
   './',
   './index.html',
   './offline.html',
@@ -827,6 +826,14 @@ const APP_SHELL = [
   './assets/js/script.boot.js',
   './assets/icons/icon-192.png',
   './assets/icons/icon-512.png'
+];
+  const cacheName = buildAppShellCacheName_(appShell);
+  const appShellSource = appShell.map(entry => `  ${JSON.stringify(entry)}`).join(',\n');
+
+  const sw = `
+const CACHE_NAME = ${JSON.stringify(cacheName)};
+const APP_SHELL = [
+${appShellSource}
 ];
 const NAVIGATION_FALLBACK = './index.html';
 const OFFLINE_FALLBACK = './offline.html';
@@ -914,6 +921,25 @@ self.addEventListener('fetch', event => {
 `.trim();
 
   fs.writeFileSync(path.join(docsDir, 'sw.js'), `${sw}\n`, 'utf8');
+}
+
+function getAppShellFilePath_(entry) {
+  const relativePath = entry === './' ? 'index.html' : entry.replace(/^\.\//, '');
+  return path.join(docsDir, relativePath);
+}
+
+function buildAppShellCacheName_(appShell) {
+  const hash = crypto.createHash('sha256');
+
+  appShell.forEach(entry => {
+    const filePath = getAppShellFilePath_(entry);
+    hash.update(entry);
+    hash.update('\0');
+    hash.update(fs.readFileSync(filePath));
+    hash.update('\0');
+  });
+
+  return `shumi-library-pwa-${hash.digest('hex').slice(0, 12)}`;
 }
 
 function crc32(buffer) {
@@ -1012,9 +1038,9 @@ function main() {
   writePwaCss();
   writeGasRunShim();
   writePwaClient();
-  writePwaFiles();
   writeIcons();
   fs.writeFileSync(path.join(docsDir, 'index.html'), buildStaticIndex(), 'utf8');
+  writePwaFiles();
   fs.writeFileSync(path.join(docsDir, '.nojekyll'), '', 'utf8');
   console.log('GitHub Pages PWA files generated in docs/');
 }
