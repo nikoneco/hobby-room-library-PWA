@@ -124,7 +124,8 @@ assert(pagesWorkflow.includes('actions/deploy-pages@v5'), 'Pages workflow deploy
   'script.modal.js',
   'script.boot.js'
 ].forEach(fileName => {
-  assert(index.includes(`./assets/js/${fileName}`), `static index references ${fileName}`);
+  const hashedPattern = new RegExp(`\\./assets/js/${fileName.replace('.js', '')}\\.[a-f0-9]{10}\\.js`);
+  assert(hashedPattern.test(index), `static index references hashed ${fileName}`);
   const source = read(path.join(docs, 'assets', 'js', fileName));
   assert(!/^\s*<script>/i.test(source), `${fileName} has no <script> wrapper`);
 });
@@ -153,6 +154,8 @@ assert(/shumi-library-pwa-[a-f0-9]{12}/.test(sw), 'service worker cache name is 
 assert(sw.includes('./assets/logo.png'), 'service worker caches local logo');
 assert(sw.includes('./assets/librarian-presence.jpg'), 'service worker caches librarian presence logo');
 assert(sw.includes('./assets/splash-lantern.jpg'), 'service worker caches optimized lantern splash image');
+assert(/\.\/assets\/js\/script\.state\.[a-f0-9]{10}\.js/.test(sw), 'service worker caches hashed state script');
+assert(sw.includes('./assets/css/style.responsive.css'), 'service worker caches responsive CSS');
 assert(sw.includes('./assets/icons/icon-lantern-192.png'), 'service worker caches renamed 192px lantern icon');
 assert(sw.includes('./assets/icons/icon-lantern-512.png'), 'service worker caches renamed 512px lantern icon');
 assert(sw.includes('./assets/icons/apple-touch-icon-lantern-180.png'), 'service worker caches renamed apple touch lantern icon');

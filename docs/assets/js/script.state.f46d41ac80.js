@@ -1,0 +1,107 @@
+let currentViewMode = 'card'; // 'card' | 'list' | 'shelf'
+let isShelfImmersiveMode = false; // true: トップの「本棚を見る」専用の没入表示
+let currentShelfRoomMapGroups = []; // 没入本棚モード用の現在のマップ集計
+let isCardView = true; // 既存コード互換用。card/list切替に同期する。
+let lastResult = null;
+let coverFullscreenPreviousKeydown = null;
+let popupDragSuppressNextClick = false;
+let isRandomBooksLoading = false;
+let preferredResultViewMode = '';
+let resultViewModeChangedLocally = false;
+let shelfScrollSpyObserver = null;
+let popupReturnScrollY = 0;
+let bookDetailCache = new Map();
+let bookDetailPersistentCachePayload = undefined;
+let bookDetailPrefetchQueue = [];
+let bookDetailPrefetchActive = 0;
+let bookDetailPrefetchTimer = 0;
+let bookDetailPrefetchIdleTimer = 0;
+let bookDetailPrefetchObserver = null;
+let bookDetailInFlightCallbacks = new Map();
+let bookshelfScrollSaveTimer = 0;
+let shelfRenderRunId = 0;
+let bookshelfPendingRestoreScroll = false;
+let popupNeighborDetailTimer = 0;
+let popupImagePrefetchTimer = 0;
+const popupImagePrefetchUrls = new Set();
+const popupImagePrefetchObjects = new Map();
+
+const NO_IMAGE_URL = "https://i.imgur.com/Q80wBRc.jpeg";
+const SENSITIVE_THEME_NAME = '18禁';
+const BOOK_DETAIL_CACHE_LIMIT = 96;
+const BOOK_DETAIL_PERSISTENT_CACHE_KEY = 'shumiLibrary.bookDetailCache.v1';
+const BOOK_DETAIL_PERSISTENT_CACHE_LIMIT = 240;
+const BOOK_DETAIL_PERSISTENT_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const BOOK_DETAIL_PREFETCH_QUEUE_LIMIT = 40;
+const BOOK_DETAIL_PREFETCH_BATCH_SIZE = 6;
+const BOOK_DETAIL_PREFETCH_WARM_LIMIT = 10;
+const BOOK_DETAIL_PREFETCH_CONCURRENCY = 1;
+const BOOK_DETAIL_PREFETCH_PRIORITY_DELAY_MS = 80;
+const BOOK_DETAIL_PREFETCH_IDLE_DELAY_MS = 480;
+const BOOK_DETAIL_PREFETCH_WARM_DELAY_MS = 1400;
+const BOOK_DETAIL_PREFETCH_WARM_TIMEOUT_MS = 1800;
+const POPUP_DETAIL_PREFETCH_RADIUS = 2;
+const POPUP_CURRENT_DETAIL_RENDER_DELAY_MS = 300;
+const POPUP_NEIGHBOR_DETAIL_DELAY_MS = 260;
+const POPUP_NEIGHBOR_IMAGE_DELAY_MS = 80;
+const POPUP_IMAGE_PREFETCH_LIMIT = 80;
+const SHELF_RENDER_INITIAL_BOOK_LIMIT = 0;
+const SHELF_RENDER_CHUNK_SIZE = 30;
+const SHELF_RENDER_CHUNK_DELAY_MS = 16;
+const SHELF_RENDER_PAUSE_RETRY_MS = 140;
+const SENSITIVE_COVER_STORAGE_KEY = 'shumiLibrary.showSensitiveCovers';
+const RESULT_VIEW_MODE_STORAGE_KEY = 'shumiLibrary.resultViewMode';
+const RESULT_VIEW_MODES = ['card', 'list', 'shelf'];
+const BOOKSHELF_CACHE_KEY = 'shumiLibrary.bookshelfLiteCache.v1';
+const BOOKSHELF_CACHE_TTL_MS = 12 * 60 * 60 * 1000;
+const BOOKSHELF_SCROLL_STATE_KEY = 'shumiLibrary.bookshelfScrollState.v1';
+const BOOKSHELF_SCROLL_STATE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+const UI_ICONS = {
+  search: '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"></circle><path d="M16 16l4 4"></path></svg>',
+  shuffle: '<svg viewBox="0 0 24 24"><path d="M4 7h4l3 10h3"></path><path d="M17 7h3v3"></path><path d="M20 7l-6 6"></path><path d="M17 17h3v-3"></path><path d="M20 17l-3-3"></path></svg>',
+  filter: '<svg viewBox="0 0 24 24"><path d="M4 7h16"></path><path d="M7 12h10"></path><path d="M10 17h4"></path></svg>',
+  shelf: '<svg viewBox="0 0 24 24"><path d="M4 20h16"></path><path d="M5 4h3v13H5z"></path><path d="M10 4h3v13h-3z"></path><path d="M15 5l3-.8 3.4 12.8-3 .8z"></path></svg>',
+  map: '<svg viewBox="0 0 24 24"><path d="M4 6l5-2 6 2 5-2v14l-5 2-6-2-5 2z"></path><path d="M9 4v14"></path><path d="M15 6v14"></path></svg>',
+  back: '<svg viewBox="0 0 24 24"><path d="M11 6l-6 6 6 6"></path><path d="M5 12h14"></path></svg>',
+  collection: '<svg viewBox="0 0 24 24"><path d="M5 5h10a4 4 0 0 1 4 4v10H9a4 4 0 0 1-4-4z"></path><path d="M9 9h6"></path><path d="M9 13h5"></path></svg>',
+  link: '<svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7 0l2-2a5 5 0 0 0-7-7l-1 1"></path><path d="M14 11a5 5 0 0 0-7 0l-2 2a5 5 0 0 0 7 7l1-1"></path></svg>',
+  store: '<svg viewBox="0 0 24 24"><path d="M5 10h14l-1 10H6z"></path><path d="M8 10a4 4 0 0 1 8 0"></path></svg>',
+  bell: '<svg viewBox="0 0 24 24"><path d="M6 17h12"></path><path d="M8 17V10a4 4 0 0 1 8 0v7"></path><path d="M10 20h4"></path></svg>',
+  close: '<svg viewBox="0 0 24 24"><path d="M6 6l12 12"></path><path d="M18 6L6 18"></path></svg>',
+  trash: '<svg viewBox="0 0 24 24"><path d="M5 6h14"></path><path d="M9 6V4h6v2"></path><path d="M8 10v8"></path><path d="M16 10v8"></path><path d="M7 6l1 14h8l1-14"></path></svg>',
+  chevronDown: '<svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"></path></svg>'
+};
+
+function getPwaLibrarianText_(key, fallback, data) {
+  const pwa = window.ShumiLibraryPwa;
+  if (!pwa || typeof pwa.getLibrarianText !== 'function') {
+    return fallback;
+  }
+  return pwa.getLibrarianText(key, fallback, data);
+}
+
+function pwaPerfStart_(name, meta) {
+  const pwa = window.ShumiLibraryPwa;
+  if (!pwa || typeof pwa.perfStart !== 'function') return null;
+  return pwa.perfStart(name, meta || {});
+}
+
+function pwaPerfEnd_(token, meta) {
+  const pwa = window.ShumiLibraryPwa;
+  if (!pwa || typeof pwa.perfEnd !== 'function') return;
+  pwa.perfEnd(token, meta || {});
+}
+
+function pwaPerfRecord_(name, durationMs, meta) {
+  const pwa = window.ShumiLibraryPwa;
+  if (!pwa || typeof pwa.recordPerf !== 'function') return;
+  pwa.recordPerf(name, durationMs, meta || {});
+}
+
+function uiIcon_(name, extraClass) {
+  return `<span class="ui-icon ${extraClass || ''}" aria-hidden="true">${UI_ICONS[name] || ''}</span>`;
+}
+
+// 画像取得率の計測はデバッグ用。
+// 通常時はOFF。URLに ?debugImageStats=1 を付けるか、

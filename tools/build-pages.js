@@ -31,6 +31,8 @@ const jsFiles = [
   'script.boot.js.html'
 ];
 
+const jsAssetNames = new Map();
+
 function ensureDir(dir) {
   fs.mkdirSync(dir, { recursive: true });
 }
@@ -45,12 +47,39 @@ function stripWrapper(source, tagName) {
   return source.replace(open, '').replace(close, '');
 }
 
-function cssOutName(fileName) {
+function shortHash(source) {
+  return crypto.createHash('sha256').update(String(source || '')).digest('hex').slice(0, 10);
+}
+
+function cssOutBaseName(fileName) {
   return fileName.replace(/\.css\.html$/, '.css');
 }
 
-function jsOutName(fileName) {
+function jsOutBaseName(fileName) {
   return fileName.replace(/\.js\.html$/, '.js');
+}
+
+function cssOutName(fileName) {
+  return cssOutBaseName(fileName);
+}
+
+function jsOutName(fileName) {
+  return jsAssetNames.get(fileName) || jsOutBaseName(fileName);
+}
+
+function buildHashedAssetName(baseName, source) {
+  const ext = path.extname(baseName);
+  const stem = baseName.slice(0, -ext.length);
+  return `${stem}.${shortHash(source)}${ext}`;
+}
+
+function prepareStaticAssetNames() {
+  jsAssetNames.clear();
+
+  jsFiles.forEach(fileName => {
+    const source = stripWrapper(readUtf8(fileName), 'script');
+    jsAssetNames.set(fileName, buildHashedAssetName(jsOutBaseName(fileName), source));
+  });
 }
 
 function buildStaticIndex() {
@@ -98,7 +127,7 @@ function buildStaticIndex() {
     [
       '\n  <script src="./assets/js/gas-run-shim.js"></script>',
       '  <script src="./assets/js/pwa-client.js"></script>',
-      '  <script src="./assets/js/script.state.js"></script>'
+      `  <script src="./assets/js/${jsOutName('script.state.js.html')}"></script>`
     ].join('\n')
   );
 
@@ -187,17 +216,29 @@ function buildStaticIndex() {
 
 function writeStaticAssets() {
   cssFiles.forEach(fileName => {
+    const source = stripWrapper(readUtf8(fileName), 'style');
+    fs.writeFileSync(
+      path.join(cssDir, cssOutBaseName(fileName)),
+      source,
+      'utf8'
+    );
     fs.writeFileSync(
       path.join(cssDir, cssOutName(fileName)),
-      stripWrapper(readUtf8(fileName), 'style'),
+      source,
       'utf8'
     );
   });
 
   jsFiles.forEach(fileName => {
+    const source = stripWrapper(readUtf8(fileName), 'script');
+    fs.writeFileSync(
+      path.join(jsDir, jsOutBaseName(fileName)),
+      source,
+      'utf8'
+    );
     fs.writeFileSync(
       path.join(jsDir, jsOutName(fileName)),
-      stripWrapper(readUtf8(fileName), 'script'),
+      source,
       'utf8'
     );
   });
@@ -2668,17 +2709,11 @@ function writePwaFiles() {
   './assets/splash-lantern.jpg',
   './assets/js/gas-run-shim.js',
   './assets/js/pwa-client.js',
-  './assets/js/script.state.js',
-  './assets/js/script.images.js',
-  './assets/js/script.search.js',
-  './assets/js/script.render.js',
-  './assets/js/script.shelf.js',
-  './assets/js/script.modal.js',
-  './assets/js/script.boot.js',
+  ...jsFiles.map(fileName => './assets/js/' + jsOutName(fileName)),
   './assets/icons/icon-lantern-192.png',
   './assets/icons/icon-lantern-512.png',
   './assets/icons/apple-touch-icon-lantern-180.png'
-];
+  ];
   const cacheName = buildAppShellCacheName_(appShell);
   const appShellSource = appShell.map(entry => `  ${JSON.stringify(entry)}`).join(',\n');
 
@@ -2979,6 +3014,7 @@ function writeLanternIcon(source, filePath, size) {
 
 function main() {
   [docsDir, cssDir, jsDir, iconDir].forEach(ensureDir);
+  prepareStaticAssetNames();
   writeStaticAssets();
   writePwaCss();
   writeGasRunShim();
