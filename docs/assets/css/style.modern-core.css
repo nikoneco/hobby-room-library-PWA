@@ -227,6 +227,10 @@ body::before {
   overflow: hidden;
 }
 
+.search-status-area.has-librarian-note {
+  border-radius: 18px;
+}
+
 .search-status-area::before {
   content: "";
   position: absolute;
@@ -287,6 +291,13 @@ body::before {
 .search-status-chips {
   min-width: 0;
   gap: 0.38rem;
+}
+
+.search-status-librarian-note {
+  margin-top: -0.08rem;
+  color: rgba(217, 231, 240, 0.62);
+  font-size: 0.72rem;
+  letter-spacing: 0;
 }
 
 .search-status-chip {

@@ -30,7 +30,8 @@ let searchStatusState = {
   previewReady: false,
   previewPending: false,
   removingChipKey: '',
-  message: ''
+  message: '',
+  sourceMode: ''
 };
 
 let PREVIEW_INDEX = [];
@@ -932,7 +933,8 @@ function getSearchStatusElements_() {
   return {
     area: document.getElementById('searchStatusArea'),
     count: document.getElementById('searchStatusCount'),
-    chips: document.getElementById('searchStatusChips')
+    chips: document.getElementById('searchStatusChips'),
+    note: document.getElementById('searchStatusLibrarianNote')
   };
 }
 
@@ -1281,6 +1283,37 @@ function getSearchStatusCountText_() {
   return getPwaLibrarianText_('status.beforeSearch', '検索前');
 }
 
+function getSearchStatusLibrarianNote_() {
+  if (searchStatusState.mode === 'random') {
+    return getPwaLibrarianText_(
+      'status.note.random',
+      '',
+      { count: searchStatusState.resultCount }
+    );
+  }
+
+  if (searchStatusState.mode === 'shelf') {
+    return getPwaLibrarianText_(
+      'status.note.shelf',
+      '',
+      { count: searchStatusState.resultCount }
+    );
+  }
+
+  if (searchStatusState.mode === 'result') {
+    return getPwaLibrarianText_(
+      'status.note.result',
+      '',
+      {
+        count: searchStatusState.resultCount,
+        sourceMode: searchStatusState.sourceMode || ''
+      }
+    );
+  }
+
+  return '';
+}
+
 function renderSearchStatus_() {
   const els = getSearchStatusElements_();
   if (!els.area || !els.count || !els.chips) return;
@@ -1291,6 +1324,8 @@ function renderSearchStatus_() {
     els.count.textContent = '';
     els.count.classList.remove('loading-dots');
     els.chips.innerHTML = '';
+    if (els.note) els.note.textContent = '';
+    els.area.classList.remove('has-librarian-note');
     return;
   }
 
@@ -1299,6 +1334,12 @@ function renderSearchStatus_() {
   els.area.classList.add(getSearchStatusModeClass_(searchStatusState.mode));
   els.count.textContent = getSearchStatusCountText_();
   els.count.classList.toggle('loading-dots', searchStatusState.previewPending);
+
+  const librarianNote = getSearchStatusLibrarianNote_();
+  if (els.note) {
+    els.note.textContent = librarianNote;
+  }
+  els.area.classList.toggle('has-librarian-note', Boolean(librarianNote));
 
   const removableChipCount = searchStatusState.chips.filter(chip => chip && chip.removable).length;
 
@@ -1371,6 +1412,7 @@ function showSearchStatusPreview_(mode, params, previewCount, previewReady) {
   searchStatusState.previewPending = !isPwaShell_() && !searchStatusState.previewReady && searchStatusState.chips.length > 0;
   searchStatusState.removingChipKey = '';
   searchStatusState.message = '';
+  searchStatusState.sourceMode = mode || 'preview';
   renderSearchStatus_();
 }
 
@@ -1384,6 +1426,7 @@ function showSearchStatusResult_(mode, resultCount, params) {
   searchStatusState.previewPending = false;
   searchStatusState.removingChipKey = '';
   searchStatusState.message = '';
+  searchStatusState.sourceMode = mode || searchStatusState.mode;
   renderSearchStatus_();
   if (typeof syncMobileAppDockState_ === 'function') syncMobileAppDockState_();
 }
@@ -1398,6 +1441,7 @@ function showSearchStatusNotice_(message) {
   searchStatusState.previewPending = false;
   searchStatusState.removingChipKey = '';
   searchStatusState.message = message || '';
+  searchStatusState.sourceMode = 'notice';
   renderSearchStatus_();
   if (typeof syncMobileAppDockState_ === 'function') syncMobileAppDockState_('focus-search');
 }
@@ -1412,6 +1456,7 @@ function hideSearchStatus_() {
   searchStatusState.previewPending = false;
   searchStatusState.removingChipKey = '';
   searchStatusState.message = '';
+  searchStatusState.sourceMode = '';
   renderSearchStatus_();
 }
 
