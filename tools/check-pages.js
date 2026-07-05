@@ -98,7 +98,7 @@ assert(pagesWorkflow.includes('actions/upload-pages-artifact@v4'), 'Pages workfl
 assert(pagesWorkflow.includes('path: docs'), 'Pages workflow deploys docs directory');
 assert(pagesWorkflow.includes('pages: write'), 'Pages workflow has pages write permission');
 assert(pagesWorkflow.includes('id-token: write'), 'Pages workflow has OIDC permission');
-assert(pagesWorkflow.includes('actions/deploy-pages@v4'), 'Pages workflow deploys to GitHub Pages');
+assert(pagesWorkflow.includes('actions/deploy-pages@v5'), 'Pages workflow deploys to GitHub Pages');
 
 [
   'style.legacy-core.css',
