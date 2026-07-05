@@ -180,6 +180,7 @@ function clearPopupMotionState_(popupContent) {
     'is-dragging',
     'popup-commit-next',
     'popup-commit-prev',
+    'popup-no-rise',
     'popup-slide-next',
     'popup-slide-prev'
   );
@@ -233,7 +234,7 @@ function createPopupTransitionClone_(popupContent, diff) {
 
   window.setTimeout(function() {
     if (clone && clone.parentNode) clone.parentNode.removeChild(clone);
-  }, 360);
+  }, 220);
 
   return clone;
 }
@@ -1524,6 +1525,7 @@ function popupMove(diff, options) {
     const popupContent = document.getElementById('image-popup-content');
     if (!popupContent) return;
     clearPopupMotionState_(popupContent);
+    popupContent.classList.add('popup-no-rise');
     popupContent.classList.add(slideClass);
 
     window.setTimeout(function() {

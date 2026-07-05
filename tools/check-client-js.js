@@ -320,9 +320,10 @@ assert(
 );
 assert(
   clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes("'popup-commit-next'") &&
+    clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes("'popup-no-rise'") &&
     modernModalStyleSource.includes('#image-popup-content.is-dragging') &&
     fs.readFileSync(path.join(root, 'style.legacy-modal.css.html'), 'utf8').includes('@keyframes popup-commit-next'),
-  'book popup commits swipe direction before changing books'
+  'book popup commits swipe direction before changing books without restarting the entry animation'
 );
 
 const cachedShelfBook = sandbox.sanitizeBookshelfCacheBook_({
