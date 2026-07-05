@@ -29,7 +29,7 @@
       "url": "./?launch=search",
       "icons": [
         {
-          "src": "./assets/icons/icon-192.png",
+          "src": "./assets/icons/icon-lantern-192.png",
           "sizes": "192x192",
           "type": "image/png"
         }
@@ -42,7 +42,7 @@
       "url": "./?launch=bookshelf",
       "icons": [
         {
-          "src": "./assets/icons/icon-192.png",
+          "src": "./assets/icons/icon-lantern-192.png",
           "sizes": "192x192",
           "type": "image/png"
         }
@@ -55,7 +55,7 @@
       "url": "./?launch=random",
       "icons": [
         {
-          "src": "./assets/icons/icon-192.png",
+          "src": "./assets/icons/icon-lantern-192.png",
           "sizes": "192x192",
           "type": "image/png"
         }
@@ -64,13 +64,13 @@
   ],
   "icons": [
     {
-      "src": "./assets/icons/icon-192.png",
+      "src": "./assets/icons/icon-lantern-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "./assets/icons/icon-512.png",
+      "src": "./assets/icons/icon-lantern-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"

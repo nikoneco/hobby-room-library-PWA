@@ -31,8 +31,9 @@ const pagesWorkflow = read(pagesWorkflowPath);
   'assets/logo.png',
   'assets/librarian-presence.jpg',
   'assets/splash-lantern.png',
-  'assets/icons/icon-192.png',
-  'assets/icons/icon-512.png'
+  'assets/icons/icon-lantern-192.png',
+  'assets/icons/icon-lantern-512.png',
+  'assets/icons/apple-touch-icon-lantern-180.png'
 ].forEach(relativePath => {
   assert(fs.existsSync(path.join(docs, relativePath)), `${relativePath} exists`);
 });
@@ -40,8 +41,9 @@ const pagesWorkflow = read(pagesWorkflowPath);
 [
   path.join('assets', 'logo.png'),
   path.join('assets', 'splash-lantern.png'),
-  path.join('assets', 'icons', 'icon-192.png'),
-  path.join('assets', 'icons', 'icon-512.png')
+  path.join('assets', 'icons', 'icon-lantern-192.png'),
+  path.join('assets', 'icons', 'icon-lantern-512.png'),
+  path.join('assets', 'icons', 'apple-touch-icon-lantern-180.png')
 ].forEach(relativePath => {
   const signature = fs.readFileSync(path.join(docs, relativePath)).subarray(0, 8);
   assert(signature.equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])), `${relativePath} is a PNG`);
@@ -54,6 +56,7 @@ const pagesWorkflow = read(pagesWorkflowPath);
 
 assert(!index.includes('HtmlService.createHtmlOutputFromFile'), 'static index has no GAS template includes');
 assert(index.includes('rel="manifest" href="./manifest.webmanifest"'), 'static index references manifest');
+assert(index.includes('rel="apple-touch-icon" href="./assets/icons/apple-touch-icon-lantern-180.png"'), 'static index references renamed lantern apple touch icon');
 assert(index.includes('interactive-widget=resizes-content'), 'static index requests keyboard viewport resizing');
 assert(index.includes('name="theme-color" content="#0a1217"'), 'static index uses shinhaku PWA theme color');
 assert(index.includes('rel="preconnect" href="https://script.google.com"'), 'static index preconnects to GAS endpoint host');
@@ -129,6 +132,8 @@ assert(manifest.start_url === './', 'manifest start_url stays within docs scope'
 assert(Array.isArray(manifest.categories) && manifest.categories.includes('books'), 'manifest declares library category');
 assert(manifest.prefer_related_applications === false, 'manifest keeps web app as preferred app');
 assert(Array.isArray(manifest.icons) && manifest.icons.length >= 2, 'manifest has install icons');
+assert(manifest.icons.some(icon => icon.src === './assets/icons/icon-lantern-192.png'), 'manifest references renamed 192px lantern icon');
+assert(manifest.icons.some(icon => icon.src === './assets/icons/icon-lantern-512.png'), 'manifest references renamed 512px lantern icon');
 assert(Array.isArray(manifest.shortcuts) && manifest.shortcuts.length >= 3, 'manifest has app shortcuts');
 assert(!manifest.shortcuts.some(item => item.url === './?launch=recent'), 'manifest omits recent-book shortcut');
 assert(manifest.shortcuts.some(item => item.url === './?launch=search'), 'manifest has search shortcut');
@@ -140,6 +145,9 @@ assert(/shumi-library-pwa-[a-f0-9]{12}/.test(sw), 'service worker cache name is 
 assert(sw.includes('./assets/logo.png'), 'service worker caches local logo');
 assert(sw.includes('./assets/librarian-presence.jpg'), 'service worker caches librarian presence logo');
 assert(sw.includes('./assets/splash-lantern.png'), 'service worker caches lantern splash image');
+assert(sw.includes('./assets/icons/icon-lantern-192.png'), 'service worker caches renamed 192px lantern icon');
+assert(sw.includes('./assets/icons/icon-lantern-512.png'), 'service worker caches renamed 512px lantern icon');
+assert(sw.includes('./assets/icons/apple-touch-icon-lantern-180.png'), 'service worker caches renamed apple touch lantern icon');
 assert(sw.includes('SKIP_WAITING'), 'service worker supports update activation');
 assert(sw.includes("const NAVIGATION_FALLBACK = './index.html'"), 'service worker uses cached app shell for offline navigation');
 assert(sw.includes('isAppShellUrl_'), 'service worker recognizes app shell assets');

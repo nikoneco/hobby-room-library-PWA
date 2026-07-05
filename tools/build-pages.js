@@ -72,7 +72,7 @@ function buildStaticIndex() {
       '<link rel="dns-prefetch" href="//script.google.com">',
       '<link rel="dns-prefetch" href="//script.googleusercontent.com">',
       '<link rel="manifest" href="./manifest.webmanifest">',
-      '<link rel="apple-touch-icon" href="./assets/icons/icon-192.png">',
+      '<link rel="apple-touch-icon" href="./assets/icons/apple-touch-icon-lantern-180.png">',
       '<title>趣味部屋図書館</title>',
       '<style id="pwa-critical-style">html{background:#0a1217;color-scheme:dark light;}body{margin:0;background:#0a1217;color:#edf5f7;}</style>'
     ].join('\n  ')
@@ -2035,7 +2035,7 @@ function writePwaFiles() {
         url: './?launch=search',
         icons: [
           {
-            src: './assets/icons/icon-192.png',
+            src: './assets/icons/icon-lantern-192.png',
             sizes: '192x192',
             type: 'image/png'
           }
@@ -2048,7 +2048,7 @@ function writePwaFiles() {
         url: './?launch=bookshelf',
         icons: [
           {
-            src: './assets/icons/icon-192.png',
+            src: './assets/icons/icon-lantern-192.png',
             sizes: '192x192',
             type: 'image/png'
           }
@@ -2061,7 +2061,7 @@ function writePwaFiles() {
         url: './?launch=random',
         icons: [
           {
-            src: './assets/icons/icon-192.png',
+            src: './assets/icons/icon-lantern-192.png',
             sizes: '192x192',
             type: 'image/png'
           }
@@ -2070,13 +2070,13 @@ function writePwaFiles() {
     ],
     icons: [
       {
-        src: './assets/icons/icon-192.png',
+        src: './assets/icons/icon-lantern-192.png',
         sizes: '192x192',
         type: 'image/png',
         purpose: 'any maskable'
       },
       {
-        src: './assets/icons/icon-512.png',
+        src: './assets/icons/icon-lantern-512.png',
         sizes: '512x512',
         type: 'image/png',
         purpose: 'any maskable'
@@ -2170,8 +2170,9 @@ function writePwaFiles() {
   './assets/js/script.shelf.js',
   './assets/js/script.modal.js',
   './assets/js/script.boot.js',
-  './assets/icons/icon-192.png',
-  './assets/icons/icon-512.png'
+  './assets/icons/icon-lantern-192.png',
+  './assets/icons/icon-lantern-512.png',
+  './assets/icons/apple-touch-icon-lantern-180.png'
 ];
   const cacheName = buildAppShellCacheName_(appShell);
   const appShellSource = appShell.map(entry => `  ${JSON.stringify(entry)}`).join(',\n');
@@ -2316,50 +2317,115 @@ function pngChunk(type, data) {
   return Buffer.concat([length, typeBuffer, data, crc]);
 }
 
-function writePng(filePath, size) {
-  const bytesPerPixel = 4;
-  const raw = Buffer.alloc((size * bytesPerPixel + 1) * size);
+function readPng(filePath) {
+  const source = fs.readFileSync(filePath);
+  const signature = source.subarray(0, 8);
+  const pngSignature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  if (!signature.equals(pngSignature)) {
+    throw new Error(`${filePath} is not a PNG`);
+  }
 
-  for (let y = 0; y < size; y++) {
-    const rowStart = y * (size * bytesPerPixel + 1);
-    raw[rowStart] = 0;
+  let offset = 8;
+  let width = 0;
+  let height = 0;
+  let bitDepth = 0;
+  let colorType = 0;
+  const idat = [];
 
-    for (let x = 0; x < size; x++) {
-      const offset = rowStart + 1 + x * bytesPerPixel;
-      const edge = Math.min(x, y, size - 1 - x, size - 1 - y);
-      const inBook = x > size * 0.22 && x < size * 0.78 && y > size * 0.18 && y < size * 0.82;
-      const spine = x > size * 0.30 && x < size * 0.40 && y > size * 0.25 && y < size * 0.75;
-      const page = x > size * 0.43 && x < size * 0.68 && y > size * 0.28 && y < size * 0.72;
-      let r = 47;
-      let g = 95;
-      let b = 74;
+  while (offset < source.length) {
+    const length = source.readUInt32BE(offset);
+    const type = source.subarray(offset + 4, offset + 8).toString('ascii');
+    const data = source.subarray(offset + 8, offset + 8 + length);
+    offset += 12 + length;
 
-      if (edge < size * 0.08) {
-        r = 36; g = 72; b = 58;
+    if (type === 'IHDR') {
+      width = data.readUInt32BE(0);
+      height = data.readUInt32BE(4);
+      bitDepth = data[8];
+      colorType = data[9];
+      const compression = data[10];
+      const filter = data[11];
+      const interlace = data[12];
+      if (bitDepth !== 8 || ![2, 6].includes(colorType) || compression !== 0 || filter !== 0 || interlace !== 0) {
+        throw new Error(`${filePath} must be a non-interlaced 8-bit RGB/RGBA PNG`);
       }
-      if (inBook) {
-        r = 246; g = 238; b = 218;
-      }
-      if (spine) {
-        r = 122; g = 67; b = 52;
-      }
-      if (page) {
-        r = 255; g = 252; b = 241;
-      }
-      if (page && y > size * 0.46 && y < size * 0.50) {
-        r = 47; g = 95; b = 74;
-      }
-
-      raw[offset] = r;
-      raw[offset + 1] = g;
-      raw[offset + 2] = b;
-      raw[offset + 3] = 255;
+    } else if (type === 'IDAT') {
+      idat.push(data);
+    } else if (type === 'IEND') {
+      break;
     }
   }
 
+  const sourceBytesPerPixel = colorType === 6 ? 4 : 3;
+  const bytesPerPixel = 4;
+  const scanlineLength = width * sourceBytesPerPixel;
+  const inflated = zlib.inflateSync(Buffer.concat(idat));
+  const sourcePixels = Buffer.alloc(width * height * sourceBytesPerPixel);
+  const pixels = Buffer.alloc(width * height * bytesPerPixel);
+  let readOffset = 0;
+
+  for (let y = 0; y < height; y++) {
+    const filterType = inflated[readOffset++];
+    const row = inflated.subarray(readOffset, readOffset + scanlineLength);
+    readOffset += scanlineLength;
+    const outRowStart = y * scanlineLength;
+    const prevRowStart = y > 0 ? (y - 1) * scanlineLength : -1;
+
+    for (let x = 0; x < scanlineLength; x++) {
+      const left = x >= sourceBytesPerPixel ? sourcePixels[outRowStart + x - sourceBytesPerPixel] : 0;
+      const up = prevRowStart >= 0 ? sourcePixels[prevRowStart + x] : 0;
+      const upLeft = prevRowStart >= 0 && x >= sourceBytesPerPixel ? sourcePixels[prevRowStart + x - sourceBytesPerPixel] : 0;
+      let value = row[x];
+
+      if (filterType === 1) {
+        value = (value + left) & 0xff;
+      } else if (filterType === 2) {
+        value = (value + up) & 0xff;
+      } else if (filterType === 3) {
+        value = (value + Math.floor((left + up) / 2)) & 0xff;
+      } else if (filterType === 4) {
+        const p = left + up - upLeft;
+        const pa = Math.abs(p - left);
+        const pb = Math.abs(p - up);
+        const pc = Math.abs(p - upLeft);
+        const predictor = pa <= pb && pa <= pc ? left : (pb <= pc ? up : upLeft);
+        value = (value + predictor) & 0xff;
+      } else if (filterType !== 0) {
+        throw new Error(`Unsupported PNG filter ${filterType}`);
+      }
+
+      sourcePixels[outRowStart + x] = value;
+    }
+  }
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const sourceOffset = (y * width + x) * sourceBytesPerPixel;
+      const outOffset = (y * width + x) * bytesPerPixel;
+      pixels[outOffset] = sourcePixels[sourceOffset];
+      pixels[outOffset + 1] = sourcePixels[sourceOffset + 1];
+      pixels[outOffset + 2] = sourcePixels[sourceOffset + 2];
+      pixels[outOffset + 3] = colorType === 6 ? sourcePixels[sourceOffset + 3] : 255;
+    }
+  }
+
+  return { width, height, pixels };
+}
+
+function writeRgbaPng(filePath, width, height, pixels) {
+  const bytesPerPixel = 4;
+  const raw = Buffer.alloc((width * bytesPerPixel + 1) * height);
+
+  for (let y = 0; y < height; y++) {
+    const rawRowStart = y * (width * bytesPerPixel + 1);
+    const pixelRowStart = y * width * bytesPerPixel;
+    raw[rawRowStart] = 0;
+    pixels.copy(raw, rawRowStart + 1, pixelRowStart, pixelRowStart + width * bytesPerPixel);
+  }
+
   const ihdr = Buffer.alloc(13);
-  ihdr.writeUInt32BE(size, 0);
-  ihdr.writeUInt32BE(size, 4);
+  ihdr.writeUInt32BE(width, 0);
+  ihdr.writeUInt32BE(height, 4);
   ihdr[8] = 8;
   ihdr[9] = 6;
   ihdr[10] = 0;
@@ -2377,8 +2443,33 @@ function writePng(filePath, size) {
 }
 
 function writeIcons() {
-  writePng(path.join(iconDir, 'icon-192.png'), 192);
-  writePng(path.join(iconDir, 'icon-512.png'), 512);
+  const source = readPng(path.join(docsDir, 'assets', 'splash-lantern.png'));
+  writeLanternIcon(source, path.join(iconDir, 'icon-lantern-192.png'), 192);
+  writeLanternIcon(source, path.join(iconDir, 'icon-lantern-512.png'), 512);
+  writeLanternIcon(source, path.join(iconDir, 'apple-touch-icon-lantern-180.png'), 180);
+}
+
+function writeLanternIcon(source, filePath, size) {
+  const bytesPerPixel = 4;
+  const out = Buffer.alloc(size * size * bytesPerPixel);
+  const cropSize = Math.min(source.width, source.height);
+  const cropX = Math.floor((source.width - cropSize) / 2);
+  const cropY = Math.floor((source.height - cropSize) * 0.52);
+
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const srcX = Math.min(source.width - 1, Math.max(0, Math.floor(cropX + (x + 0.5) * cropSize / size)));
+      const srcY = Math.min(source.height - 1, Math.max(0, Math.floor(cropY + (y + 0.5) * cropSize / size)));
+      const srcOffset = (srcY * source.width + srcX) * bytesPerPixel;
+      const outOffset = (y * size + x) * bytesPerPixel;
+      out[outOffset] = source.pixels[srcOffset];
+      out[outOffset + 1] = source.pixels[srcOffset + 1];
+      out[outOffset + 2] = source.pixels[srcOffset + 2];
+      out[outOffset + 3] = 255;
+    }
+  }
+
+  writeRgbaPng(filePath, size, size, out);
 }
 
 function main() {
