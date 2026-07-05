@@ -222,6 +222,9 @@ function createPopupTransitionClone_(popupContent, diff) {
   }
 
   overlay.appendChild(clone);
+  popupContent.style.visibility = 'hidden';
+  clearPopupMotionState_(popupContent);
+
   window.requestAnimationFrame(function() {
     clone.style.animation = '';
     clone.style.transition = '';
@@ -1267,6 +1270,10 @@ function showPopup(book, index, dataArr, seriesContext, options) {
   const prevBtn = document.getElementById('popup-prev');
   const nextBtn = document.getElementById('popup-next');
 
+  if (popupContent) {
+    popupContent.style.visibility = '';
+    clearPopupMotionState_(popupContent);
+  }
   img.style.display = '';
   if (popupContent) popupContent.classList.remove('series-mode');
   img.alt = book.title || '表紙';

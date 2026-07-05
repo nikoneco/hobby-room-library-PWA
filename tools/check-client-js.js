@@ -275,6 +275,8 @@ assert(
     popupMoveStart >= 0 &&
       modalSource.includes('function createPopupTransitionClone_') &&
       modalSource.includes('popup-transition-clone') &&
+      modalSource.includes("popupContent.style.visibility = 'hidden';") &&
+      modalSource.includes("popupContent.style.visibility = '';") &&
       popupMoveSource.includes('useTransitionClone') &&
       popupMoveSource.includes('window.requestAnimationFrame(function()') &&
       renderNextIndex >= 0 &&
