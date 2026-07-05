@@ -44,6 +44,8 @@ const sw = read(path.join(docs, 'sw.js'));
 
 assert(!index.includes('HtmlService.createHtmlOutputFromFile'), 'static index has no GAS template includes');
 assert(index.includes('rel="manifest" href="./manifest.webmanifest"'), 'static index references manifest');
+assert(index.includes('name="theme-color" content="#0b111a"'), 'static index uses dark PWA theme color');
+assert(index.includes('apple-mobile-web-app-status-bar-style" content="black-translucent"'), 'static index uses translucent iOS standalone status bar');
 assert(index.includes('id="pwaNetworkBanner"'), 'static index includes offline/network banner');
 assert(index.includes('./assets/js/gas-run-shim.js'), 'static index loads GAS JSONP shim');
 assert(index.includes('./assets/js/pwa-client.js'), 'static index loads PWA client');
@@ -80,6 +82,8 @@ assert(index.includes('src="./assets/logo.png"'), 'static index uses local logo 
 
 assert(manifest.name === '趣味部屋図書館', 'manifest name is set');
 assert(manifest.display === 'standalone', 'manifest display is standalone');
+assert(manifest.theme_color === '#0b111a', 'manifest theme color matches dark app shell');
+assert(manifest.background_color === '#0b111a', 'manifest splash background matches dark app shell');
 assert(manifest.start_url === './', 'manifest start_url stays within docs scope');
 assert(Array.isArray(manifest.icons) && manifest.icons.length >= 2, 'manifest has install icons');
 assert(Array.isArray(manifest.shortcuts) && manifest.shortcuts.length >= 2, 'manifest has app shortcuts');

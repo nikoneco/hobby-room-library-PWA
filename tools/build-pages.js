@@ -61,10 +61,11 @@ function buildStaticIndex() {
     /<title>[^<]*<\/title>/,
     [
       '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">',
-      '<meta name="theme-color" content="#2f5f4a">',
+      '<meta name="theme-color" content="#0b111a">',
+      '<meta name="color-scheme" content="dark light">',
       '<meta name="apple-mobile-web-app-capable" content="yes">',
       '<meta name="apple-mobile-web-app-title" content="趣味部屋図書館">',
-      '<meta name="apple-mobile-web-app-status-bar-style" content="default">',
+      '<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">',
       '<link rel="manifest" href="./manifest.webmanifest">',
       '<link rel="apple-touch-icon" href="./assets/icons/icon-192.png">',
       '<title>趣味部屋図書館</title>'
@@ -683,8 +684,8 @@ function writePwaFiles() {
     start_url: './',
     scope: './',
     display: 'standalone',
-    background_color: '#f7f4ed',
-    theme_color: '#2f5f4a',
+    background_color: '#0b111a',
+    theme_color: '#0b111a',
     orientation: 'portrait',
     shortcuts: [
       {
@@ -741,7 +742,8 @@ function writePwaFiles() {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#2f5f4a">
+  <meta name="theme-color" content="#0b111a">
+  <meta name="color-scheme" content="dark light">
   <title>オフライン | 趣味部屋図書館</title>
   <link rel="stylesheet" href="./assets/css/pwa.css">
   <style>
@@ -751,8 +753,8 @@ function writePwaFiles() {
       display: grid;
       place-items: center;
       padding: 24px;
-      background: #f7f4ed;
-      color: #1d352b;
+      background: #0b111a;
+      color: #edf5f7;
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
     main {
@@ -772,8 +774,8 @@ function writePwaFiles() {
       padding: 10px 16px;
       border: 0;
       border-radius: 8px;
-      background: #2f5f4a;
-      color: #fff;
+      background: #68bfd7;
+      color: #0b111a;
       font-weight: 700;
     }
   </style>
