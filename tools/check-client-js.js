@@ -273,6 +273,12 @@ assert(
     modernModalStyleSource.includes('translate(var(--popup-drag-x, 0), var(--popup-drag-y, 0))'),
   'book popup provides horizontal drag feedback while swiping'
 );
+assert(
+  clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes("'popup-commit-next'") &&
+    modernModalStyleSource.includes('#image-popup-content.is-dragging') &&
+    fs.readFileSync(path.join(root, 'style.legacy-modal.css.html'), 'utf8').includes('@keyframes popup-commit-next'),
+  'book popup commits swipe direction before changing books'
+);
 
 const cachedShelfBook = sandbox.sanitizeBookshelfCacheBook_({
   rowIndex: 12,

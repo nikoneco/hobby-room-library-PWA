@@ -160,9 +160,22 @@ function clearPopupTouchHandlers_() {
     overlay.onmouseleave = null;
   }
   if (popupContent) {
-    popupContent.style.removeProperty('--popup-drag-y');
-    popupContent.style.removeProperty('--popup-drag-opacity');
+    clearPopupMotionState_(popupContent);
   }
+}
+
+function clearPopupMotionState_(popupContent) {
+  if (!popupContent) return;
+  popupContent.classList.remove(
+    'is-dragging',
+    'popup-commit-next',
+    'popup-commit-prev',
+    'popup-slide-next',
+    'popup-slide-prev'
+  );
+  popupContent.style.removeProperty('--popup-drag-x');
+  popupContent.style.removeProperty('--popup-drag-y');
+  popupContent.style.removeProperty('--popup-drag-opacity');
 }
 
 function isBookPopupOpen_() {
@@ -1185,7 +1198,7 @@ function showPopup(book, index, dataArr, seriesContext) {
   overlay.style.display = 'flex';
   document.body.classList.add('modal-open');
 
-  popupContent.classList.remove('popup-slide-next', 'popup-slide-prev');
+  clearPopupMotionState_(popupContent);
 
   function hide() {
     closeCoverFullscreen_();
@@ -1230,6 +1243,7 @@ function showPopup(book, index, dataArr, seriesContext) {
     popupDragging = true;
     popupDragSource = source;
     popupDragScrollTarget = isPopupSummaryScrollTarget_(target);
+    popupContent.classList.add('is-dragging');
     return true;
   }
 
@@ -1242,8 +1256,9 @@ function showPopup(book, index, dataArr, seriesContext) {
     const absY = Math.abs(diffYRaw);
 
     if (absX > 8 && absX > absY * 0.82) {
-      const dragX = Math.max(-92, Math.min(92, diffX));
-      const opacity = Math.max(0.72, 1 - Math.abs(dragX) / 420);
+      const maxDragX = Math.min(178, Math.max(96, window.innerWidth * 0.42));
+      const dragX = Math.max(-maxDragX, Math.min(maxDragX, diffX));
+      const opacity = Math.max(0.66, 1 - Math.abs(dragX) / 360);
       popupContent.style.setProperty('--popup-drag-x', `${dragX}px`);
       popupContent.style.setProperty('--popup-drag-y', '0px');
       popupContent.style.setProperty('--popup-drag-opacity', String(opacity));
@@ -1265,9 +1280,7 @@ function showPopup(book, index, dataArr, seriesContext) {
     popupDragging = false;
     popupDragSource = '';
     popupDragScrollTarget = false;
-    popupContent.style.removeProperty('--popup-drag-x');
-    popupContent.style.removeProperty('--popup-drag-y');
-    popupContent.style.removeProperty('--popup-drag-opacity');
+    clearPopupMotionState_(popupContent);
   }
 
   function endPopupDrag_(x, y) {
@@ -1275,17 +1288,37 @@ function showPopup(book, index, dataArr, seriesContext) {
     const diffY = y - popupDragStartY;
     const shouldClose = !popupDragScrollTarget && diffY > 92 && Math.abs(diffY) > Math.abs(diffX) * 1.12;
     const shouldMove = !popupDragScrollTarget && Math.abs(diffX) > 48 && Math.abs(diffX) > Math.abs(diffY);
-
-    resetPopupDrag_();
+    const moveDiff = diffX > 0 ? -1 : 1;
 
     if (shouldClose) {
       popupDragSuppressNextClick = true;
+      resetPopupDrag_();
       hide();
       window.setTimeout(function() {
         popupDragSuppressNextClick = false;
       }, 260);
     } else if (shouldMove) {
-      popupMove(diffX > 0 ? -1 : 1);
+      const targetIndex = popupIndex + moveDiff;
+      if (targetIndex < 0 || targetIndex >= popupData.length) {
+        resetPopupDrag_();
+        return;
+      }
+
+      popupDragging = false;
+      popupDragSource = '';
+      popupDragScrollTarget = false;
+      popupDragSuppressNextClick = true;
+      popupContent.classList.remove('is-dragging');
+      popupContent.classList.add(moveDiff > 0 ? 'popup-commit-next' : 'popup-commit-prev');
+      window.setTimeout(function() {
+        clearPopupMotionState_(popupContent);
+        popupMove(moveDiff);
+        window.setTimeout(function() {
+          popupDragSuppressNextClick = false;
+        }, 260);
+      }, 135);
+    } else {
+      resetPopupDrag_();
     }
   }
 
@@ -1338,7 +1371,7 @@ function popupMove(diff) {
 
   const popupContent = document.getElementById('image-popup-content');
   if (!popupContent) return;
-  popupContent.classList.remove('popup-slide-next', 'popup-slide-prev');
+  clearPopupMotionState_(popupContent);
   void popupContent.offsetWidth;
   popupContent.classList.add(slideClass);
 
