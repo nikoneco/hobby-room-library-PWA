@@ -247,6 +247,20 @@ assert(
     clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('fetchPopupContextBookDetails_(book, index, dataArr, popupSeriesContext)'),
   'book popup fetches current and nearby details in one priority batch'
 );
+{
+  const modalSource = clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')];
+  const popupMoveStart = modalSource.indexOf('function popupMove(diff)');
+  const popupMoveSource = popupMoveStart >= 0 ? modalSource.slice(popupMoveStart) : '';
+  const showPopupIndex = popupMoveSource.indexOf('showPopup(popupData[popupIndex], popupIndex, popupData, popupSeriesContext)');
+  const timeoutIndex = popupMoveSource.indexOf('window.setTimeout(function()');
+  assert(
+    popupMoveStart >= 0 &&
+      showPopupIndex >= 0 &&
+      timeoutIndex >= 0 &&
+      showPopupIndex < timeoutIndex,
+    'popup navigation renders the next book before animation cleanup timing'
+  );
+}
 assert(
   clientScriptSources[clientScriptFiles.indexOf('script.shelf.js.html')].includes("button.addEventListener('pointerup'") &&
     clientScriptSources[clientScriptFiles.indexOf('script.shelf.js.html')].includes('function openShelfBook_') &&

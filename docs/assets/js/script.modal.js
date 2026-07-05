@@ -1316,18 +1316,16 @@ function popupMove(diff) {
   queueBookDetailPrefetch_(popupData[popupIndex], true);
   warmPopupNeighborDetails_(popupIndex, popupData);
 
+  const slideClass = diff > 0 ? 'popup-slide-next' : 'popup-slide-prev';
+  showPopup(popupData[popupIndex], popupIndex, popupData, popupSeriesContext);
+
   const popupContent = document.getElementById('image-popup-content');
+  if (!popupContent) return;
   popupContent.classList.remove('popup-slide-next', 'popup-slide-prev');
   void popupContent.offsetWidth;
+  popupContent.classList.add(slideClass);
 
-  if (diff > 0) {
-    popupContent.classList.add('popup-slide-next');
-  } else {
-    popupContent.classList.add('popup-slide-prev');
-  }
-
-  setTimeout(() => {
+  window.setTimeout(function() {
     popupContent.classList.remove('popup-slide-next', 'popup-slide-prev');
-    showPopup(popupData[popupIndex], popupIndex, popupData, popupSeriesContext);
-  }, 220);
+  }, 200);
 }
