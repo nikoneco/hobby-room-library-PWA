@@ -50,6 +50,8 @@
     'status.note.random': data => data && Number.isFinite(data.count) ? '今夜の気配で、この' + data.count + '冊を手前に出しました。' : '今夜目が合う本を手前に出しました。',
     'status.note.shelf': data => data && Number.isFinite(data.count) ? '棚位置を確かめたい時は、この' + data.count + '冊の眺めが近道です。' : '棚位置を確かめるなら、この眺めが近道です。',
     'status.note.result': data => data && data.sourceMode === 'advanced' ? '細かい手がかりに合う本だけ、棚の前へ寄せています。' : '見つかった本だけ、棚の前へ寄せています。',
+    'notice.keywordRequired': '探す手がかりをひとつください',
+    'notice.conditionsRequired': '棚を探す手がかりをひとつください',
     'spinner.label.search': '棚を探しています',
     'spinner.label.advanced': '手がかりを照らしています',
     'spinner.label.random': '棚から10冊抜き出しています',

@@ -1446,6 +1446,16 @@ function showSearchStatusNotice_(message) {
   if (typeof syncMobileAppDockState_ === 'function') syncMobileAppDockState_('focus-search');
 }
 
+function getLibrarianNoticeText_(message) {
+  if (message === '検索語を入力してください') {
+    return getPwaLibrarianText_('notice.keywordRequired', message);
+  }
+  if (message === '検索条件を入力してください') {
+    return getPwaLibrarianText_('notice.conditionsRequired', message);
+  }
+  return message;
+}
+
 function hideSearchStatus_() {
   searchStatusState.visible = false;
   searchStatusState.mode = 'none';
@@ -1748,7 +1758,7 @@ function showEmptySearchNotice_(message) {
 
   lastResult = null;
   if (typeof syncMobileAppDockState_ === 'function') syncMobileAppDockState_();
-  showSearchStatusNotice_(message);
+  showSearchStatusNotice_(getLibrarianNoticeText_(message));
 }
 
 function search() {
