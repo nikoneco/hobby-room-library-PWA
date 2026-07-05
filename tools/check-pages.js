@@ -137,6 +137,8 @@ const bootClient = read(path.join(docs, 'assets', 'js', 'script.boot.js'));
 assert(pwaCss.includes('body.pwa-standalone .mobile-app-dock'), 'PWA CSS styles standalone dock');
 assert(pwaCss.includes('.pwa-settings-button'), 'PWA CSS styles settings button');
 assert(pwaCss.includes('.pwa-settings-panel'), 'PWA CSS styles settings panel');
+assert(pwaCss.includes('.pwa-settings-button ~ .view-toggle'), 'PWA CSS keeps mobile view toggle away from settings button');
+assert(pwaCss.includes('left: max(8px, env(safe-area-inset-left))'), 'PWA CSS moves mobile view toggle to the left edge');
 assert(pwaCss.includes('body.pwa-theme-calm'), 'PWA CSS includes calm theme');
 assert(pwaCss.includes('body.pwa-theme-warm'), 'PWA CSS includes warm theme');
 assert(pwaCss.includes('--pwa-safe-top: env(safe-area-inset-top'), 'PWA CSS defines standalone top safe-area');
