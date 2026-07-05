@@ -110,6 +110,11 @@ function buildStaticIndex() {
   source = source.replace(
     /(<body>)/,
     `$1
+  <div id="pwaLaunchSplash" class="pwa-launch-splash" aria-hidden="true">
+    <div class="pwa-launch-splash-scene">
+      <img src="./assets/splash-lantern.png" alt="">
+    </div>
+  </div>
   <div id="pwaNetworkBanner" class="pwa-network-banner" role="status" aria-live="polite" hidden></div>
   <button id="pwaSettingsButton" class="pwa-settings-button" type="button" aria-label="設定を開く" aria-controls="pwaSettingsPanel" aria-expanded="false">
     <span aria-hidden="true"></span>
@@ -310,6 +315,164 @@ body.pwa-theme-kohaku {
   --pwa-warm-2: #f0c37a;
   --pwa-warm-rgb: 201, 138, 73;
   --pwa-grid-rgb: 214, 164, 95;
+}
+
+.pwa-launch-splash {
+  position: fixed;
+  inset: 0;
+  z-index: 13000;
+  display: grid;
+  place-items: center;
+  padding: max(18px, env(safe-area-inset-top)) max(18px, env(safe-area-inset-right)) max(18px, env(safe-area-inset-bottom)) max(18px, env(safe-area-inset-left));
+  background:
+    radial-gradient(circle at 50% 62%, rgba(214, 164, 95, 0.16), transparent 22%),
+    radial-gradient(circle at 50% 44%, rgba(90, 174, 192, 0.10), transparent 34%),
+    linear-gradient(180deg, #05090d 0%, #0a1217 52%, #05070a 100%);
+  opacity: 1;
+  pointer-events: auto;
+  transition: opacity 520ms ease, visibility 520ms ease;
+}
+
+.pwa-launch-splash::before,
+.pwa-launch-splash::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.pwa-launch-splash::before {
+  background:
+    radial-gradient(circle at 50% 59%, rgba(240, 195, 122, 0.00) 0 8%, rgba(240, 195, 122, 0.22) 18%, transparent 38%),
+    radial-gradient(circle at 50% 57%, rgba(255, 226, 154, 0.18), transparent 18%);
+  opacity: 0;
+  transform: scale(0.82);
+}
+
+.pwa-launch-splash::after {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 30%),
+    radial-gradient(circle at 50% 18%, rgba(120, 200, 200, 0.07), transparent 32%);
+  opacity: 0;
+}
+
+.pwa-launch-splash-scene {
+  position: relative;
+  width: min(82vw, 440px);
+  max-height: min(82svh, 660px);
+  aspect-ratio: 2 / 3;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 8px;
+  transform: translateY(10px) scale(0.985);
+  opacity: 0;
+}
+
+.pwa-launch-splash-scene img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 56%;
+  filter: brightness(0.58) saturate(0.92);
+  transform: scale(1.04);
+}
+
+.pwa-launch-splash-scene::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background:
+    radial-gradient(circle at 50% 61%, rgba(255, 220, 140, 0.00) 0 9%, rgba(255, 218, 139, 0.34) 18%, transparent 36%),
+    radial-gradient(circle at 50% 59%, rgba(240, 195, 122, 0.25), transparent 24%);
+  mix-blend-mode: screen;
+  opacity: 0;
+}
+
+.pwa-launch-splash.is-ready::before {
+  animation: pwaLanternGlow 1700ms cubic-bezier(.18,.86,.22,1) forwards;
+}
+
+.pwa-launch-splash.is-ready::after {
+  animation: pwaLanternAir 1700ms ease forwards;
+}
+
+.pwa-launch-splash.is-ready .pwa-launch-splash-scene {
+  animation: pwaLanternScene 1700ms cubic-bezier(.18,.86,.22,1) forwards;
+}
+
+.pwa-launch-splash.is-ready .pwa-launch-splash-scene img {
+  animation: pwaLanternImage 1700ms cubic-bezier(.18,.86,.22,1) forwards;
+}
+
+.pwa-launch-splash.is-ready .pwa-launch-splash-scene::before {
+  animation: pwaLanternCore 1700ms cubic-bezier(.18,.86,.22,1) forwards;
+}
+
+.pwa-launch-splash.is-leaving {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+body.pwa-launch-splash-visible {
+  overflow: hidden;
+}
+
+@keyframes pwaLanternGlow {
+  0% { opacity: 0; transform: scale(0.76); filter: blur(16px); }
+  38% { opacity: 0.42; transform: scale(0.92); filter: blur(14px); }
+  68% { opacity: 0.88; transform: scale(1.02); filter: blur(10px); }
+  100% { opacity: 0.66; transform: scale(1); filter: blur(12px); }
+}
+
+@keyframes pwaLanternAir {
+  0%, 30% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+@keyframes pwaLanternScene {
+  0% { opacity: 0; transform: translateY(14px) scale(0.975); }
+  34% { opacity: 0.72; }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes pwaLanternImage {
+  0% { filter: brightness(0.42) saturate(0.82); transform: scale(1.075); }
+  58% { filter: brightness(0.84) saturate(1.04); }
+  100% { filter: brightness(0.96) saturate(1.08); transform: scale(1.02); }
+}
+
+@keyframes pwaLanternCore {
+  0%, 24% { opacity: 0; transform: scale(0.76); }
+  62% { opacity: 0.72; transform: scale(1.04); }
+  100% { opacity: 0.48; transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pwa-launch-splash,
+  .pwa-launch-splash::before,
+  .pwa-launch-splash::after,
+  .pwa-launch-splash-scene,
+  .pwa-launch-splash-scene img,
+  .pwa-launch-splash-scene::before {
+    animation: none;
+    transition-duration: 160ms;
+  }
+
+  .pwa-launch-splash::before,
+  .pwa-launch-splash::after,
+  .pwa-launch-splash-scene,
+  .pwa-launch-splash-scene::before {
+    opacity: 1;
+    transform: none;
+  }
+
+  .pwa-launch-splash-scene img {
+    filter: brightness(0.92) saturate(1.02);
+    transform: scale(1.02);
+  }
 }
 
 .pwa-network-banner {
@@ -1182,6 +1345,8 @@ function writePwaClient() {
   const IOS_INSTALL_MESSAGE = '共有からホーム画面に追加できます。';
   const IOS_INSTALL_STORAGE_KEY = 'shumiLibrary.pwaIosInstallHintDismissed.v1';
   const INSTALL_HINT_AUTO_HIDE_MS = 12000;
+  const LAUNCH_SPLASH_DURATION_MS = 1850;
+  const LAUNCH_SPLASH_DEBUG_DURATION_MS = 6000;
   const THEME_STORAGE_KEY = 'shumiLibrary.pwaTheme.v1';
   const LIBRARIAN_PRESENCE_STORAGE_KEY = 'shumiLibrary.librarianPresence.v1';
   const QUIET_MOTION_STORAGE_KEY = 'shumiLibrary.quietMotion.v1';
@@ -1242,6 +1407,8 @@ function writePwaClient() {
   let activeRegistration = null;
   let lastUpdateCheckAt = 0;
   let installHintTimer = 0;
+  let launchSplashTimer = 0;
+  let launchSplashReady = false;
 
   function isStandalone_() {
     return Boolean(
@@ -1719,6 +1886,57 @@ function writePwaClient() {
     });
   }
 
+  function finishLaunchSplash_() {
+    const splash = document.getElementById('pwaLaunchSplash');
+    if (!splash) return;
+
+    splash.classList.add('is-leaving');
+    if (document.body) {
+      document.body.classList.remove('pwa-launch-splash-visible');
+    }
+    window.setTimeout(function() {
+      if (splash.parentNode) {
+        splash.parentNode.removeChild(splash);
+      }
+    }, 560);
+  }
+
+  function getLaunchSplashDuration_() {
+    try {
+      const params = new URLSearchParams(window.location.search || '');
+      return params.has('debugLaunchSplash') ? LAUNCH_SPLASH_DEBUG_DURATION_MS : LAUNCH_SPLASH_DURATION_MS;
+    } catch (e) {
+      return LAUNCH_SPLASH_DURATION_MS;
+    }
+  }
+
+  function startLaunchSplash_() {
+    const splash = document.getElementById('pwaLaunchSplash');
+    if (!splash || !document.body) return;
+
+    document.body.classList.add('pwa-launch-splash-visible');
+
+    function markReady() {
+      if (launchSplashReady) return;
+      launchSplashReady = true;
+      splash.classList.add('is-ready');
+      launchSplashTimer = window.setTimeout(function() {
+        launchSplashTimer = 0;
+        finishLaunchSplash_();
+      }, getLaunchSplashDuration_());
+    }
+
+    const image = splash.querySelector('img');
+    if (!image || image.complete) {
+      window.setTimeout(markReady, 40);
+      return;
+    }
+
+    image.addEventListener('load', markReady, { once: true });
+    image.addEventListener('error', markReady, { once: true });
+    window.setTimeout(markReady, 1200);
+  }
+
   window.ShumiLibraryPwa = {
     isPwaShell: true,
     isLibrarianPresenceEnabled: isLibrarianPresenceEnabled_,
@@ -1770,6 +1988,7 @@ function writePwaClient() {
 
   window.addEventListener('DOMContentLoaded', function() {
     syncBodyState_();
+    startLaunchSplash_();
     bindSettingsPanel_();
     syncOnlineState_();
     window.setTimeout(showIosInstallHint_, 3500);
@@ -1941,6 +2160,7 @@ function writePwaFiles() {
   './assets/css/pwa.css',
   './assets/logo.png',
   './assets/librarian-presence.jpg',
+  './assets/splash-lantern.png',
   './assets/js/gas-run-shim.js',
   './assets/js/pwa-client.js',
   './assets/js/script.state.js',

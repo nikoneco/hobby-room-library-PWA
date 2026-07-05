@@ -30,6 +30,7 @@ const pagesWorkflow = read(pagesWorkflowPath);
   'assets/js/pwa-client.js',
   'assets/logo.png',
   'assets/librarian-presence.jpg',
+  'assets/splash-lantern.png',
   'assets/icons/icon-192.png',
   'assets/icons/icon-512.png'
 ].forEach(relativePath => {
@@ -38,6 +39,7 @@ const pagesWorkflow = read(pagesWorkflowPath);
 
 [
   path.join('assets', 'logo.png'),
+  path.join('assets', 'splash-lantern.png'),
   path.join('assets', 'icons', 'icon-192.png'),
   path.join('assets', 'icons', 'icon-512.png')
 ].forEach(relativePath => {
@@ -59,6 +61,8 @@ assert(index.includes('rel="preconnect" href="https://script.googleusercontent.c
 assert(index.includes('id="pwa-critical-style"'), 'static index includes critical shell paint style');
 assert(index.includes('html{background:#0a1217'), 'critical style paints shinhaku shell before CSS loads');
 assert(index.includes('apple-mobile-web-app-status-bar-style" content="black-translucent"'), 'static index uses translucent iOS standalone status bar');
+assert(index.includes('id="pwaLaunchSplash"'), 'static index includes launch splash overlay');
+assert(index.includes('src="./assets/splash-lantern.png"'), 'static index uses lantern splash asset');
 assert(index.includes('id="pwaNetworkBanner"'), 'static index includes offline/network banner');
 assert(index.includes('./assets/js/gas-run-shim.js'), 'static index loads GAS JSONP shim');
 assert(index.includes('./assets/js/pwa-client.js'), 'static index loads PWA client');
@@ -135,6 +139,7 @@ assert(sw.includes('offline.html'), 'service worker caches offline fallback');
 assert(/shumi-library-pwa-[a-f0-9]{12}/.test(sw), 'service worker cache name is content hashed');
 assert(sw.includes('./assets/logo.png'), 'service worker caches local logo');
 assert(sw.includes('./assets/librarian-presence.jpg'), 'service worker caches librarian presence logo');
+assert(sw.includes('./assets/splash-lantern.png'), 'service worker caches lantern splash image');
 assert(sw.includes('SKIP_WAITING'), 'service worker supports update activation');
 assert(sw.includes("const NAVIGATION_FALLBACK = './index.html'"), 'service worker uses cached app shell for offline navigation');
 assert(sw.includes('isAppShellUrl_'), 'service worker recognizes app shell assets');
@@ -149,6 +154,8 @@ const pwaCss = read(path.join(docs, 'assets', 'css', 'pwa.css'));
 const pwaClient = read(path.join(docs, 'assets', 'js', 'pwa-client.js'));
 const bootClient = read(path.join(docs, 'assets', 'js', 'script.boot.js'));
 assert(pwaCss.includes('body.pwa-standalone .mobile-app-dock'), 'PWA CSS styles standalone dock');
+assert(pwaCss.includes('.pwa-launch-splash'), 'PWA CSS styles launch splash overlay');
+assert(pwaCss.includes('@keyframes pwaLanternGlow'), 'PWA CSS animates lantern glow');
 assert(pwaCss.includes('.pwa-settings-button'), 'PWA CSS styles settings button');
 assert(pwaCss.includes('.pwa-settings-panel'), 'PWA CSS styles settings panel');
 assert(pwaCss.includes('.pwa-settings-button ~ .view-toggle'), 'PWA CSS keeps mobile view toggle away from settings button');
@@ -168,6 +175,8 @@ assert(pwaClient.includes("currentBannerKind && currentBannerKind !== 'update'")
 assert(!pwaCss.includes('.pwa-recent-rail'), 'PWA CSS omits recent book rail');
 assert(!pwaCss.includes('.pwa-recent-book'), 'PWA CSS omits recent book cards');
 assert(pwaClient.includes("document.body.classList.add('pwa-shell')"), 'PWA client marks shell body');
+assert(pwaClient.includes('startLaunchSplash_'), 'PWA client starts launch splash animation');
+assert(pwaClient.includes('finishLaunchSplash_'), 'PWA client removes launch splash animation');
 assert(pwaClient.includes("window.matchMedia('(display-mode: standalone)')"), 'PWA client detects standalone display mode');
 assert(pwaClient.includes('requestServiceWorkerUpdate_'), 'PWA client can request service worker update checks');
 assert(pwaClient.includes("document.addEventListener('visibilitychange'"), 'PWA client checks updates when returning to foreground');

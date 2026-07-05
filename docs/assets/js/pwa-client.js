@@ -9,6 +9,8 @@
   const IOS_INSTALL_MESSAGE = '共有からホーム画面に追加できます。';
   const IOS_INSTALL_STORAGE_KEY = 'shumiLibrary.pwaIosInstallHintDismissed.v1';
   const INSTALL_HINT_AUTO_HIDE_MS = 12000;
+  const LAUNCH_SPLASH_DURATION_MS = 1850;
+  const LAUNCH_SPLASH_DEBUG_DURATION_MS = 6000;
   const THEME_STORAGE_KEY = 'shumiLibrary.pwaTheme.v1';
   const LIBRARIAN_PRESENCE_STORAGE_KEY = 'shumiLibrary.librarianPresence.v1';
   const QUIET_MOTION_STORAGE_KEY = 'shumiLibrary.quietMotion.v1';
@@ -69,6 +71,8 @@
   let activeRegistration = null;
   let lastUpdateCheckAt = 0;
   let installHintTimer = 0;
+  let launchSplashTimer = 0;
+  let launchSplashReady = false;
 
   function isStandalone_() {
     return Boolean(
@@ -546,6 +550,57 @@
     });
   }
 
+  function finishLaunchSplash_() {
+    const splash = document.getElementById('pwaLaunchSplash');
+    if (!splash) return;
+
+    splash.classList.add('is-leaving');
+    if (document.body) {
+      document.body.classList.remove('pwa-launch-splash-visible');
+    }
+    window.setTimeout(function() {
+      if (splash.parentNode) {
+        splash.parentNode.removeChild(splash);
+      }
+    }, 560);
+  }
+
+  function getLaunchSplashDuration_() {
+    try {
+      const params = new URLSearchParams(window.location.search || '');
+      return params.has('debugLaunchSplash') ? LAUNCH_SPLASH_DEBUG_DURATION_MS : LAUNCH_SPLASH_DURATION_MS;
+    } catch (e) {
+      return LAUNCH_SPLASH_DURATION_MS;
+    }
+  }
+
+  function startLaunchSplash_() {
+    const splash = document.getElementById('pwaLaunchSplash');
+    if (!splash || !document.body) return;
+
+    document.body.classList.add('pwa-launch-splash-visible');
+
+    function markReady() {
+      if (launchSplashReady) return;
+      launchSplashReady = true;
+      splash.classList.add('is-ready');
+      launchSplashTimer = window.setTimeout(function() {
+        launchSplashTimer = 0;
+        finishLaunchSplash_();
+      }, getLaunchSplashDuration_());
+    }
+
+    const image = splash.querySelector('img');
+    if (!image || image.complete) {
+      window.setTimeout(markReady, 40);
+      return;
+    }
+
+    image.addEventListener('load', markReady, { once: true });
+    image.addEventListener('error', markReady, { once: true });
+    window.setTimeout(markReady, 1200);
+  }
+
   window.ShumiLibraryPwa = {
     isPwaShell: true,
     isLibrarianPresenceEnabled: isLibrarianPresenceEnabled_,
@@ -597,6 +652,7 @@
 
   window.addEventListener('DOMContentLoaded', function() {
     syncBodyState_();
+    startLaunchSplash_();
     bindSettingsPanel_();
     syncOnlineState_();
     window.setTimeout(showIosInstallHint_, 3500);
