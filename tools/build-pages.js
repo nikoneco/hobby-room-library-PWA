@@ -765,7 +765,7 @@ function writePwaFiles() {
   fs.writeFileSync(path.join(docsDir, 'offline.html'), offlineHtml, 'utf8');
 
   const sw = `
-const CACHE_NAME = 'shumi-library-pwa-v43';
+const CACHE_NAME = 'shumi-library-pwa-v44';
 const APP_SHELL = [
   './',
   './index.html',
@@ -792,6 +792,27 @@ const APP_SHELL = [
   './assets/icons/icon-192.png',
   './assets/icons/icon-512.png'
 ];
+const NAVIGATION_FALLBACK = './index.html';
+const OFFLINE_FALLBACK = './offline.html';
+const APP_SHELL_URLS = new Set(APP_SHELL.map(path => new URL(path, self.location.href).href));
+
+function getCacheKey_(url) {
+  const copy = new URL(url.href);
+  copy.search = '';
+  copy.hash = '';
+  return copy.href;
+}
+
+function isAppShellUrl_(url) {
+  return APP_SHELL_URLS.has(getCacheKey_(url));
+}
+
+function putCache_(cacheKey, response) {
+  if (!response || !response.ok) return response;
+  const copy = response.clone();
+  caches.open(CACHE_NAME).then(cache => cache.put(cacheKey, copy));
+  return response;
+}
 
 self.addEventListener('install', event => {
   event.waitUntil(
@@ -826,26 +847,32 @@ self.addEventListener('fetch', event => {
   }
 
   if (request.mode === 'navigate') {
+    const cacheKey = new URL(NAVIGATION_FALLBACK, self.location.href).href;
     event.respondWith(
       fetch(request)
-        .then(response => {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then(cache => cache.put('./index.html', copy));
-          return response;
-        })
-        .catch(() => caches.match('./offline.html'))
+        .then(response => putCache_(cacheKey, response))
+        .catch(() => caches.match(cacheKey).then(cached => cached || caches.match(OFFLINE_FALLBACK)))
+    );
+    return;
+  }
+
+  if (isAppShellUrl_(url)) {
+    const cacheKey = getCacheKey_(url);
+    event.respondWith(
+      caches.match(cacheKey).then(cached => {
+        const refresh = fetch(request)
+          .then(response => putCache_(cacheKey, response))
+          .catch(() => null);
+        return cached || refresh.then(response => response || caches.match(OFFLINE_FALLBACK));
+      })
     );
     return;
   }
 
   event.respondWith(
     fetch(request)
-      .then(response => {
-        const copy = response.clone();
-        caches.open(CACHE_NAME).then(cache => cache.put(request, copy));
-        return response;
-      })
-      .catch(() => caches.match(request).then(cached => cached || caches.match('./offline.html')))
+      .then(response => putCache_(getCacheKey_(url), response))
+      .catch(() => caches.match(getCacheKey_(url)).then(cached => cached || caches.match(OFFLINE_FALLBACK)))
   );
 });
 `.trim();

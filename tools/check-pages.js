@@ -88,9 +88,12 @@ assert(manifest.shortcuts.some(item => item.url === './?launch=bookshelf'), 'man
 assert(manifest.shortcuts.some(item => item.url === './?launch=random'), 'manifest has random shortcut');
 
 assert(sw.includes('offline.html'), 'service worker caches offline fallback');
-assert(sw.includes('shumi-library-pwa-v43'), 'service worker has versioned cache');
+assert(sw.includes('shumi-library-pwa-v44'), 'service worker has versioned cache');
 assert(sw.includes('./assets/logo.png'), 'service worker caches local logo');
 assert(sw.includes('SKIP_WAITING'), 'service worker supports update activation');
+assert(sw.includes("const NAVIGATION_FALLBACK = './index.html'"), 'service worker uses cached app shell for offline navigation');
+assert(sw.includes('isAppShellUrl_'), 'service worker recognizes app shell assets');
+assert(sw.includes('return cached || refresh.then'), 'service worker serves app shell cache before network refresh');
 
 const pwaCss = read(path.join(docs, 'assets', 'css', 'pwa.css'));
 const pwaClient = read(path.join(docs, 'assets', 'js', 'pwa-client.js'));
