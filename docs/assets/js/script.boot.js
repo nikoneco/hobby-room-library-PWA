@@ -311,9 +311,30 @@ function getLaunchActionFromUrl_() {
   }
 }
 
+function clearLaunchActionFromUrl_() {
+  if (!window.history || typeof window.history.replaceState !== 'function') return;
+
+  try {
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has('launch')) return;
+
+    url.searchParams.delete('launch');
+    const nextUrl =
+      url.pathname +
+      (url.searchParams.toString() ? '?' + url.searchParams.toString() : '') +
+      url.hash;
+
+    window.history.replaceState(window.history.state, document.title, nextUrl);
+  } catch (e) {
+    // URL整理に失敗しても、起動アクション自体は続ける。
+  }
+}
+
 function runLaunchActionFromUrl_() {
   const launch = getLaunchActionFromUrl_();
   if (!launch) return;
+
+  clearLaunchActionFromUrl_();
 
   window.setTimeout(function() {
     if (launch === 'bookshelf') {

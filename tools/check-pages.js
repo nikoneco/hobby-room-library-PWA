@@ -101,6 +101,7 @@ assert(sw.includes('return cached || refresh.then'), 'service worker serves app 
 
 const pwaCss = read(path.join(docs, 'assets', 'css', 'pwa.css'));
 const pwaClient = read(path.join(docs, 'assets', 'js', 'pwa-client.js'));
+const bootClient = read(path.join(docs, 'assets', 'js', 'script.boot.js'));
 assert(pwaCss.includes('body.pwa-standalone .mobile-app-dock'), 'PWA CSS styles standalone dock');
 assert(pwaCss.includes('--pwa-safe-top: env(safe-area-inset-top'), 'PWA CSS defines standalone top safe-area');
 assert(pwaCss.includes('top: var(--pwa-safe-top)'), 'PWA CSS keeps sticky header below standalone status bar');
@@ -111,6 +112,8 @@ assert(!pwaCss.includes('.pwa-recent-rail'), 'PWA CSS omits recent book rail');
 assert(!pwaCss.includes('.pwa-recent-book'), 'PWA CSS omits recent book cards');
 assert(pwaClient.includes("document.body.classList.add('pwa-shell')"), 'PWA client marks shell body');
 assert(pwaClient.includes("window.matchMedia('(display-mode: standalone)')"), 'PWA client detects standalone display mode');
+assert(bootClient.includes('clearLaunchActionFromUrl_'), 'boot client clears consumed PWA launch shortcut');
+assert(bootClient.includes('window.history.replaceState'), 'boot client rewrites launch shortcut URL after use');
 assert(!pwaClient.includes('shumiLibrary.pwaRecentBooks.v1'), 'PWA client does not persist recent books');
 assert(!pwaClient.includes('pwaRecentRail'), 'PWA client does not render recent book rail');
 assert(!pwaClient.includes('launch=recent'), 'PWA client omits recent launch flow');
