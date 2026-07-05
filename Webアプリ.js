@@ -38,6 +38,26 @@ const WEB_APP_API_REGISTRY_ = Object.freeze({
   ]
 });
 
+const WEBAPP_API_LIMITS_ = Object.freeze({
+  RANDOM_MAX_COUNT: 50,
+  SHELF_CHUNK_DEFAULT_LIMIT: 300,
+  SHELF_CHUNK_MAX_LIMIT: 500,
+  BOOK_DETAIL_BATCH_MAX: 12
+});
+
+function normalizeWebAppApiInteger_(value, options) {
+  const opt = options || {};
+  const fallback = Number.isFinite(Number(opt.fallback)) ? Math.floor(Number(opt.fallback)) : 0;
+  const min = Number.isFinite(Number(opt.min)) ? Math.floor(Number(opt.min)) : 0;
+  const max = Number.isFinite(Number(opt.max)) ? Math.floor(Number(opt.max)) : null;
+  let parsed = Math.floor(Number(value));
+
+  if (!Number.isFinite(parsed)) parsed = fallback;
+  parsed = Math.max(min, parsed);
+  if (max !== null) parsed = Math.min(parsed, max);
+  return parsed;
+}
+
 /**
  * 目録シートから I列(タイトル)〜AB列(WEB_IMAGE_SOURCE) をまとめて取得する共通関数
  * タイトル空行は除外する
@@ -1608,9 +1628,11 @@ function getRandomBooks(count) {
 
     if (!rows.length) return [];
 
-    const requested = Number(count);
-    const safeCount = Number.isFinite(requested) ? Math.floor(requested) : 0;
-    const n = Math.min(Math.max(safeCount, 0), rows.length);
+    const n = normalizeWebAppApiInteger_(count, {
+      fallback: 10,
+      min: 0,
+      max: Math.min(WEBAPP_API_LIMITS_.RANDOM_MAX_COUNT, rows.length)
+    });
 
     if (n <= 0) return [];
 
@@ -1720,8 +1742,16 @@ function getBookshelfBooksChunk(offset, limit) {
     const dataset = getBookshelfLiteDataset_();
     const books = dataset.books || [];
     const total = books.length;
-    const start = Math.max(0, Number(offset || 0));
-    const size = Math.min(Math.max(Number(limit || 300), 1), 500);
+    const start = normalizeWebAppApiInteger_(offset, {
+      fallback: 0,
+      min: 0,
+      max: total
+    });
+    const size = normalizeWebAppApiInteger_(limit, {
+      fallback: WEBAPP_API_LIMITS_.SHELF_CHUNK_DEFAULT_LIMIT,
+      min: 1,
+      max: WEBAPP_API_LIMITS_.SHELF_CHUNK_MAX_LIMIT
+    });
     const end = Math.min(start + size, total);
 
     return {
@@ -1736,8 +1766,8 @@ function getBookshelfBooksChunk(offset, limit) {
     return {
       books: [],
       total: 0,
-      offset: Math.max(0, Number(offset || 0)),
-      nextOffset: Math.max(0, Number(offset || 0)),
+      offset: normalizeWebAppApiInteger_(offset, { fallback: 0, min: 0 }),
+      nextOffset: normalizeWebAppApiInteger_(offset, { fallback: 0, min: 0 }),
       done: true,
       error: e && e.message ? e.message : String(e)
     };
@@ -1779,7 +1809,7 @@ function parseBookDetailRowIndexes_(rowIndexes) {
       seen[value] = true;
       return true;
     })
-    .slice(0, 12);
+    .slice(0, WEBAPP_API_LIMITS_.BOOK_DETAIL_BATCH_MAX);
 }
 
 function getBookDetailsByRowIndexes(rowIndexes) {
