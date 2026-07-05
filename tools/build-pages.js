@@ -62,7 +62,7 @@ function buildStaticIndex() {
     /<title>[^<]*<\/title>/,
     [
       '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">',
-      '<meta name="theme-color" content="#0b111a">',
+      '<meta name="theme-color" content="#07161a">',
       '<meta name="color-scheme" content="dark light">',
       '<meta name="apple-mobile-web-app-capable" content="yes">',
       '<meta name="apple-mobile-web-app-title" content="趣味部屋図書館">',
@@ -74,7 +74,7 @@ function buildStaticIndex() {
       '<link rel="manifest" href="./manifest.webmanifest">',
       '<link rel="apple-touch-icon" href="./assets/icons/icon-192.png">',
       '<title>趣味部屋図書館</title>',
-      '<style id="pwa-critical-style">html{background:#0b111a;color-scheme:dark light;}body{margin:0;background:#0b111a;color:#edf5f7;}</style>'
+      '<style id="pwa-critical-style">html{background:#07161a;color-scheme:dark light;}body{margin:0;background:#07161a;color:#edf5f7;}</style>'
     ].join('\n  ')
   );
 
@@ -128,15 +128,19 @@ function buildStaticIndex() {
     <fieldset class="pwa-settings-section pwa-theme-settings">
       <legend>カラーテーマ</legend>
       <label>
-        <input type="radio" name="pwaTheme" value="default">
-        <span>標準</span>
+        <input type="radio" name="pwaTheme" value="shinhaku">
+        <span>深碧</span>
       </label>
       <label>
-        <input type="radio" name="pwaTheme" value="calm">
-        <span>青緑</span>
+        <input type="radio" name="pwaTheme" value="kohi">
+        <span>紅緋</span>
       </label>
       <label>
-        <input type="radio" name="pwaTheme" value="warm">
+        <input type="radio" name="pwaTheme" value="shikon">
+        <span>紫紺</span>
+      </label>
+      <label>
+        <input type="radio" name="pwaTheme" value="kohaku">
         <span>琥珀</span>
       </label>
     </fieldset>
@@ -166,6 +170,129 @@ function writeStaticAssets() {
 
 function writePwaCss() {
   const css = `
+body.pwa-shell {
+  --pwa-bg-top: #111923;
+  --pwa-bg: #0b111a;
+  --pwa-bg-bottom: #070b11;
+  --pwa-panel: rgba(15, 22, 31, 0.82);
+  --pwa-panel-strong: rgba(16, 24, 34, 0.96);
+  --pwa-panel-soft: rgba(255, 255, 255, 0.048);
+  --pwa-line: rgba(143, 220, 226, 0.22);
+  --pwa-line-strong: rgba(143, 220, 226, 0.42);
+  --pwa-accent: #68bfd7;
+  --pwa-accent-2: #8ee1df;
+  --pwa-accent-rgb: 104, 191, 215;
+  --pwa-accent-2-rgb: 142, 225, 223;
+  --pwa-accent-text: #06151a;
+  --pwa-accent-readable: #dff8ff;
+  --pwa-warm: #d6a45f;
+  --pwa-warm-2: #f0c37a;
+  --pwa-warm-rgb: 214, 164, 95;
+  --pwa-grid-rgb: 143, 220, 226;
+  --pwa-shadow-rgb: 0, 0, 0;
+  --lib-bg: var(--pwa-bg);
+  --lib-bg-2: var(--pwa-bg-top);
+  --lib-panel: var(--pwa-panel);
+  --lib-panel-strong: var(--pwa-panel-strong);
+  --lib-panel-soft: var(--pwa-panel-soft);
+  --lib-line: var(--pwa-line);
+  --lib-line-strong: var(--pwa-line-strong);
+  --lib-accent: var(--pwa-accent);
+  --lib-accent-2: var(--pwa-accent-2);
+  --lib-amber: var(--pwa-warm);
+  --lib-amber-2: var(--pwa-warm-2);
+  background:
+    linear-gradient(135deg, rgba(var(--pwa-grid-rgb), 0.032) 0 1px, transparent 1px 18px),
+    linear-gradient(180deg, var(--pwa-bg-top) 0%, var(--pwa-bg) 42%, var(--pwa-bg-bottom) 100%);
+}
+
+body.pwa-shell::before {
+  background:
+    radial-gradient(circle at 14% 12%, rgba(var(--pwa-accent-rgb), 0.12), transparent 30%),
+    linear-gradient(90deg, rgba(var(--pwa-accent-rgb), 0.060), transparent 30%, transparent 70%, rgba(var(--pwa-warm-rgb), 0.052)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.036), transparent 36%);
+}
+
+body.pwa-theme-shinhaku {
+  --pwa-bg-top: #101a22;
+  --pwa-bg: #07161a;
+  --pwa-bg-bottom: #050b10;
+  --pwa-panel: rgba(8, 24, 29, 0.84);
+  --pwa-panel-strong: rgba(10, 28, 34, 0.96);
+  --pwa-line: rgba(104, 191, 215, 0.25);
+  --pwa-line-strong: rgba(142, 225, 223, 0.46);
+  --pwa-accent: #68bfd7;
+  --pwa-accent-2: #8ee1df;
+  --pwa-accent-rgb: 104, 191, 215;
+  --pwa-accent-2-rgb: 142, 225, 223;
+  --pwa-accent-text: #06151a;
+  --pwa-accent-readable: #dff8ff;
+  --pwa-warm: #d6a45f;
+  --pwa-warm-2: #f0c37a;
+  --pwa-warm-rgb: 214, 164, 95;
+  --pwa-grid-rgb: 104, 191, 215;
+}
+
+body.pwa-theme-kohi {
+  --pwa-bg-top: #211317;
+  --pwa-bg: #16090d;
+  --pwa-bg-bottom: #0d0508;
+  --pwa-panel: rgba(31, 13, 18, 0.84);
+  --pwa-panel-strong: rgba(38, 14, 20, 0.96);
+  --pwa-line: rgba(218, 91, 92, 0.25);
+  --pwa-line-strong: rgba(239, 145, 116, 0.48);
+  --pwa-accent: #db5a5d;
+  --pwa-accent-2: #ef9174;
+  --pwa-accent-rgb: 219, 90, 93;
+  --pwa-accent-2-rgb: 239, 145, 116;
+  --pwa-accent-text: #1b0708;
+  --pwa-accent-readable: #ffe1d9;
+  --pwa-warm: #d6a45f;
+  --pwa-warm-2: #f0c37a;
+  --pwa-warm-rgb: 214, 164, 95;
+  --pwa-grid-rgb: 219, 90, 93;
+}
+
+body.pwa-theme-shikon {
+  --pwa-bg-top: #19162a;
+  --pwa-bg: #100d1d;
+  --pwa-bg-bottom: #090712;
+  --pwa-panel: rgba(24, 19, 42, 0.84);
+  --pwa-panel-strong: rgba(29, 22, 50, 0.96);
+  --pwa-line: rgba(166, 142, 225, 0.26);
+  --pwa-line-strong: rgba(194, 172, 244, 0.48);
+  --pwa-accent: #a68ee1;
+  --pwa-accent-2: #c2acf4;
+  --pwa-accent-rgb: 166, 142, 225;
+  --pwa-accent-2-rgb: 194, 172, 244;
+  --pwa-accent-text: #120d22;
+  --pwa-accent-readable: #eee6ff;
+  --pwa-warm: #d6a45f;
+  --pwa-warm-2: #f0c37a;
+  --pwa-warm-rgb: 214, 164, 95;
+  --pwa-grid-rgb: 166, 142, 225;
+}
+
+body.pwa-theme-kohaku {
+  --pwa-bg-top: #1f1710;
+  --pwa-bg: #16110c;
+  --pwa-bg-bottom: #0d0906;
+  --pwa-panel: rgba(25, 19, 13, 0.86);
+  --pwa-panel-strong: rgba(32, 23, 15, 0.96);
+  --pwa-line: rgba(214, 164, 95, 0.28);
+  --pwa-line-strong: rgba(240, 195, 122, 0.50);
+  --pwa-accent: #d6a45f;
+  --pwa-accent-2: #f0c37a;
+  --pwa-accent-rgb: 214, 164, 95;
+  --pwa-accent-2-rgb: 240, 195, 122;
+  --pwa-accent-text: #171006;
+  --pwa-accent-readable: #fff2d6;
+  --pwa-warm: #c98a49;
+  --pwa-warm-2: #f0c37a;
+  --pwa-warm-rgb: 201, 138, 73;
+  --pwa-grid-rgb: 214, 164, 95;
+}
+
 .pwa-network-banner {
   position: fixed;
   left: max(12px, env(safe-area-inset-left));
@@ -192,7 +319,7 @@ body.pwa-standalone {
   user-select: none;
   min-height: 100svh;
   padding-top: var(--pwa-safe-top);
-  background-color: #0b111a;
+  background-color: var(--pwa-bg);
 }
 
 body.pwa-standalone input,
@@ -214,7 +341,7 @@ body.pwa-standalone .search-container:not(.centered) {
 
 body.pwa-standalone .mobile-app-dock {
   border-radius: 22px;
-  background: rgba(9, 13, 19, 0.90);
+  background: color-mix(in srgb, var(--pwa-panel-strong) 90%, transparent);
 }
 
 body.pwa-settings-open {
@@ -231,9 +358,9 @@ body.pwa-settings-open {
   display: grid;
   place-content: center;
   gap: 4px;
-  border: 1px solid rgba(167, 183, 204, 0.18);
+  border: 1px solid var(--pwa-line);
   border-radius: 999px;
-  background: rgba(10, 15, 22, 0.56);
+  background: color-mix(in srgb, var(--pwa-panel-strong) 58%, transparent);
   color: rgba(234, 241, 248, 0.82);
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.24);
   backdrop-filter: blur(14px);
@@ -248,15 +375,15 @@ body.pwa-settings-open {
 }
 
 .pwa-settings-button[aria-expanded="true"] {
-  border-color: rgba(104, 191, 215, 0.46);
-  color: #dff8ff;
+  border-color: var(--pwa-line-strong);
+  color: var(--pwa-accent-readable);
 }
 
 .pwa-settings-backdrop {
   position: fixed;
   inset: 0;
   z-index: 12100;
-  background: rgba(4, 7, 11, 0.48);
+  background: color-mix(in srgb, var(--pwa-bg-bottom) 62%, transparent);
   backdrop-filter: blur(5px);
 }
 
@@ -267,9 +394,9 @@ body.pwa-settings-open {
   z-index: 12200;
   width: min(340px, calc(100vw - 24px - env(safe-area-inset-left) - env(safe-area-inset-right)));
   padding: 14px;
-  border: 1px solid rgba(167, 183, 204, 0.20);
+  border: 1px solid var(--pwa-line);
   border-radius: 8px;
-  background: rgba(14, 20, 29, 0.96);
+  background: var(--pwa-panel-strong);
   color: #edf5f7;
   box-shadow: 0 20px 54px rgba(0, 0, 0, 0.46);
 }
@@ -291,9 +418,9 @@ body.pwa-settings-open {
 .pwa-settings-close {
   width: 36px;
   height: 36px;
-  border: 1px solid rgba(167, 183, 204, 0.18);
+  border: 1px solid var(--pwa-line);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--pwa-panel-soft);
   color: rgba(234, 241, 248, 0.78);
   font-size: 1.35rem;
   line-height: 1;
@@ -304,7 +431,7 @@ body.pwa-settings-open {
   margin: 0;
   padding: 12px 0;
   border: 0;
-  border-top: 1px solid rgba(167, 183, 204, 0.12);
+  border-top: 1px solid color-mix(in srgb, var(--pwa-line) 68%, transparent);
 }
 
 .pwa-settings-row {
@@ -340,7 +467,7 @@ body.pwa-settings-open {
 
 .pwa-theme-settings {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
 }
 
@@ -355,40 +482,160 @@ body.pwa-settings-open {
   gap: 6px;
   min-height: 38px;
   padding: 7px 8px;
-  border: 1px solid rgba(167, 183, 204, 0.16);
+  border: 1px solid color-mix(in srgb, var(--pwa-line) 72%, transparent);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.045);
+  background: var(--pwa-panel-soft);
   color: rgba(234, 241, 248, 0.78);
   font-size: 0.78rem;
   font-weight: 800;
 }
 
 .pwa-theme-settings input {
-  accent-color: #68bfd7;
+  accent-color: var(--pwa-accent);
 }
 
-body.pwa-theme-calm {
-  background-color: #07161a;
+body.pwa-shell .search-container,
+body.pwa-shell #image-popup-content,
+body.pwa-shell .book-card,
+body.pwa-shell .bookshelf-group,
+body.pwa-shell .shelf-room-map,
+body.pwa-shell .shelf-room-map-modal-panel,
+body.pwa-shell .spinner-panel {
+  background: var(--pwa-panel);
+  border-color: var(--pwa-line);
 }
 
-body.pwa-theme-calm .search-container {
-  background: rgba(8, 24, 29, 0.84);
+body.pwa-shell .search-container {
+  box-shadow: 0 10px 34px rgba(var(--pwa-shadow-rgb), 0.30);
 }
 
-body.pwa-theme-calm .mobile-app-dock {
-  background: rgba(7, 18, 23, 0.92);
+body.pwa-shell input,
+body.pwa-shell select,
+body.pwa-shell textarea {
+  border-color: color-mix(in srgb, var(--pwa-line) 78%, transparent);
 }
 
-body.pwa-theme-warm {
-  background-color: #16110c;
+body.pwa-shell input:focus,
+body.pwa-shell select:focus,
+body.pwa-shell textarea:focus {
+  border-color: var(--pwa-line-strong);
+  box-shadow: 0 0 0 3px rgba(var(--pwa-accent-rgb), 0.14);
 }
 
-body.pwa-theme-warm .search-container {
-  background: rgba(25, 19, 13, 0.84);
+body.pwa-shell .button-group button.primary,
+body.pwa-shell .button-group button[data-action="search"],
+body.pwa-shell .pwa-network-banner-action,
+body.pwa-shell .mobile-app-dock-btn.active,
+body.pwa-shell .mobile-app-dock-btn:focus-visible,
+body.pwa-shell .mobile-dock-view-btn.active,
+body.pwa-shell .mobile-dock-view-btn:focus-visible,
+body.pwa-shell .toggle-btn.active {
+  border-color: var(--pwa-line-strong);
+  background: linear-gradient(180deg, var(--pwa-accent-2), var(--pwa-accent));
+  color: var(--pwa-accent-text);
+  box-shadow: 0 10px 24px rgba(var(--pwa-accent-rgb), 0.16);
 }
 
-body.pwa-theme-warm .mobile-app-dock {
-  background: rgba(20, 15, 10, 0.92);
+body.pwa-shell .button-group button.secondary,
+body.pwa-shell .button-group button[data-action="random"],
+body.pwa-shell .toggle-btn,
+body.pwa-shell .mobile-app-dock,
+body.pwa-shell .mobile-app-dock-btn,
+body.pwa-shell .mobile-dock-view-btn,
+body.pwa-shell .view-toggle,
+body.pwa-shell .shelf-jump-nav,
+body.pwa-shell .shelf-jump-chip,
+body.pwa-shell .shelf-jump-top-btn {
+  border-color: color-mix(in srgb, var(--pwa-line) 68%, transparent);
+  background: color-mix(in srgb, var(--pwa-panel-strong) 78%, transparent);
+}
+
+body.pwa-shell .button-group button.accent,
+body.pwa-shell .top-shelf-btn,
+body.pwa-shell .bookshelf-cta-card.top-shelf-btn,
+body.pwa-shell .mobile-app-dock-btn.primary,
+body.pwa-shell .shelf-jump-chip.is-active,
+body.pwa-shell .room-map-shelf.is-active {
+  border-color: color-mix(in srgb, var(--pwa-warm-2) 54%, transparent);
+  background:
+    linear-gradient(135deg, rgba(var(--pwa-warm-rgb), 0.24), rgba(var(--pwa-accent-rgb), 0.10)),
+    color-mix(in srgb, var(--pwa-panel-strong) 82%, transparent);
+  color: var(--pwa-accent-readable);
+}
+
+body.pwa-shell .bookshelf-cta-icon,
+body.pwa-shell .bookshelf-cta-title,
+body.pwa-shell .shelf-room-map-fab-icon,
+body.pwa-shell .book-meta-pill-label,
+body.pwa-shell .shelf-view-stat-value,
+body.pwa-shell .spinner-shelf::after {
+  color: var(--pwa-warm-2);
+}
+
+body.pwa-shell .genre-chip,
+body.pwa-shell .summary-chip-toggle,
+body.pwa-shell .book-meta-pill,
+body.pwa-shell .search-status-chip,
+body.pwa-shell .shelf-view-stat,
+body.pwa-shell .bookshelf-level-title {
+  border-color: color-mix(in srgb, var(--pwa-line) 76%, transparent);
+  background: rgba(var(--pwa-accent-rgb), 0.10);
+  color: var(--pwa-accent-readable);
+}
+
+body.pwa-shell .summary-chip-toggle,
+body.pwa-shell .search-status-chip.shelf,
+body.pwa-shell .book-meta-pill.location {
+  border-color: color-mix(in srgb, var(--pwa-warm-2) 42%, transparent);
+  background: rgba(var(--pwa-warm-rgb), 0.12);
+  color: var(--pwa-accent-readable);
+}
+
+body.pwa-shell .toggle-btn.active::after,
+body.pwa-shell .spinner-shelf span,
+body.pwa-shell .bookshelf-group-title::before {
+  background: var(--pwa-warm-2);
+}
+
+body.pwa-shell .sensitive-toggle-input:checked + .sensitive-toggle-switch,
+body.pwa-shell .sensitive-toggle:has(.sensitive-toggle-input:checked) .sensitive-toggle-switch {
+  background: rgba(var(--pwa-accent-rgb), 0.34);
+  border-color: var(--pwa-line-strong);
+}
+
+body.pwa-shell .sensitive-toggle-input:focus-visible + .sensitive-toggle-switch,
+body.pwa-shell button:focus-visible,
+body.pwa-shell .book-open-surface:focus-visible,
+body.pwa-shell .shelf-book:focus-visible,
+body.pwa-shell #image-popup-img:focus-visible,
+body.pwa-shell #cover-fullscreen-img:focus-visible {
+  outline-color: color-mix(in srgb, var(--pwa-accent-2) 78%, white);
+}
+
+body.pwa-shell #image-popup-overlay,
+body.pwa-shell #cover-fullscreen-overlay,
+body.pwa-shell .shelf-room-map-overlay {
+  background: color-mix(in srgb, var(--pwa-bg-bottom) 82%, transparent);
+}
+
+body.pwa-shell .room-map-shelf {
+  border-color: color-mix(in srgb, var(--pwa-warm-2) 34%, transparent);
+  background: linear-gradient(135deg, rgba(var(--pwa-warm-rgb), 0.18), rgba(var(--pwa-accent-rgb), 0.08));
+}
+
+body.pwa-shell .room-map-shelf:hover,
+body.pwa-shell .room-map-shelf:focus-visible,
+body.pwa-shell .shelf-book:hover,
+body.pwa-shell .shelf-book:focus-visible,
+body.pwa-shell .book-card:hover {
+  border-color: var(--pwa-line-strong);
+  box-shadow: 0 12px 28px rgba(var(--pwa-accent-rgb), 0.14), 0 12px 28px rgba(0, 0, 0, 0.24);
+}
+
+body.pwa-shell .pwa-theme-settings label:has(input:checked) {
+  border-color: var(--pwa-line-strong);
+  background: rgba(var(--pwa-accent-rgb), 0.18);
+  color: var(--pwa-accent-readable);
 }
 
 .pwa-settings-button ~ .view-toggle {
@@ -782,11 +1029,18 @@ function writePwaClient() {
   const IOS_INSTALL_STORAGE_KEY = 'shumiLibrary.pwaIosInstallHintDismissed.v1';
   const INSTALL_HINT_AUTO_HIDE_MS = 12000;
   const THEME_STORAGE_KEY = 'shumiLibrary.pwaTheme.v1';
-  const THEME_OPTIONS = ['default', 'calm', 'warm'];
+  const THEME_DEFAULT = 'shinhaku';
+  const THEME_OPTIONS = ['shinhaku', 'kohi', 'shikon', 'kohaku'];
+  const LEGACY_THEME_ALIASES = {
+    default: 'shinhaku',
+    calm: 'shinhaku',
+    warm: 'kohaku'
+  };
   const THEME_COLORS = {
-    default: '#0b111a',
-    calm: '#07161a',
-    warm: '#16110c'
+    shinhaku: '#07161a',
+    kohi: '#16090d',
+    shikon: '#100d1d',
+    kohaku: '#16110c'
   };
 
   const UPDATE_CHECK_INTERVAL_MS = 60 * 60 * 1000;
@@ -1061,20 +1315,31 @@ function writePwaClient() {
     });
   }
 
+  function normalizeTheme_(theme) {
+    const value = String(theme || '').trim();
+    const migrated = LEGACY_THEME_ALIASES[value] || value;
+    return THEME_OPTIONS.includes(migrated) ? migrated : THEME_DEFAULT;
+  }
+
   function getStoredTheme_() {
     try {
       const value = window.localStorage ? window.localStorage.getItem(THEME_STORAGE_KEY) : '';
-      return THEME_OPTIONS.includes(value) ? value : 'default';
+      const nextTheme = normalizeTheme_(value);
+      if (window.localStorage && value && value !== nextTheme) {
+        window.localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
+      }
+      return nextTheme;
     } catch (e) {
-      return 'default';
+      return THEME_DEFAULT;
     }
   }
 
   function applyTheme_(theme) {
-    const nextTheme = THEME_OPTIONS.includes(theme) ? theme : 'default';
+    const nextTheme = normalizeTheme_(theme);
     if (document.body) {
-      document.body.classList.toggle('pwa-theme-calm', nextTheme === 'calm');
-      document.body.classList.toggle('pwa-theme-warm', nextTheme === 'warm');
+      THEME_OPTIONS.forEach(option => {
+        document.body.classList.toggle('pwa-theme-' + option, nextTheme === option);
+      });
     }
 
     const themeColor = document.querySelector('meta[name="theme-color"]');
@@ -1088,7 +1353,7 @@ function writePwaClient() {
   }
 
   function setTheme_(theme) {
-    const nextTheme = THEME_OPTIONS.includes(theme) ? theme : 'default';
+    const nextTheme = normalizeTheme_(theme);
     try {
       if (window.localStorage) {
         window.localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
@@ -1254,8 +1519,8 @@ function writePwaFiles() {
     scope: './',
     display: 'standalone',
     display_override: ['standalone', 'browser'],
-    background_color: '#0b111a',
-    theme_color: '#0b111a',
+    background_color: '#07161a',
+    theme_color: '#07161a',
     orientation: 'portrait',
     categories: ['books', 'education', 'productivity'],
     prefer_related_applications: false,
@@ -1327,7 +1592,7 @@ function writePwaFiles() {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#0b111a">
+  <meta name="theme-color" content="#07161a">
   <meta name="color-scheme" content="dark light">
   <title>オフライン | 趣味部屋図書館</title>
   <link rel="stylesheet" href="./assets/css/pwa.css">
@@ -1338,7 +1603,7 @@ function writePwaFiles() {
       display: grid;
       place-items: center;
       padding: 24px;
-      background: #0b111a;
+      background: #07161a;
       color: #edf5f7;
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
@@ -1360,7 +1625,7 @@ function writePwaFiles() {
       border: 0;
       border-radius: 8px;
       background: #68bfd7;
-      color: #0b111a;
+      color: #07161a;
       font-weight: 700;
     }
   </style>

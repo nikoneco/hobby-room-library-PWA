@@ -10,11 +10,18 @@
   const IOS_INSTALL_STORAGE_KEY = 'shumiLibrary.pwaIosInstallHintDismissed.v1';
   const INSTALL_HINT_AUTO_HIDE_MS = 12000;
   const THEME_STORAGE_KEY = 'shumiLibrary.pwaTheme.v1';
-  const THEME_OPTIONS = ['default', 'calm', 'warm'];
+  const THEME_DEFAULT = 'shinhaku';
+  const THEME_OPTIONS = ['shinhaku', 'kohi', 'shikon', 'kohaku'];
+  const LEGACY_THEME_ALIASES = {
+    default: 'shinhaku',
+    calm: 'shinhaku',
+    warm: 'kohaku'
+  };
   const THEME_COLORS = {
-    default: '#0b111a',
-    calm: '#07161a',
-    warm: '#16110c'
+    shinhaku: '#07161a',
+    kohi: '#16090d',
+    shikon: '#100d1d',
+    kohaku: '#16110c'
   };
 
   const UPDATE_CHECK_INTERVAL_MS = 60 * 60 * 1000;
@@ -289,20 +296,31 @@
     });
   }
 
+  function normalizeTheme_(theme) {
+    const value = String(theme || '').trim();
+    const migrated = LEGACY_THEME_ALIASES[value] || value;
+    return THEME_OPTIONS.includes(migrated) ? migrated : THEME_DEFAULT;
+  }
+
   function getStoredTheme_() {
     try {
       const value = window.localStorage ? window.localStorage.getItem(THEME_STORAGE_KEY) : '';
-      return THEME_OPTIONS.includes(value) ? value : 'default';
+      const nextTheme = normalizeTheme_(value);
+      if (window.localStorage && value && value !== nextTheme) {
+        window.localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
+      }
+      return nextTheme;
     } catch (e) {
-      return 'default';
+      return THEME_DEFAULT;
     }
   }
 
   function applyTheme_(theme) {
-    const nextTheme = THEME_OPTIONS.includes(theme) ? theme : 'default';
+    const nextTheme = normalizeTheme_(theme);
     if (document.body) {
-      document.body.classList.toggle('pwa-theme-calm', nextTheme === 'calm');
-      document.body.classList.toggle('pwa-theme-warm', nextTheme === 'warm');
+      THEME_OPTIONS.forEach(option => {
+        document.body.classList.toggle('pwa-theme-' + option, nextTheme === option);
+      });
     }
 
     const themeColor = document.querySelector('meta[name="theme-color"]');
@@ -316,7 +334,7 @@
   }
 
   function setTheme_(theme) {
-    const nextTheme = THEME_OPTIONS.includes(theme) ? theme : 'default';
+    const nextTheme = normalizeTheme_(theme);
     try {
       if (window.localStorage) {
         window.localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
