@@ -20,6 +20,7 @@ let bookDetailInFlightCallbacks = new Map();
 let bookshelfScrollSaveTimer = 0;
 let shelfRenderRunId = 0;
 let bookshelfPendingRestoreScroll = false;
+let popupNeighborDetailTimer = 0;
 
 const NO_IMAGE_URL = "https://i.imgur.com/Q80wBRc.jpeg";
 const SENSITIVE_THEME_NAME = '18禁';
@@ -32,6 +33,7 @@ const BOOK_DETAIL_PREFETCH_BATCH_SIZE = 6;
 const BOOK_DETAIL_PREFETCH_WARM_LIMIT = 10;
 const BOOK_DETAIL_PREFETCH_CONCURRENCY = 1;
 const POPUP_DETAIL_PREFETCH_RADIUS = 2;
+const POPUP_NEIGHBOR_DETAIL_DELAY_MS = 260;
 const SHELF_RENDER_INITIAL_BOOK_LIMIT = 0;
 const SHELF_RENDER_CHUNK_SIZE = 80;
 const SHELF_RENDER_CHUNK_DELAY_MS = 16;

@@ -245,14 +245,16 @@ assert(
   clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('function fetchPopupContextBookDetails_') &&
     clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('function collectPopupContextDetailTargets_') &&
     clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('getBookDetailsByRowIndexes(rowIndexes)') &&
-    clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('fetchPopupContextBookDetails_(book, index, dataArr, popupSeriesContext)'),
-  'book popup fetches current and nearby details in one priority batch'
+    clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes("mode: 'currentOnly'") &&
+    clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('function schedulePopupNeighborBookDetails_') &&
+    clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes("mode: 'neighborsOnly'"),
+  'book popup fetches current details immediately and delays nearby detail prefetch'
 );
 {
   const modalSource = clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')];
   const popupMoveStart = modalSource.indexOf('function popupMove(diff)');
   const popupMoveSource = popupMoveStart >= 0 ? modalSource.slice(popupMoveStart) : '';
-  const showPopupIndex = popupMoveSource.indexOf('showPopup(popupData[popupIndex], popupIndex, popupData, popupSeriesContext)');
+  const showPopupIndex = popupMoveSource.indexOf('showPopup(popupData[popupIndex], popupIndex, popupData, popupSeriesContext');
   const timeoutIndex = popupMoveSource.indexOf('window.setTimeout(function()');
   assert(
     popupMoveStart >= 0 &&
@@ -260,6 +262,11 @@ assert(
       timeoutIndex >= 0 &&
       showPopupIndex < timeoutIndex,
     'popup navigation renders the next book before animation cleanup timing'
+  );
+  assert(
+    popupMoveSource.includes('clearPopupNeighborDetailTimer_();') &&
+      !popupMoveSource.includes('warmPopupNeighborDetails_(popupIndex, popupData);'),
+    'popup navigation does not run nearby detail prefetch during swipe transition'
   );
 }
 assert(
