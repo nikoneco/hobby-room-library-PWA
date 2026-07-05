@@ -62,7 +62,7 @@ function buildStaticIndex() {
     /<title>[^<]*<\/title>/,
     [
       '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">',
-      '<meta name="theme-color" content="#07161a">',
+      '<meta name="theme-color" content="#0a1217">',
       '<meta name="color-scheme" content="dark light">',
       '<meta name="apple-mobile-web-app-capable" content="yes">',
       '<meta name="apple-mobile-web-app-title" content="趣味部屋図書館">',
@@ -74,7 +74,7 @@ function buildStaticIndex() {
       '<link rel="manifest" href="./manifest.webmanifest">',
       '<link rel="apple-touch-icon" href="./assets/icons/icon-192.png">',
       '<title>趣味部屋図書館</title>',
-      '<style id="pwa-critical-style">html{background:#07161a;color-scheme:dark light;}body{margin:0;background:#07161a;color:#edf5f7;}</style>'
+      '<style id="pwa-critical-style">html{background:#0a1217;color-scheme:dark light;}body{margin:0;background:#0a1217;color:#edf5f7;}</style>'
     ].join('\n  ')
   );
 
@@ -171,18 +171,18 @@ function writeStaticAssets() {
 function writePwaCss() {
   const css = `
 body.pwa-shell {
-  --pwa-bg-top: #111923;
-  --pwa-bg: #0b111a;
-  --pwa-bg-bottom: #070b11;
-  --pwa-panel: rgba(15, 22, 31, 0.82);
-  --pwa-panel-strong: rgba(16, 24, 34, 0.96);
+  --pwa-bg-top: #10171e;
+  --pwa-bg: #0a1217;
+  --pwa-bg-bottom: #060a0f;
+  --pwa-panel: rgba(13, 22, 29, 0.84);
+  --pwa-panel-strong: rgba(14, 23, 31, 0.96);
   --pwa-panel-soft: rgba(255, 255, 255, 0.048);
-  --pwa-line: rgba(143, 220, 226, 0.22);
-  --pwa-line-strong: rgba(143, 220, 226, 0.42);
-  --pwa-accent: #68bfd7;
-  --pwa-accent-2: #8ee1df;
-  --pwa-accent-rgb: 104, 191, 215;
-  --pwa-accent-2-rgb: 142, 225, 223;
+  --pwa-line: rgba(92, 164, 180, 0.20);
+  --pwa-line-strong: rgba(116, 198, 204, 0.36);
+  --pwa-accent: #5aaec0;
+  --pwa-accent-2: #78c8c8;
+  --pwa-accent-rgb: 90, 174, 192;
+  --pwa-accent-2-rgb: 120, 200, 200;
   --pwa-accent-text: #06151a;
   --pwa-accent-readable: #dff8ff;
   --pwa-warm: #d6a45f;
@@ -208,23 +208,23 @@ body.pwa-shell {
 
 body.pwa-shell::before {
   background:
-    radial-gradient(circle at 14% 12%, rgba(var(--pwa-accent-rgb), 0.12), transparent 30%),
-    linear-gradient(90deg, rgba(var(--pwa-accent-rgb), 0.060), transparent 30%, transparent 70%, rgba(var(--pwa-warm-rgb), 0.052)),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.036), transparent 36%);
+    radial-gradient(circle at 14% 12%, rgba(var(--pwa-accent-rgb), 0.055), transparent 32%),
+    linear-gradient(90deg, rgba(var(--pwa-accent-rgb), 0.026), transparent 30%, transparent 70%, rgba(var(--pwa-warm-rgb), 0.024)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.028), transparent 36%);
 }
 
 body.pwa-theme-shinhaku {
-  --pwa-bg-top: #101a22;
-  --pwa-bg: #07161a;
-  --pwa-bg-bottom: #050b10;
-  --pwa-panel: rgba(8, 24, 29, 0.84);
-  --pwa-panel-strong: rgba(10, 28, 34, 0.96);
-  --pwa-line: rgba(104, 191, 215, 0.25);
-  --pwa-line-strong: rgba(142, 225, 223, 0.46);
-  --pwa-accent: #68bfd7;
-  --pwa-accent-2: #8ee1df;
-  --pwa-accent-rgb: 104, 191, 215;
-  --pwa-accent-2-rgb: 142, 225, 223;
+  --pwa-bg-top: #10171e;
+  --pwa-bg: #0a1217;
+  --pwa-bg-bottom: #060a0f;
+  --pwa-panel: rgba(13, 22, 29, 0.84);
+  --pwa-panel-strong: rgba(14, 23, 31, 0.96);
+  --pwa-line: rgba(92, 164, 180, 0.20);
+  --pwa-line-strong: rgba(116, 198, 204, 0.36);
+  --pwa-accent: #5aaec0;
+  --pwa-accent-2: #78c8c8;
+  --pwa-accent-rgb: 90, 174, 192;
+  --pwa-accent-2-rgb: 120, 200, 200;
   --pwa-accent-text: #06151a;
   --pwa-accent-readable: #dff8ff;
   --pwa-warm: #d6a45f;
@@ -234,17 +234,17 @@ body.pwa-theme-shinhaku {
 }
 
 body.pwa-theme-kohi {
-  --pwa-bg-top: #211317;
-  --pwa-bg: #16090d;
-  --pwa-bg-bottom: #0d0508;
-  --pwa-panel: rgba(31, 13, 18, 0.84);
-  --pwa-panel-strong: rgba(38, 14, 20, 0.96);
-  --pwa-line: rgba(218, 91, 92, 0.25);
-  --pwa-line-strong: rgba(239, 145, 116, 0.48);
-  --pwa-accent: #db5a5d;
-  --pwa-accent-2: #ef9174;
-  --pwa-accent-rgb: 219, 90, 93;
-  --pwa-accent-2-rgb: 239, 145, 116;
+  --pwa-bg-top: #191316;
+  --pwa-bg: #120c0f;
+  --pwa-bg-bottom: #090608;
+  --pwa-panel: rgba(24, 18, 21, 0.84);
+  --pwa-panel-strong: rgba(28, 19, 22, 0.96);
+  --pwa-line: rgba(186, 82, 86, 0.20);
+  --pwa-line-strong: rgba(213, 106, 98, 0.36);
+  --pwa-accent: #b94f55;
+  --pwa-accent-2: #d56f65;
+  --pwa-accent-rgb: 185, 79, 85;
+  --pwa-accent-2-rgb: 213, 111, 101;
   --pwa-accent-text: #1b0708;
   --pwa-accent-readable: #ffe1d9;
   --pwa-warm: #d6a45f;
@@ -254,17 +254,17 @@ body.pwa-theme-kohi {
 }
 
 body.pwa-theme-shikon {
-  --pwa-bg-top: #19162a;
-  --pwa-bg: #100d1d;
-  --pwa-bg-bottom: #090712;
-  --pwa-panel: rgba(24, 19, 42, 0.84);
-  --pwa-panel-strong: rgba(29, 22, 50, 0.96);
-  --pwa-line: rgba(166, 142, 225, 0.26);
-  --pwa-line-strong: rgba(194, 172, 244, 0.48);
-  --pwa-accent: #a68ee1;
-  --pwa-accent-2: #c2acf4;
-  --pwa-accent-rgb: 166, 142, 225;
-  --pwa-accent-2-rgb: 194, 172, 244;
+  --pwa-bg-top: #171621;
+  --pwa-bg: #0f0e18;
+  --pwa-bg-bottom: #080711;
+  --pwa-panel: rgba(21, 20, 32, 0.84);
+  --pwa-panel-strong: rgba(24, 22, 36, 0.96);
+  --pwa-line: rgba(143, 126, 200, 0.22);
+  --pwa-line-strong: rgba(171, 151, 224, 0.38);
+  --pwa-accent: #8d7cc5;
+  --pwa-accent-2: #aa98df;
+  --pwa-accent-rgb: 141, 124, 197;
+  --pwa-accent-2-rgb: 170, 152, 223;
   --pwa-accent-text: #120d22;
   --pwa-accent-readable: #eee6ff;
   --pwa-warm: #d6a45f;
@@ -274,17 +274,17 @@ body.pwa-theme-shikon {
 }
 
 body.pwa-theme-kohaku {
-  --pwa-bg-top: #1f1710;
-  --pwa-bg: #16110c;
-  --pwa-bg-bottom: #0d0906;
-  --pwa-panel: rgba(25, 19, 13, 0.86);
-  --pwa-panel-strong: rgba(32, 23, 15, 0.96);
-  --pwa-line: rgba(214, 164, 95, 0.28);
-  --pwa-line-strong: rgba(240, 195, 122, 0.50);
-  --pwa-accent: #d6a45f;
-  --pwa-accent-2: #f0c37a;
-  --pwa-accent-rgb: 214, 164, 95;
-  --pwa-accent-2-rgb: 240, 195, 122;
+  --pwa-bg-top: #18140f;
+  --pwa-bg: #120f0b;
+  --pwa-bg-bottom: #090705;
+  --pwa-panel: rgba(22, 18, 13, 0.86);
+  --pwa-panel-strong: rgba(26, 20, 14, 0.96);
+  --pwa-line: rgba(191, 143, 78, 0.22);
+  --pwa-line-strong: rgba(221, 174, 104, 0.38);
+  --pwa-accent: #bd8c4f;
+  --pwa-accent-2: #ddb06e;
+  --pwa-accent-rgb: 189, 140, 79;
+  --pwa-accent-2-rgb: 221, 176, 110;
   --pwa-accent-text: #171006;
   --pwa-accent-readable: #fff2d6;
   --pwa-warm: #c98a49;
@@ -519,7 +519,7 @@ body.pwa-shell input:focus,
 body.pwa-shell select:focus,
 body.pwa-shell textarea:focus {
   border-color: var(--pwa-line-strong);
-  box-shadow: 0 0 0 3px rgba(var(--pwa-accent-rgb), 0.14);
+  box-shadow: 0 0 0 3px rgba(var(--pwa-accent-rgb), 0.09);
 }
 
 body.pwa-shell .button-group button.primary,
@@ -531,9 +531,11 @@ body.pwa-shell .mobile-dock-view-btn.active,
 body.pwa-shell .mobile-dock-view-btn:focus-visible,
 body.pwa-shell .toggle-btn.active {
   border-color: var(--pwa-line-strong);
-  background: linear-gradient(180deg, var(--pwa-accent-2), var(--pwa-accent));
-  color: var(--pwa-accent-text);
-  box-shadow: 0 10px 24px rgba(var(--pwa-accent-rgb), 0.16);
+  background:
+    linear-gradient(180deg, rgba(var(--pwa-accent-2-rgb), 0.26), rgba(var(--pwa-accent-rgb), 0.18)),
+    color-mix(in srgb, var(--pwa-panel-strong) 86%, transparent);
+  color: var(--pwa-accent-readable);
+  box-shadow: 0 10px 24px rgba(var(--pwa-accent-rgb), 0.08);
 }
 
 body.pwa-shell .button-group button.secondary,
@@ -556,10 +558,10 @@ body.pwa-shell .bookshelf-cta-card.top-shelf-btn,
 body.pwa-shell .mobile-app-dock-btn.primary,
 body.pwa-shell .shelf-jump-chip.is-active,
 body.pwa-shell .room-map-shelf.is-active {
-  border-color: color-mix(in srgb, var(--pwa-warm-2) 54%, transparent);
+  border-color: color-mix(in srgb, var(--pwa-warm-2) 38%, transparent);
   background:
-    linear-gradient(135deg, rgba(var(--pwa-warm-rgb), 0.24), rgba(var(--pwa-accent-rgb), 0.10)),
-    color-mix(in srgb, var(--pwa-panel-strong) 82%, transparent);
+    linear-gradient(135deg, rgba(var(--pwa-warm-rgb), 0.14), rgba(var(--pwa-accent-rgb), 0.055)),
+    color-mix(in srgb, var(--pwa-panel-strong) 88%, transparent);
   color: var(--pwa-accent-readable);
 }
 
@@ -578,16 +580,16 @@ body.pwa-shell .book-meta-pill,
 body.pwa-shell .search-status-chip,
 body.pwa-shell .shelf-view-stat,
 body.pwa-shell .bookshelf-level-title {
-  border-color: color-mix(in srgb, var(--pwa-line) 76%, transparent);
-  background: rgba(var(--pwa-accent-rgb), 0.10);
+  border-color: color-mix(in srgb, var(--pwa-line) 62%, transparent);
+  background: rgba(var(--pwa-accent-rgb), 0.055);
   color: var(--pwa-accent-readable);
 }
 
 body.pwa-shell .summary-chip-toggle,
 body.pwa-shell .search-status-chip.shelf,
 body.pwa-shell .book-meta-pill.location {
-  border-color: color-mix(in srgb, var(--pwa-warm-2) 42%, transparent);
-  background: rgba(var(--pwa-warm-rgb), 0.12);
+  border-color: color-mix(in srgb, var(--pwa-warm-2) 32%, transparent);
+  background: rgba(var(--pwa-warm-rgb), 0.075);
   color: var(--pwa-accent-readable);
 }
 
@@ -599,7 +601,7 @@ body.pwa-shell .bookshelf-group-title::before {
 
 body.pwa-shell .sensitive-toggle-input:checked + .sensitive-toggle-switch,
 body.pwa-shell .sensitive-toggle:has(.sensitive-toggle-input:checked) .sensitive-toggle-switch {
-  background: rgba(var(--pwa-accent-rgb), 0.34);
+  background: rgba(var(--pwa-accent-rgb), 0.22);
   border-color: var(--pwa-line-strong);
 }
 
@@ -619,8 +621,8 @@ body.pwa-shell .shelf-room-map-overlay {
 }
 
 body.pwa-shell .room-map-shelf {
-  border-color: color-mix(in srgb, var(--pwa-warm-2) 34%, transparent);
-  background: linear-gradient(135deg, rgba(var(--pwa-warm-rgb), 0.18), rgba(var(--pwa-accent-rgb), 0.08));
+  border-color: color-mix(in srgb, var(--pwa-warm-2) 24%, transparent);
+  background: linear-gradient(135deg, rgba(var(--pwa-warm-rgb), 0.10), rgba(var(--pwa-accent-rgb), 0.045));
 }
 
 body.pwa-shell .room-map-shelf:hover,
@@ -629,12 +631,12 @@ body.pwa-shell .shelf-book:hover,
 body.pwa-shell .shelf-book:focus-visible,
 body.pwa-shell .book-card:hover {
   border-color: var(--pwa-line-strong);
-  box-shadow: 0 12px 28px rgba(var(--pwa-accent-rgb), 0.14), 0 12px 28px rgba(0, 0, 0, 0.24);
+  box-shadow: 0 12px 28px rgba(var(--pwa-accent-rgb), 0.08), 0 12px 28px rgba(0, 0, 0, 0.24);
 }
 
 body.pwa-shell .pwa-theme-settings label:has(input:checked) {
   border-color: var(--pwa-line-strong);
-  background: rgba(var(--pwa-accent-rgb), 0.18);
+  background: rgba(var(--pwa-accent-rgb), 0.105);
   color: var(--pwa-accent-readable);
 }
 
@@ -1037,10 +1039,10 @@ function writePwaClient() {
     warm: 'kohaku'
   };
   const THEME_COLORS = {
-    shinhaku: '#07161a',
-    kohi: '#16090d',
-    shikon: '#100d1d',
-    kohaku: '#16110c'
+    shinhaku: '#0a1217',
+    kohi: '#120c0f',
+    shikon: '#0f0e18',
+    kohaku: '#120f0b'
   };
 
   const UPDATE_CHECK_INTERVAL_MS = 60 * 60 * 1000;
@@ -1519,8 +1521,8 @@ function writePwaFiles() {
     scope: './',
     display: 'standalone',
     display_override: ['standalone', 'browser'],
-    background_color: '#07161a',
-    theme_color: '#07161a',
+    background_color: '#0a1217',
+    theme_color: '#0a1217',
     orientation: 'portrait',
     categories: ['books', 'education', 'productivity'],
     prefer_related_applications: false,
@@ -1592,7 +1594,7 @@ function writePwaFiles() {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#07161a">
+  <meta name="theme-color" content="#0a1217">
   <meta name="color-scheme" content="dark light">
   <title>オフライン | 趣味部屋図書館</title>
   <link rel="stylesheet" href="./assets/css/pwa.css">
@@ -1603,7 +1605,7 @@ function writePwaFiles() {
       display: grid;
       place-items: center;
       padding: 24px;
-      background: #07161a;
+      background: #0a1217;
       color: #edf5f7;
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
@@ -1625,7 +1627,7 @@ function writePwaFiles() {
       border: 0;
       border-radius: 8px;
       background: #68bfd7;
-      color: #07161a;
+      color: #0a1217;
       font-weight: 700;
     }
   </style>

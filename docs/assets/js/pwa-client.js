@@ -18,10 +18,10 @@
     warm: 'kohaku'
   };
   const THEME_COLORS = {
-    shinhaku: '#07161a',
-    kohi: '#16090d',
-    shikon: '#100d1d',
-    kohaku: '#16110c'
+    shinhaku: '#0a1217',
+    kohi: '#120c0f',
+    shikon: '#0f0e18',
+    kohaku: '#120f0b'
   };
 
   const UPDATE_CHECK_INTERVAL_MS = 60 * 60 * 1000;

@@ -12,8 +12,8 @@
     "standalone",
     "browser"
   ],
-  "background_color": "#07161a",
-  "theme_color": "#07161a",
+  "background_color": "#0a1217",
+  "theme_color": "#0a1217",
   "orientation": "portrait",
   "categories": [
     "books",
