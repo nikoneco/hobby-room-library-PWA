@@ -271,10 +271,18 @@ assert(
 assert(
   clientScriptSources[clientScriptFiles.indexOf('script.state.js.html')].includes('SHELF_RENDER_INITIAL_BOOK_LIMIT') &&
     clientScriptSources[clientScriptFiles.indexOf('script.state.js.html')].includes('SHELF_RENDER_CHUNK_SIZE') &&
+    clientScriptSources[clientScriptFiles.indexOf('script.state.js.html')].includes('SHELF_RENDER_PAUSE_RETRY_MS') &&
     clientScriptSources[clientScriptFiles.indexOf('script.shelf.js.html')].includes('function scheduleShelfRenderQueue_') &&
     clientScriptSources[clientScriptFiles.indexOf('script.shelf.js.html')].includes('appendShelfBookItems_') &&
+    clientScriptSources[clientScriptFiles.indexOf('script.shelf.js.html')].includes('function isShelfRenderPaused_') &&
     clientScriptSources[clientScriptFiles.indexOf('script.shelf.js.html')].includes('renderQueue.push'),
   'bookshelf view renders book tiles incrementally instead of blocking on every tile'
+);
+assert(
+  clientScriptSources[clientScriptFiles.indexOf('script.state.js.html')].includes('bookshelfPendingRestoreScroll') &&
+    clientScriptSources[clientScriptFiles.indexOf('script.shelf.js.html')].includes('restoreBookshelfScrollAfterRender_') &&
+    clientScriptSources[clientScriptFiles.indexOf('script.search.js.html')].includes('bookshelfPendingRestoreScroll = Boolean(opt.restoreScroll)'),
+  'bookshelf scroll restore waits for asynchronous shelf tile rendering'
 );
 assert(
   clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes("--popup-drag-x', `${dragX}px`") &&

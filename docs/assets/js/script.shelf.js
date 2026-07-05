@@ -795,9 +795,22 @@ function appendShelfBookItems_(strip, items, context) {
   return items.length;
 }
 
-function scheduleShelfRenderQueue_(queue, context) {
-  if (!Array.isArray(queue) || !queue.length || !context) return;
+function finishShelfRenderQueue_(context) {
+  if (!context || context.runId !== shelfRenderRunId) return;
+  if (typeof context.onComplete === 'function') {
+    context.onComplete();
+  }
+}
 
+function isShelfRenderPaused_() {
+  return !!(
+    document.body &&
+    document.body.classList &&
+    document.body.classList.contains('modal-open')
+  );
+}
+
+function scheduleShelfRenderQueue_(queue, context) {
   function scheduleNext_(callback, delay) {
     if (delay <= 0 && typeof window.requestAnimationFrame === 'function') {
       window.requestAnimationFrame(callback);
@@ -806,8 +819,19 @@ function scheduleShelfRenderQueue_(queue, context) {
     window.setTimeout(callback, Math.max(0, delay));
   }
 
+  if (!Array.isArray(queue) || !queue.length || !context) {
+    scheduleNext_(function() {
+      finishShelfRenderQueue_(context);
+    }, 0);
+    return;
+  }
+
   function runChunk_() {
     if (context.runId !== shelfRenderRunId) return;
+    if (isShelfRenderPaused_()) {
+      scheduleNext_(runChunk_, SHELF_RENDER_PAUSE_RETRY_MS);
+      return;
+    }
 
     let rendered = 0;
     while (queue.length && rendered < SHELF_RENDER_CHUNK_SIZE) {
@@ -826,11 +850,22 @@ function scheduleShelfRenderQueue_(queue, context) {
       }
     }
 
-    if (!queue.length) return;
+    if (!queue.length) {
+      finishShelfRenderQueue_(context);
+      return;
+    }
     scheduleNext_(runChunk_, SHELF_RENDER_CHUNK_DELAY_MS);
   }
 
   scheduleNext_(runChunk_, 0);
+}
+
+function restoreBookshelfScrollAfterRender_() {
+  if (!bookshelfPendingRestoreScroll) return;
+  bookshelfPendingRestoreScroll = false;
+  if (typeof restoreBookshelfScroll_ === 'function') {
+    restoreBookshelfScroll_();
+  }
 }
 
 function renderShelfView_(data) {
@@ -863,7 +898,8 @@ function renderShelfView_(data) {
     runId: renderRunId,
     revealIndex: 0,
     popupIndexByOriginalIndex: shelfPopupIndexByOriginalIndex,
-    popupData: shelfPopupData
+    popupData: shelfPopupData,
+    onComplete: restoreBookshelfScrollAfterRender_
   };
   let initialRenderedCount = 0;
 

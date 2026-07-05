@@ -1971,11 +1971,11 @@ function showAllBookshelf() {
       const resultBooks = Array.isArray(loadedBooks) ? loadedBooks : [];
       if (!resultBooks.length && renderedFromCache) return;
 
+      bookshelfPendingRestoreScroll = Boolean(opt.restoreScroll);
       lastResult = resultBooks;
       showResult(resultBooks);
       showSearchStatusResult_('shelf', resultBooks.length, opt.statusParams || {});
       if (opt.restoreScroll) {
-        restoreBookshelfScroll_();
         return;
       }
       if (!opt.keepScroll) scrollToBookshelfTop_();
