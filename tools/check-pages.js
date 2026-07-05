@@ -31,6 +31,7 @@ const pagesWorkflow = read(pagesWorkflowPath);
   'assets/logo.png',
   'assets/librarian-presence.jpg',
   'assets/splash-lantern.png',
+  'assets/splash-lantern.jpg',
   'assets/icons/icon-lantern-192.png',
   'assets/icons/icon-lantern-512.png',
   'assets/icons/apple-touch-icon-lantern-180.png'
@@ -54,6 +55,11 @@ const pagesWorkflow = read(pagesWorkflowPath);
   assert(signature.equals(Buffer.from([0xff, 0xd8, 0xff])), 'assets/librarian-presence.jpg is a JPEG');
 }
 
+{
+  const signature = fs.readFileSync(path.join(docs, 'assets', 'splash-lantern.jpg')).subarray(0, 3);
+  assert(signature.equals(Buffer.from([0xff, 0xd8, 0xff])), 'assets/splash-lantern.jpg is a JPEG');
+}
+
 assert(!index.includes('HtmlService.createHtmlOutputFromFile'), 'static index has no GAS template includes');
 assert(index.includes('rel="manifest" href="./manifest.webmanifest"'), 'static index references manifest');
 assert(index.includes('rel="apple-touch-icon" href="./assets/icons/apple-touch-icon-lantern-180.png"'), 'static index references renamed lantern apple touch icon');
@@ -65,7 +71,7 @@ assert(index.includes('id="pwa-critical-style"'), 'static index includes critica
 assert(index.includes('html{background:#0a1217'), 'critical style paints shinhaku shell before CSS loads');
 assert(index.includes('apple-mobile-web-app-status-bar-style" content="black-translucent"'), 'static index uses translucent iOS standalone status bar');
 assert(index.includes('id="pwaLaunchSplash"'), 'static index includes launch splash overlay');
-assert(index.includes('src="./assets/splash-lantern.png"'), 'static index uses lantern splash asset');
+assert(index.includes('src="./assets/splash-lantern.jpg"'), 'static index uses optimized lantern splash asset');
 assert(index.includes('id="pwaNetworkBanner"'), 'static index includes offline/network banner');
 assert(index.includes('./assets/js/gas-run-shim.js'), 'static index loads GAS JSONP shim');
 assert(index.includes('./assets/js/pwa-client.js'), 'static index loads PWA client');
@@ -144,7 +150,7 @@ assert(sw.includes('offline.html'), 'service worker caches offline fallback');
 assert(/shumi-library-pwa-[a-f0-9]{12}/.test(sw), 'service worker cache name is content hashed');
 assert(sw.includes('./assets/logo.png'), 'service worker caches local logo');
 assert(sw.includes('./assets/librarian-presence.jpg'), 'service worker caches librarian presence logo');
-assert(sw.includes('./assets/splash-lantern.png'), 'service worker caches lantern splash image');
+assert(sw.includes('./assets/splash-lantern.jpg'), 'service worker caches optimized lantern splash image');
 assert(sw.includes('./assets/icons/icon-lantern-192.png'), 'service worker caches renamed 192px lantern icon');
 assert(sw.includes('./assets/icons/icon-lantern-512.png'), 'service worker caches renamed 512px lantern icon');
 assert(sw.includes('./assets/icons/apple-touch-icon-lantern-180.png'), 'service worker caches renamed apple touch lantern icon');
@@ -163,6 +169,7 @@ const pwaClient = read(path.join(docs, 'assets', 'js', 'pwa-client.js'));
 const bootClient = read(path.join(docs, 'assets', 'js', 'script.boot.js'));
 assert(pwaCss.includes('body.pwa-standalone .mobile-app-dock'), 'PWA CSS styles standalone dock');
 assert(pwaCss.includes('.pwa-launch-splash'), 'PWA CSS styles launch splash overlay');
+assert(pwaCss.includes('body.pwa-launch-splash-visible .pwa-launch-splash'), 'PWA CSS only reveals launch splash while body state is active');
 assert(pwaCss.includes('@keyframes pwaLanternGlow'), 'PWA CSS animates lantern glow');
 assert(pwaCss.includes('.pwa-settings-button'), 'PWA CSS styles settings button');
 assert(pwaCss.includes('.pwa-settings-panel'), 'PWA CSS styles settings panel');
@@ -185,6 +192,8 @@ assert(!pwaCss.includes('.pwa-recent-book'), 'PWA CSS omits recent book cards');
 assert(pwaClient.includes("document.body.classList.add('pwa-shell')"), 'PWA client marks shell body');
 assert(pwaClient.includes('startLaunchSplash_'), 'PWA client starts launch splash animation');
 assert(pwaClient.includes('finishLaunchSplash_'), 'PWA client removes launch splash animation');
+assert(pwaClient.includes('shouldShowLaunchSplash_'), 'PWA client gates launch splash visibility');
+assert(pwaClient.includes('removeLaunchSplashImmediately_'), 'PWA client removes launch splash outside standalone mode');
 assert(pwaClient.includes("window.matchMedia('(display-mode: standalone)')"), 'PWA client detects standalone display mode');
 assert(pwaClient.includes('requestServiceWorkerUpdate_'), 'PWA client can request service worker update checks');
 assert(pwaClient.includes("document.addEventListener('visibilitychange'"), 'PWA client checks updates when returning to foreground');

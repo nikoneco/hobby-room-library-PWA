@@ -574,9 +574,38 @@
     }
   }
 
+  function isLaunchSplashDebug_() {
+    try {
+      const params = new URLSearchParams(window.location.search || '');
+      return params.has('debugLaunchSplash');
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function shouldShowLaunchSplash_() {
+    return isStandalone_() || isLaunchSplashDebug_();
+  }
+
+  function removeLaunchSplashImmediately_() {
+    const splash = document.getElementById('pwaLaunchSplash');
+    if (!splash) return;
+    if (document.body) {
+      document.body.classList.remove('pwa-launch-splash-visible');
+    }
+    if (splash.parentNode) {
+      splash.parentNode.removeChild(splash);
+    }
+  }
+
   function startLaunchSplash_() {
     const splash = document.getElementById('pwaLaunchSplash');
     if (!splash || !document.body) return;
+
+    if (!shouldShowLaunchSplash_()) {
+      removeLaunchSplashImmediately_();
+      return;
+    }
 
     document.body.classList.add('pwa-launch-splash-visible');
 

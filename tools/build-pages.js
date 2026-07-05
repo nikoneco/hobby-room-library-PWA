@@ -112,7 +112,7 @@ function buildStaticIndex() {
     `$1
   <div id="pwaLaunchSplash" class="pwa-launch-splash" aria-hidden="true">
     <div class="pwa-launch-splash-scene">
-      <img src="./assets/splash-lantern.png" alt="">
+      <img src="./assets/splash-lantern.jpg" alt="">
     </div>
   </div>
   <div id="pwaNetworkBanner" class="pwa-network-banner" role="status" aria-live="polite" hidden></div>
@@ -328,9 +328,16 @@ body.pwa-theme-kohaku {
     radial-gradient(circle at 50% 62%, rgba(214, 164, 95, 0.16), transparent 22%),
     radial-gradient(circle at 50% 44%, rgba(90, 174, 192, 0.10), transparent 34%),
     linear-gradient(180deg, #05090d 0%, #0a1217 52%, #05070a 100%);
-  opacity: 1;
-  pointer-events: auto;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
   transition: opacity 520ms ease, visibility 520ms ease;
+}
+
+body.pwa-launch-splash-visible .pwa-launch-splash {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
 }
 
 .pwa-launch-splash::before,
@@ -1910,9 +1917,38 @@ function writePwaClient() {
     }
   }
 
+  function isLaunchSplashDebug_() {
+    try {
+      const params = new URLSearchParams(window.location.search || '');
+      return params.has('debugLaunchSplash');
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function shouldShowLaunchSplash_() {
+    return isStandalone_() || isLaunchSplashDebug_();
+  }
+
+  function removeLaunchSplashImmediately_() {
+    const splash = document.getElementById('pwaLaunchSplash');
+    if (!splash) return;
+    if (document.body) {
+      document.body.classList.remove('pwa-launch-splash-visible');
+    }
+    if (splash.parentNode) {
+      splash.parentNode.removeChild(splash);
+    }
+  }
+
   function startLaunchSplash_() {
     const splash = document.getElementById('pwaLaunchSplash');
     if (!splash || !document.body) return;
+
+    if (!shouldShowLaunchSplash_()) {
+      removeLaunchSplashImmediately_();
+      return;
+    }
 
     document.body.classList.add('pwa-launch-splash-visible');
 
@@ -2160,7 +2196,7 @@ function writePwaFiles() {
   './assets/css/pwa.css',
   './assets/logo.png',
   './assets/librarian-presence.jpg',
-  './assets/splash-lantern.png',
+  './assets/splash-lantern.jpg',
   './assets/js/gas-run-shim.js',
   './assets/js/pwa-client.js',
   './assets/js/script.state.js',
