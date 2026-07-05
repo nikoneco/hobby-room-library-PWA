@@ -797,6 +797,10 @@ function appendShelfBookItems_(strip, items, context) {
 
 function finishShelfRenderQueue_(context) {
   if (!context || context.runId !== shelfRenderRunId) return;
+  pwaPerfEnd_(context.perfToken, {
+    count: context.totalCount,
+    chunks: context.chunkCount || 0
+  });
   if (typeof context.onComplete === 'function') {
     context.onComplete();
   }
@@ -834,6 +838,9 @@ function scheduleShelfRenderQueue_(queue, context) {
     }
 
     let rendered = 0;
+    const chunkToken = pwaPerfStart_('shelf:chunk', {
+      count: SHELF_RENDER_CHUNK_SIZE
+    });
     while (queue.length && rendered < SHELF_RENDER_CHUNK_SIZE) {
       const task = queue[0];
       if (!task || !task.strip || !Array.isArray(task.items) || !task.items.length) {
@@ -849,6 +856,8 @@ function scheduleShelfRenderQueue_(queue, context) {
         queue.shift();
       }
     }
+    context.chunkCount = (context.chunkCount || 0) + 1;
+    pwaPerfEnd_(chunkToken, { count: rendered });
 
     if (!queue.length) {
       finishShelfRenderQueue_(context);
@@ -869,6 +878,12 @@ function restoreBookshelfScrollAfterRender_() {
 }
 
 function renderShelfView_(data) {
+  const perfToken = pwaPerfStart_('shelf:render-full', {
+    count: Array.isArray(data) ? data.length : 0
+  });
+  const initialPerfToken = pwaPerfStart_('render:shelf-initial', {
+    count: Array.isArray(data) ? data.length : 0
+  });
   resetBookDetailPrefetchObserver_();
   const renderRunId = ++shelfRenderRunId;
 
@@ -899,6 +914,9 @@ function renderShelfView_(data) {
     revealIndex: 0,
     popupIndexByOriginalIndex: shelfPopupIndexByOriginalIndex,
     popupData: shelfPopupData,
+    totalCount: data.length,
+    perfToken: perfToken,
+    chunkCount: 0,
     onComplete: restoreBookshelfScrollAfterRender_
   };
   let initialRenderedCount = 0;
@@ -969,6 +987,7 @@ function renderShelfView_(data) {
   });
 
   scheduleShelfRenderQueue_(renderQueue, renderContext);
+  pwaPerfEnd_(initialPerfToken, { count: data.length });
 
   warmBookDetailPrefetch_(shelfPopupData, {
     limit: BOOK_DETAIL_PREFETCH_WARM_LIMIT,
@@ -999,6 +1018,7 @@ function showResult(data) {
   updateViewToggleButtons_();
 
   const viewMode = getCurrentViewMode_();
+  const renderPerfToken = pwaPerfStart_('render:' + viewMode, { count: data.length });
   syncShelfViewUiState_(viewMode);
   if (viewMode !== 'shelf') {
     shelfRenderRunId += 1;
@@ -1154,6 +1174,7 @@ function showResult(data) {
     result.appendChild(container);
   }
 
+  pwaPerfEnd_(renderPerfToken, { count: data.length });
   result.classList.remove('show');
   result.classList.add('result-fade');
 

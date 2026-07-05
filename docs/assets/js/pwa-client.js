@@ -14,6 +14,11 @@
   const THEME_STORAGE_KEY = 'shumiLibrary.pwaTheme.v1';
   const LIBRARIAN_PRESENCE_STORAGE_KEY = 'shumiLibrary.librarianPresence.v1';
   const QUIET_MOTION_STORAGE_KEY = 'shumiLibrary.quietMotion.v1';
+  const PERF_HUD_STORAGE_KEY = 'shumiLibrary.perfHudEnabled.v1';
+  const PERF_LOG_STORAGE_KEY = 'shumiLibrary.perfLog.v1';
+  const PERF_LOG_LIMIT = 20;
+  const PERF_SLOW_THRESHOLD_MS = 250;
+  const PERF_LONG_TASK_THRESHOLD_MS = 50;
   const DEFAULT_LOGO_SRC = './assets/logo.png';
   const LIBRARIAN_LOGO_SRC = './assets/librarian-presence.jpg';
   const THEME_DEFAULT = 'shinhaku';
@@ -73,6 +78,10 @@
   let installHintTimer = 0;
   let launchSplashTimer = 0;
   let launchSplashReady = false;
+  let perfHudEnabled = false;
+  let perfHudElement = null;
+  let perfLog = null;
+  let perfLongTaskObserver = null;
 
   function isStandalone_() {
     return Boolean(
@@ -454,6 +463,286 @@
     applyPlaySettings_();
   }
 
+  function now_() {
+    return window.performance && typeof window.performance.now === 'function'
+      ? window.performance.now()
+      : Date.now();
+  }
+
+  function isPerfHudRequested_() {
+    try {
+      const params = new URLSearchParams(window.location.search || '');
+      return params.has('debugPerf');
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function isPerfHudEnabled_() {
+    return Boolean(perfHudEnabled || isPerfHudRequested_() || getStoredBoolean_(PERF_HUD_STORAGE_KEY, false));
+  }
+
+  function getPerfLog_() {
+    if (Array.isArray(perfLog)) return perfLog;
+    try {
+      const raw = window.localStorage ? window.localStorage.getItem(PERF_LOG_STORAGE_KEY) : '';
+      const parsed = raw ? JSON.parse(raw) : [];
+      perfLog = Array.isArray(parsed) ? parsed.slice(-PERF_LOG_LIMIT) : [];
+    } catch (e) {
+      perfLog = [];
+    }
+    return perfLog;
+  }
+
+  function savePerfLog_() {
+    try {
+      if (window.localStorage) {
+        window.localStorage.setItem(PERF_LOG_STORAGE_KEY, JSON.stringify(getPerfLog_().slice(-PERF_LOG_LIMIT)));
+      }
+    } catch (e) {
+      // 計測ログが保存できなくてもHUD表示だけ継続する。
+    }
+  }
+
+  function formatDuration_(durationMs) {
+    const value = Math.max(0, Number(durationMs || 0));
+    if (value >= 1000) return (value / 1000).toFixed(2) + 's';
+    return Math.round(value) + 'ms';
+  }
+
+  function summarizePerfMeta_(entry) {
+    const meta = entry && entry.meta && typeof entry.meta === 'object' ? entry.meta : {};
+    const parts = [];
+    if (meta.api) parts.push('api=' + meta.api);
+    if (meta.method) parts.push('method=' + meta.method);
+    if (meta.count !== undefined) parts.push('count=' + meta.count);
+    if (meta.ok === false) parts.push('fail');
+    if (meta.code) parts.push('code=' + meta.code);
+    return parts.join(' / ');
+  }
+
+  function ensurePerfHud_() {
+    if (perfHudElement) return perfHudElement;
+
+    const hud = document.createElement('section');
+    hud.id = 'pwaPerfHud';
+    hud.className = 'pwa-perf-hud';
+    hud.setAttribute('aria-label', '性能HUD');
+    hud.hidden = true;
+
+    const header = document.createElement('div');
+    header.className = 'pwa-perf-hud-header';
+
+    const title = document.createElement('p');
+    title.className = 'pwa-perf-hud-title';
+    title.textContent = 'Perf HUD';
+    header.appendChild(title);
+
+    const actions = document.createElement('div');
+    actions.className = 'pwa-perf-hud-actions';
+
+    const copyButton = document.createElement('button');
+    copyButton.id = 'pwaPerfHudCopy';
+    copyButton.type = 'button';
+    copyButton.textContent = 'コピー';
+    actions.appendChild(copyButton);
+
+    const clearButton = document.createElement('button');
+    clearButton.id = 'pwaPerfHudClear';
+    clearButton.type = 'button';
+    clearButton.textContent = '消す';
+    actions.appendChild(clearButton);
+
+    header.appendChild(actions);
+    hud.appendChild(header);
+
+    const summary = document.createElement('div');
+    summary.id = 'pwaPerfHudSummary';
+    summary.className = 'pwa-perf-hud-summary';
+    hud.appendChild(summary);
+
+    const rows = document.createElement('div');
+    rows.id = 'pwaPerfHudRows';
+    rows.className = 'pwa-perf-hud-rows';
+    hud.appendChild(rows);
+
+    const note = document.createElement('p');
+    note.id = 'pwaPerfHudNote';
+    note.className = 'pwa-perf-hud-note';
+    note.textContent = '直近20件を保存します';
+    hud.appendChild(note);
+
+    copyButton.addEventListener('click', copyPerfLog_);
+    clearButton.addEventListener('click', function() {
+      perfLog = [];
+      savePerfLog_();
+      renderPerfHud_();
+    });
+
+    document.body.appendChild(hud);
+    perfHudElement = hud;
+    return hud;
+  }
+
+  function renderPerfHud_() {
+    const enabled = isPerfHudEnabled_();
+    if (document.body) {
+      document.body.classList.toggle('pwa-perf-hud-visible', enabled);
+    }
+
+    const input = document.getElementById('pwaPerfHudEnabled');
+    if (input) input.checked = enabled;
+
+    if (!enabled) {
+      if (perfHudElement) perfHudElement.hidden = true;
+      return;
+    }
+
+    const hud = ensurePerfHud_();
+    const rowsEl = document.getElementById('pwaPerfHudRows');
+    const summaryEl = document.getElementById('pwaPerfHudSummary');
+    const entries = getPerfLog_();
+    hud.hidden = false;
+
+    if (summaryEl) {
+      const latestApi = entries.slice().reverse().find(entry => String(entry.name || '').indexOf('api:') === 0);
+      const latestRender = entries.slice().reverse().find(entry => String(entry.name || '').indexOf('render:') === 0 || String(entry.name || '').indexOf('shelf:') === 0);
+      const latestPopup = entries.slice().reverse().find(entry => String(entry.name || '').indexOf('popup:') === 0);
+      const longTasks = entries.filter(entry => String(entry.name || '') === 'longtask').length;
+      const stats = [
+        { label: 'API', value: latestApi ? formatDuration_(latestApi.durationMs) : '-' },
+        { label: '描画', value: latestRender ? formatDuration_(latestRender.durationMs) : '-' },
+        { label: 'モーダル', value: latestPopup ? formatDuration_(latestPopup.durationMs) : '-' },
+        { label: 'Long task', value: String(longTasks) }
+      ];
+      summaryEl.innerHTML = '';
+      stats.forEach(function(stat) {
+        const item = document.createElement('div');
+        item.className = 'pwa-perf-hud-stat';
+        item.innerHTML = '<span class="pwa-perf-hud-stat-label"></span><span class="pwa-perf-hud-stat-value"></span>';
+        item.querySelector('.pwa-perf-hud-stat-label').textContent = stat.label;
+        item.querySelector('.pwa-perf-hud-stat-value').textContent = stat.value;
+        summaryEl.appendChild(item);
+      });
+    }
+
+    if (!rowsEl) return;
+    rowsEl.innerHTML = '';
+    entries.slice(-8).reverse().forEach(function(entry) {
+      const row = document.createElement('div');
+      row.className = 'pwa-perf-hud-row';
+      if (Number(entry.durationMs || 0) >= PERF_SLOW_THRESHOLD_MS || entry.name === 'longtask') {
+        row.classList.add('is-slow');
+      }
+      const name = document.createElement('div');
+      name.className = 'pwa-perf-hud-name';
+      const metaText = summarizePerfMeta_(entry);
+      name.textContent = metaText ? entry.name + ' / ' + metaText : entry.name;
+      const time = document.createElement('div');
+      time.className = 'pwa-perf-hud-time';
+      time.textContent = formatDuration_(entry.durationMs);
+      row.appendChild(name);
+      row.appendChild(time);
+      rowsEl.appendChild(row);
+    });
+  }
+
+  function copyPerfLog_() {
+    const payload = {
+      generatedAt: new Date().toISOString(),
+      url: window.location.href,
+      userAgent: navigator.userAgent,
+      entries: getPerfLog_()
+    };
+    const text = JSON.stringify(payload, null, 2);
+    const done = function(ok) {
+      const note = document.getElementById('pwaPerfHudNote');
+      if (note) note.textContent = ok ? 'コピーしました' : 'コピーできませんでした';
+    };
+
+    if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+      navigator.clipboard.writeText(text).then(function() {
+        done(true);
+      }).catch(function() {
+        done(false);
+      });
+      return;
+    }
+
+    try {
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.setAttribute('readonly', 'readonly');
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      const ok = document.execCommand('copy');
+      textarea.remove();
+      done(ok);
+    } catch (e) {
+      done(false);
+    }
+  }
+
+  function recordPerf_(name, durationMs, meta) {
+    if (!isPerfHudEnabled_()) return null;
+    const entry = {
+      name: String(name || 'measure'),
+      durationMs: Math.max(0, Math.round(Number(durationMs || 0))),
+      at: new Date().toISOString(),
+      meta: meta && typeof meta === 'object' ? meta : {}
+    };
+    const log = getPerfLog_();
+    log.push(entry);
+    while (log.length > PERF_LOG_LIMIT) log.shift();
+    savePerfLog_();
+    renderPerfHud_();
+    if (window.console && typeof window.console.debug === 'function') {
+      window.console.debug('[perf]', entry);
+    }
+    return entry;
+  }
+
+  function startPerf_(name, meta) {
+    if (!isPerfHudEnabled_()) return null;
+    return {
+      name: String(name || 'measure'),
+      startedAt: now_(),
+      meta: meta && typeof meta === 'object' ? meta : {}
+    };
+  }
+
+  function endPerf_(token, meta) {
+    if (!token) return null;
+    const mergedMeta = Object.assign({}, token.meta || {}, meta || {});
+    return recordPerf_(token.name, now_() - Number(token.startedAt || now_()), mergedMeta);
+  }
+
+  function observeLongTasks_() {
+    if (perfLongTaskObserver || !isPerfHudEnabled_()) return;
+    if (!('PerformanceObserver' in window)) return;
+    try {
+      perfLongTaskObserver = new PerformanceObserver(function(list) {
+        list.getEntries().forEach(function(entry) {
+          if (Number(entry.duration || 0) >= PERF_LONG_TASK_THRESHOLD_MS) {
+            recordPerf_('longtask', entry.duration, {});
+          }
+        });
+      });
+      perfLongTaskObserver.observe({ entryTypes: ['longtask'] });
+    } catch (e) {
+      perfLongTaskObserver = null;
+    }
+  }
+
+  function setPerfHudEnabled_(enabled) {
+    perfHudEnabled = Boolean(enabled);
+    setStoredBoolean_(PERF_HUD_STORAGE_KEY, perfHudEnabled);
+    if (perfHudEnabled) observeLongTasks_();
+    renderPerfHud_();
+  }
+
   function getLibrarianText_(key, fallback, data) {
     if (!isLibrarianPresenceEnabled_()) return fallback;
     const entry = LIBRARIAN_TEXTS[key];
@@ -543,6 +832,15 @@
         setQuietMotion_(quietMotionInput.checked);
       });
     }
+    const perfInput = document.getElementById('pwaPerfHudEnabled');
+    if (perfInput) {
+      perfInput.addEventListener('change', function() {
+        setPerfHudEnabled_(perfInput.checked);
+      });
+    }
+    perfHudEnabled = isPerfHudEnabled_();
+    if (perfHudEnabled) observeLongTasks_();
+    renderPerfHud_();
     document.addEventListener('keydown', function(event) {
       if (event.key === 'Escape' && button.getAttribute('aria-expanded') === 'true') {
         setSettingsOpen_(false);
@@ -635,6 +933,9 @@
     isLibrarianPresenceEnabled: isLibrarianPresenceEnabled_,
     isQuietMotionEnabled: isQuietMotionEnabled_,
     getLibrarianText: getLibrarianText_,
+    perfStart: startPerf_,
+    perfEnd: endPerf_,
+    recordPerf: recordPerf_,
     handleApiFailure: function(error) {
       if (error && error.code === 'OFFLINE') {
         setBanner_(OFFLINE_MESSAGE, 'error');

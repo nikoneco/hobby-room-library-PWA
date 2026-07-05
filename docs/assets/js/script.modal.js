@@ -1314,6 +1314,11 @@ function showSeriesPanel(sourceBook, seriesBooks, returnContext) {
 }
 
 function showPopup(book, index, dataArr, seriesContext, options) {
+  const popupRenderPerfToken = pwaPerfStart_('popup:render', {
+    index,
+    count: Array.isArray(dataArr) ? dataArr.length : 0,
+    shelf: isShelfPopupContext_(dataArr)
+  });
   const popupOptions = options || {};
   const sourceBook = book;
   const deferCurrentDetailRender = Boolean(
@@ -1461,6 +1466,12 @@ function showPopup(book, index, dataArr, seriesContext, options) {
     if (e.key === 'ArrowRight') popupMove(1);
   };
 
+  pwaPerfEnd_(popupRenderPerfToken, {
+    index: popupIndex,
+    detailLoaded: Boolean(renderBook && renderBook.detailLoaded),
+    deferred: Boolean(deferCurrentDetailRender)
+  });
+
   prevBtn.style.display = (popupIndex > 0) ? 'block' : 'none';
   nextBtn.style.display = (popupIndex < popupData.length - 1) ? 'block' : 'none';
   setupPopupNavButton_(prevBtn, popupIndex - 1, '前へ');
@@ -1597,6 +1608,12 @@ function popupMove(diff, options) {
   const newIndex = popupIndex + diff;
   if (newIndex < 0 || newIndex >= popupData.length) return;
 
+  const movePerfToken = pwaPerfStart_('popup:move', {
+    from: popupIndex,
+    to: newIndex,
+    diff,
+    shelf: isShelfPopupContext_(popupData)
+  });
   const popupOptions = options || {};
   const currentContent = document.getElementById('image-popup-content');
   const useTransitionClone = Boolean(
@@ -1632,4 +1649,8 @@ function popupMove(diff, options) {
   };
 
   renderNextPopup_();
+  pwaPerfEnd_(movePerfToken, {
+    index: popupIndex,
+    count: Array.isArray(popupData) ? popupData.length : 0
+  });
 }

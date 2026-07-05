@@ -81,6 +81,7 @@ assert(index.includes('id="pwaSettingsButton"'), 'static index includes PWA sett
 assert(index.includes('id="pwaSettingsPanel"'), 'static index includes PWA settings panel');
 assert(index.includes('id="pwaLibrarianPresence"'), 'static index includes librarian presence setting');
 assert(index.includes('id="pwaQuietMotion"'), 'static index includes quiet motion setting');
+assert(index.includes('id="pwaPerfHudEnabled"'), 'static index includes performance HUD setting');
 ['shinhaku', 'kohi', 'shikon', 'kohaku'].forEach(value => {
   assert(index.includes(`name="pwaTheme" value="${value}"`), `static index includes ${value} theme option`);
 });
@@ -167,6 +168,7 @@ assert(buildScript.includes('buildAppShellCacheName_'), 'build script derives se
 
 const pwaCss = read(path.join(docs, 'assets', 'css', 'pwa.css'));
 const pwaClient = read(path.join(docs, 'assets', 'js', 'pwa-client.js'));
+const gasRunShim = read(path.join(docs, 'assets', 'js', 'gas-run-shim.js'));
 const bootClient = read(path.join(docs, 'assets', 'js', 'script.boot.js'));
 assert(pwaCss.includes('body.pwa-standalone .mobile-app-dock'), 'PWA CSS styles standalone dock');
 assert(pwaCss.includes('.pwa-launch-splash'), 'PWA CSS styles launch splash overlay');
@@ -174,6 +176,8 @@ assert(pwaCss.includes('body.pwa-launch-splash-visible .pwa-launch-splash'), 'PW
 assert(pwaCss.includes('@keyframes pwaLanternGlow'), 'PWA CSS animates lantern glow');
 assert(pwaCss.includes('.pwa-settings-button'), 'PWA CSS styles settings button');
 assert(pwaCss.includes('.pwa-settings-panel'), 'PWA CSS styles settings panel');
+assert(pwaCss.includes('.pwa-perf-hud'), 'PWA CSS styles performance HUD');
+assert(pwaCss.includes('.pwa-perf-hud-row.is-slow'), 'PWA CSS highlights slow performance rows');
 assert(pwaCss.includes('.pwa-settings-button ~ .view-toggle'), 'PWA CSS keeps mobile view toggle away from settings button');
 assert(pwaCss.includes('left: max(8px, env(safe-area-inset-left))'), 'PWA CSS moves mobile view toggle to the left edge');
 assert(pwaCss.includes('body.pwa-theme-shinhaku'), 'PWA CSS includes shinhaku theme');
@@ -206,6 +210,11 @@ assert(pwaClient.includes('IOS_INSTALL_STORAGE_KEY'), 'PWA client remembers dism
 assert(pwaClient.includes('THEME_STORAGE_KEY'), 'PWA client persists selected color theme');
 assert(pwaClient.includes('LIBRARIAN_PRESENCE_STORAGE_KEY'), 'PWA client persists librarian presence setting');
 assert(pwaClient.includes('QUIET_MOTION_STORAGE_KEY'), 'PWA client persists quiet motion setting');
+assert(pwaClient.includes('PERF_HUD_STORAGE_KEY'), 'PWA client persists performance HUD setting');
+assert(pwaClient.includes('PERF_LOG_STORAGE_KEY'), 'PWA client persists performance HUD logs');
+assert(pwaClient.includes('recordPerf_'), 'PWA client records performance entries');
+assert(pwaClient.includes('observeLongTasks_'), 'PWA client observes long tasks for performance HUD');
+assert(pwaClient.includes('copyPerfLog_'), 'PWA client can copy performance logs');
 assert(pwaClient.includes('LIBRARIAN_LOGO_SRC'), 'PWA client can switch to librarian logo');
 assert(pwaClient.includes('getLibrarianText'), 'PWA client exposes librarian text hook');
 assert(pwaClient.includes('THEME_COLORS'), 'PWA client maps themes to shell colors');
@@ -214,6 +223,10 @@ assert(pwaClient.includes('LEGACY_THEME_ALIASES'), 'PWA client migrates old stor
 assert(pwaClient.includes('meta[name="theme-color"]'), 'PWA client updates browser theme color');
 assert(pwaClient.includes('moveSensitiveToggleToSettings_'), 'PWA client moves sensitive toggle into settings');
 assert(pwaClient.includes('bindSettingsPanel_'), 'PWA client binds settings panel controls');
+assert(pwaClient.includes('perfStart: startPerf_'), 'PWA client exposes performance start hook');
+assert(pwaClient.includes('perfEnd: endPerf_'), 'PWA client exposes performance end hook');
+assert(gasRunShim.includes("startPerf_('api:' + config.api"), 'GAS JSONP shim measures API calls');
+assert(gasRunShim.includes("endPerf_(perfToken"), 'GAS JSONP shim completes API performance measures');
 assert(pwaClient.includes('function isIosLike_'), 'PWA client detects iOS-like browsers');
 assert(pwaClient.includes('showIosInstallHint_'), 'PWA client can show iOS install hint');
 assert(pwaClient.includes('INSTALL_HINT_AUTO_HIDE_MS'), 'PWA client auto-hides install hints');

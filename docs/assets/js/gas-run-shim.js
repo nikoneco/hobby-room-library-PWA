@@ -85,6 +85,19 @@
     }
   }
 
+  function startPerf_(name, meta) {
+    if (window.ShumiLibraryPwa && typeof window.ShumiLibraryPwa.perfStart === 'function') {
+      return window.ShumiLibraryPwa.perfStart(name, meta);
+    }
+    return null;
+  }
+
+  function endPerf_(token, meta) {
+    if (window.ShumiLibraryPwa && typeof window.ShumiLibraryPwa.perfEnd === 'function') {
+      window.ShumiLibraryPwa.perfEnd(token, meta);
+    }
+  }
+
   function invokeFailure_(handler, error) {
     notifyFailure_(error);
     if (typeof handler === 'function') {
@@ -134,7 +147,13 @@
       return;
     }
 
+    const perfToken = startPerf_('api:' + config.api, {
+      method: methodName,
+      api: config.api
+    });
+
     if (navigator && navigator.onLine === false) {
+      endPerf_(perfToken, { ok: false, code: 'OFFLINE' });
       invokeFailure_(
         failureHandler,
         createError_('端末がオフラインです。通信が戻ってから再試行してください。', 'OFFLINE')
@@ -172,6 +191,7 @@
 
       if (!envelope || envelope.ok === false) {
         const errorInfo = envelope && envelope.error ? envelope.error : {};
+        endPerf_(perfToken, { ok: false, code: errorInfo.code || 'API_ERROR' });
         invokeFailure_(
           failureHandler,
           createError_(errorInfo.message || 'APIからエラーが返りました。', 'API_ERROR', errorInfo)
@@ -179,6 +199,10 @@
         return;
       }
 
+      endPerf_(perfToken, {
+        ok: true,
+        count: Array.isArray(envelope.data) ? envelope.data.length : undefined
+      });
       notifySuccess_();
       if (typeof successHandler === 'function') {
         successHandler(envelope.data);
@@ -189,6 +213,7 @@
       if (finished) return;
       finished = true;
       cleanup_();
+      endPerf_(perfToken, { ok: false, code: 'TIMEOUT' });
       invokeFailure_(
         failureHandler,
         createError_('通信がタイムアウトしました。時間を置いて再度お試しください。', 'TIMEOUT')
@@ -201,6 +226,7 @@
       if (finished) return;
       finished = true;
       cleanup_();
+      endPerf_(perfToken, { ok: false, code: 'SCRIPT_ERROR' });
       invokeFailure_(
         failureHandler,
         createError_('APIを読み込めませんでした。通信状態を確認してください。', 'SCRIPT_ERROR')

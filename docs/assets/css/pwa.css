@@ -552,6 +552,137 @@ body.pwa-settings-open {
   accent-color: var(--pwa-accent);
 }
 
+.pwa-perf-hud {
+  position: fixed;
+  right: max(12px, env(safe-area-inset-right));
+  bottom: max(92px, calc(env(safe-area-inset-bottom) + 92px));
+  z-index: 11880;
+  width: min(330px, calc(100vw - 24px - env(safe-area-inset-left) - env(safe-area-inset-right)));
+  max-height: min(52vh, 420px);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--pwa-line);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--pwa-panel-strong) 88%, transparent);
+  color: rgba(237, 245, 247, 0.92);
+  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.44);
+  backdrop-filter: blur(16px);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.pwa-perf-hud[hidden] {
+  display: none;
+}
+
+.pwa-perf-hud-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.pwa-perf-hud-title {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: 0;
+}
+
+.pwa-perf-hud-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.pwa-perf-hud-actions button {
+  min-height: 28px;
+  padding: 4px 8px;
+  border: 1px solid color-mix(in srgb, var(--pwa-line) 76%, transparent);
+  border-radius: 999px;
+  background: var(--pwa-panel-soft);
+  color: rgba(237, 245, 247, 0.84);
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.pwa-perf-hud-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.pwa-perf-hud-stat {
+  min-width: 0;
+  padding: 6px 7px;
+  border: 1px solid color-mix(in srgb, var(--pwa-line) 58%, transparent);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.pwa-perf-hud-stat-label {
+  display: block;
+  color: rgba(220, 232, 238, 0.56);
+  font-size: 0.62rem;
+  font-weight: 800;
+}
+
+.pwa-perf-hud-stat-value {
+  display: block;
+  margin-top: 2px;
+  color: var(--pwa-accent-readable);
+  font-size: 0.8rem;
+  font-weight: 900;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pwa-perf-hud-rows {
+  display: grid;
+  gap: 5px;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.pwa-perf-hud-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 7px;
+  border: 1px solid color-mix(in srgb, var(--pwa-line) 50%, transparent);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.pwa-perf-hud-row.is-slow {
+  border-color: rgba(236, 187, 107, 0.50);
+  background: rgba(236, 187, 107, 0.075);
+}
+
+.pwa-perf-hud-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: rgba(237, 245, 247, 0.86);
+  font-weight: 800;
+}
+
+.pwa-perf-hud-time {
+  color: var(--pwa-warm-2);
+  font-variant-numeric: tabular-nums;
+  font-weight: 900;
+}
+
+.pwa-perf-hud-note {
+  margin: 0;
+  color: rgba(220, 232, 238, 0.56);
+  font-size: 0.66rem;
+}
+
 body.pwa-shell .search-container,
 body.pwa-shell #image-popup-content,
 body.pwa-shell .book-card,

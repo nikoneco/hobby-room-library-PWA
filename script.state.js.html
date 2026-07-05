@@ -77,6 +77,24 @@ function getPwaLibrarianText_(key, fallback, data) {
   return pwa.getLibrarianText(key, fallback, data);
 }
 
+function pwaPerfStart_(name, meta) {
+  const pwa = window.ShumiLibraryPwa;
+  if (!pwa || typeof pwa.perfStart !== 'function') return null;
+  return pwa.perfStart(name, meta || {});
+}
+
+function pwaPerfEnd_(token, meta) {
+  const pwa = window.ShumiLibraryPwa;
+  if (!pwa || typeof pwa.perfEnd !== 'function') return;
+  pwa.perfEnd(token, meta || {});
+}
+
+function pwaPerfRecord_(name, durationMs, meta) {
+  const pwa = window.ShumiLibraryPwa;
+  if (!pwa || typeof pwa.recordPerf !== 'function') return;
+  pwa.recordPerf(name, durationMs, meta || {});
+}
+
 function uiIcon_(name, extraClass) {
   return `<span class="ui-icon ${extraClass || ''}" aria-hidden="true">${UI_ICONS[name] || ''}</span>`;
 }
