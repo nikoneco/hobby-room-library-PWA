@@ -108,6 +108,13 @@ body.pwa-update-visible .mobile-app-dock {
   cursor: pointer;
 }
 
+.pwa-network-banner-action-muted {
+  margin-left: 0.45em;
+  border-color: rgba(47, 95, 74, 0.20);
+  background: rgba(255, 255, 255, 0.60);
+  color: #2f453d;
+}
+
 @media (max-width: 640px) {
   body.pwa-network-visible {
     padding-bottom: calc(196px + env(safe-area-inset-bottom));

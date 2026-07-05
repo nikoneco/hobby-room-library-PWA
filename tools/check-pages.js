@@ -136,6 +136,10 @@ assert(pwaClient.includes("window.matchMedia('(display-mode: standalone)')"), 'P
 assert(pwaClient.includes('requestServiceWorkerUpdate_'), 'PWA client can request service worker update checks');
 assert(pwaClient.includes("document.addEventListener('visibilitychange'"), 'PWA client checks updates when returning to foreground');
 assert(pwaClient.includes("window.addEventListener('focus'"), 'PWA client checks updates on app focus');
+assert(pwaClient.includes("window.addEventListener('beforeinstallprompt'"), 'PWA client handles install prompt availability');
+assert(pwaClient.includes('INSTALL_PROMPT_STORAGE_KEY'), 'PWA client remembers dismissed install prompt');
+assert(pwaClient.includes("window.addEventListener('appinstalled'"), 'PWA client handles completed installation');
+assert(pwaCss.includes('.pwa-network-banner-action-muted'), 'PWA CSS styles secondary banner action');
 assert(bootClient.includes('clearLaunchActionFromUrl_'), 'boot client clears consumed PWA launch shortcut');
 assert(bootClient.includes('window.history.replaceState'), 'boot client rewrites launch shortcut URL after use');
 assert(!pwaClient.includes('shumiLibrary.pwaRecentBooks.v1'), 'PWA client does not persist recent books');
