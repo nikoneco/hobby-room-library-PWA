@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - docs/**
+      - tools/**
       - .github/workflows/deploy-pages.yml
   workflow_dispatch:
 
@@ -27,6 +28,23 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+
+      - name: Check client JavaScript
+        run: node tools/check-client-js.js
+
+      - name: Check client CSS
+        run: node tools/check-client-css.js
+
+      - name: Check Pages artifact
+        run: node tools/check-pages.js
+
+      - name: Check GAS API surface
+        run: node tools/check-server-api.js
 
       - name: Configure Pages
         uses: actions/configure-pages@v5

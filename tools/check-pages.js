@@ -53,6 +53,11 @@ assert(index.includes('./assets/js/gas-run-shim.js'), 'static index loads GAS JS
 assert(index.includes('./assets/js/pwa-client.js'), 'static index loads PWA client');
 assert(index.includes('./assets/css/pwa.css'), 'static index loads PWA CSS');
 assert(index.includes('src="./assets/logo.png"'), 'static index uses local logo asset');
+assert(pagesWorkflow.includes('actions/setup-node@v5'), 'Pages workflow sets up Node.js');
+assert(pagesWorkflow.includes('node tools/check-client-js.js'), 'Pages workflow checks client JavaScript before deploy');
+assert(pagesWorkflow.includes('node tools/check-client-css.js'), 'Pages workflow checks client CSS before deploy');
+assert(pagesWorkflow.includes('node tools/check-pages.js'), 'Pages workflow checks static Pages artifact before deploy');
+assert(pagesWorkflow.includes('node tools/check-server-api.js'), 'Pages workflow checks GAS API surface before deploy');
 assert(pagesWorkflow.includes('actions/upload-pages-artifact@v4'), 'Pages workflow uploads docs artifact');
 assert(pagesWorkflow.includes('path: docs'), 'Pages workflow deploys docs directory');
 assert(pagesWorkflow.includes('pages: write'), 'Pages workflow has pages write permission');
