@@ -846,6 +846,7 @@ function closeActiveBookPopup_() {
   clearPopupTouchHandlers_();
   overlay.style.display = 'none';
   document.body.classList.remove('modal-open');
+  if (typeof setShelfPopupPerformanceMode_ === 'function') setShelfPopupPerformanceMode_(false);
   document.onkeydown = null;
 }
 

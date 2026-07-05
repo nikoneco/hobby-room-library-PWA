@@ -3,6 +3,15 @@
   backdrop-filter: blur(9px);
 }
 
+body.shelf-popup-open #result {
+  visibility: hidden;
+}
+
+body.shelf-popup-open #image-popup-overlay {
+  background: rgba(5, 8, 12, 0.86);
+  backdrop-filter: none;
+}
+
 #image-popup-content {
   display: grid;
   grid-template-columns: minmax(190px, 320px) minmax(280px, 520px);

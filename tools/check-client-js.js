@@ -250,6 +250,21 @@ assert(
     clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes("mode: 'neighborsOnly'"),
   'book popup fetches current details immediately and delays nearby detail prefetch'
 );
+assert(
+    clientScriptSources[clientScriptFiles.indexOf('script.images.js.html')].includes('function prefetchPopupNeighborCoverImages_') &&
+      clientScriptSources[clientScriptFiles.indexOf('script.images.js.html')].includes('function prefetchBookCoverImage_') &&
+      clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('function schedulePopupNeighborCoverPrefetch_') &&
+      clientScriptSources[clientScriptFiles.indexOf('script.state.js.html')].includes('POPUP_NEIGHBOR_IMAGE_DELAY_MS') &&
+      clientScriptSources[clientScriptFiles.indexOf('script.state.js.html')].includes('popupImagePrefetchObjects'),
+    'book popup preloads nearby cover images separately from detail prefetch'
+  );
+assert(
+  clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('function setShelfPopupPerformanceMode_') &&
+    clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('shelf-popup-open') &&
+    clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('function canRunBackgroundBookDetailPrefetch_') &&
+    clientScriptSources[clientScriptFiles.indexOf('script.search.js.html')].includes('setShelfPopupPerformanceMode_(false)'),
+  'bookshelf popup hides heavy background painting and pauses generic prefetch work'
+);
 {
   const modalSource = clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')];
   const popupMoveStart = modalSource.indexOf('function popupMove(diff)');

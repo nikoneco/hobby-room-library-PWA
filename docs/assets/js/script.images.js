@@ -437,3 +437,42 @@ function setupBookImageElement_(img, book, options) {
 
   setCandidate(0);
 }
+
+function prefetchBookCoverImage_(book) {
+  if (!book) return;
+
+  const candidates = buildBookImageCandidates_(book);
+  const first = candidates.find(item => item && item.url && item.label !== 'NO_IMAGE');
+  if (!first || !first.url) return;
+  if (popupImagePrefetchUrls.has(first.url)) return;
+
+  popupImagePrefetchUrls.add(first.url);
+  while (popupImagePrefetchUrls.size > POPUP_IMAGE_PREFETCH_LIMIT) {
+    const oldest = popupImagePrefetchUrls.values().next().value;
+    popupImagePrefetchUrls.delete(oldest);
+    popupImagePrefetchObjects.delete(oldest);
+  }
+
+  const img = new Image();
+  img.decoding = 'async';
+  img.loading = 'lazy';
+  img.fetchPriority = 'low';
+  img.setAttribute('fetchpriority', 'low');
+  popupImagePrefetchObjects.set(first.url, img);
+  img.src = first.url;
+  if (typeof img.decode === 'function') {
+    img.decode().catch(function() {});
+  }
+}
+
+function prefetchPopupNeighborCoverImages_(index, dataArr, radius) {
+  if (!Array.isArray(dataArr) || !dataArr.length) return;
+  const baseIndex = Math.floor(Number(index));
+  if (!Number.isFinite(baseIndex)) return;
+  const safeRadius = Math.max(1, Math.min(Number(radius || POPUP_DETAIL_PREFETCH_RADIUS), POPUP_DETAIL_PREFETCH_RADIUS));
+
+  for (let step = 1; step <= safeRadius; step += 1) {
+    prefetchBookCoverImage_(dataArr[baseIndex + step]);
+    prefetchBookCoverImage_(dataArr[baseIndex - step]);
+  }
+}

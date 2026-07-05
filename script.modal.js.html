@@ -111,6 +111,17 @@ function getPopupNavBookLabel_(targetIndex) {
   return targetBook && targetBook.title ? String(targetBook.title) : '';
 }
 
+function isShelfPopupContext_(dataArr) {
+  if (typeof getCurrentViewMode_ === 'function' && getCurrentViewMode_() === 'shelf') return true;
+  if (isShelfImmersiveMode) return true;
+  return Array.isArray(dataArr) && dataArr.length >= 700;
+}
+
+function setShelfPopupPerformanceMode_(enabled) {
+  if (!document.body || !document.body.classList) return;
+  document.body.classList.toggle('shelf-popup-open', Boolean(enabled));
+}
+
 function setupPopupNavButton_(button, targetIndex, directionLabel) {
   if (!button) return;
 
@@ -274,6 +285,10 @@ function canPrefetchBookDetails_() {
 
   const effectiveType = String(connection.effectiveType || '').toLowerCase();
   return effectiveType !== 'slow-2g' && effectiveType !== '2g';
+}
+
+function canRunBackgroundBookDetailPrefetch_() {
+  return canPrefetchBookDetails_() && !isBookPopupOpen_();
 }
 
 function getBookDetailPrefetchConcurrency_() {
@@ -610,6 +625,29 @@ function clearPopupNeighborDetailTimer_() {
   }
 }
 
+function clearPopupImagePrefetchTimer_() {
+  if (popupImagePrefetchTimer) {
+    window.clearTimeout(popupImagePrefetchTimer);
+    popupImagePrefetchTimer = 0;
+  }
+}
+
+function schedulePopupNeighborCoverPrefetch_(index, dataArr, delayMs) {
+  clearPopupImagePrefetchTimer_();
+  if (!Array.isArray(dataArr) || !dataArr.length) return;
+
+  const targetIndex = Math.floor(Number(index));
+  if (!Number.isFinite(targetIndex)) return;
+
+  popupImagePrefetchTimer = window.setTimeout(function() {
+    popupImagePrefetchTimer = 0;
+    if (popupIndex !== targetIndex || popupData !== dataArr) return;
+    if (typeof prefetchPopupNeighborCoverImages_ === 'function') {
+      prefetchPopupNeighborCoverImages_(targetIndex, dataArr, POPUP_DETAIL_PREFETCH_RADIUS);
+    }
+  }, Math.max(0, Number(delayMs || POPUP_NEIGHBOR_IMAGE_DELAY_MS)));
+}
+
 function schedulePopupNeighborBookDetails_(index, dataArr, seriesContext, delayMs) {
   clearPopupNeighborDetailTimer_();
   if (!Array.isArray(dataArr) || !dataArr.length) return;
@@ -629,7 +667,7 @@ function schedulePopupNeighborBookDetails_(index, dataArr, seriesContext, delayM
 }
 
 function processBookDetailPrefetchQueue_() {
-  if (!canPrefetchBookDetails_()) return;
+  if (!canRunBackgroundBookDetailPrefetch_()) return;
   if (bookDetailPrefetchActive >= getBookDetailPrefetchConcurrency_()) return;
 
   const batch = [];
@@ -723,7 +761,7 @@ function processBookDetailPrefetchQueue_() {
 }
 
 function queueBookDetailPrefetch_(book, priority) {
-  if (!canPrefetchBookDetails_()) return;
+  if (!canRunBackgroundBookDetailPrefetch_()) return;
   if (!shouldFetchDeferredBookDetails_(book) || getCachedBookDetail_(book)) return;
 
   if (!book.detailQueued) {
@@ -750,7 +788,7 @@ function queueBookDetailPrefetch_(book, priority) {
 }
 
 function warmBookDetailPrefetch_(books, options) {
-  if (!Array.isArray(books) || !books.length || !canPrefetchBookDetails_()) return;
+  if (!Array.isArray(books) || !books.length || !canRunBackgroundBookDetailPrefetch_()) return;
 
   const opt = options || {};
   const limit = Math.max(0, Number(opt.limit || BOOK_DETAIL_PREFETCH_WARM_LIMIT));
@@ -1128,6 +1166,7 @@ function showSeriesPanel(sourceBook, seriesBooks, returnContext) {
     if (e.target === overlay) {
       overlay.style.display = 'none';
       document.body.classList.remove('modal-open');
+      setShelfPopupPerformanceMode_(false);
       document.onkeydown = null;
     }
   };
@@ -1135,6 +1174,7 @@ function showSeriesPanel(sourceBook, seriesBooks, returnContext) {
   closeBtn.onclick = function() {
     overlay.style.display = 'none';
     document.body.classList.remove('modal-open');
+    setShelfPopupPerformanceMode_(false);
     document.onkeydown = null;
   };
 
@@ -1142,6 +1182,7 @@ function showSeriesPanel(sourceBook, seriesBooks, returnContext) {
     if (e.key === 'Escape') {
       overlay.style.display = 'none';
       document.body.classList.remove('modal-open');
+      setShelfPopupPerformanceMode_(false);
       document.onkeydown = null;
     }
   };
@@ -1149,6 +1190,10 @@ function showSeriesPanel(sourceBook, seriesBooks, returnContext) {
 
 function showPopup(book, index, dataArr, seriesContext, options) {
   const popupOptions = options || {};
+  if (bookDetailPrefetchTimer) {
+    window.clearTimeout(bookDetailPrefetchTimer);
+    bookDetailPrefetchTimer = 0;
+  }
   const wasPopupOpen = document.body.classList.contains('modal-open');
   if (!wasPopupOpen) {
     popupReturnScrollY = window.scrollY || 0;
@@ -1166,6 +1211,7 @@ function showPopup(book, index, dataArr, seriesContext, options) {
   popupIndex = index;
   popupData = dataArr;
   popupSeriesContext = seriesContext || null;
+  setShelfPopupPerformanceMode_(isShelfPopupContext_(dataArr));
 
   const overlay = document.getElementById('image-popup-overlay');
   const popupContent = document.getElementById('image-popup-content');
@@ -1227,6 +1273,7 @@ function showPopup(book, index, dataArr, seriesContext, options) {
   fetchPopupContextBookDetails_(book, index, dataArr, popupSeriesContext, {
     mode: 'currentOnly'
   });
+  schedulePopupNeighborCoverPrefetch_(index, dataArr, POPUP_NEIGHBOR_IMAGE_DELAY_MS);
   schedulePopupNeighborBookDetails_(
     index,
     dataArr,
@@ -1243,8 +1290,10 @@ function showPopup(book, index, dataArr, seriesContext, options) {
     closeCoverFullscreen_();
     clearPopupTouchHandlers_();
     clearPopupNeighborDetailTimer_();
+    clearPopupImagePrefetchTimer_();
     overlay.style.display = 'none';
     document.body.classList.remove('modal-open');
+    setShelfPopupPerformanceMode_(false);
     document.onkeydown = null;
     window.requestAnimationFrame(function() {
       window.scrollTo({ top: popupReturnScrollY || 0, behavior: 'auto' });
@@ -1404,6 +1453,7 @@ function popupMove(diff) {
 
   popupIndex = newIndex;
   clearPopupNeighborDetailTimer_();
+  clearPopupImagePrefetchTimer_();
 
   const slideClass = diff > 0 ? 'popup-slide-next' : 'popup-slide-prev';
   showPopup(popupData[popupIndex], popupIndex, popupData, popupSeriesContext, {
