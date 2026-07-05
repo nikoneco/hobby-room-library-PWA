@@ -229,7 +229,10 @@ body::before {
 }
 
 .search-status-area.has-librarian-note {
+  width: min(520px, 92vw);
   border-radius: 18px;
+  flex-wrap: wrap;
+  row-gap: 0.34rem;
 }
 
 .search-status-area::before {
@@ -295,10 +298,14 @@ body::before {
 }
 
 .search-status-librarian-note {
-  margin-top: -0.08rem;
+  flex: 0 0 100%;
+  width: 100%;
+  margin-top: -0.02rem;
   color: rgba(217, 231, 240, 0.62);
   font-size: 0.72rem;
   letter-spacing: 0;
+  line-height: 1.45;
+  text-align: center;
 }
 
 .search-status-chip {
