@@ -20,6 +20,9 @@ assert(source.includes('stringifyForJsonp_'), 'JSONP escapes script-sensitive se
 assert(source.includes('decodeWebAppJsonpParams_'), 'JSONP decodes Base64URL parameters');
 assert(source.includes('Utilities.base64DecodeWebSafe'), 'JSONP uses web-safe Base64 decoding');
 assert(source.includes('buildQuickBrowseCountsPayload_'), 'PWA initial data includes quick browse counts');
+assert(source.includes('SHELF_DATASET_KEY'), 'server defines a separate bookshelf dataset cache key');
+assert(source.includes('getBookshelfLiteDataset_'), 'server has a lightweight bookshelf dataset path');
+assert(source.includes('buildBookshelfLiteDataset_'), 'server can build bookshelf data without full search index');
 
 [
   'initial',
@@ -57,6 +60,7 @@ assert(source.includes('buildQuickBrowseCountsPayload_'), 'PWA initial data incl
 });
 
 assert(source.includes("case 'previewIndex':\n      return [];"), 'PWA previewIndex avoids full-index JSONP transfer');
+assert(source.includes('const dataset = getBookshelfLiteDataset_();'), 'bookshelf API uses lightweight dataset cache');
 assert(!/params\.c\b/.test(source), 'JSONP route does not use reserved c parameter');
 assert(!/params\.sid\b/.test(source), 'JSONP route does not use reserved sid parameter');
 assert(/^docs\/\*\*/m.test(claspignore), 'docs are excluded from clasp push');

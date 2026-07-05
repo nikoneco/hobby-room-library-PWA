@@ -13,6 +13,10 @@ const WEB_APP_API_REGISTRY_ = Object.freeze({
     { name: 'searchBooksAdvanced', calledBy: 'script.js.html: search/rerunSearchWithParams_', role: '詳細検索' },
     { name: 'countPreviewMatchesAuthoritative', calledBy: 'script.js.html: syncSearchStatusPreviewFromForm_', role: '詳細検索プレビュー件数のサーバー補正' },
     { name: 'getRandomBooks', calledBy: 'script.js.html: showRandomBooks', role: 'ランダム表示' },
+    { name: 'getBookshelfBooks', calledBy: 'script.js.html: showAllBookshelf', role: 'PWA本棚一覧用の軽量全件取得' },
+    { name: 'getBookshelfBooksChunk', calledBy: 'JSONP API: shelfChunk', role: 'PWA本棚一覧用の軽量分割取得' },
+    { name: 'getBookDetailByRowIndex', calledBy: 'script.js.html: showPopup', role: 'PWA本棚一覧から開いた本の詳細取得' },
+    { name: 'getBookDetailsByRowIndexes', calledBy: 'script.js.html: detail prefetch', role: 'PWA本棚詳細の少量先読み' },
     { name: 'getBooksBySeriesKey', calledBy: 'script.js.html: loadSeriesPanel', role: 'シリーズ一覧表示' },
     { name: 'getWebAppUserPreferences', calledBy: 'script.js.html: fetchInitialSearchData', role: 'Webアプリ表示設定取得' },
     { name: 'saveWebAppUserPreferences', calledBy: 'script.js.html: savePreferredResultViewModeToServer_', role: 'Webアプリ表示設定保存' }
@@ -246,6 +250,7 @@ function clearCachedJson_(key) {
  */
 function clearLibrarySearchCache_() {
   clearCachedJson_(CACHE_CONFIG.LIBRARY_DATASET_KEY);
+  clearCachedJson_(CACHE_CONFIG.SHELF_DATASET_KEY);
 }
 
 /**
@@ -812,6 +817,13 @@ function isSensitiveIndexItem_(idx) {
   return meta.some(item => item && item.category === 'theme' && item.name === '18禁');
 }
 
+function isSensitiveGenreText_(genreText) {
+  return String(genreText || '')
+    .split(',')
+    .map(value => value.trim())
+    .some(value => value === '18禁');
+}
+
 /**
  * PWA本棚表示専用の軽量データへ変換する。
  * 詳細情報はモーダルを開いた時に1冊ずつ取得する。
@@ -827,7 +839,9 @@ function mapRowsToShelfBooks_(rows, indexData, rowOffset) {
   return rows.map((row, i) => {
     const isbn = normalizeIsbn_(row[CONFIG.IDX.ISBN]);
     const idx = Array.isArray(indexData) ? indexData[i] : null;
-    const isSensitive = isSensitiveIndexItem_(idx);
+    const isSensitive = idx
+      ? isSensitiveIndexItem_(idx)
+      : isSensitiveGenreText_(row[CONFIG.IDX.GENRE]);
     const book = {
       rowIndex: offset + i,
       detailLoaded: false,
@@ -845,6 +859,40 @@ function mapRowsToShelfBooks_(rows, indexData, rowOffset) {
 
     return book;
   });
+}
+
+function buildBookshelfLiteDataset_() {
+  const rows = loadMainBookData_();
+  const books = mapRowsToShelfBooks_(rows || [], null, 0);
+  return {
+    books,
+    total: books.length
+  };
+}
+
+function getBookshelfLiteDataset_() {
+  const cacheKey = CACHE_CONFIG.SHELF_DATASET_KEY;
+  const cached = getCachedJson_(cacheKey);
+  if (
+    cached &&
+    Array.isArray(cached.books) &&
+    Number(cached.total || 0) === cached.books.length &&
+    cached.books.every(book =>
+      book &&
+      typeof book.title === 'string' &&
+      typeof book.shelf === 'string' &&
+      typeof book.location === 'string' &&
+      Object.prototype.hasOwnProperty.call(book, 'rowIndex')
+    )
+  ) {
+    return cached;
+  }
+
+  const dataset = buildBookshelfLiteDataset_();
+  if (dataset && Array.isArray(dataset.books) && dataset.books.length) {
+    putCachedJson_(cacheKey, dataset, CACHE_CONFIG.TTL_SECONDS);
+  }
+  return dataset;
 }
 
 /**
@@ -1659,8 +1707,8 @@ function getAllBooks() {
  */
 function getBookshelfBooks() {
   try {
-    const dataset = getLibraryDataset_();
-    return mapRowsToShelfBooks_(dataset.rows || [], dataset.index || [], 0);
+    const dataset = getBookshelfLiteDataset_();
+    return dataset.books || [];
   } catch (e) {
     console.error('getBookshelfBooks error:', e);
     return [];
@@ -1669,16 +1717,15 @@ function getBookshelfBooks() {
 
 function getBookshelfBooksChunk(offset, limit) {
   try {
-    const dataset = getLibraryDataset_();
-    const rows = dataset.rows || [];
-    const index = dataset.index || [];
-    const total = rows.length;
+    const dataset = getBookshelfLiteDataset_();
+    const books = dataset.books || [];
+    const total = books.length;
     const start = Math.max(0, Number(offset || 0));
     const size = Math.min(Math.max(Number(limit || 300), 1), 500);
     const end = Math.min(start + size, total);
 
     return {
-      books: mapRowsToShelfBooks_(rows.slice(start, end), index.slice(start, end), start),
+      books: books.slice(start, end),
       total,
       offset: start,
       nextOffset: end,
