@@ -246,10 +246,13 @@ assert(
     clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('function collectPopupContextDetailTargets_') &&
     clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('function createPopupDeferredRenderBook_') &&
     clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('function schedulePopupCurrentDetailRender_') &&
+    clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('function handlePopupContextBookDetailResult_') &&
     clientScriptSources[clientScriptFiles.indexOf('script.state.js.html')].includes('POPUP_CURRENT_DETAIL_RENDER_DELAY_MS') &&
     clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('getBookDetailsByRowIndexes(rowIndexes)') &&
     clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes("mode: 'currentOnly'") &&
     clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('forceCurrent: Boolean(popupOptions.forceCurrentDetailFetch)') &&
+    clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('deferCurrentApplyMs: deferCurrentDetailRender ? POPUP_CURRENT_DETAIL_RENDER_DELAY_MS : 0') &&
+    clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('bookDetailInFlightCallbacks.delete(key)') &&
     clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('function schedulePopupNeighborBookDetails_') &&
     clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes("mode: 'neighborsOnly'"),
   'book popup fetches current details immediately, can defer heavy detail rendering, and delays nearby detail prefetch'

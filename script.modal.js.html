@@ -606,8 +606,10 @@ function collectPopupContextDetailTargets_(book, index, dataArr, options) {
       book: targetBook,
       index: targetIndex,
       options: {
+        current: Boolean(isCurrent),
         prefetch: !isCurrent,
-        force: Boolean(isCurrent && opt.forceCurrent)
+        force: Boolean(isCurrent && opt.forceCurrent),
+        deferApplyMs: isCurrent ? Math.max(0, Number(opt.deferCurrentApplyMs || 0)) : 0
       }
     });
   }
@@ -626,6 +628,39 @@ function collectPopupContextDetailTargets_(book, index, dataArr, options) {
   return targets;
 }
 
+function handlePopupContextBookDetailResult_(target, dataArr, seriesContext, detail, error) {
+  if (!target || !target.book) return;
+
+  const delayMs = Math.max(0, Number(target.options && target.options.deferApplyMs || 0));
+  const applyResult_ = function() {
+    if (
+      delayMs &&
+      target.options &&
+      target.options.current &&
+      isBookPopupOpen_() &&
+      (popupIndex !== target.index || popupData !== dataArr)
+    ) {
+      return;
+    }
+
+    handleDeferredBookDetailResult_(
+      target.book,
+      target.index,
+      dataArr,
+      seriesContext,
+      target.options || {},
+      detail,
+      error
+    );
+  };
+
+  if (delayMs) {
+    window.setTimeout(applyResult_, delayMs);
+  } else {
+    applyResult_();
+  }
+}
+
 function fetchPopupContextBookDetails_(book, index, dataArr, seriesContext, options) {
   const targets = collectPopupContextDetailTargets_(book, index, dataArr, options);
   if (!targets.length) return;
@@ -636,17 +671,19 @@ function fetchPopupContextBookDetails_(book, index, dataArr, seriesContext, opti
     const targetBook = target.book;
     const cached = getCachedBookDetail_(targetBook);
     if (cached) {
-      const mergedFromCache = mergeDeferredBookDetails_(targetBook, cached);
-      replaceDeferredBookReference_(targetBook, mergedFromCache, target.index, dataArr, seriesContext);
+      handlePopupContextBookDetailResult_(target, dataArr, seriesContext, cached, null);
       return;
     }
 
     const key = getBookDetailCacheKey_(targetBook);
+    if (key && target.options.current && target.options.force) {
+      bookDetailInFlightCallbacks.delete(key);
+    }
     if (key && bookDetailInFlightCallbacks.has(key)) {
       targetBook.detailLoading = true;
       targetBook.detailPrefetching = Boolean(target.options.prefetch);
       addBookDetailInFlightCallback_(key, function(detail, error) {
-        handleDeferredBookDetailResult_(targetBook, target.index, dataArr, seriesContext, target.options, detail, error);
+        handlePopupContextBookDetailResult_(target, dataArr, seriesContext, detail, error);
       });
       return;
     }
@@ -664,7 +701,7 @@ function fetchPopupContextBookDetails_(book, index, dataArr, seriesContext, opti
     const key = getBookDetailCacheKey_(target.book);
     if (key) {
       addBookDetailInFlightCallback_(key, function(detail, error) {
-        handleDeferredBookDetailResult_(target.book, target.index, dataArr, seriesContext, target.options, detail, error);
+        handlePopupContextBookDetailResult_(target, dataArr, seriesContext, detail, error);
       });
     }
   });
@@ -690,7 +727,7 @@ function fetchPopupContextBookDetails_(book, index, dataArr, seriesContext, opti
         if (key) {
           settleBookDetailInFlight_(key, detail || null, null);
         } else {
-          handleDeferredBookDetailResult_(target.book, target.index, dataArr, seriesContext, target.options, detail || null, null);
+          handlePopupContextBookDetailResult_(target, dataArr, seriesContext, detail || null, null);
         }
       });
     })
@@ -700,7 +737,7 @@ function fetchPopupContextBookDetails_(book, index, dataArr, seriesContext, opti
         if (key) {
           settleBookDetailInFlight_(key, null, err);
         } else {
-          handleDeferredBookDetailResult_(target.book, target.index, dataArr, seriesContext, target.options, null, err);
+          handlePopupContextBookDetailResult_(target, dataArr, seriesContext, null, err);
         }
       });
     })
@@ -1380,10 +1417,13 @@ function showPopup(book, index, dataArr, seriesContext, options) {
       POPUP_CURRENT_DETAIL_RENDER_DELAY_MS
     );
   }
-  fetchPopupContextBookDetails_(sourceBook, index, dataArr, popupSeriesContext, {
-    mode: 'currentOnly',
-    forceCurrent: Boolean(popupOptions.forceCurrentDetailFetch)
-  });
+  if (!deferCurrentDetailRender || (sourceBook && sourceBook.detailLoaded === false)) {
+    fetchPopupContextBookDetails_(sourceBook, index, dataArr, popupSeriesContext, {
+      mode: 'currentOnly',
+      forceCurrent: Boolean(popupOptions.forceCurrentDetailFetch),
+      deferCurrentApplyMs: deferCurrentDetailRender ? POPUP_CURRENT_DETAIL_RENDER_DELAY_MS : 0
+    });
+  }
   schedulePopupNeighborCoverPrefetch_(index, dataArr, POPUP_NEIGHBOR_IMAGE_DELAY_MS);
   schedulePopupNeighborBookDetails_(
     index,
