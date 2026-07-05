@@ -809,7 +809,7 @@ function buildPopupDetailLoadingHtml_(book) {
   }
   return `
     <div class="popup-detail-loading" aria-live="polite">
-      <div class="popup-detail-state loading">詳細を準備中</div>
+      <div class="popup-detail-state loading">${escapeHtml(getPwaLibrarianText_('popup.detailLoading', '詳細を準備中'))}</div>
       <div class="popup-detail-skeleton" aria-hidden="true">
         <span class="popup-detail-skeleton-line wide"></span>
         <span class="popup-detail-skeleton-line"></span>
@@ -1009,7 +1009,7 @@ function openSeriesPanel(sourceBook) {
 
   info.innerHTML = `
     <div class="series-panel">
-      <div class="series-panel-title">シリーズ一覧を読み込み中...</div>
+      <div class="series-panel-title">${escapeHtml(getPwaLibrarianText_('series.loading', 'シリーズ一覧を読み込み中...'))}</div>
       <div class="series-panel-subtitle">${escapeHtml(sourceBook.seriesSearchTitle || sourceBook.title || '')}</div>
     </div>
   `;

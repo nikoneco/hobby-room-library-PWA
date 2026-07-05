@@ -109,11 +109,17 @@ function renderEmptyResult_(result) {
 
   const title = document.createElement('div');
   title.className = 'empty-result-title';
-  title.textContent = '該当する本が見つかりませんでした';
+  title.textContent = getPwaLibrarianText_(
+    'empty.title',
+    '該当する本が見つかりませんでした'
+  );
 
   const text = document.createElement('div');
   text.className = 'empty-result-text';
-  text.textContent = 'キーワードを短くするか、条件チップを外してもう一度探してみてください。';
+  text.textContent = getPwaLibrarianText_(
+    'empty.text',
+    'キーワードを短くするか、条件チップを外してもう一度探してみてください。'
+  );
 
   const actions = document.createElement('div');
   actions.className = 'empty-result-actions';
@@ -121,7 +127,7 @@ function renderEmptyResult_(result) {
   const focusButton = document.createElement('button');
   focusButton.type = 'button';
   focusButton.className = 'quiet-action empty-result-action';
-  focusButton.innerHTML = `${uiIcon_('search', 'ui-icon-inline')}<span>検索語を見直す</span>`;
+  focusButton.innerHTML = `${uiIcon_('search', 'ui-icon-inline')}<span>${escapeHtml(getPwaLibrarianText_('empty.action.search', '検索語を見直す'))}</span>`;
   focusButton.onclick = function() {
     const keyword = document.getElementById('keyword');
     if (keyword && typeof keyword.focus === 'function') {
@@ -133,7 +139,7 @@ function renderEmptyResult_(result) {
   const clearButton = document.createElement('button');
   clearButton.type = 'button';
   clearButton.className = 'quiet-action empty-result-action';
-  clearButton.innerHTML = `${uiIcon_('trash', 'ui-icon-inline')}<span>条件をクリア</span>`;
+  clearButton.innerHTML = `${uiIcon_('trash', 'ui-icon-inline')}<span>${escapeHtml(getPwaLibrarianText_('empty.action.clear', '条件をクリア'))}</span>`;
   clearButton.onclick = function() {
     resetSearch();
   };
@@ -141,7 +147,7 @@ function renderEmptyResult_(result) {
   const randomButton = document.createElement('button');
   randomButton.type = 'button';
   randomButton.className = 'quiet-action empty-result-action empty-result-random';
-  randomButton.innerHTML = `${uiIcon_('shuffle', 'ui-icon-inline')}<span>ランダムで眺める</span>`;
+  randomButton.innerHTML = `${uiIcon_('shuffle', 'ui-icon-inline')}<span>${escapeHtml(getPwaLibrarianText_('empty.action.random', 'ランダムで眺める'))}</span>`;
   randomButton.onclick = function() {
     showRandomBooks();
   };

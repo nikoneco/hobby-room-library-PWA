@@ -262,6 +262,14 @@ body.pwa-settings-open {
   border-top: 1px solid color-mix(in srgb, var(--pwa-line) 68%, transparent);
 }
 
+.pwa-settings-section-title {
+  margin: 0 0 10px;
+  color: rgba(237, 245, 247, 0.92);
+  font-size: 0.86rem;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
 .pwa-settings-row {
   display: flex;
   align-items: center;
@@ -279,10 +287,67 @@ body.pwa-settings-open {
 }
 
 .pwa-settings-row-note {
+  display: block;
   margin: 0;
   color: rgba(220, 232, 238, 0.58);
   font-size: 0.74rem;
   line-height: 1.45;
+}
+
+.pwa-settings-toggle-row {
+  min-height: 48px;
+  cursor: pointer;
+}
+
+.pwa-settings-toggle-row + .pwa-settings-toggle-row {
+  margin-top: 10px;
+}
+
+.pwa-settings-toggle-row input {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.pwa-mini-switch {
+  position: relative;
+  flex: 0 0 auto;
+  width: 42px;
+  height: 24px;
+  border: 1px solid var(--pwa-line);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  transition: background 160ms ease, border-color 160ms ease;
+}
+
+.pwa-mini-switch::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: rgba(237, 245, 247, 0.84);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.32);
+  transition: transform 160ms ease, background 160ms ease;
+}
+
+.pwa-settings-toggle-row input:checked + .pwa-mini-switch {
+  border-color: var(--pwa-line-strong);
+  background: rgba(var(--pwa-accent-rgb), 0.22);
+}
+
+.pwa-settings-toggle-row input:checked + .pwa-mini-switch::after {
+  transform: translateX(18px);
+  background: var(--pwa-warm-2);
+}
+
+.pwa-settings-toggle-row:focus-within .pwa-mini-switch {
+  outline: 2px solid color-mix(in srgb, var(--pwa-accent-2) 78%, white);
+  outline-offset: 3px;
 }
 
 .pwa-settings-panel .sensitive-toggle {
@@ -402,6 +467,30 @@ body.pwa-shell .spinner-shelf::after {
   color: var(--pwa-warm-2);
 }
 
+body.pwa-librarian-presence #logoResetBtn.logo {
+  width: min(360px, 72vw);
+  height: clamp(112px, 17vw, 172px);
+  object-fit: cover;
+  object-position: 22% 42%;
+  border: 1px solid color-mix(in srgb, var(--pwa-warm-2) 28%, transparent);
+  border-radius: 18px;
+  box-shadow:
+    0 18px 46px rgba(0, 0, 0, 0.34),
+    0 0 0 1px rgba(255, 255, 255, 0.045) inset;
+}
+
+body.pwa-librarian-presence .search-container.shrink #logoResetBtn.logo {
+  width: 132px;
+  height: 62px;
+  border-radius: 12px;
+  object-position: 22% 42%;
+}
+
+body.pwa-librarian-presence .search-container.shrink.shelf-view-active #logoResetBtn.logo {
+  width: 108px;
+  height: 48px;
+}
+
 body.pwa-shell .genre-chip,
 body.pwa-shell .summary-chip-toggle,
 body.pwa-shell .book-meta-pill,
@@ -431,6 +520,50 @@ body.pwa-shell .sensitive-toggle-input:checked + .sensitive-toggle-switch,
 body.pwa-shell .sensitive-toggle:has(.sensitive-toggle-input:checked) .sensitive-toggle-switch {
   background: rgba(var(--pwa-accent-rgb), 0.22);
   border-color: var(--pwa-line-strong);
+}
+
+body.pwa-quiet-motion .result-fade.show {
+  transition-duration: 360ms;
+  transition-timing-function: cubic-bezier(.18,.86,.22,1);
+}
+
+body.pwa-quiet-motion .result-fade.show .book-card,
+body.pwa-quiet-motion .result-fade.show .shelf-book {
+  animation-duration: 360ms;
+  animation-delay: calc(var(--book-reveal-index, 0) * 34ms);
+}
+
+body.pwa-quiet-motion #image-popup-content {
+  transition:
+    transform 220ms cubic-bezier(.18,.86,.22,1),
+    opacity 220ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease;
+}
+
+body.pwa-quiet-motion .book-cover.book-image-loaded,
+body.pwa-quiet-motion .list-thumb.book-image-loaded,
+body.pwa-quiet-motion .shelf-book-cover.book-image-loaded,
+body.pwa-quiet-motion #image-popup-img.book-image-loaded,
+body.pwa-quiet-motion #cover-fullscreen-img.book-image-loaded {
+  animation-duration: 360ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body.pwa-quiet-motion .result-fade.show,
+  body.pwa-quiet-motion #image-popup-content {
+    transition: none;
+  }
+
+  body.pwa-quiet-motion .result-fade.show .book-card,
+  body.pwa-quiet-motion .result-fade.show .shelf-book,
+  body.pwa-quiet-motion .book-cover.book-image-loaded,
+  body.pwa-quiet-motion .list-thumb.book-image-loaded,
+  body.pwa-quiet-motion .shelf-book-cover.book-image-loaded,
+  body.pwa-quiet-motion #image-popup-img.book-image-loaded,
+  body.pwa-quiet-motion #cover-fullscreen-img.book-image-loaded {
+    animation: none;
+  }
 }
 
 body.pwa-shell .sensitive-toggle-input:focus-visible + .sensitive-toggle-switch,

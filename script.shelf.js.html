@@ -42,9 +42,13 @@ function renderShelfViewOverview_(groups, totalCount, immersive) {
 
   const heading = document.createElement('div');
   heading.className = 'shelf-view-mode';
-  heading.textContent = immersive
+  const headingText = immersive
     ? '蔵書全体を本棚順で表示中'
     : '検索結果を本棚順で表示中';
+  heading.textContent = getPwaLibrarianText_(
+    immersive ? 'shelfOverview.heading.immersive' : 'shelfOverview.heading.result',
+    headingText
+  );
   overview.appendChild(heading);
 
   const statGrid = document.createElement('div');
@@ -69,9 +73,13 @@ function renderShelfViewOverview_(groups, totalCount, immersive) {
 
   const note = document.createElement('div');
   note.className = 'shelf-view-note';
-  note.textContent = immersive
+  const noteText = immersive
     ? 'マップと棚ジャンプで、部屋の配置から本棚へ移動できます。'
     : '検索結果だけを棚順に並べています。全体を眺めるときはトップの「本棚を見る」を使います。';
+  note.textContent = getPwaLibrarianText_(
+    immersive ? 'shelfOverview.note.immersive' : 'shelfOverview.note.result',
+    noteText
+  );
   overview.appendChild(note);
 
   return overview;

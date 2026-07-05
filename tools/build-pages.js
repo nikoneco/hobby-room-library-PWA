@@ -125,6 +125,25 @@ function buildStaticIndex() {
       </button>
     </div>
     <div id="pwaSensitiveSetting" class="pwa-settings-section"></div>
+    <div class="pwa-settings-section pwa-play-settings" aria-label="遊び">
+      <p class="pwa-settings-section-title">遊び</p>
+      <label class="pwa-settings-row pwa-settings-toggle-row">
+        <span>
+          <span class="pwa-settings-row-title">司書の気配</span>
+          <span class="pwa-settings-row-note">検索や読み込みの言葉を少しだけ図書館寄りにします</span>
+        </span>
+        <input id="pwaLibrarianPresence" type="checkbox">
+        <span class="pwa-mini-switch" aria-hidden="true"></span>
+      </label>
+      <label class="pwa-settings-row pwa-settings-toggle-row">
+        <span>
+          <span class="pwa-settings-row-title">静かな演出</span>
+          <span class="pwa-settings-row-note">結果表示や詳細表示に控えめな余韻を足します</span>
+        </span>
+        <input id="pwaQuietMotion" type="checkbox">
+        <span class="pwa-mini-switch" aria-hidden="true"></span>
+      </label>
+    </div>
     <fieldset class="pwa-settings-section pwa-theme-settings">
       <legend>カラーテーマ</legend>
       <label>
@@ -434,6 +453,14 @@ body.pwa-settings-open {
   border-top: 1px solid color-mix(in srgb, var(--pwa-line) 68%, transparent);
 }
 
+.pwa-settings-section-title {
+  margin: 0 0 10px;
+  color: rgba(237, 245, 247, 0.92);
+  font-size: 0.86rem;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
 .pwa-settings-row {
   display: flex;
   align-items: center;
@@ -451,10 +478,67 @@ body.pwa-settings-open {
 }
 
 .pwa-settings-row-note {
+  display: block;
   margin: 0;
   color: rgba(220, 232, 238, 0.58);
   font-size: 0.74rem;
   line-height: 1.45;
+}
+
+.pwa-settings-toggle-row {
+  min-height: 48px;
+  cursor: pointer;
+}
+
+.pwa-settings-toggle-row + .pwa-settings-toggle-row {
+  margin-top: 10px;
+}
+
+.pwa-settings-toggle-row input {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.pwa-mini-switch {
+  position: relative;
+  flex: 0 0 auto;
+  width: 42px;
+  height: 24px;
+  border: 1px solid var(--pwa-line);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  transition: background 160ms ease, border-color 160ms ease;
+}
+
+.pwa-mini-switch::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: rgba(237, 245, 247, 0.84);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.32);
+  transition: transform 160ms ease, background 160ms ease;
+}
+
+.pwa-settings-toggle-row input:checked + .pwa-mini-switch {
+  border-color: var(--pwa-line-strong);
+  background: rgba(var(--pwa-accent-rgb), 0.22);
+}
+
+.pwa-settings-toggle-row input:checked + .pwa-mini-switch::after {
+  transform: translateX(18px);
+  background: var(--pwa-warm-2);
+}
+
+.pwa-settings-toggle-row:focus-within .pwa-mini-switch {
+  outline: 2px solid color-mix(in srgb, var(--pwa-accent-2) 78%, white);
+  outline-offset: 3px;
 }
 
 .pwa-settings-panel .sensitive-toggle {
@@ -574,6 +658,30 @@ body.pwa-shell .spinner-shelf::after {
   color: var(--pwa-warm-2);
 }
 
+body.pwa-librarian-presence #logoResetBtn.logo {
+  width: min(360px, 72vw);
+  height: clamp(112px, 17vw, 172px);
+  object-fit: cover;
+  object-position: 22% 42%;
+  border: 1px solid color-mix(in srgb, var(--pwa-warm-2) 28%, transparent);
+  border-radius: 18px;
+  box-shadow:
+    0 18px 46px rgba(0, 0, 0, 0.34),
+    0 0 0 1px rgba(255, 255, 255, 0.045) inset;
+}
+
+body.pwa-librarian-presence .search-container.shrink #logoResetBtn.logo {
+  width: 132px;
+  height: 62px;
+  border-radius: 12px;
+  object-position: 22% 42%;
+}
+
+body.pwa-librarian-presence .search-container.shrink.shelf-view-active #logoResetBtn.logo {
+  width: 108px;
+  height: 48px;
+}
+
 body.pwa-shell .genre-chip,
 body.pwa-shell .summary-chip-toggle,
 body.pwa-shell .book-meta-pill,
@@ -603,6 +711,50 @@ body.pwa-shell .sensitive-toggle-input:checked + .sensitive-toggle-switch,
 body.pwa-shell .sensitive-toggle:has(.sensitive-toggle-input:checked) .sensitive-toggle-switch {
   background: rgba(var(--pwa-accent-rgb), 0.22);
   border-color: var(--pwa-line-strong);
+}
+
+body.pwa-quiet-motion .result-fade.show {
+  transition-duration: 360ms;
+  transition-timing-function: cubic-bezier(.18,.86,.22,1);
+}
+
+body.pwa-quiet-motion .result-fade.show .book-card,
+body.pwa-quiet-motion .result-fade.show .shelf-book {
+  animation-duration: 360ms;
+  animation-delay: calc(var(--book-reveal-index, 0) * 34ms);
+}
+
+body.pwa-quiet-motion #image-popup-content {
+  transition:
+    transform 220ms cubic-bezier(.18,.86,.22,1),
+    opacity 220ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease;
+}
+
+body.pwa-quiet-motion .book-cover.book-image-loaded,
+body.pwa-quiet-motion .list-thumb.book-image-loaded,
+body.pwa-quiet-motion .shelf-book-cover.book-image-loaded,
+body.pwa-quiet-motion #image-popup-img.book-image-loaded,
+body.pwa-quiet-motion #cover-fullscreen-img.book-image-loaded {
+  animation-duration: 360ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body.pwa-quiet-motion .result-fade.show,
+  body.pwa-quiet-motion #image-popup-content {
+    transition: none;
+  }
+
+  body.pwa-quiet-motion .result-fade.show .book-card,
+  body.pwa-quiet-motion .result-fade.show .shelf-book,
+  body.pwa-quiet-motion .book-cover.book-image-loaded,
+  body.pwa-quiet-motion .list-thumb.book-image-loaded,
+  body.pwa-quiet-motion .shelf-book-cover.book-image-loaded,
+  body.pwa-quiet-motion #image-popup-img.book-image-loaded,
+  body.pwa-quiet-motion #cover-fullscreen-img.book-image-loaded {
+    animation: none;
+  }
 }
 
 body.pwa-shell .sensitive-toggle-input:focus-visible + .sensitive-toggle-switch,
@@ -1031,6 +1183,10 @@ function writePwaClient() {
   const IOS_INSTALL_STORAGE_KEY = 'shumiLibrary.pwaIosInstallHintDismissed.v1';
   const INSTALL_HINT_AUTO_HIDE_MS = 12000;
   const THEME_STORAGE_KEY = 'shumiLibrary.pwaTheme.v1';
+  const LIBRARIAN_PRESENCE_STORAGE_KEY = 'shumiLibrary.librarianPresence.v1';
+  const QUIET_MOTION_STORAGE_KEY = 'shumiLibrary.quietMotion.v1';
+  const DEFAULT_LOGO_SRC = './assets/logo.png';
+  const LIBRARIAN_LOGO_SRC = './assets/librarian-presence.jpg';
   const THEME_DEFAULT = 'shinhaku';
   const THEME_OPTIONS = ['shinhaku', 'kohi', 'shikon', 'kohaku'];
   const LEGACY_THEME_ALIASES = {
@@ -1043,6 +1199,38 @@ function writePwaClient() {
     kohi: '#120c0f',
     shikon: '#0f0e18',
     kohaku: '#120f0b'
+  };
+  const LIBRARIAN_TEXTS = {
+    'empty.title': 'この条件の本は、今は棚の奥に隠れているようです',
+    'empty.text': '言葉を少しゆるめるか、条件を外してもう一度だけ棚を覗いてみましょう。',
+    'empty.action.search': '検索語を整える',
+    'empty.action.clear': '条件をほどく',
+    'empty.action.random': '別の棚を眺める',
+    'status.random': data => data && Number.isFinite(data.count) ? data.count + '冊をそっと選びました' : '棚から本を選びました',
+    'status.shelf': data => data && Number.isFinite(data.count) ? '全' + data.count + '冊の棚を開いています' : '本棚を開いています',
+    'status.result': data => data && Number.isFinite(data.count) ? data.count + '冊が灯りの下に出てきました' : '本が見つかりました',
+    'status.beforeSearch': '棚を探す前',
+    'status.previewPending': '棚札を確かめています',
+    'status.conditions': '探す手がかり',
+    'status.previewReady': data => data && Number.isFinite(data.count) ? 'この手がかりなら' + data.count + '冊' : '候補が見えています',
+    'spinner.label.search': '棚を探しています',
+    'spinner.label.advanced': '手がかりを照らしています',
+    'spinner.label.random': '棚から10冊抜き出しています',
+    'spinner.label.shelf': '棚の灯りをともしています',
+    'spinner.label.browse': '選んだ入口を辿っています',
+    'spinner.label.refine': '棚を並べ直しています',
+    'spinner.detail.search': 'タイトル・作者・読みを静かに照合しています',
+    'spinner.detail.advanced': 'ジャンルや発売日の札を一枚ずつ確かめています',
+    'spinner.detail.random': '今夜目が合う本を少しだけ選んでいます',
+    'spinner.detail.shelf': '蔵書全体と棚マップをゆっくり広げています',
+    'spinner.detail.browse': '選んだ気分に近い棚を覗いています',
+    'spinner.detail.refine': '外した条件を反映して、棚を整えています',
+    'shelfOverview.heading.immersive': '蔵書全体の棚を開いています',
+    'shelfOverview.heading.result': '見つかった本を棚順に並べています',
+    'shelfOverview.note.immersive': 'マップと棚ジャンプで、趣味部屋の奥へ移動できます。',
+    'shelfOverview.note.result': '検索結果だけを棚順に並べています。全体を眺めるときはトップの「本棚を見る」からどうぞ。',
+    'popup.detailLoading': '詳細の頁を開いています',
+    'series.loading': 'シリーズ棚を確かめています...'
   };
 
   const UPDATE_CHECK_INTERVAL_MS = 60 * 60 * 1000;
@@ -1366,6 +1554,84 @@ function writePwaClient() {
     applyTheme_(nextTheme);
   }
 
+  function getStoredBoolean_(key, defaultValue) {
+    try {
+      if (!window.localStorage) return Boolean(defaultValue);
+      const value = window.localStorage.getItem(key);
+      if (value === null || value === '') return Boolean(defaultValue);
+      return value === '1';
+    } catch (e) {
+      return Boolean(defaultValue);
+    }
+  }
+
+  function setStoredBoolean_(key, value) {
+    try {
+      if (window.localStorage) {
+        window.localStorage.setItem(key, value ? '1' : '0');
+      }
+    } catch (e) {
+      // localStorageが使えない環境でも、その場の設定は反映する。
+    }
+  }
+
+  function isLibrarianPresenceEnabled_() {
+    return getStoredBoolean_(LIBRARIAN_PRESENCE_STORAGE_KEY, false);
+  }
+
+  function isQuietMotionEnabled_() {
+    return getStoredBoolean_(QUIET_MOTION_STORAGE_KEY, false);
+  }
+
+  function syncLogoForLibrarianPresence_(enabled) {
+    const logo = document.getElementById('logoResetBtn');
+    if (!logo) return;
+
+    const nextSrc = enabled ? LIBRARIAN_LOGO_SRC : DEFAULT_LOGO_SRC;
+    const currentSrc = logo.getAttribute('src') || '';
+    if (currentSrc !== nextSrc) {
+      logo.setAttribute('src', nextSrc);
+    }
+    logo.setAttribute('alt', enabled ? '司書のいる趣味部屋図書館' : 'ロゴ');
+  }
+
+  function applyPlaySettings_() {
+    const librarianPresence = isLibrarianPresenceEnabled_();
+    const quietMotion = isQuietMotionEnabled_();
+    if (document.body) {
+      document.body.classList.toggle('pwa-librarian-presence', librarianPresence);
+      document.body.classList.toggle('pwa-quiet-motion', quietMotion);
+    }
+    syncLogoForLibrarianPresence_(librarianPresence);
+
+    const librarianInput = document.getElementById('pwaLibrarianPresence');
+    if (librarianInput) librarianInput.checked = librarianPresence;
+    const quietMotionInput = document.getElementById('pwaQuietMotion');
+    if (quietMotionInput) quietMotionInput.checked = quietMotion;
+  }
+
+  function setLibrarianPresence_(enabled) {
+    setStoredBoolean_(LIBRARIAN_PRESENCE_STORAGE_KEY, Boolean(enabled));
+    applyPlaySettings_();
+    if (typeof renderSearchStatus_ === 'function') {
+      renderSearchStatus_();
+    }
+  }
+
+  function setQuietMotion_(enabled) {
+    setStoredBoolean_(QUIET_MOTION_STORAGE_KEY, Boolean(enabled));
+    applyPlaySettings_();
+  }
+
+  function getLibrarianText_(key, fallback, data) {
+    if (!isLibrarianPresenceEnabled_()) return fallback;
+    const entry = LIBRARIAN_TEXTS[key];
+    if (typeof entry === 'function') {
+      return entry(data || {});
+    }
+    return entry || fallback;
+  }
+
   function moveSensitiveToggleToSettings_() {
     const target = document.getElementById('pwaSensitiveSetting');
     const toggle = document.querySelector('.sensitive-toggle');
@@ -1418,6 +1684,7 @@ function writePwaClient() {
 
     moveSensitiveToggleToSettings_();
     applyTheme_(getStoredTheme_());
+    applyPlaySettings_();
 
     button.addEventListener('click', function() {
       setSettingsOpen_(button.getAttribute('aria-expanded') !== 'true');
@@ -1433,6 +1700,18 @@ function writePwaClient() {
         if (input.checked) setTheme_(input.value);
       });
     });
+    const librarianInput = document.getElementById('pwaLibrarianPresence');
+    if (librarianInput) {
+      librarianInput.addEventListener('change', function() {
+        setLibrarianPresence_(librarianInput.checked);
+      });
+    }
+    const quietMotionInput = document.getElementById('pwaQuietMotion');
+    if (quietMotionInput) {
+      quietMotionInput.addEventListener('change', function() {
+        setQuietMotion_(quietMotionInput.checked);
+      });
+    }
     document.addEventListener('keydown', function(event) {
       if (event.key === 'Escape' && button.getAttribute('aria-expanded') === 'true') {
         setSettingsOpen_(false);
@@ -1442,6 +1721,9 @@ function writePwaClient() {
 
   window.ShumiLibraryPwa = {
     isPwaShell: true,
+    isLibrarianPresenceEnabled: isLibrarianPresenceEnabled_,
+    isQuietMotionEnabled: isQuietMotionEnabled_,
+    getLibrarianText: getLibrarianText_,
     handleApiFailure: function(error) {
       if (error && error.code === 'OFFLINE') {
         setBanner_(OFFLINE_MESSAGE, 'error');
@@ -1658,6 +1940,7 @@ function writePwaFiles() {
   './assets/css/style.responsive.css',
   './assets/css/pwa.css',
   './assets/logo.png',
+  './assets/librarian-presence.jpg',
   './assets/js/gas-run-shim.js',
   './assets/js/pwa-client.js',
   './assets/js/script.state.js',

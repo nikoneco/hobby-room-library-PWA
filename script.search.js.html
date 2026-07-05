@@ -1234,34 +1234,50 @@ function getSearchStatusCountText_() {
   }
 
   if (searchStatusState.mode === 'random') {
-    return `${searchStatusState.resultCount}冊を選びました`;
+    return getPwaLibrarianText_(
+      'status.random',
+      `${searchStatusState.resultCount}冊を選びました`,
+      { count: searchStatusState.resultCount }
+    );
   }
 
   if (searchStatusState.mode === 'shelf') {
-    return `全${searchStatusState.resultCount}冊を表示中`;
+    return getPwaLibrarianText_(
+      'status.shelf',
+      `全${searchStatusState.resultCount}冊を表示中`,
+      { count: searchStatusState.resultCount }
+    );
   }
 
   if (searchStatusState.mode === 'result') {
-    return `${searchStatusState.resultCount}冊見つかりました`;
+    return getPwaLibrarianText_(
+      'status.result',
+      `${searchStatusState.resultCount}冊見つかりました`,
+      { count: searchStatusState.resultCount }
+    );
   }
 
   if (!hasConditions) {
-    return '検索前';
+    return getPwaLibrarianText_('status.beforeSearch', '検索前');
   }
 
   if (searchStatusState.previewPending) {
-    return '候補を確認中';
+    return getPwaLibrarianText_('status.previewPending', '候補を確認中');
   }
 
   if (isPwaShell_() && hasConditions) {
-    return '検索条件';
+    return getPwaLibrarianText_('status.conditions', '検索条件');
   }
 
   if (searchStatusState.previewReady && Number.isFinite(searchStatusState.previewCount)) {
-    return `この条件なら${searchStatusState.previewCount}冊`;
+    return getPwaLibrarianText_(
+      'status.previewReady',
+      `この条件なら${searchStatusState.previewCount}冊`,
+      { count: searchStatusState.previewCount }
+    );
   }
 
-  return '検索前';
+  return getPwaLibrarianText_('status.beforeSearch', '検索前');
 }
 
 function renderSearchStatus_() {
@@ -2072,7 +2088,10 @@ function setSpinnerLabel_(message, options) {
   const spinnerOptions = normalizeSpinnerOptions_(options);
   const label = document.getElementById('spinner-label') || document.querySelector('.spinner-label');
   if (label) {
-    label.textContent = message || SPINNER_DEFAULT_LABEL_;
+    label.textContent = getPwaLibrarianText_(
+      'spinner.label.' + (spinnerOptions.kind || 'default'),
+      message || SPINNER_DEFAULT_LABEL_
+    );
   }
 
   const detail = document.getElementById('spinner-detail');
@@ -2080,8 +2099,12 @@ function setSpinnerLabel_(message, options) {
 
   const fallbackDetail = SPINNER_DETAIL_BY_KIND_[spinnerOptions.kind] || '';
   const detailText = spinnerOptions.detail !== undefined ? spinnerOptions.detail : fallbackDetail;
-  detail.textContent = detailText || '';
-  detail.hidden = !detailText;
+  const finalDetailText = getPwaLibrarianText_(
+    'spinner.detail.' + (spinnerOptions.kind || 'default'),
+    detailText || ''
+  );
+  detail.textContent = finalDetailText;
+  detail.hidden = !finalDetailText;
 }
 
 function showSpinner(message, options) {

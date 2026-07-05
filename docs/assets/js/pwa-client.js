@@ -10,6 +10,10 @@
   const IOS_INSTALL_STORAGE_KEY = 'shumiLibrary.pwaIosInstallHintDismissed.v1';
   const INSTALL_HINT_AUTO_HIDE_MS = 12000;
   const THEME_STORAGE_KEY = 'shumiLibrary.pwaTheme.v1';
+  const LIBRARIAN_PRESENCE_STORAGE_KEY = 'shumiLibrary.librarianPresence.v1';
+  const QUIET_MOTION_STORAGE_KEY = 'shumiLibrary.quietMotion.v1';
+  const DEFAULT_LOGO_SRC = './assets/logo.png';
+  const LIBRARIAN_LOGO_SRC = './assets/librarian-presence.jpg';
   const THEME_DEFAULT = 'shinhaku';
   const THEME_OPTIONS = ['shinhaku', 'kohi', 'shikon', 'kohaku'];
   const LEGACY_THEME_ALIASES = {
@@ -22,6 +26,38 @@
     kohi: '#120c0f',
     shikon: '#0f0e18',
     kohaku: '#120f0b'
+  };
+  const LIBRARIAN_TEXTS = {
+    'empty.title': 'この条件の本は、今は棚の奥に隠れているようです',
+    'empty.text': '言葉を少しゆるめるか、条件を外してもう一度だけ棚を覗いてみましょう。',
+    'empty.action.search': '検索語を整える',
+    'empty.action.clear': '条件をほどく',
+    'empty.action.random': '別の棚を眺める',
+    'status.random': data => data && Number.isFinite(data.count) ? data.count + '冊をそっと選びました' : '棚から本を選びました',
+    'status.shelf': data => data && Number.isFinite(data.count) ? '全' + data.count + '冊の棚を開いています' : '本棚を開いています',
+    'status.result': data => data && Number.isFinite(data.count) ? data.count + '冊が灯りの下に出てきました' : '本が見つかりました',
+    'status.beforeSearch': '棚を探す前',
+    'status.previewPending': '棚札を確かめています',
+    'status.conditions': '探す手がかり',
+    'status.previewReady': data => data && Number.isFinite(data.count) ? 'この手がかりなら' + data.count + '冊' : '候補が見えています',
+    'spinner.label.search': '棚を探しています',
+    'spinner.label.advanced': '手がかりを照らしています',
+    'spinner.label.random': '棚から10冊抜き出しています',
+    'spinner.label.shelf': '棚の灯りをともしています',
+    'spinner.label.browse': '選んだ入口を辿っています',
+    'spinner.label.refine': '棚を並べ直しています',
+    'spinner.detail.search': 'タイトル・作者・読みを静かに照合しています',
+    'spinner.detail.advanced': 'ジャンルや発売日の札を一枚ずつ確かめています',
+    'spinner.detail.random': '今夜目が合う本を少しだけ選んでいます',
+    'spinner.detail.shelf': '蔵書全体と棚マップをゆっくり広げています',
+    'spinner.detail.browse': '選んだ気分に近い棚を覗いています',
+    'spinner.detail.refine': '外した条件を反映して、棚を整えています',
+    'shelfOverview.heading.immersive': '蔵書全体の棚を開いています',
+    'shelfOverview.heading.result': '見つかった本を棚順に並べています',
+    'shelfOverview.note.immersive': 'マップと棚ジャンプで、趣味部屋の奥へ移動できます。',
+    'shelfOverview.note.result': '検索結果だけを棚順に並べています。全体を眺めるときはトップの「本棚を見る」からどうぞ。',
+    'popup.detailLoading': '詳細の頁を開いています',
+    'series.loading': 'シリーズ棚を確かめています...'
   };
 
   const UPDATE_CHECK_INTERVAL_MS = 60 * 60 * 1000;
@@ -345,6 +381,84 @@
     applyTheme_(nextTheme);
   }
 
+  function getStoredBoolean_(key, defaultValue) {
+    try {
+      if (!window.localStorage) return Boolean(defaultValue);
+      const value = window.localStorage.getItem(key);
+      if (value === null || value === '') return Boolean(defaultValue);
+      return value === '1';
+    } catch (e) {
+      return Boolean(defaultValue);
+    }
+  }
+
+  function setStoredBoolean_(key, value) {
+    try {
+      if (window.localStorage) {
+        window.localStorage.setItem(key, value ? '1' : '0');
+      }
+    } catch (e) {
+      // localStorageが使えない環境でも、その場の設定は反映する。
+    }
+  }
+
+  function isLibrarianPresenceEnabled_() {
+    return getStoredBoolean_(LIBRARIAN_PRESENCE_STORAGE_KEY, false);
+  }
+
+  function isQuietMotionEnabled_() {
+    return getStoredBoolean_(QUIET_MOTION_STORAGE_KEY, false);
+  }
+
+  function syncLogoForLibrarianPresence_(enabled) {
+    const logo = document.getElementById('logoResetBtn');
+    if (!logo) return;
+
+    const nextSrc = enabled ? LIBRARIAN_LOGO_SRC : DEFAULT_LOGO_SRC;
+    const currentSrc = logo.getAttribute('src') || '';
+    if (currentSrc !== nextSrc) {
+      logo.setAttribute('src', nextSrc);
+    }
+    logo.setAttribute('alt', enabled ? '司書のいる趣味部屋図書館' : 'ロゴ');
+  }
+
+  function applyPlaySettings_() {
+    const librarianPresence = isLibrarianPresenceEnabled_();
+    const quietMotion = isQuietMotionEnabled_();
+    if (document.body) {
+      document.body.classList.toggle('pwa-librarian-presence', librarianPresence);
+      document.body.classList.toggle('pwa-quiet-motion', quietMotion);
+    }
+    syncLogoForLibrarianPresence_(librarianPresence);
+
+    const librarianInput = document.getElementById('pwaLibrarianPresence');
+    if (librarianInput) librarianInput.checked = librarianPresence;
+    const quietMotionInput = document.getElementById('pwaQuietMotion');
+    if (quietMotionInput) quietMotionInput.checked = quietMotion;
+  }
+
+  function setLibrarianPresence_(enabled) {
+    setStoredBoolean_(LIBRARIAN_PRESENCE_STORAGE_KEY, Boolean(enabled));
+    applyPlaySettings_();
+    if (typeof renderSearchStatus_ === 'function') {
+      renderSearchStatus_();
+    }
+  }
+
+  function setQuietMotion_(enabled) {
+    setStoredBoolean_(QUIET_MOTION_STORAGE_KEY, Boolean(enabled));
+    applyPlaySettings_();
+  }
+
+  function getLibrarianText_(key, fallback, data) {
+    if (!isLibrarianPresenceEnabled_()) return fallback;
+    const entry = LIBRARIAN_TEXTS[key];
+    if (typeof entry === 'function') {
+      return entry(data || {});
+    }
+    return entry || fallback;
+  }
+
   function moveSensitiveToggleToSettings_() {
     const target = document.getElementById('pwaSensitiveSetting');
     const toggle = document.querySelector('.sensitive-toggle');
@@ -397,6 +511,7 @@
 
     moveSensitiveToggleToSettings_();
     applyTheme_(getStoredTheme_());
+    applyPlaySettings_();
 
     button.addEventListener('click', function() {
       setSettingsOpen_(button.getAttribute('aria-expanded') !== 'true');
@@ -412,6 +527,18 @@
         if (input.checked) setTheme_(input.value);
       });
     });
+    const librarianInput = document.getElementById('pwaLibrarianPresence');
+    if (librarianInput) {
+      librarianInput.addEventListener('change', function() {
+        setLibrarianPresence_(librarianInput.checked);
+      });
+    }
+    const quietMotionInput = document.getElementById('pwaQuietMotion');
+    if (quietMotionInput) {
+      quietMotionInput.addEventListener('change', function() {
+        setQuietMotion_(quietMotionInput.checked);
+      });
+    }
     document.addEventListener('keydown', function(event) {
       if (event.key === 'Escape' && button.getAttribute('aria-expanded') === 'true') {
         setSettingsOpen_(false);
@@ -421,6 +548,9 @@
 
   window.ShumiLibraryPwa = {
     isPwaShell: true,
+    isLibrarianPresenceEnabled: isLibrarianPresenceEnabled_,
+    isQuietMotionEnabled: isQuietMotionEnabled_,
+    getLibrarianText: getLibrarianText_,
     handleApiFailure: function(error) {
       if (error && error.code === 'OFFLINE') {
         setBanner_(OFFLINE_MESSAGE, 'error');

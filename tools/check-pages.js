@@ -29,6 +29,7 @@ const pagesWorkflow = read(pagesWorkflowPath);
   'assets/js/gas-run-shim.js',
   'assets/js/pwa-client.js',
   'assets/logo.png',
+  'assets/librarian-presence.jpg',
   'assets/icons/icon-192.png',
   'assets/icons/icon-512.png'
 ].forEach(relativePath => {
@@ -43,6 +44,11 @@ const pagesWorkflow = read(pagesWorkflowPath);
   const signature = fs.readFileSync(path.join(docs, relativePath)).subarray(0, 8);
   assert(signature.equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])), `${relativePath} is a PNG`);
 });
+
+{
+  const signature = fs.readFileSync(path.join(docs, 'assets', 'librarian-presence.jpg')).subarray(0, 3);
+  assert(signature.equals(Buffer.from([0xff, 0xd8, 0xff])), 'assets/librarian-presence.jpg is a JPEG');
+}
 
 assert(!index.includes('HtmlService.createHtmlOutputFromFile'), 'static index has no GAS template includes');
 assert(index.includes('rel="manifest" href="./manifest.webmanifest"'), 'static index references manifest');
@@ -60,6 +66,8 @@ assert(index.includes('./assets/css/pwa.css'), 'static index loads PWA CSS');
 assert(index.includes('src="./assets/logo.png"'), 'static index uses local logo asset');
 assert(index.includes('id="pwaSettingsButton"'), 'static index includes PWA settings button');
 assert(index.includes('id="pwaSettingsPanel"'), 'static index includes PWA settings panel');
+assert(index.includes('id="pwaLibrarianPresence"'), 'static index includes librarian presence setting');
+assert(index.includes('id="pwaQuietMotion"'), 'static index includes quiet motion setting');
 ['shinhaku', 'kohi', 'shikon', 'kohaku'].forEach(value => {
   assert(index.includes(`name="pwaTheme" value="${value}"`), `static index includes ${value} theme option`);
 });
@@ -126,6 +134,7 @@ assert(manifest.shortcuts.some(item => item.url === './?launch=random'), 'manife
 assert(sw.includes('offline.html'), 'service worker caches offline fallback');
 assert(/shumi-library-pwa-[a-f0-9]{12}/.test(sw), 'service worker cache name is content hashed');
 assert(sw.includes('./assets/logo.png'), 'service worker caches local logo');
+assert(sw.includes('./assets/librarian-presence.jpg'), 'service worker caches librarian presence logo');
 assert(sw.includes('SKIP_WAITING'), 'service worker supports update activation');
 assert(sw.includes("const NAVIGATION_FALLBACK = './index.html'"), 'service worker uses cached app shell for offline navigation');
 assert(sw.includes('isAppShellUrl_'), 'service worker recognizes app shell assets');
@@ -148,6 +157,8 @@ assert(pwaCss.includes('body.pwa-theme-shinhaku'), 'PWA CSS includes shinhaku th
 assert(pwaCss.includes('body.pwa-theme-kohi'), 'PWA CSS includes kohi theme');
 assert(pwaCss.includes('body.pwa-theme-shikon'), 'PWA CSS includes shikon theme');
 assert(pwaCss.includes('body.pwa-theme-kohaku'), 'PWA CSS includes kohaku theme');
+assert(pwaCss.includes('body.pwa-librarian-presence #logoResetBtn.logo'), 'PWA CSS styles librarian presence logo');
+assert(pwaCss.includes('body.pwa-quiet-motion .result-fade.show'), 'PWA CSS adds quiet motion option');
 assert(pwaCss.includes('--pwa-accent-rgb'), 'PWA CSS uses theme color variables for detailed accents');
 assert(pwaCss.includes('--pwa-safe-top: env(safe-area-inset-top'), 'PWA CSS defines standalone top safe-area');
 assert(pwaCss.includes('top: var(--pwa-safe-top)'), 'PWA CSS keeps sticky header below standalone status bar');
@@ -166,6 +177,10 @@ assert(pwaClient.includes('INSTALL_PROMPT_STORAGE_KEY'), 'PWA client remembers d
 assert(pwaClient.includes("window.addEventListener('appinstalled'"), 'PWA client handles completed installation');
 assert(pwaClient.includes('IOS_INSTALL_STORAGE_KEY'), 'PWA client remembers dismissed iOS install hint');
 assert(pwaClient.includes('THEME_STORAGE_KEY'), 'PWA client persists selected color theme');
+assert(pwaClient.includes('LIBRARIAN_PRESENCE_STORAGE_KEY'), 'PWA client persists librarian presence setting');
+assert(pwaClient.includes('QUIET_MOTION_STORAGE_KEY'), 'PWA client persists quiet motion setting');
+assert(pwaClient.includes('LIBRARIAN_LOGO_SRC'), 'PWA client can switch to librarian logo');
+assert(pwaClient.includes('getLibrarianText'), 'PWA client exposes librarian text hook');
 assert(pwaClient.includes('THEME_COLORS'), 'PWA client maps themes to shell colors');
 assert(pwaClient.includes("THEME_OPTIONS = ['shinhaku', 'kohi', 'shikon', 'kohaku']"), 'PWA client exposes the four named themes');
 assert(pwaClient.includes('LEGACY_THEME_ALIASES'), 'PWA client migrates old stored theme values');

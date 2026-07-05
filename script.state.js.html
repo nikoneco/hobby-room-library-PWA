@@ -55,6 +55,14 @@ const UI_ICONS = {
   chevronDown: '<svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"></path></svg>'
 };
 
+function getPwaLibrarianText_(key, fallback, data) {
+  const pwa = window.ShumiLibraryPwa;
+  if (!pwa || typeof pwa.getLibrarianText !== 'function') {
+    return fallback;
+  }
+  return pwa.getLibrarianText(key, fallback, data);
+}
+
 function uiIcon_(name, extraClass) {
   return `<span class="ui-icon ${extraClass || ''}" aria-hidden="true">${UI_ICONS[name] || ''}</span>`;
 }
