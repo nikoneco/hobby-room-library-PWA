@@ -244,11 +244,15 @@ assert(
 assert(
   clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('function fetchPopupContextBookDetails_') &&
     clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('function collectPopupContextDetailTargets_') &&
+    clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('function createPopupDeferredRenderBook_') &&
+    clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('function schedulePopupCurrentDetailRender_') &&
+    clientScriptSources[clientScriptFiles.indexOf('script.state.js.html')].includes('POPUP_CURRENT_DETAIL_RENDER_DELAY_MS') &&
     clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('getBookDetailsByRowIndexes(rowIndexes)') &&
     clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes("mode: 'currentOnly'") &&
+    clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('forceCurrent: Boolean(popupOptions.forceCurrentDetailFetch)') &&
     clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('function schedulePopupNeighborBookDetails_') &&
     clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes("mode: 'neighborsOnly'"),
-  'book popup fetches current details immediately and delays nearby detail prefetch'
+  'book popup fetches current details immediately, can defer heavy detail rendering, and delays nearby detail prefetch'
 );
 assert(
     clientScriptSources[clientScriptFiles.indexOf('script.images.js.html')].includes('function prefetchPopupNeighborCoverImages_') &&
@@ -324,6 +328,7 @@ assert(
     clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes("'popup-no-rise'") &&
     clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('renderNextPopup_();') &&
     !clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('window.requestAnimationFrame(renderNextPopup_)') &&
+    clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('deferCurrentDetailRender: Boolean(transitionClone)') &&
     modernModalStyleSource.includes('#image-popup-content.is-dragging') &&
     fs.readFileSync(path.join(root, 'style.legacy-modal.css.html'), 'utf8').includes('@keyframes popup-commit-next'),
   'book popup commits swipe direction before changing books without restarting the entry animation'

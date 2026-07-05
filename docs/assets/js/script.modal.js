@@ -251,14 +251,49 @@ function isBookPopupOpen_() {
   );
 }
 
-function shouldFetchDeferredBookDetails_(book) {
+function shouldFetchDeferredBookDetails_(book, options) {
+  const opt = options || {};
   return !!(
     book &&
     book.detailLoaded === false &&
     book.rowIndex !== undefined &&
     book.rowIndex !== null &&
-    !book.detailLoading
+    (opt.force || !book.detailLoading)
   );
+}
+
+function createPopupDeferredRenderBook_(book) {
+  if (!book || typeof book !== 'object') return book;
+
+  return {
+    title: book.title || '',
+    rowIndex: book.rowIndex,
+    isbn: book.isbn || '',
+    shelf: book.shelf || '',
+    location: book.location || '',
+    img: book.img || '',
+    img400: book.img400 || '',
+    fallbackImg: book.fallbackImg || '',
+    fallbackImageSource: book.fallbackImageSource || '',
+    isSensitive: book.isSensitive,
+    detailLoaded: false,
+    detailLoading: true,
+    detailError: ''
+  };
+}
+
+function schedulePopupCurrentDetailRender_(book, index, dataArr, seriesContext, delayMs) {
+  const targetIndex = Math.floor(Number(index));
+  if (!book || !Array.isArray(dataArr) || !Number.isFinite(targetIndex)) return;
+
+  window.setTimeout(function() {
+    if (!isBookPopupOpen_()) return;
+    if (popupIndex !== targetIndex || popupData !== dataArr) return;
+    showPopup(book, targetIndex, dataArr, seriesContext, {
+      deferNeighborDetails: true,
+      skipCurrentDetailRenderDefer: true
+    });
+  }, Math.max(0, Number(delayMs || POPUP_CURRENT_DETAIL_RENDER_DELAY_MS)));
 }
 
 function getBookDetailCacheKey_(book) {
@@ -569,7 +604,10 @@ function collectPopupContextDetailTargets_(book, index, dataArr, options) {
     targets.push({
       book: targetBook,
       index: targetIndex,
-      options: { prefetch: !isCurrent }
+      options: {
+        prefetch: !isCurrent,
+        force: Boolean(isCurrent && opt.forceCurrent)
+      }
     });
   }
 
@@ -612,7 +650,7 @@ function fetchPopupContextBookDetails_(book, index, dataArr, seriesContext, opti
       return;
     }
 
-    if (!shouldFetchDeferredBookDetails_(targetBook)) return;
+    if (!shouldFetchDeferredBookDetails_(targetBook, target.options)) return;
     requestTargets.push(target);
   });
 
@@ -1240,6 +1278,13 @@ function showSeriesPanel(sourceBook, seriesBooks, returnContext) {
 
 function showPopup(book, index, dataArr, seriesContext, options) {
   const popupOptions = options || {};
+  const sourceBook = book;
+  const deferCurrentDetailRender = Boolean(
+    popupOptions.deferCurrentDetailRender &&
+    !popupOptions.skipCurrentDetailRenderDefer &&
+    book &&
+    book.detailLoaded !== false
+  );
   if (bookDetailPrefetchTimer) {
     window.clearTimeout(bookDetailPrefetchTimer);
     bookDetailPrefetchTimer = 0;
@@ -1249,7 +1294,7 @@ function showPopup(book, index, dataArr, seriesContext, options) {
     popupReturnScrollY = window.scrollY || 0;
   }
 
-  const cachedDetail = getCachedBookDetail_(book);
+  const cachedDetail = deferCurrentDetailRender ? null : getCachedBookDetail_(book);
   if (cachedDetail && book && book.detailLoaded === false) {
     const originalBook = book;
     book = mergeDeferredBookDetails_(book, cachedDetail);
@@ -1257,6 +1302,7 @@ function showPopup(book, index, dataArr, seriesContext, options) {
       dataArr[index] = book;
     }
   }
+  const renderBook = deferCurrentDetailRender ? createPopupDeferredRenderBook_(book) : book;
 
   popupIndex = index;
   popupData = dataArr;
@@ -1277,11 +1323,11 @@ function showPopup(book, index, dataArr, seriesContext, options) {
   }
   img.style.display = '';
   if (popupContent) popupContent.classList.remove('series-mode');
-  img.alt = book.title || '表紙';
+  img.alt = renderBook.title || '表紙';
   img.setAttribute('role', 'button');
   img.setAttribute('tabindex', '0');
   img.setAttribute('aria-label', '表紙を全画面で表示');
-  setupBookImageElement_(img, book, {
+  setupBookImageElement_(img, renderBook, {
     track: false,
     loading: 'eager',
     fetchPriority: 'high',
@@ -1295,37 +1341,47 @@ function showPopup(book, index, dataArr, seriesContext, options) {
       popupDragSuppressNextClick = false;
       return;
     }
-    openCoverFullscreen_(book);
+    openCoverFullscreen_(sourceBook || renderBook);
   };
   img.onkeydown = function(e) {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
-      openCoverFullscreen_(book);
+      openCoverFullscreen_(sourceBook || renderBook);
     }
   };
 
-  const actionsHtml = buildPopupActionsHtml(book, popupSeriesContext);
+  const actionsHtml = buildPopupActionsHtml(renderBook, popupSeriesContext);
   info.innerHTML = `
     <div class="popup-book-detail">
       <div class="popup-book-head">
-        <div class="popup-book-title">${escapeHtml(book.title || '(タイトルなし)')}</div>
-        ${buildPopupBookLeadHtml_(book)}
-        ${buildPopupDetailLoadingHtml_(book)}
+        <div class="popup-book-title">${escapeHtml(renderBook.title || '(タイトルなし)')}</div>
+        ${buildPopupBookLeadHtml_(renderBook)}
+        ${buildPopupDetailLoadingHtml_(renderBook)}
       </div>
-      <div class="genre-chip-wrap popup">${buildGenreChips(book)}</div>
+      <div class="genre-chip-wrap popup">${buildGenreChips(renderBook)}</div>
       <div class="popup-book-primary-meta">
-        ${buildBookMetaPillsHtml_(book, { includeIsbn: true })}
-        ${buildBookMemoHtml_(book)}
+        ${buildBookMetaPillsHtml_(renderBook, { includeIsbn: true })}
+        ${buildBookMemoHtml_(renderBook)}
       </div>
       ${actionsHtml}
       <div class="popup-position">${popupIndex + 1} / ${popupData.length}</div>
     </div>
   `;
 
-  appendPopupSummaryAccordion_(info.querySelector('.genre-chip-wrap.popup'), book);
-  attachPopupActionHandlers(book, popupSeriesContext);
-  fetchPopupContextBookDetails_(book, index, dataArr, popupSeriesContext, {
-    mode: 'currentOnly'
+  appendPopupSummaryAccordion_(info.querySelector('.genre-chip-wrap.popup'), renderBook);
+  attachPopupActionHandlers(renderBook, popupSeriesContext);
+  if (deferCurrentDetailRender) {
+    schedulePopupCurrentDetailRender_(
+      sourceBook,
+      index,
+      dataArr,
+      popupSeriesContext,
+      POPUP_CURRENT_DETAIL_RENDER_DELAY_MS
+    );
+  }
+  fetchPopupContextBookDetails_(sourceBook, index, dataArr, popupSeriesContext, {
+    mode: 'currentOnly',
+    forceCurrent: Boolean(popupOptions.forceCurrentDetailFetch)
   });
   schedulePopupNeighborCoverPrefetch_(index, dataArr, POPUP_NEIGHBOR_IMAGE_DELAY_MS);
   schedulePopupNeighborBookDetails_(
@@ -1519,7 +1575,9 @@ function popupMove(diff, options) {
   const slideClass = diff > 0 ? 'popup-slide-next' : 'popup-slide-prev';
   const renderNextPopup_ = function() {
     showPopup(popupData[popupIndex], popupIndex, popupData, popupSeriesContext, {
-      deferNeighborDetails: true
+      deferNeighborDetails: true,
+      deferCurrentDetailRender: Boolean(transitionClone),
+      forceCurrentDetailFetch: true
     });
 
     const popupContent = document.getElementById('image-popup-content');
