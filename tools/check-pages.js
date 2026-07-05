@@ -139,6 +139,9 @@ assert(pwaClient.includes("window.addEventListener('focus'"), 'PWA client checks
 assert(pwaClient.includes("window.addEventListener('beforeinstallprompt'"), 'PWA client handles install prompt availability');
 assert(pwaClient.includes('INSTALL_PROMPT_STORAGE_KEY'), 'PWA client remembers dismissed install prompt');
 assert(pwaClient.includes("window.addEventListener('appinstalled'"), 'PWA client handles completed installation');
+assert(pwaClient.includes('IOS_INSTALL_STORAGE_KEY'), 'PWA client remembers dismissed iOS install hint');
+assert(pwaClient.includes('function isIosLike_'), 'PWA client detects iOS-like browsers');
+assert(pwaClient.includes('showIosInstallHint_'), 'PWA client can show iOS install hint');
 assert(pwaCss.includes('.pwa-network-banner-action-muted'), 'PWA CSS styles secondary banner action');
 assert(bootClient.includes('clearLaunchActionFromUrl_'), 'boot client clears consumed PWA launch shortcut');
 assert(bootClient.includes('window.history.replaceState'), 'boot client rewrites launch shortcut URL after use');

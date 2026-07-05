@@ -6,6 +6,8 @@
   const UPDATE_MESSAGE = '新しい版があります。';
   const INSTALL_PROMPT_MESSAGE = 'ホーム画面に追加できます。';
   const INSTALL_PROMPT_STORAGE_KEY = 'shumiLibrary.pwaInstallPromptDismissed.v1';
+  const IOS_INSTALL_MESSAGE = '共有からホーム画面に追加できます。';
+  const IOS_INSTALL_STORAGE_KEY = 'shumiLibrary.pwaIosInstallHintDismissed.v1';
 
   const UPDATE_CHECK_INTERVAL_MS = 60 * 60 * 1000;
 
@@ -21,6 +23,15 @@
       window.matchMedia &&
       window.matchMedia('(display-mode: standalone)').matches
     ) || window.navigator.standalone === true;
+  }
+
+  function isIosLike_() {
+    const ua = navigator && navigator.userAgent ? navigator.userAgent : '';
+    const platform = navigator && navigator.platform ? navigator.platform : '';
+    const touchPoints = navigator && navigator.maxTouchPoints ? navigator.maxTouchPoints : 0;
+
+    return /iPad|iPhone|iPod/.test(ua) ||
+      (platform === 'MacIntel' && touchPoints > 1);
   }
 
   function getBanner_() {
@@ -75,6 +86,56 @@
     if (currentBannerKind === 'install') {
       clearBanner_();
     }
+  }
+
+  function isIosInstallHintDismissed_() {
+    try {
+      return window.localStorage &&
+        window.localStorage.getItem(IOS_INSTALL_STORAGE_KEY) === '1';
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function dismissIosInstallHint_() {
+    try {
+      if (window.localStorage) {
+        window.localStorage.setItem(IOS_INSTALL_STORAGE_KEY, '1');
+      }
+    } catch (e) {
+      // localStorageが使えない環境では、その場の表示だけ閉じる。
+    }
+
+    if (currentBannerKind === 'ios-install') {
+      clearBanner_();
+    }
+  }
+
+  function showIosInstallHint_() {
+    if (!isIosLike_() || isStandalone_() || isIosInstallHintDismissed_()) return;
+    if (currentBannerKind) return;
+
+    const banner = getBanner_();
+    if (!banner) return;
+
+    banner.innerHTML = '';
+    banner.hidden = false;
+    currentBannerKind = 'ios-install';
+    banner.classList.remove('is-error');
+    banner.classList.remove('is-update');
+    banner.classList.add('is-notice');
+    syncBodyState_();
+
+    const text = document.createElement('span');
+    text.textContent = IOS_INSTALL_MESSAGE;
+    banner.appendChild(text);
+
+    const closeButton = document.createElement('button');
+    closeButton.type = 'button';
+    closeButton.className = 'pwa-network-banner-action pwa-network-banner-action-muted';
+    closeButton.textContent = '閉じる';
+    closeButton.addEventListener('click', dismissIosInstallHint_);
+    banner.appendChild(closeButton);
   }
 
   function showInstallBanner_() {
@@ -247,6 +308,7 @@
   window.addEventListener('DOMContentLoaded', function() {
     syncBodyState_();
     syncOnlineState_();
+    window.setTimeout(showIosInstallHint_, 3500);
 
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('./sw.js')
