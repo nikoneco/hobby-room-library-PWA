@@ -121,6 +121,8 @@ assert(sw.includes('./assets/logo.png'), 'service worker caches local logo');
 assert(sw.includes('SKIP_WAITING'), 'service worker supports update activation');
 assert(sw.includes("const NAVIGATION_FALLBACK = './index.html'"), 'service worker uses cached app shell for offline navigation');
 assert(sw.includes('isAppShellUrl_'), 'service worker recognizes app shell assets');
+assert(sw.includes("if (request.mode === 'navigate')"), 'service worker handles app navigation requests');
+assert(sw.includes('caches.match(cacheKey).then(cached => {'), 'service worker serves cached app shell for navigation');
 assert(sw.includes('return cached || refresh.then'), 'service worker serves app shell cache before network refresh');
 const buildScript = read(path.join(root, 'tools', 'build-pages.js'));
 assert(buildScript.includes("crypto.createHash('sha256')"), 'build script hashes app shell for service worker cache');

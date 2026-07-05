@@ -82,9 +82,12 @@ self.addEventListener('fetch', event => {
   if (request.mode === 'navigate') {
     const cacheKey = new URL(NAVIGATION_FALLBACK, self.location.href).href;
     event.respondWith(
-      fetch(request)
-        .then(response => putCache_(cacheKey, response))
-        .catch(() => caches.match(cacheKey).then(cached => cached || caches.match(OFFLINE_FALLBACK)))
+      caches.match(cacheKey).then(cached => {
+        const refresh = fetch(request)
+          .then(response => putCache_(cacheKey, response))
+          .catch(() => null);
+        return cached || refresh.then(response => response || caches.match(OFFLINE_FALLBACK));
+      })
     );
     return;
   }
