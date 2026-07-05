@@ -533,9 +533,13 @@ function writePwaClient() {
   const API_ERROR_MESSAGE = '蔵書データを取得できませんでした。通信状態を確認して再試行してください。';
   const UPDATE_MESSAGE = '新しい版があります。';
 
+  const UPDATE_CHECK_INTERVAL_MS = 60 * 60 * 1000;
+
   let updateWaitingWorker = null;
   let reloadForUpdate = false;
   let currentBannerKind = '';
+  let activeRegistration = null;
+  let lastUpdateCheckAt = 0;
 
   function isStandalone_() {
     return Boolean(
@@ -618,6 +622,7 @@ function writePwaClient() {
 
   function watchServiceWorkerUpdate_(registration) {
     if (!registration) return;
+    activeRegistration = registration;
 
     if (registration.waiting && navigator.serviceWorker.controller) {
       showUpdateBanner_(registration.waiting);
@@ -632,6 +637,19 @@ function writePwaClient() {
           showUpdateBanner_(worker);
         }
       });
+    });
+  }
+
+  function requestServiceWorkerUpdate_(force) {
+    if (!activeRegistration || typeof activeRegistration.update !== 'function') return;
+    if (navigator && navigator.onLine === false) return;
+
+    const now = Date.now();
+    if (!force && now - lastUpdateCheckAt < UPDATE_CHECK_INTERVAL_MS) return;
+    lastUpdateCheckAt = now;
+
+    activeRegistration.update().catch(function(error) {
+      console.warn('service worker update check failed:', error);
     });
   }
 
@@ -653,6 +671,14 @@ function writePwaClient() {
 
   window.addEventListener('online', syncOnlineState_);
   window.addEventListener('offline', syncOnlineState_);
+  window.addEventListener('focus', function() {
+    requestServiceWorkerUpdate_(false);
+  });
+  document.addEventListener('visibilitychange', function() {
+    if (document.visibilityState === 'visible') {
+      requestServiceWorkerUpdate_(false);
+    }
+  });
   if (window.matchMedia) {
     const standaloneMedia = window.matchMedia('(display-mode: standalone)');
     if (standaloneMedia && typeof standaloneMedia.addEventListener === 'function') {
@@ -673,7 +699,10 @@ function writePwaClient() {
 
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('./sw.js')
-        .then(watchServiceWorkerUpdate_)
+        .then(function(registration) {
+          watchServiceWorkerUpdate_(registration);
+          requestServiceWorkerUpdate_(true);
+        })
         .catch(function(error) {
           console.warn('service worker registration failed:', error);
         });
