@@ -991,8 +991,9 @@ function renderShelfView_(data) {
 
   warmBookDetailPrefetch_(shelfPopupData, {
     limit: BOOK_DETAIL_PREFETCH_WARM_LIMIT,
-    timeout: 1200,
-    delay: 520
+    priorityCount: 0,
+    timeout: BOOK_DETAIL_PREFETCH_WARM_TIMEOUT_MS,
+    delay: BOOK_DETAIL_PREFETCH_WARM_DELAY_MS
   });
 
   return container;

@@ -814,7 +814,7 @@ function processBookDetailPrefetchQueue_() {
   }
 
   if (!batch.length) {
-    if (bookDetailPrefetchQueue.length) window.setTimeout(processBookDetailPrefetchQueue_, 0);
+    if (bookDetailPrefetchQueue.length) scheduleBookDetailPrefetchQueue_(false);
     return;
   }
 
@@ -876,13 +876,46 @@ function processBookDetailPrefetchQueue_() {
 
     bookDetailPrefetchActive = Math.max(0, bookDetailPrefetchActive - 1);
     if (bookDetailPrefetchQueue.length) {
-      window.setTimeout(processBookDetailPrefetchQueue_, 80);
+      scheduleBookDetailPrefetchQueue_(false);
     }
   }, 120);
 
   if (bookDetailPrefetchQueue.length && bookDetailPrefetchActive < getBookDetailPrefetchConcurrency_()) {
-    window.setTimeout(processBookDetailPrefetchQueue_, 80);
+    scheduleBookDetailPrefetchQueue_(false);
   }
+}
+
+function clearBookDetailPrefetchSchedule_() {
+  if (bookDetailPrefetchTimer) {
+    window.clearTimeout(bookDetailPrefetchTimer);
+    bookDetailPrefetchTimer = 0;
+  }
+  if (
+    bookDetailPrefetchIdleTimer &&
+    typeof window.cancelIdleCallback === 'function'
+  ) {
+    window.cancelIdleCallback(bookDetailPrefetchIdleTimer);
+    bookDetailPrefetchIdleTimer = 0;
+  }
+}
+
+function scheduleBookDetailPrefetchQueue_(priority) {
+  clearBookDetailPrefetchSchedule_();
+  const delay = priority ? BOOK_DETAIL_PREFETCH_PRIORITY_DELAY_MS : BOOK_DETAIL_PREFETCH_IDLE_DELAY_MS;
+
+  bookDetailPrefetchTimer = window.setTimeout(function() {
+    bookDetailPrefetchTimer = 0;
+    const run = function() {
+      bookDetailPrefetchIdleTimer = 0;
+      processBookDetailPrefetchQueue_();
+    };
+
+    if (!priority && typeof window.requestIdleCallback === 'function') {
+      bookDetailPrefetchIdleTimer = window.requestIdleCallback(run, { timeout: 900 });
+    } else {
+      run();
+    }
+  }, delay);
 }
 
 function queueBookDetailPrefetch_(book, priority) {
@@ -908,8 +941,7 @@ function queueBookDetailPrefetch_(book, priority) {
     });
   }
 
-  if (bookDetailPrefetchTimer) window.clearTimeout(bookDetailPrefetchTimer);
-  bookDetailPrefetchTimer = window.setTimeout(processBookDetailPrefetchQueue_, priority ? 20 : 320);
+  scheduleBookDetailPrefetchQueue_(Boolean(priority));
 }
 
 function warmBookDetailPrefetch_(books, options) {
@@ -917,6 +949,9 @@ function warmBookDetailPrefetch_(books, options) {
 
   const opt = options || {};
   const limit = Math.max(0, Number(opt.limit || BOOK_DETAIL_PREFETCH_WARM_LIMIT));
+  const priorityCount = opt.priorityCount === undefined
+    ? 4
+    : Math.max(0, Number(opt.priorityCount || 0));
   const targets = books
     .filter(book => shouldFetchDeferredBookDetails_(book) && !getCachedBookDetail_(book))
     .slice(0, limit);
@@ -925,15 +960,19 @@ function warmBookDetailPrefetch_(books, options) {
 
   const run = function() {
     targets.forEach((book, index) => {
-      queueBookDetailPrefetch_(book, index < 4);
+      queueBookDetailPrefetch_(book, index < priorityCount);
     });
   };
 
-  if ('requestIdleCallback' in window) {
-    window.requestIdleCallback(run, { timeout: Math.max(500, Number(opt.timeout || 1000)) });
-  } else {
-    window.setTimeout(run, Math.max(220, Number(opt.delay || 480)));
-  }
+  const delay = Math.max(0, Number(opt.delay || BOOK_DETAIL_PREFETCH_WARM_DELAY_MS));
+  const timeout = Math.max(500, Number(opt.timeout || BOOK_DETAIL_PREFETCH_WARM_TIMEOUT_MS));
+  window.setTimeout(function() {
+    if (typeof window.requestIdleCallback === 'function') {
+      window.requestIdleCallback(run, { timeout });
+    } else {
+      run();
+    }
+  }, delay);
 }
 
 function warmPopupNeighborDetails_(index, dataArr) {

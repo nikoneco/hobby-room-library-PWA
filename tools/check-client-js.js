@@ -308,12 +308,20 @@ assert(
 assert(
   clientScriptSources[clientScriptFiles.indexOf('script.state.js.html')].includes('SHELF_RENDER_INITIAL_BOOK_LIMIT') &&
     clientScriptSources[clientScriptFiles.indexOf('script.state.js.html')].includes('SHELF_RENDER_CHUNK_SIZE') &&
+    clientScriptSources[clientScriptFiles.indexOf('script.state.js.html')].includes('const SHELF_RENDER_CHUNK_SIZE = 30') &&
     clientScriptSources[clientScriptFiles.indexOf('script.state.js.html')].includes('SHELF_RENDER_PAUSE_RETRY_MS') &&
     clientScriptSources[clientScriptFiles.indexOf('script.shelf.js.html')].includes('function scheduleShelfRenderQueue_') &&
     clientScriptSources[clientScriptFiles.indexOf('script.shelf.js.html')].includes('appendShelfBookItems_') &&
     clientScriptSources[clientScriptFiles.indexOf('script.shelf.js.html')].includes('function isShelfRenderPaused_') &&
     clientScriptSources[clientScriptFiles.indexOf('script.shelf.js.html')].includes('renderQueue.push'),
   'bookshelf view renders book tiles incrementally instead of blocking on every tile'
+);
+assert(
+  clientScriptSources[clientScriptFiles.indexOf('script.state.js.html')].includes('BOOK_DETAIL_PREFETCH_WARM_DELAY_MS') &&
+    clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('function scheduleBookDetailPrefetchQueue_') &&
+    clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('window.requestIdleCallback(run') &&
+    clientScriptSources[clientScriptFiles.indexOf('script.shelf.js.html')].includes('priorityCount: 0'),
+  'bookshelf detail prefetch is delayed and scheduled through idle-friendly background work'
 );
 assert(
   clientScriptSources[clientScriptFiles.indexOf('script.state.js.html')].includes('bookshelfPendingRestoreScroll') &&
