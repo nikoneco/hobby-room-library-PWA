@@ -24,7 +24,8 @@
     if (!document.body) return;
     document.body.classList.add('pwa-shell');
     document.body.classList.toggle('pwa-standalone', isStandalone_());
-    document.body.classList.toggle('pwa-network-visible', Boolean(currentBannerKind));
+    document.body.classList.toggle('pwa-network-visible', Boolean(currentBannerKind && currentBannerKind !== 'update'));
+    document.body.classList.toggle('pwa-update-visible', currentBannerKind === 'update');
   }
 
   function setBanner_(message, kind) {

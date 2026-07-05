@@ -187,6 +187,10 @@ body.pwa-network-visible.mobile-input-active .mobile-app-dock {
   transform: translateY(calc(100% + 16px));
 }
 
+body.pwa-update-visible .mobile-app-dock {
+  transform: none;
+}
+
 .pwa-network-banner.is-error {
   border-color: rgba(166, 73, 58, 0.28);
   color: #5f2f26;
@@ -194,7 +198,19 @@ body.pwa-network-visible.mobile-input-active .mobile-app-dock {
 
 .pwa-network-banner.is-update {
   border-color: rgba(104, 191, 215, 0.34);
-  color: #17343c;
+  color: #dff8ff;
+  background: rgba(13, 22, 31, 0.94);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  left: auto;
+  right: max(12px, env(safe-area-inset-right));
+  bottom: auto;
+  top: max(12px, env(safe-area-inset-top));
+  max-width: min(360px, calc(100vw - 24px - env(safe-area-inset-left) - env(safe-area-inset-right)));
+  padding: 9px 10px 9px 12px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.26);
 }
 
 .pwa-network-banner.is-notice {
@@ -226,6 +242,15 @@ body.pwa-network-visible.mobile-input-active .mobile-app-dock {
   .pwa-network-banner {
     font-size: 0.86rem;
     padding: 10px 12px;
+  }
+
+  .pwa-network-banner.is-update {
+    left: max(12px, env(safe-area-inset-left));
+    right: max(12px, env(safe-area-inset-right));
+    width: auto;
+    max-width: none;
+    padding: 8px 9px 8px 11px;
+    font-size: 0.82rem;
   }
 }
 
@@ -517,7 +542,8 @@ function writePwaClient() {
     if (!document.body) return;
     document.body.classList.add('pwa-shell');
     document.body.classList.toggle('pwa-standalone', isStandalone_());
-    document.body.classList.toggle('pwa-network-visible', Boolean(currentBannerKind));
+    document.body.classList.toggle('pwa-network-visible', Boolean(currentBannerKind && currentBannerKind !== 'update'));
+    document.body.classList.toggle('pwa-update-visible', currentBannerKind === 'update');
   }
 
   function setBanner_(message, kind) {

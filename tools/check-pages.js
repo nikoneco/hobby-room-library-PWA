@@ -99,6 +99,8 @@ const pwaCss = read(path.join(docs, 'assets', 'css', 'pwa.css'));
 const pwaClient = read(path.join(docs, 'assets', 'js', 'pwa-client.js'));
 assert(pwaCss.includes('body.pwa-standalone .mobile-app-dock'), 'PWA CSS styles standalone dock');
 assert(pwaCss.includes('body.pwa-network-visible .mobile-app-dock'), 'PWA CSS offsets dock while network banner is visible');
+assert(pwaCss.includes('body.pwa-update-visible .mobile-app-dock'), 'PWA CSS keeps dock stable while update toast is visible');
+assert(pwaClient.includes("currentBannerKind && currentBannerKind !== 'update'"), 'PWA client separates update toast from network banner state');
 assert(!pwaCss.includes('.pwa-recent-rail'), 'PWA CSS omits recent book rail');
 assert(!pwaCss.includes('.pwa-recent-book'), 'PWA CSS omits recent book cards');
 assert(pwaClient.includes("document.body.classList.add('pwa-shell')"), 'PWA client marks shell body');
