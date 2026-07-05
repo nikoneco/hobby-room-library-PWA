@@ -278,7 +278,8 @@ assert(
       modalSource.includes("popupContent.style.visibility = 'hidden';") &&
       modalSource.includes("popupContent.style.visibility = '';") &&
       popupMoveSource.includes('useTransitionClone') &&
-      popupMoveSource.includes('window.requestAnimationFrame(function()') &&
+      popupMoveSource.includes('renderNextPopup_();') &&
+      !popupMoveSource.includes('window.requestAnimationFrame(renderNextPopup_)') &&
       renderNextIndex >= 0 &&
       showPopupIndex >= 0 &&
       renderNextIndex < showPopupIndex &&
@@ -321,6 +322,8 @@ assert(
 assert(
   clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes("'popup-commit-next'") &&
     clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes("'popup-no-rise'") &&
+    clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('renderNextPopup_();') &&
+    !clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('window.requestAnimationFrame(renderNextPopup_)') &&
     modernModalStyleSource.includes('#image-popup-content.is-dragging') &&
     fs.readFileSync(path.join(root, 'style.legacy-modal.css.html'), 'utf8').includes('@keyframes popup-commit-next'),
   'book popup commits swipe direction before changing books without restarting the entry animation'

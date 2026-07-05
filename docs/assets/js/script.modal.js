@@ -1533,11 +1533,5 @@ function popupMove(diff, options) {
     }, 240);
   };
 
-  if (transitionClone) {
-    window.requestAnimationFrame(function() {
-      window.requestAnimationFrame(renderNextPopup_);
-    });
-  } else {
-    renderNextPopup_();
-  }
+  renderNextPopup_();
 }
