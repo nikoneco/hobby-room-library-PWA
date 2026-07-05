@@ -89,6 +89,7 @@ assert(index.includes('id="pwaQuietMotion"'), 'static index includes quiet motio
 });
 assert(pagesWorkflow.includes('actions/setup-node@v5'), 'Pages workflow sets up Node.js');
 assert(pagesWorkflow.includes('node tools/build-pages.js'), 'Pages workflow builds docs artifact before checks');
+assert(pagesWorkflow.includes('node tools/check-project-identity.js'), 'Pages workflow checks PWA project identity before deploy');
 assert(pagesWorkflow.includes('node tools/check-client-js.js'), 'Pages workflow checks client JavaScript before deploy');
 assert(pagesWorkflow.includes('node tools/check-client-css.js'), 'Pages workflow checks client CSS before deploy');
 assert(pagesWorkflow.includes('node tools/check-pages.js'), 'Pages workflow checks static Pages artifact before deploy');

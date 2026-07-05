@@ -267,16 +267,21 @@ assert(
 );
 {
   const modalSource = clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')];
-  const popupMoveStart = modalSource.indexOf('function popupMove(diff)');
+  const popupMoveStart = modalSource.indexOf('function popupMove(diff, options)');
   const popupMoveSource = popupMoveStart >= 0 ? modalSource.slice(popupMoveStart) : '';
+  const renderNextIndex = popupMoveSource.indexOf('const renderNextPopup_ = function()');
   const showPopupIndex = popupMoveSource.indexOf('showPopup(popupData[popupIndex], popupIndex, popupData, popupSeriesContext');
-  const timeoutIndex = popupMoveSource.indexOf('window.setTimeout(function()');
   assert(
     popupMoveStart >= 0 &&
+      modalSource.includes('function createPopupTransitionClone_') &&
+      modalSource.includes('popup-transition-clone') &&
+      popupMoveSource.includes('useTransitionClone') &&
+      popupMoveSource.includes('window.requestAnimationFrame(function()') &&
+      renderNextIndex >= 0 &&
       showPopupIndex >= 0 &&
-      timeoutIndex >= 0 &&
-      showPopupIndex < timeoutIndex,
-    'popup navigation renders the next book before animation cleanup timing'
+      renderNextIndex < showPopupIndex &&
+      !popupMoveSource.includes('void popupContent.offsetWidth'),
+    'popup navigation uses a transition clone and avoids forced reflow during swipe transition'
   );
   assert(
     popupMoveSource.includes('clearPopupNeighborDetailTimer_();') &&

@@ -60,10 +60,12 @@
 #image-popup-content.popup-slide-prev {
   animation: popup-slide-prev 0.28s cubic-bezier(.2,.8,.2,1);
 }
-#image-popup-content.popup-commit-next {
+#image-popup-content.popup-commit-next,
+.popup-transition-clone.popup-commit-next {
   animation: popup-commit-next 0.16s cubic-bezier(.32,0,.67,0) forwards;
 }
-#image-popup-content.popup-commit-prev {
+#image-popup-content.popup-commit-prev,
+.popup-transition-clone.popup-commit-prev {
   animation: popup-commit-prev 0.16s cubic-bezier(.32,0,.67,0) forwards;
 }
 @keyframes popup-slide-next {

@@ -3,3 +3,4 @@ node_modules/
 *.log
 .clasprc.json
 LOCAL_URLS.md
+tmp/

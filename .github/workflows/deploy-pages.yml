@@ -41,6 +41,9 @@ jobs:
       - name: Build Pages artifact
         run: node tools/build-pages.js
 
+      - name: Check project identity
+        run: node tools/check-project-identity.js
+
       - name: Check client JavaScript
         run: node tools/check-client-js.js
 

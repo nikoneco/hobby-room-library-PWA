@@ -189,6 +189,53 @@ function clearPopupMotionState_(popupContent) {
   popupContent.style.removeProperty('--popup-drag-opacity');
 }
 
+function createPopupTransitionClone_(popupContent, diff) {
+  const overlay = document.getElementById('image-popup-overlay');
+  if (!overlay || !popupContent || typeof popupContent.cloneNode !== 'function') return null;
+
+  const rect = popupContent.getBoundingClientRect();
+  if (!rect.width || !rect.height) return null;
+
+  const computed = window.getComputedStyle ? window.getComputedStyle(popupContent) : null;
+  const clone = popupContent.cloneNode(true);
+  clone.id = '';
+  clone.classList.add('popup-transition-clone');
+  clone.classList.remove('is-dragging', 'popup-slide-next', 'popup-slide-prev');
+  clone.style.position = 'fixed';
+  clone.style.left = `${Math.round(rect.left)}px`;
+  clone.style.top = `${Math.round(rect.top)}px`;
+  clone.style.width = `${Math.round(rect.width)}px`;
+  clone.style.height = `${Math.round(rect.height)}px`;
+  clone.style.margin = '0';
+  clone.style.pointerEvents = 'none';
+  clone.style.zIndex = '10040';
+  clone.style.animation = 'none';
+  clone.style.transition = 'none';
+
+  if (computed) {
+    const dragX = popupContent.style.getPropertyValue('--popup-drag-x') || '0px';
+    const dragY = popupContent.style.getPropertyValue('--popup-drag-y') || '0px';
+    clone.style.opacity = computed.opacity || '1';
+    clone.style.transform = computed.transform && computed.transform !== 'none'
+      ? computed.transform
+      : `translate(${dragX}, ${dragY})`;
+    clone.style.transformOrigin = computed.transformOrigin || 'center center';
+  }
+
+  overlay.appendChild(clone);
+  window.requestAnimationFrame(function() {
+    clone.style.animation = '';
+    clone.style.transition = '';
+    clone.classList.add(diff > 0 ? 'popup-commit-next' : 'popup-commit-prev');
+  });
+
+  window.setTimeout(function() {
+    if (clone && clone.parentNode) clone.parentNode.removeChild(clone);
+  }, 360);
+
+  return clone;
+}
+
 function isBookPopupOpen_() {
   const overlay = document.getElementById('image-popup-overlay');
   return !!(
@@ -1398,14 +1445,10 @@ function showPopup(book, index, dataArr, seriesContext, options) {
       popupDragScrollTarget = false;
       popupDragSuppressNextClick = true;
       popupContent.classList.remove('is-dragging');
-      popupContent.classList.add(moveDiff > 0 ? 'popup-commit-next' : 'popup-commit-prev');
+      popupMove(moveDiff, { useTransitionClone: true });
       window.setTimeout(function() {
-        clearPopupMotionState_(popupContent);
-        popupMove(moveDiff);
-        window.setTimeout(function() {
-          popupDragSuppressNextClick = false;
-        }, 260);
-      }, 135);
+        popupDragSuppressNextClick = false;
+      }, 360);
     } else {
       resetPopupDrag_();
     }
@@ -1447,27 +1490,47 @@ function showPopup(book, index, dataArr, seriesContext, options) {
   };
 }
 
-function popupMove(diff) {
+function popupMove(diff, options) {
   const newIndex = popupIndex + diff;
   if (newIndex < 0 || newIndex >= popupData.length) return;
+
+  const popupOptions = options || {};
+  const currentContent = document.getElementById('image-popup-content');
+  const useTransitionClone = Boolean(
+    currentContent &&
+    document.body.classList.contains('modal-open') &&
+    (popupOptions.useTransitionClone || isShelfPopupContext_(popupData))
+  );
+  const transitionClone = useTransitionClone
+    ? createPopupTransitionClone_(currentContent, diff)
+    : null;
 
   popupIndex = newIndex;
   clearPopupNeighborDetailTimer_();
   clearPopupImagePrefetchTimer_();
 
   const slideClass = diff > 0 ? 'popup-slide-next' : 'popup-slide-prev';
-  showPopup(popupData[popupIndex], popupIndex, popupData, popupSeriesContext, {
-    deferNeighborDetails: true
-  });
+  const renderNextPopup_ = function() {
+    showPopup(popupData[popupIndex], popupIndex, popupData, popupSeriesContext, {
+      deferNeighborDetails: true
+    });
 
-  const popupContent = document.getElementById('image-popup-content');
-  if (!popupContent) return;
-  clearPopupMotionState_(popupContent);
-  void popupContent.offsetWidth;
-  popupContent.classList.add(slideClass);
+    const popupContent = document.getElementById('image-popup-content');
+    if (!popupContent) return;
+    clearPopupMotionState_(popupContent);
+    popupContent.classList.add(slideClass);
 
-  window.setTimeout(function() {
-    popupContent.classList.remove('popup-slide-next', 'popup-slide-prev');
-  }, 200);
+    window.setTimeout(function() {
+      popupContent.classList.remove('popup-slide-next', 'popup-slide-prev');
+    }, 240);
+  };
+
+  if (transitionClone) {
+    window.requestAnimationFrame(function() {
+      window.requestAnimationFrame(renderNextPopup_);
+    });
+  } else {
+    renderNextPopup_();
+  }
 }
 </script>
