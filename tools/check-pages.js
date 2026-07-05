@@ -46,6 +46,7 @@ const pagesWorkflow = read(pagesWorkflowPath);
 
 assert(!index.includes('HtmlService.createHtmlOutputFromFile'), 'static index has no GAS template includes');
 assert(index.includes('rel="manifest" href="./manifest.webmanifest"'), 'static index references manifest');
+assert(index.includes('interactive-widget=resizes-content'), 'static index requests keyboard viewport resizing');
 assert(index.includes('name="theme-color" content="#0b111a"'), 'static index uses dark PWA theme color');
 assert(index.includes('apple-mobile-web-app-status-bar-style" content="black-translucent"'), 'static index uses translucent iOS standalone status bar');
 assert(index.includes('id="pwaNetworkBanner"'), 'static index includes offline/network banner');
