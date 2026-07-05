@@ -18,6 +18,8 @@ function read(filePath) {
 const index = read(path.join(docs, 'index.html'));
 const manifest = JSON.parse(read(path.join(docs, 'manifest.webmanifest')));
 const sw = read(path.join(docs, 'sw.js'));
+const pagesWorkflowPath = path.join(root, '.github', 'workflows', 'deploy-pages.yml');
+const pagesWorkflow = read(pagesWorkflowPath);
 
 [
   'manifest.webmanifest',
@@ -51,6 +53,11 @@ assert(index.includes('./assets/js/gas-run-shim.js'), 'static index loads GAS JS
 assert(index.includes('./assets/js/pwa-client.js'), 'static index loads PWA client');
 assert(index.includes('./assets/css/pwa.css'), 'static index loads PWA CSS');
 assert(index.includes('src="./assets/logo.png"'), 'static index uses local logo asset');
+assert(pagesWorkflow.includes('actions/upload-pages-artifact@v4'), 'Pages workflow uploads docs artifact');
+assert(pagesWorkflow.includes('path: docs'), 'Pages workflow deploys docs directory');
+assert(pagesWorkflow.includes('pages: write'), 'Pages workflow has pages write permission');
+assert(pagesWorkflow.includes('id-token: write'), 'Pages workflow has OIDC permission');
+assert(pagesWorkflow.includes('actions/deploy-pages@v4'), 'Pages workflow deploys to GitHub Pages');
 
 [
   'style.legacy-core.css',
