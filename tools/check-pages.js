@@ -48,6 +48,8 @@ assert(!index.includes('HtmlService.createHtmlOutputFromFile'), 'static index ha
 assert(index.includes('rel="manifest" href="./manifest.webmanifest"'), 'static index references manifest');
 assert(index.includes('interactive-widget=resizes-content'), 'static index requests keyboard viewport resizing');
 assert(index.includes('name="theme-color" content="#0b111a"'), 'static index uses dark PWA theme color');
+assert(index.includes('rel="preconnect" href="https://script.google.com"'), 'static index preconnects to GAS endpoint host');
+assert(index.includes('rel="preconnect" href="https://script.googleusercontent.com"'), 'static index preconnects to GAS response host');
 assert(index.includes('id="pwa-critical-style"'), 'static index includes critical shell paint style');
 assert(index.includes('html{background:#0b111a'), 'critical style paints dark shell before CSS loads');
 assert(index.includes('apple-mobile-web-app-status-bar-style" content="black-translucent"'), 'static index uses translucent iOS standalone status bar');
