@@ -82,6 +82,20 @@ function renderShelfViewOverview_(groups, totalCount, immersive) {
   );
   overview.appendChild(note);
 
+  if (immersive) {
+    const librarianNoteText = getPwaLibrarianText_(
+      'status.note.shelf',
+      '',
+      { count: stats.total }
+    );
+    if (librarianNoteText) {
+      const librarianNote = document.createElement('div');
+      librarianNote.className = 'shelf-view-librarian-note';
+      librarianNote.textContent = librarianNoteText;
+      overview.appendChild(librarianNote);
+    }
+  }
+
   return overview;
 }
 

@@ -72,6 +72,13 @@
   line-height: 1.55;
 }
 
+.shelf-view-librarian-note {
+  padding-top: 0.1rem;
+  color: rgba(217, 231, 240, 0.66);
+  font-size: 0.78rem;
+  line-height: 1.55;
+}
+
 .shelf-jump-nav,
 .shelf-jump-nav.immersive {
   border-color: var(--lib-line);
