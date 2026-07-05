@@ -16,6 +16,7 @@ const indexPath = path.join(root, 'index.html');
 const serverPath = path.join(root, 'Webアプリ.js');
 const indexSource = fs.readFileSync(indexPath, 'utf8');
 const serverSource = fs.readFileSync(serverPath, 'utf8');
+const modernModalStyleSource = fs.readFileSync(path.join(root, 'style.modern-modal.css.html'), 'utf8');
 const clientScriptSources = clientScriptFiles
   .map(fileName => fs
     .readFileSync(path.join(root, fileName), 'utf8')
@@ -266,6 +267,11 @@ assert(
     clientScriptSources[clientScriptFiles.indexOf('script.shelf.js.html')].includes('function openShelfBook_') &&
     clientScriptSources[clientScriptFiles.indexOf('script.shelf.js.html')].includes('showPopup(book, originalIndex, data)'),
   'bookshelf book tiles have resilient tap-to-open detail handling'
+);
+assert(
+  clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes("--popup-drag-x', `${dragX}px`") &&
+    modernModalStyleSource.includes('translate(var(--popup-drag-x, 0), var(--popup-drag-y, 0))'),
+  'book popup provides horizontal drag feedback while swiping'
 );
 
 const cachedShelfBook = sandbox.sanitizeBookshelfCacheBook_({

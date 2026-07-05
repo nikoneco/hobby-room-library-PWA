@@ -1236,11 +1236,26 @@ function showPopup(book, index, dataArr, seriesContext) {
   function updatePopupDrag_(x, y) {
     if (popupDragScrollTarget) return false;
 
-    const diffY = Math.max(0, y - popupDragStartY);
+    const diffX = x - popupDragStartX;
+    const diffYRaw = y - popupDragStartY;
+    const absX = Math.abs(diffX);
+    const absY = Math.abs(diffYRaw);
+
+    if (absX > 8 && absX > absY * 0.82) {
+      const dragX = Math.max(-92, Math.min(92, diffX));
+      const opacity = Math.max(0.72, 1 - Math.abs(dragX) / 420);
+      popupContent.style.setProperty('--popup-drag-x', `${dragX}px`);
+      popupContent.style.setProperty('--popup-drag-y', '0px');
+      popupContent.style.setProperty('--popup-drag-opacity', String(opacity));
+      return true;
+    }
+
+    const diffY = Math.max(0, diffYRaw);
     if (diffY < 8) return false;
 
     const dragY = Math.min(diffY, 130);
     const opacity = Math.max(0.56, 1 - dragY / 260);
+    popupContent.style.setProperty('--popup-drag-x', '0px');
     popupContent.style.setProperty('--popup-drag-y', `${dragY}px`);
     popupContent.style.setProperty('--popup-drag-opacity', String(opacity));
     return true;
@@ -1250,6 +1265,7 @@ function showPopup(book, index, dataArr, seriesContext) {
     popupDragging = false;
     popupDragSource = '';
     popupDragScrollTarget = false;
+    popupContent.style.removeProperty('--popup-drag-x');
     popupContent.style.removeProperty('--popup-drag-y');
     popupContent.style.removeProperty('--popup-drag-opacity');
   }

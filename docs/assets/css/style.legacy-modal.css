@@ -55,17 +55,17 @@
 }
 /* ポップアップ全体のスライドアニメーション */
 #image-popup-content.popup-slide-next {
-  animation: popup-slide-next 0.18s cubic-bezier(.2,.8,.2,1);
+  animation: popup-slide-next 0.28s cubic-bezier(.2,.8,.2,1);
 }
 #image-popup-content.popup-slide-prev {
-  animation: popup-slide-prev 0.18s cubic-bezier(.2,.8,.2,1);
+  animation: popup-slide-prev 0.28s cubic-bezier(.2,.8,.2,1);
 }
 @keyframes popup-slide-next {
-  from { opacity: 0.82; transform: translateX(34px);}
+  from { opacity: 0.76; transform: translateX(72px);}
   to   { opacity: 1; transform: translateX(0);}
 }
 @keyframes popup-slide-prev {
-  from { opacity: 0.82; transform: translateX(-34px);}
+  from { opacity: 0.76; transform: translateX(-72px);}
   to   { opacity: 1; transform: translateX(0);}
 }
 
