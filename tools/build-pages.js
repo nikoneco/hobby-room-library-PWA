@@ -109,7 +109,38 @@ function buildStaticIndex() {
 
   source = source.replace(
     /(<body>)/,
-    `$1\n  <div id="pwaNetworkBanner" class="pwa-network-banner" role="status" aria-live="polite" hidden></div>`
+    `$1
+  <div id="pwaNetworkBanner" class="pwa-network-banner" role="status" aria-live="polite" hidden></div>
+  <button id="pwaSettingsButton" class="pwa-settings-button" type="button" aria-label="設定を開く" aria-controls="pwaSettingsPanel" aria-expanded="false">
+    <span aria-hidden="true"></span>
+    <span aria-hidden="true"></span>
+    <span aria-hidden="true"></span>
+  </button>
+  <div id="pwaSettingsBackdrop" class="pwa-settings-backdrop" hidden></div>
+  <section id="pwaSettingsPanel" class="pwa-settings-panel" role="dialog" aria-modal="true" aria-labelledby="pwaSettingsTitle" tabindex="-1" hidden>
+    <div class="pwa-settings-header">
+      <h2 id="pwaSettingsTitle">設定</h2>
+      <button id="pwaSettingsClose" class="pwa-settings-close" type="button" aria-label="設定を閉じる">
+        <span aria-hidden="true">×</span>
+      </button>
+    </div>
+    <div id="pwaSensitiveSetting" class="pwa-settings-section"></div>
+    <fieldset class="pwa-settings-section pwa-theme-settings">
+      <legend>カラーテーマ</legend>
+      <label>
+        <input type="radio" name="pwaTheme" value="default">
+        <span>標準</span>
+      </label>
+      <label>
+        <input type="radio" name="pwaTheme" value="calm">
+        <span>青緑</span>
+      </label>
+      <label>
+        <input type="radio" name="pwaTheme" value="warm">
+        <span>琥珀</span>
+      </label>
+    </fieldset>
+  </section>`
   );
 
   return source;
@@ -184,6 +215,180 @@ body.pwa-standalone .search-container:not(.centered) {
 body.pwa-standalone .mobile-app-dock {
   border-radius: 22px;
   background: rgba(9, 13, 19, 0.90);
+}
+
+body.pwa-settings-open {
+  overflow: hidden;
+}
+
+.pwa-settings-button {
+  position: fixed;
+  top: max(12px, env(safe-area-inset-top));
+  right: max(12px, env(safe-area-inset-right));
+  z-index: 11900;
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-content: center;
+  gap: 4px;
+  border: 1px solid rgba(167, 183, 204, 0.18);
+  border-radius: 999px;
+  background: rgba(10, 15, 22, 0.56);
+  color: rgba(234, 241, 248, 0.82);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.24);
+  backdrop-filter: blur(14px);
+  cursor: pointer;
+}
+
+.pwa-settings-button span {
+  width: 16px;
+  height: 2px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.pwa-settings-button[aria-expanded="true"] {
+  border-color: rgba(104, 191, 215, 0.46);
+  color: #dff8ff;
+}
+
+.pwa-settings-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 12100;
+  background: rgba(4, 7, 11, 0.48);
+  backdrop-filter: blur(5px);
+}
+
+.pwa-settings-panel {
+  position: fixed;
+  top: max(64px, calc(env(safe-area-inset-top) + 58px));
+  right: max(12px, env(safe-area-inset-right));
+  z-index: 12200;
+  width: min(340px, calc(100vw - 24px - env(safe-area-inset-left) - env(safe-area-inset-right)));
+  padding: 14px;
+  border: 1px solid rgba(167, 183, 204, 0.20);
+  border-radius: 8px;
+  background: rgba(14, 20, 29, 0.96);
+  color: #edf5f7;
+  box-shadow: 0 20px 54px rgba(0, 0, 0, 0.46);
+}
+
+.pwa-settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.pwa-settings-header h2 {
+  margin: 0;
+  font-size: 1rem;
+  letter-spacing: 0;
+}
+
+.pwa-settings-close {
+  width: 36px;
+  height: 36px;
+  border: 1px solid rgba(167, 183, 204, 0.18);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(234, 241, 248, 0.78);
+  font-size: 1.35rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.pwa-settings-section {
+  margin: 0;
+  padding: 12px 0;
+  border: 0;
+  border-top: 1px solid rgba(167, 183, 204, 0.12);
+}
+
+.pwa-settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.pwa-settings-row-title,
+.pwa-theme-settings legend {
+  margin: 0 0 4px;
+  color: rgba(237, 245, 247, 0.92);
+  font-size: 0.86rem;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.pwa-settings-row-note {
+  margin: 0;
+  color: rgba(220, 232, 238, 0.58);
+  font-size: 0.74rem;
+  line-height: 1.45;
+}
+
+.pwa-settings-panel .sensitive-toggle {
+  position: relative;
+  top: auto;
+  right: auto;
+  flex: 0 0 auto;
+  margin: 0;
+}
+
+.pwa-theme-settings {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.pwa-theme-settings legend {
+  grid-column: 1 / -1;
+}
+
+.pwa-theme-settings label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 38px;
+  padding: 7px 8px;
+  border: 1px solid rgba(167, 183, 204, 0.16);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.045);
+  color: rgba(234, 241, 248, 0.78);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.pwa-theme-settings input {
+  accent-color: #68bfd7;
+}
+
+body.pwa-theme-calm {
+  background-color: #07161a;
+}
+
+body.pwa-theme-calm .search-container {
+  background: rgba(8, 24, 29, 0.84);
+}
+
+body.pwa-theme-calm .mobile-app-dock {
+  background: rgba(7, 18, 23, 0.92);
+}
+
+body.pwa-theme-warm {
+  background-color: #16110c;
+}
+
+body.pwa-theme-warm .search-container {
+  background: rgba(25, 19, 13, 0.84);
+}
+
+body.pwa-theme-warm .mobile-app-dock {
+  background: rgba(20, 15, 10, 0.92);
 }
 
 body.pwa-network-visible {
@@ -273,6 +478,15 @@ body.pwa-update-visible .mobile-app-dock {
     max-width: none;
     padding: 8px 9px 8px 11px;
     font-size: 0.82rem;
+  }
+
+  .pwa-settings-button {
+    width: 38px;
+    height: 38px;
+  }
+
+  .pwa-settings-panel {
+    top: max(56px, calc(env(safe-area-inset-top) + 50px));
   }
 }
 
@@ -549,6 +763,8 @@ function writePwaClient() {
   const IOS_INSTALL_MESSAGE = '共有からホーム画面に追加できます。';
   const IOS_INSTALL_STORAGE_KEY = 'shumiLibrary.pwaIosInstallHintDismissed.v1';
   const INSTALL_HINT_AUTO_HIDE_MS = 12000;
+  const THEME_STORAGE_KEY = 'shumiLibrary.pwaTheme.v1';
+  const THEME_OPTIONS = ['default', 'calm', 'warm'];
 
   const UPDATE_CHECK_INTERVAL_MS = 60 * 60 * 1000;
 
@@ -822,6 +1038,113 @@ function writePwaClient() {
     });
   }
 
+  function getStoredTheme_() {
+    try {
+      const value = window.localStorage ? window.localStorage.getItem(THEME_STORAGE_KEY) : '';
+      return THEME_OPTIONS.includes(value) ? value : 'default';
+    } catch (e) {
+      return 'default';
+    }
+  }
+
+  function applyTheme_(theme) {
+    const nextTheme = THEME_OPTIONS.includes(theme) ? theme : 'default';
+    if (document.body) {
+      document.body.classList.toggle('pwa-theme-calm', nextTheme === 'calm');
+      document.body.classList.toggle('pwa-theme-warm', nextTheme === 'warm');
+    }
+
+    document.querySelectorAll('input[name="pwaTheme"]').forEach(input => {
+      input.checked = input.value === nextTheme;
+    });
+  }
+
+  function setTheme_(theme) {
+    const nextTheme = THEME_OPTIONS.includes(theme) ? theme : 'default';
+    try {
+      if (window.localStorage) {
+        window.localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
+      }
+    } catch (e) {
+      // localStorageが使えない環境でも、その場のテーマ切替は反映する。
+    }
+    applyTheme_(nextTheme);
+  }
+
+  function moveSensitiveToggleToSettings_() {
+    const target = document.getElementById('pwaSensitiveSetting');
+    const toggle = document.querySelector('.sensitive-toggle');
+    if (!target || !toggle) return;
+
+    const row = document.createElement('div');
+    row.className = 'pwa-settings-row';
+
+    const text = document.createElement('div');
+    const title = document.createElement('p');
+    const note = document.createElement('p');
+    title.className = 'pwa-settings-row-title';
+    note.className = 'pwa-settings-row-note';
+    title.textContent = 'センシティブ';
+    note.textContent = '検索結果への表示を切り替えます';
+    text.appendChild(title);
+    text.appendChild(note);
+
+    row.appendChild(text);
+    row.appendChild(toggle);
+    target.appendChild(row);
+  }
+
+  function setSettingsOpen_(open) {
+    const panel = document.getElementById('pwaSettingsPanel');
+    const backdrop = document.getElementById('pwaSettingsBackdrop');
+    const button = document.getElementById('pwaSettingsButton');
+    if (!panel || !backdrop || !button || !document.body) return;
+
+    const isOpen = Boolean(open);
+    panel.hidden = !isOpen;
+    backdrop.hidden = !isOpen;
+    document.body.classList.toggle('pwa-settings-open', isOpen);
+    button.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+
+    if (isOpen) {
+      const checkedTheme = panel.querySelector('input[name="pwaTheme"]:checked');
+      (checkedTheme || panel).focus({ preventScroll: true });
+    } else {
+      button.focus({ preventScroll: true });
+    }
+  }
+
+  function bindSettingsPanel_() {
+    const panel = document.getElementById('pwaSettingsPanel');
+    const backdrop = document.getElementById('pwaSettingsBackdrop');
+    const button = document.getElementById('pwaSettingsButton');
+    const closeButton = document.getElementById('pwaSettingsClose');
+    if (!panel || !backdrop || !button || !closeButton) return;
+
+    moveSensitiveToggleToSettings_();
+    applyTheme_(getStoredTheme_());
+
+    button.addEventListener('click', function() {
+      setSettingsOpen_(button.getAttribute('aria-expanded') !== 'true');
+    });
+    closeButton.addEventListener('click', function() {
+      setSettingsOpen_(false);
+    });
+    backdrop.addEventListener('click', function() {
+      setSettingsOpen_(false);
+    });
+    panel.querySelectorAll('input[name="pwaTheme"]').forEach(input => {
+      input.addEventListener('change', function() {
+        if (input.checked) setTheme_(input.value);
+      });
+    });
+    document.addEventListener('keydown', function(event) {
+      if (event.key === 'Escape' && button.getAttribute('aria-expanded') === 'true') {
+        setSettingsOpen_(false);
+      }
+    });
+  }
+
   window.ShumiLibraryPwa = {
     isPwaShell: true,
     handleApiFailure: function(error) {
@@ -870,6 +1193,7 @@ function writePwaClient() {
 
   window.addEventListener('DOMContentLoaded', function() {
     syncBodyState_();
+    bindSettingsPanel_();
     syncOnlineState_();
     window.setTimeout(showIosInstallHint_, 3500);
 
