@@ -6,6 +6,10 @@ on:
       - main
     paths:
       - docs/**
+      - index.html
+      - script.*.js.html
+      - style.*.css.html
+      - tools/build-pages.js
       - tools/**
       - .github/workflows/deploy-pages.yml
   workflow_dispatch:
@@ -33,6 +37,9 @@ jobs:
         uses: actions/setup-node@v5
         with:
           node-version: '22'
+
+      - name: Build Pages artifact
+        run: node tools/build-pages.js
 
       - name: Check client JavaScript
         run: node tools/check-client-js.js

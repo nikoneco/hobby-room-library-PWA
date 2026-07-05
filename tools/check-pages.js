@@ -54,6 +54,7 @@ assert(index.includes('./assets/js/pwa-client.js'), 'static index loads PWA clie
 assert(index.includes('./assets/css/pwa.css'), 'static index loads PWA CSS');
 assert(index.includes('src="./assets/logo.png"'), 'static index uses local logo asset');
 assert(pagesWorkflow.includes('actions/setup-node@v5'), 'Pages workflow sets up Node.js');
+assert(pagesWorkflow.includes('node tools/build-pages.js'), 'Pages workflow builds docs artifact before checks');
 assert(pagesWorkflow.includes('node tools/check-client-js.js'), 'Pages workflow checks client JavaScript before deploy');
 assert(pagesWorkflow.includes('node tools/check-client-css.js'), 'Pages workflow checks client CSS before deploy');
 assert(pagesWorkflow.includes('node tools/check-pages.js'), 'Pages workflow checks static Pages artifact before deploy');
