@@ -143,6 +143,8 @@ assert(pwaClient.includes("window.addEventListener('appinstalled'"), 'PWA client
 assert(pwaClient.includes('IOS_INSTALL_STORAGE_KEY'), 'PWA client remembers dismissed iOS install hint');
 assert(pwaClient.includes('function isIosLike_'), 'PWA client detects iOS-like browsers');
 assert(pwaClient.includes('showIosInstallHint_'), 'PWA client can show iOS install hint');
+assert(pwaClient.includes('INSTALL_HINT_AUTO_HIDE_MS'), 'PWA client auto-hides install hints');
+assert(pwaClient.includes('autoHideInstallHint_'), 'PWA client schedules install hint auto-hide');
 assert(pwaCss.includes('.pwa-network-banner-action-muted'), 'PWA CSS styles secondary banner action');
 assert(bootClient.includes('clearLaunchActionFromUrl_'), 'boot client clears consumed PWA launch shortcut');
 assert(bootClient.includes('window.history.replaceState'), 'boot client rewrites launch shortcut URL after use');

@@ -543,6 +543,7 @@ function writePwaClient() {
   const INSTALL_PROMPT_STORAGE_KEY = 'shumiLibrary.pwaInstallPromptDismissed.v1';
   const IOS_INSTALL_MESSAGE = '共有からホーム画面に追加できます。';
   const IOS_INSTALL_STORAGE_KEY = 'shumiLibrary.pwaIosInstallHintDismissed.v1';
+  const INSTALL_HINT_AUTO_HIDE_MS = 12000;
 
   const UPDATE_CHECK_INTERVAL_MS = 60 * 60 * 1000;
 
@@ -552,6 +553,7 @@ function writePwaClient() {
   let currentBannerKind = '';
   let activeRegistration = null;
   let lastUpdateCheckAt = 0;
+  let installHintTimer = 0;
 
   function isStandalone_() {
     return Boolean(
@@ -599,6 +601,22 @@ function writePwaClient() {
     setBanner_('', '');
   }
 
+  function clearInstallHintTimer_() {
+    if (!installHintTimer) return;
+    window.clearTimeout(installHintTimer);
+    installHintTimer = 0;
+  }
+
+  function autoHideInstallHint_(kind) {
+    clearInstallHintTimer_();
+    installHintTimer = window.setTimeout(function() {
+      installHintTimer = 0;
+      if (currentBannerKind === kind) {
+        clearBanner_();
+      }
+    }, INSTALL_HINT_AUTO_HIDE_MS);
+  }
+
   function isInstallPromptDismissed_() {
     try {
       return window.localStorage &&
@@ -610,6 +628,7 @@ function writePwaClient() {
 
   function dismissInstallPrompt_() {
     installPromptEvent = null;
+    clearInstallHintTimer_();
     try {
       if (window.localStorage) {
         window.localStorage.setItem(INSTALL_PROMPT_STORAGE_KEY, '1');
@@ -642,6 +661,7 @@ function writePwaClient() {
     }
 
     if (currentBannerKind === 'ios-install') {
+      clearInstallHintTimer_();
       clearBanner_();
     }
   }
@@ -671,6 +691,7 @@ function writePwaClient() {
     closeButton.textContent = '閉じる';
     closeButton.addEventListener('click', dismissIosInstallHint_);
     banner.appendChild(closeButton);
+    autoHideInstallHint_('ios-install');
   }
 
   function showInstallBanner_() {
@@ -717,10 +738,12 @@ function writePwaClient() {
     closeButton.textContent = '閉じる';
     closeButton.addEventListener('click', dismissInstallPrompt_);
     banner.appendChild(closeButton);
+    autoHideInstallHint_('install');
   }
 
   function showUpdateBanner_(worker) {
     if (!worker) return;
+    clearInstallHintTimer_();
     updateWaitingWorker = worker;
 
     const banner = getBanner_();
