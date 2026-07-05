@@ -81,13 +81,19 @@ assert(index.includes('src="./assets/logo.png"'), 'static index uses local logo 
 });
 
 assert(manifest.name === '趣味部屋図書館', 'manifest name is set');
+assert(manifest.id === './', 'manifest has stable app id');
+assert(manifest.lang === 'ja', 'manifest language is Japanese');
 assert(manifest.display === 'standalone', 'manifest display is standalone');
+assert(Array.isArray(manifest.display_override) && manifest.display_override.includes('standalone'), 'manifest has display override fallback');
 assert(manifest.theme_color === '#0b111a', 'manifest theme color matches dark app shell');
 assert(manifest.background_color === '#0b111a', 'manifest splash background matches dark app shell');
 assert(manifest.start_url === './', 'manifest start_url stays within docs scope');
+assert(Array.isArray(manifest.categories) && manifest.categories.includes('books'), 'manifest declares library category');
+assert(manifest.prefer_related_applications === false, 'manifest keeps web app as preferred app');
 assert(Array.isArray(manifest.icons) && manifest.icons.length >= 2, 'manifest has install icons');
-assert(Array.isArray(manifest.shortcuts) && manifest.shortcuts.length >= 2, 'manifest has app shortcuts');
+assert(Array.isArray(manifest.shortcuts) && manifest.shortcuts.length >= 3, 'manifest has app shortcuts');
 assert(!manifest.shortcuts.some(item => item.url === './?launch=recent'), 'manifest omits recent-book shortcut');
+assert(manifest.shortcuts.some(item => item.url === './?launch=search'), 'manifest has search shortcut');
 assert(manifest.shortcuts.some(item => item.url === './?launch=bookshelf'), 'manifest has bookshelf shortcut');
 assert(manifest.shortcuts.some(item => item.url === './?launch=random'), 'manifest has random shortcut');
 

@@ -716,16 +716,35 @@ function writePwaClient() {
 
 function writePwaFiles() {
   const manifest = {
+    id: './',
     name: '趣味部屋図書館',
     short_name: '図書館',
     description: '蔵書目録を検索し、本棚から読みたい本を見つけるPWA。',
+    lang: 'ja',
+    dir: 'ltr',
     start_url: './',
     scope: './',
     display: 'standalone',
+    display_override: ['standalone', 'browser'],
     background_color: '#0b111a',
     theme_color: '#0b111a',
     orientation: 'portrait',
+    categories: ['books', 'education', 'productivity'],
+    prefer_related_applications: false,
     shortcuts: [
+      {
+        name: '検索を開く',
+        short_name: '検索',
+        description: 'タイトル、読み仮名、作者から蔵書を検索する',
+        url: './?launch=search',
+        icons: [
+          {
+            src: './assets/icons/icon-192.png',
+            sizes: '192x192',
+            type: 'image/png'
+          }
+        ]
+      },
       {
         name: '本棚を見る',
         short_name: '本棚',
