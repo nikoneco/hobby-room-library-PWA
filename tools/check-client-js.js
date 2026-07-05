@@ -269,6 +269,14 @@ assert(
   'bookshelf book tiles have resilient tap-to-open detail handling'
 );
 assert(
+  clientScriptSources[clientScriptFiles.indexOf('script.state.js.html')].includes('SHELF_RENDER_INITIAL_BOOK_LIMIT') &&
+    clientScriptSources[clientScriptFiles.indexOf('script.state.js.html')].includes('SHELF_RENDER_CHUNK_SIZE') &&
+    clientScriptSources[clientScriptFiles.indexOf('script.shelf.js.html')].includes('function scheduleShelfRenderQueue_') &&
+    clientScriptSources[clientScriptFiles.indexOf('script.shelf.js.html')].includes('appendShelfBookItems_') &&
+    clientScriptSources[clientScriptFiles.indexOf('script.shelf.js.html')].includes('renderQueue.push'),
+  'bookshelf view renders book tiles incrementally instead of blocking on every tile'
+);
+assert(
   clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes("--popup-drag-x', `${dragX}px`") &&
     modernModalStyleSource.includes('translate(var(--popup-drag-x, 0), var(--popup-drag-y, 0))'),
   'book popup provides horizontal drag feedback while swiping'

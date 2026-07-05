@@ -775,8 +775,67 @@ function createShelfBookElement_(book, originalIndex, data, revealIndex) {
   return button;
 }
 
+function appendShelfBookItems_(strip, items, context) {
+  if (!strip || !Array.isArray(items) || !items.length || !context) return 0;
+
+  const fragment = document.createDocumentFragment();
+  items.forEach(item => {
+    const popupIndex = context.popupIndexByOriginalIndex.has(item.originalIndex)
+      ? context.popupIndexByOriginalIndex.get(item.originalIndex)
+      : item.originalIndex;
+    fragment.appendChild(createShelfBookElement_(
+      item.book,
+      popupIndex,
+      context.popupData,
+      context.revealIndex
+    ));
+    context.revealIndex += 1;
+  });
+  strip.appendChild(fragment);
+  return items.length;
+}
+
+function scheduleShelfRenderQueue_(queue, context) {
+  if (!Array.isArray(queue) || !queue.length || !context) return;
+
+  function scheduleNext_(callback, delay) {
+    if (delay <= 0 && typeof window.requestAnimationFrame === 'function') {
+      window.requestAnimationFrame(callback);
+      return;
+    }
+    window.setTimeout(callback, Math.max(0, delay));
+  }
+
+  function runChunk_() {
+    if (context.runId !== shelfRenderRunId) return;
+
+    let rendered = 0;
+    while (queue.length && rendered < SHELF_RENDER_CHUNK_SIZE) {
+      const task = queue[0];
+      if (!task || !task.strip || !Array.isArray(task.items) || !task.items.length) {
+        queue.shift();
+        continue;
+      }
+
+      const take = Math.min(task.items.length, SHELF_RENDER_CHUNK_SIZE - rendered);
+      const items = task.items.splice(0, take);
+      rendered += appendShelfBookItems_(task.strip, items, context);
+
+      if (!task.items.length) {
+        queue.shift();
+      }
+    }
+
+    if (!queue.length) return;
+    scheduleNext_(runChunk_, SHELF_RENDER_CHUNK_DELAY_MS);
+  }
+
+  scheduleNext_(runChunk_, 0);
+}
+
 function renderShelfView_(data) {
   resetBookDetailPrefetchObserver_();
+  const renderRunId = ++shelfRenderRunId;
 
   const groups = groupBooksByShelf_(data);
   const shelfPopupItems = flattenShelfBooksForPopup_(groups);
@@ -799,7 +858,14 @@ function renderShelfView_(data) {
     currentShelfRoomMapGroups = groups;
   }
 
-  let shelfRevealIndex = 0;
+  const renderQueue = [];
+  const renderContext = {
+    runId: renderRunId,
+    revealIndex: 0,
+    popupIndexByOriginalIndex: shelfPopupIndexByOriginalIndex,
+    popupData: shelfPopupData
+  };
+  let initialRenderedCount = 0;
 
   container.appendChild(renderShelfViewOverview_(groups, data.length, isShelfImmersiveMode));
 
@@ -842,13 +908,19 @@ function renderShelfView_(data) {
 
         const strip = document.createElement('div');
         strip.className = 'bookshelf-strip';
-        level.books.forEach(item => {
-          const popupIndex = shelfPopupIndexByOriginalIndex.has(item.originalIndex)
-            ? shelfPopupIndexByOriginalIndex.get(item.originalIndex)
-            : item.originalIndex;
-          strip.appendChild(createShelfBookElement_(item.book, popupIndex, shelfPopupData, shelfRevealIndex));
-          shelfRevealIndex += 1;
-        });
+        const levelBooks = Array.isArray(level.books) ? level.books : [];
+        const remainingInitial = Math.max(0, SHELF_RENDER_INITIAL_BOOK_LIMIT - initialRenderedCount);
+        const syncBooks = remainingInitial > 0 ? levelBooks.slice(0, remainingInitial) : [];
+        const deferredBooks = syncBooks.length < levelBooks.length
+          ? levelBooks.slice(syncBooks.length)
+          : [];
+
+        if (syncBooks.length) {
+          initialRenderedCount += appendShelfBookItems_(strip, syncBooks, renderContext);
+        }
+        if (deferredBooks.length) {
+          renderQueue.push({ strip, items: deferredBooks });
+        }
 
         levelWrap.appendChild(strip);
         sectionWrap.appendChild(levelWrap);
@@ -859,6 +931,8 @@ function renderShelfView_(data) {
 
     container.appendChild(groupSection);
   });
+
+  scheduleShelfRenderQueue_(renderQueue, renderContext);
 
   warmBookDetailPrefetch_(shelfPopupData, {
     limit: BOOK_DETAIL_PREFETCH_WARM_LIMIT,
@@ -877,6 +951,8 @@ function showResult(data) {
   result.innerHTML = '';
 
   if (!data || !Array.isArray(data) || data.length === 0) {
+    shelfRenderRunId += 1;
+    resetBookDetailPrefetchObserver_();
     renderEmptyResult_(result);
     resetImageLoadStats_([]);
     disconnectShelfScrollSpy_();
@@ -888,6 +964,10 @@ function showResult(data) {
 
   const viewMode = getCurrentViewMode_();
   syncShelfViewUiState_(viewMode);
+  if (viewMode !== 'shelf') {
+    shelfRenderRunId += 1;
+    resetBookDetailPrefetchObserver_();
+  }
 
   // 本棚ビューは小型表紙を大量に並べるため、画像取得率デバッグ集計には含めない。
   // カード/リストの既存集計だけを維持する。
