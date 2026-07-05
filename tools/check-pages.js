@@ -156,6 +156,8 @@ assert(pwaClient.includes('INSTALL_PROMPT_STORAGE_KEY'), 'PWA client remembers d
 assert(pwaClient.includes("window.addEventListener('appinstalled'"), 'PWA client handles completed installation');
 assert(pwaClient.includes('IOS_INSTALL_STORAGE_KEY'), 'PWA client remembers dismissed iOS install hint');
 assert(pwaClient.includes('THEME_STORAGE_KEY'), 'PWA client persists selected color theme');
+assert(pwaClient.includes('THEME_COLORS'), 'PWA client maps themes to shell colors');
+assert(pwaClient.includes('meta[name="theme-color"]'), 'PWA client updates browser theme color');
 assert(pwaClient.includes('moveSensitiveToggleToSettings_'), 'PWA client moves sensitive toggle into settings');
 assert(pwaClient.includes('bindSettingsPanel_'), 'PWA client binds settings panel controls');
 assert(pwaClient.includes('function isIosLike_'), 'PWA client detects iOS-like browsers');

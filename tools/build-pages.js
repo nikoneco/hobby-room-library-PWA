@@ -765,6 +765,11 @@ function writePwaClient() {
   const INSTALL_HINT_AUTO_HIDE_MS = 12000;
   const THEME_STORAGE_KEY = 'shumiLibrary.pwaTheme.v1';
   const THEME_OPTIONS = ['default', 'calm', 'warm'];
+  const THEME_COLORS = {
+    default: '#0b111a',
+    calm: '#07161a',
+    warm: '#16110c'
+  };
 
   const UPDATE_CHECK_INTERVAL_MS = 60 * 60 * 1000;
 
@@ -1052,6 +1057,11 @@ function writePwaClient() {
     if (document.body) {
       document.body.classList.toggle('pwa-theme-calm', nextTheme === 'calm');
       document.body.classList.toggle('pwa-theme-warm', nextTheme === 'warm');
+    }
+
+    const themeColor = document.querySelector('meta[name="theme-color"]');
+    if (themeColor) {
+      themeColor.setAttribute('content', THEME_COLORS[nextTheme] || THEME_COLORS.default);
     }
 
     document.querySelectorAll('input[name="pwaTheme"]').forEach(input => {
