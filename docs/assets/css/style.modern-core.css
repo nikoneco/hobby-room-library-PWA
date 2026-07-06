@@ -1410,26 +1410,45 @@ button.genre-chip.status:focus-visible {
 }
 
 #spinner-overlay {
-  background: rgba(7, 10, 15, 0.70);
-  backdrop-filter: blur(8px);
+  background:
+    radial-gradient(circle at 50% 30%, rgba(104, 191, 215, 0.10), transparent 34%),
+    rgba(7, 10, 15, 0.74);
+  backdrop-filter: blur(10px) saturate(118%);
   padding: 24px;
 }
 
 .spinner-panel {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
   display: flex;
-  width: min(360px, 100%);
-  min-height: 210px;
+  width: min(380px, 100%);
+  min-height: 224px;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.72rem;
-  padding: 1.25rem 1.15rem 1.1rem;
-  border: 1px solid rgba(148, 163, 184, 0.18);
-  border-radius: 8px;
+  gap: 0.78rem;
+  padding: 1.35rem 1.2rem 1.18rem;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 16px;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.076), rgba(255, 255, 255, 0.038)),
-    rgba(15, 19, 27, 0.76);
-  box-shadow: 0 22px 60px rgba(0, 0, 0, 0.34);
+    linear-gradient(90deg, rgba(240, 195, 122, 0.12) 0 5px, transparent 5px),
+    linear-gradient(145deg, rgba(104, 191, 215, 0.11), rgba(214, 164, 95, 0.050) 46%, rgba(255, 255, 255, 0.026)),
+    rgba(15, 19, 27, 0.84);
+  box-shadow:
+    0 24px 68px rgba(0, 0, 0, 0.38),
+    inset 0 1px 0 rgba(255, 255, 255, 0.060);
+}
+
+.spinner-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(circle at 20% 0%, rgba(240, 195, 122, 0.13), transparent 35%),
+    radial-gradient(circle at 82% 8%, rgba(104, 191, 215, 0.12), transparent 38%);
+  pointer-events: none;
 }
 
 .spinner-shelf {
@@ -1438,10 +1457,10 @@ button.genre-chip.status:focus-visible {
   align-items: flex-end;
   justify-content: center;
   gap: 4px;
-  width: 118px;
-  height: 40px;
-  margin-bottom: 0.05rem;
-  padding-bottom: 7px;
+  width: 128px;
+  height: 46px;
+  margin-bottom: 0.08rem;
+  padding-bottom: 8px;
 }
 
 .spinner-shelf::after {
@@ -1457,11 +1476,11 @@ button.genre-chip.status:focus-visible {
 
 .spinner-shelf span {
   display: block;
-  width: 12px;
+  width: 13px;
   min-height: 22px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 3px 3px 2px 2px;
-  background: rgba(214, 164, 95, 0.72);
+  background: rgba(214, 164, 95, 0.74);
   box-shadow: 0 8px 18px rgba(0, 0, 0, 0.22);
   animation: shelf-wait 1.8s ease-in-out infinite;
 }
@@ -1485,13 +1504,13 @@ button.genre-chip.status:focus-visible {
 
 .spinner-shelf span:nth-child(4) {
   height: 34px;
-  background: rgba(154, 132, 220, 0.70);
+  background: rgba(104, 191, 215, 0.68);
   animation-delay: 0.24s;
 }
 
 .spinner-shelf span:nth-child(5) {
   height: 25px;
-  background: rgba(239, 145, 116, 0.70);
+  background: rgba(214, 164, 95, 0.66);
   animation-delay: 0.32s;
 }
 
@@ -1509,31 +1528,37 @@ button.genre-chip.status:focus-visible {
 
 .empty-result {
   position: relative;
-  width: min(560px, calc(100vw - 32px));
-  margin: 2.4rem auto 0;
-  padding: 1.38rem 1.25rem 1.25rem;
-  border: 1px solid var(--lib-line);
+  isolation: isolate;
+  width: min(600px, calc(100vw - 32px));
+  margin: 2.5rem auto 0;
+  padding: 1.5rem 1.35rem 1.28rem;
+  border: 1px solid rgba(148, 163, 184, 0.14);
   border-radius: var(--lib-radius-lg);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.058), rgba(255, 255, 255, 0.035));
+  background:
+    linear-gradient(90deg, rgba(240, 195, 122, 0.11) 0 5px, transparent 5px),
+    linear-gradient(145deg, rgba(104, 191, 215, 0.075), rgba(214, 164, 95, 0.042) 48%, rgba(255, 255, 255, 0.024)),
+    rgba(13, 18, 26, 0.82);
   color: var(--lib-text);
   text-align: center;
-  box-shadow: var(--lib-shadow-sm);
+  box-shadow:
+    0 18px 44px rgba(0, 0, 0, 0.26),
+    inset 0 1px 0 rgba(255, 255, 255, 0.050);
   overflow: hidden;
 }
 
 .empty-result::before {
   content: "";
   display: block;
-  width: 74px;
-  height: 30px;
-  margin: 0 auto 0.86rem;
-  border-bottom: 2px solid rgba(214, 164, 95, 0.28);
+  width: 82px;
+  height: 34px;
+  margin: 0 auto 0.92rem;
+  border-bottom: 2px solid rgba(240, 195, 122, 0.34);
   background:
     linear-gradient(90deg, rgba(104, 191, 215, 0.82) 0 9px, transparent 9px 13px),
     linear-gradient(90deg, transparent 13px, rgba(214, 164, 95, 0.76) 13px 25px, transparent 25px 29px),
     linear-gradient(90deg, transparent 29px, rgba(105, 198, 163, 0.72) 29px 39px, transparent 39px 43px),
-    linear-gradient(90deg, transparent 43px, rgba(154, 132, 220, 0.70) 43px 55px, transparent 55px 59px),
-    linear-gradient(90deg, transparent 59px, rgba(239, 145, 116, 0.66) 59px 70px, transparent 70px);
+    linear-gradient(90deg, transparent 43px, rgba(104, 191, 215, 0.66) 43px 55px, transparent 55px 59px),
+    linear-gradient(90deg, transparent 59px, rgba(214, 164, 95, 0.62) 59px 74px, transparent 74px);
   background-repeat: no-repeat;
   background-size: 100% 82%;
   background-position: center bottom;
@@ -1543,20 +1568,25 @@ button.genre-chip.status:focus-visible {
 .empty-result::after {
   content: "";
   position: absolute;
-  inset: auto 0 0;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(214, 164, 95, 0.24), transparent);
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(circle at 20% 0%, rgba(240, 195, 122, 0.12), transparent 34%),
+    radial-gradient(circle at 84% 4%, rgba(104, 191, 215, 0.10), transparent 36%);
+  pointer-events: none;
 }
 
 .empty-result-title {
-  font-size: 1.05rem;
-  font-weight: 800;
+  color: rgba(246, 241, 229, 0.96);
+  font-size: 1.08rem;
+  font-weight: 840;
+  line-height: 1.45;
 }
 
 .empty-result-text {
   max-width: 32em;
   margin: 0.55rem auto 0;
-  color: var(--lib-muted);
+  color: rgba(217, 231, 240, 0.68);
   font-size: 0.9rem;
   line-height: 1.7;
 }
@@ -1572,6 +1602,10 @@ button.genre-chip.status:focus-visible {
 .empty-result-action {
   min-height: 38px;
   padding-inline: 0.85rem;
+  border-color: rgba(148, 163, 184, 0.15);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.050), rgba(255, 255, 255, 0.024)),
+    rgba(11, 17, 24, 0.54);
 }
 
 .empty-result-random {
@@ -1588,22 +1622,43 @@ button.genre-chip.status:focus-visible {
 }
 
 .spinner {
-  width: 56px;
-  height: 56px;
-  border-width: 4px;
-  border-color: rgba(255, 255, 255, 0.12);
-  border-top-color: var(--lib-accent);
-  margin-bottom: 0;
+  position: relative;
+  width: min(180px, 72vw);
+  height: 5px;
+  margin: 0.12rem 0 0.05rem;
+  overflow: hidden;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.080);
+}
+
+.spinner::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 42%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, rgba(104, 191, 215, 0.10), rgba(104, 191, 215, 0.94), rgba(240, 195, 122, 0.72));
+  animation: shelf-progress 1.55s ease-in-out infinite;
+}
+
+@keyframes shelf-progress {
+  0% {
+    transform: translateX(-110%);
+  }
+  100% {
+    transform: translateX(250%);
+  }
 }
 
 .spinner-label {
-  color: var(--lib-text);
+  color: rgba(246, 241, 229, 0.96);
   font-size: 0.98rem;
   max-width: min(72vw, 22rem);
-  padding: 0.42rem 0.72rem;
-  border: 1px solid rgba(148, 163, 184, 0.18);
+  padding: 0.42rem 0.78rem;
+  border: 1px solid rgba(148, 163, 184, 0.16);
   border-radius: 999px;
-  background: rgba(15, 19, 27, 0.54);
+  background: rgba(5, 10, 15, 0.38);
   line-height: 1.45;
   text-align: center;
 }

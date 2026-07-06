@@ -292,16 +292,18 @@ body.pwa-launch-splash-visible {
   right: max(12px, env(safe-area-inset-right));
   bottom: max(12px, env(safe-area-inset-bottom));
   z-index: 12000;
-  padding: 11px 13px;
-  border: 1px solid color-mix(in srgb, var(--pwa-line) 58%, transparent);
-  border-radius: 12px;
+  overflow: hidden;
+  padding: 12px 14px 12px 17px;
+  border: 1px solid color-mix(in srgb, var(--pwa-line) 62%, transparent);
+  border-radius: 14px;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.058), rgba(255, 255, 255, 0.022)),
+    linear-gradient(90deg, rgba(var(--pwa-warm-rgb), 0.12) 0 5px, transparent 5px),
+    linear-gradient(145deg, rgba(var(--pwa-accent-rgb), 0.080), rgba(var(--pwa-warm-rgb), 0.050) 46%, rgba(255, 255, 255, 0.024)),
     color-mix(in srgb, var(--pwa-panel-strong) 92%, transparent);
   color: rgba(237, 245, 247, 0.90);
   box-shadow:
-    0 16px 34px rgba(0, 0, 0, 0.30),
-    inset 0 1px 0 rgba(255, 255, 255, 0.055);
+    0 18px 44px rgba(0, 0, 0, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.060);
   font-size: 0.92rem;
   line-height: 1.55;
   backdrop-filter: blur(14px);
@@ -736,6 +738,19 @@ body.pwa-shell .shelf-room-map-modal-panel,
 body.pwa-shell .spinner-panel {
   background: var(--pwa-panel);
   border-color: var(--pwa-line);
+}
+
+body.pwa-shell .spinner-panel,
+body.pwa-shell .empty-result {
+  border-color: color-mix(in srgb, var(--pwa-line) 66%, transparent);
+  background:
+    linear-gradient(90deg, rgba(var(--pwa-warm-rgb), 0.11) 0 5px, transparent 5px),
+    linear-gradient(145deg, rgba(var(--pwa-accent-rgb), 0.080), rgba(var(--pwa-warm-rgb), 0.046) 46%, rgba(255, 255, 255, 0.026)),
+    color-mix(in srgb, var(--pwa-panel-strong) 82%, transparent);
+}
+
+body.pwa-shell .spinner::before {
+  background: linear-gradient(90deg, rgba(var(--pwa-accent-rgb), 0.08), rgba(var(--pwa-accent-rgb), 0.92), rgba(var(--pwa-warm-rgb), 0.72));
 }
 
 body.pwa-shell .book-card {
@@ -1202,7 +1217,8 @@ body.pwa-update-visible .mobile-app-dock {
   border-color: rgba(234, 147, 116, 0.34);
   color: rgba(255, 224, 212, 0.92);
   background:
-    linear-gradient(180deg, rgba(234, 147, 116, 0.11), rgba(255, 255, 255, 0.018)),
+    linear-gradient(90deg, rgba(234, 147, 116, 0.20) 0 5px, transparent 5px),
+    linear-gradient(145deg, rgba(234, 147, 116, 0.13), rgba(255, 255, 255, 0.020)),
     color-mix(in srgb, var(--pwa-panel-strong) 92%, transparent);
 }
 
@@ -1210,7 +1226,8 @@ body.pwa-update-visible .mobile-app-dock {
   border-color: color-mix(in srgb, var(--pwa-line-strong) 72%, transparent);
   color: #dff8ff;
   background:
-    linear-gradient(180deg, rgba(var(--pwa-accent-rgb), 0.12), rgba(255, 255, 255, 0.022)),
+    linear-gradient(90deg, rgba(var(--pwa-accent-rgb), 0.20) 0 5px, transparent 5px),
+    linear-gradient(145deg, rgba(var(--pwa-accent-rgb), 0.13), rgba(var(--pwa-warm-rgb), 0.042), rgba(255, 255, 255, 0.022)),
     color-mix(in srgb, var(--pwa-panel-strong) 94%, transparent);
   display: flex;
   align-items: center;
@@ -1229,7 +1246,8 @@ body.pwa-update-visible .mobile-app-dock {
   border-color: rgba(var(--pwa-warm-rgb), 0.34);
   color: rgba(255, 241, 214, 0.92);
   background:
-    linear-gradient(180deg, rgba(var(--pwa-warm-rgb), 0.12), rgba(255, 255, 255, 0.018)),
+    linear-gradient(90deg, rgba(var(--pwa-warm-rgb), 0.20) 0 5px, transparent 5px),
+    linear-gradient(145deg, rgba(var(--pwa-warm-rgb), 0.13), rgba(var(--pwa-accent-rgb), 0.044), rgba(255, 255, 255, 0.020)),
     color-mix(in srgb, var(--pwa-panel-strong) 92%, transparent);
 }
 

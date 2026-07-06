@@ -668,6 +668,20 @@
     line-height: 1;
     margin: -0.1rem 0;
   }
+
+  .empty-result {
+    padding: 1.25rem 1rem 1rem;
+  }
+
+  .empty-result-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.55rem;
+  }
+
+  .empty-result-action {
+    width: 100%;
+  }
 }
 
 @media (max-width: 420px) {
@@ -791,6 +805,7 @@
   #image-popup-img.book-image-loaded,
   #cover-fullscreen-img.book-image-loaded,
   .spinner,
+  .spinner::before,
   .spinner-shelf span,
   .popup-detail-skeleton-line::after,
   .popup-detail-skeleton-chip-row span::after,
