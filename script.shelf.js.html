@@ -1089,8 +1089,8 @@ function showResult(data) {
       info.innerHTML = `
         <div class="book-title">${escapeHtml(book.title || '(タイトルなし)')}</div>
         ${buildBookAuthorLineHtml_(book)}
-        <div class="genre-chip-wrap">${buildGenreChips(book)}</div>
-        ${buildBookMetaPillsHtml_(book, { includeIsbn: true })}
+        <div class="genre-chip-wrap card-chip-wrap">${buildGenreChips(book, { limit: 4 })}</div>
+        ${buildBookMetaPillsHtml_(book, { mode: 'card' })}
         ${buildBookMemoHtml_(book)}
       `;
 

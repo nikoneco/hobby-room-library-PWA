@@ -42,23 +42,28 @@ function buildListBookMetaHtml_(book) {
   return `<div class="list-book-meta">${parts.map(part => escapeHtml(part)).join(' / ')}</div>`;
 }
 
+function buildBookMetaPillClass_(kind) {
+  return kind ? ` ${kind}` : '';
+}
+
 function buildBookMetaPillsHtml_(book, options) {
   const opt = options || {};
+  const cardMode = opt.mode === 'card';
   const items = [];
   const shelfLabel = formatShelfLabel_(book);
 
-  if (shelfLabel) items.push({ label: '棚', value: shelfLabel });
-  if (hasDisplayValue_(book && book.released)) items.push({ label: '発売', value: book.released });
-  if (hasDisplayValue_(book && book.price)) items.push({ label: '値', value: book.price });
-  if (hasDisplayValue_(book && book.brand)) items.push({ label: 'レーベル', value: book.brand });
-  if (opt.includeIsbn && hasDisplayValue_(book && book.isbn)) items.push({ label: 'ISBN', value: book.isbn });
+  if (shelfLabel) items.push({ label: '棚', value: shelfLabel, kind: 'location' });
+  if (hasDisplayValue_(book && book.released)) items.push({ label: '発売', value: book.released, kind: 'released' });
+  if (!cardMode && hasDisplayValue_(book && book.price)) items.push({ label: '値', value: book.price, kind: 'price' });
+  if (hasDisplayValue_(book && book.brand)) items.push({ label: 'レーベル', value: book.brand, kind: 'brand' });
+  if (!cardMode && opt.includeIsbn && hasDisplayValue_(book && book.isbn)) items.push({ label: 'ISBN', value: book.isbn, kind: 'isbn' });
 
   if (!items.length) return '';
 
   return `
-    <div class="book-meta-pills${opt.compact ? ' compact' : ''}">
+    <div class="book-meta-pills${opt.compact ? ' compact' : ''}${cardMode ? ' card-meta' : ''}">
       ${items.map(item => `
-        <span class="book-meta-pill">
+        <span class="book-meta-pill${buildBookMetaPillClass_(item.kind)}">
           <span class="book-meta-pill-label">${escapeHtml(item.label)}</span>
           <span class="book-meta-pill-value">${escapeHtml(item.value)}</span>
         </span>
@@ -163,11 +168,23 @@ function renderEmptyResult_(result) {
   result.appendChild(empty);
 }
 
-function buildGenreChips(book) {
+function getLimitedGenreMeta_(meta, limit) {
+  const safeLimit = Number(limit) || 0;
+  if (!safeLimit || meta.length <= safeLimit) return meta;
+
+  const statusItems = meta.filter(item => item && item.category === 'status');
+  const regularItems = meta.filter(item => item && item.category !== 'status');
+  const reservedStatus = statusItems.length ? [statusItems[0]] : [];
+  const regularLimit = Math.max(0, safeLimit - reservedStatus.length);
+  return regularItems.slice(0, regularLimit).concat(reservedStatus);
+}
+
+function buildGenreChips(book, options) {
+  const opt = options || {};
   const meta = Array.isArray(book.genreMeta) ? book.genreMeta : [];
   if (!meta.length) return '';
 
-  return meta.map(item => {
+  return getLimitedGenreMeta_(meta, opt.limit).map(item => {
     const cls = item.category === 'status' ? 'genre-chip status' : 'genre-chip';
     const field = getGenreSearchField_(item.category);
     const label = getGenreCategoryLabel_(item.category);

@@ -816,20 +816,24 @@ body.pwa-shell .spinner::before {
 
 body.pwa-shell .book-card {
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.050), rgba(255, 255, 255, 0.026)),
-    color-mix(in srgb, var(--pwa-panel) 72%, transparent);
+    radial-gradient(circle at 50% 0%, rgba(var(--pwa-accent-rgb), 0.055), transparent 38%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.046), rgba(255, 255, 255, 0.020)),
+    color-mix(in srgb, var(--pwa-panel) 76%, transparent);
   border-color: color-mix(in srgb, var(--pwa-line) 58%, transparent);
 }
 
 body.pwa-shell .book-card::before {
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.050);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.052),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.018);
 }
 
 body.pwa-shell .book-card:hover {
   border-color: color-mix(in srgb, var(--pwa-warm-2) 34%, transparent);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.064), rgba(255, 255, 255, 0.034)),
-    color-mix(in srgb, var(--pwa-panel-strong) 76%, transparent);
+    radial-gradient(circle at 50% 0%, rgba(var(--pwa-warm-rgb), 0.070), transparent 40%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.060), rgba(255, 255, 255, 0.028)),
+    color-mix(in srgb, var(--pwa-panel-strong) 78%, transparent);
 }
 
 body.pwa-shell .book-card.list {
@@ -860,6 +864,35 @@ body.pwa-shell .book-card.list.open {
 body.pwa-shell .book-cover,
 body.pwa-shell .list-thumb {
   border-color: rgba(255, 255, 255, 0.075);
+}
+
+body.pwa-shell .card-view .book-meta-pill {
+  border-color: color-mix(in srgb, var(--pwa-line) 48%, transparent);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.038), rgba(255, 255, 255, 0.014)),
+    color-mix(in srgb, var(--pwa-panel) 38%, transparent);
+}
+
+body.pwa-shell .card-view .book-meta-pill.location {
+  border-color: color-mix(in srgb, var(--pwa-warm-2) 28%, transparent);
+  background:
+    linear-gradient(180deg, rgba(var(--pwa-warm-rgb), 0.12), rgba(var(--pwa-warm-rgb), 0.040)),
+    color-mix(in srgb, var(--pwa-panel) 34%, transparent);
+  color: var(--pwa-accent-readable);
+}
+
+body.pwa-shell .card-view .genre-chip {
+  border-color: color-mix(in srgb, var(--pwa-line) 52%, transparent);
+  background:
+    linear-gradient(180deg, rgba(var(--pwa-accent-rgb), 0.095), rgba(var(--pwa-accent-rgb), 0.035)),
+    color-mix(in srgb, var(--pwa-panel) 30%, transparent);
+}
+
+body.pwa-shell .card-view .genre-chip.status {
+  border-color: color-mix(in srgb, var(--pwa-warm-2) 26%, transparent);
+  background:
+    linear-gradient(180deg, rgba(var(--pwa-warm-rgb), 0.13), rgba(var(--pwa-warm-rgb), 0.040)),
+    color-mix(in srgb, var(--pwa-panel) 30%, transparent);
 }
 
 body.pwa-shell .list-title-author {
