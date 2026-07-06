@@ -507,15 +507,16 @@ button.popup-arrow:active {
   min-height: 1.8rem;
   margin-top: 0.55rem;
   padding: 0.32rem 0.68rem 0.32rem 0.54rem;
-  border: 1px solid rgba(214, 164, 95, 0.22);
+  border: 1px solid rgba(214, 164, 95, 0.24);
   border-radius: 999px;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.046), rgba(255, 255, 255, 0.018)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.058), rgba(255, 255, 255, 0.020)),
     rgba(214, 164, 95, 0.082);
   color: rgba(246, 241, 229, 0.82);
   font-size: 0.78rem;
   font-weight: 750;
   line-height: 1.35;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.044);
 }
 
 .popup-detail-state::before {
@@ -531,7 +532,7 @@ button.popup-arrow:active {
 .popup-detail-state.error {
   border-color: rgba(234, 147, 116, 0.34);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.040), rgba(255, 255, 255, 0.014)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.048), rgba(255, 255, 255, 0.016)),
     rgba(234, 147, 116, 0.12);
   color: rgba(255, 224, 212, 0.86);
 }
@@ -548,12 +549,16 @@ button.popup-arrow:active {
   display: grid;
   gap: 0.66rem;
   margin-top: 0.68rem;
-  padding: 0.74rem;
-  border: 1px solid rgba(148, 163, 184, 0.10);
-  border-radius: 12px;
+  padding: 0.78rem 0.82rem 0.84rem;
+  border: 1px solid rgba(148, 163, 184, 0.13);
+  border-radius: 13px;
   background:
-    linear-gradient(90deg, rgba(240, 195, 122, 0.085) 0 4px, transparent 4px),
-    rgba(255, 255, 255, 0.028);
+    linear-gradient(90deg, rgba(240, 195, 122, 0.105) 0 4px, transparent 4px),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.046), rgba(255, 255, 255, 0.018)),
+    rgba(8, 13, 19, 0.28);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.044),
+    0 10px 24px rgba(0, 0, 0, 0.14);
 }
 
 .popup-detail-loading::before {
@@ -567,12 +572,14 @@ button.popup-arrow:active {
 
 .popup-detail-state.loading {
   width: fit-content;
+  margin-top: 0;
 }
 
 .popup-detail-skeleton {
   display: grid;
   gap: 0.46rem;
   width: min(100%, 360px);
+  padding-left: 0.1rem;
 }
 
 .popup-detail-skeleton-line,
@@ -580,7 +587,10 @@ button.popup-arrow:active {
   position: relative;
   overflow: hidden;
   border-radius: 999px;
-  background: rgba(246, 241, 229, 0.060);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.050), rgba(255, 255, 255, 0.020)),
+    rgba(246, 241, 229, 0.052);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.030);
 }
 
 .popup-detail-skeleton-line {
@@ -602,7 +612,7 @@ button.popup-arrow:active {
 .popup-detail-skeleton-chip-row span {
   width: 4.8rem;
   height: 1.52rem;
-  border: 1px solid rgba(246, 241, 229, 0.065);
+  border: 1px solid rgba(246, 241, 229, 0.078);
 }
 
 .popup-detail-skeleton-line::after,

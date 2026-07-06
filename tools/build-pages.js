@@ -1208,6 +1208,17 @@ body.pwa-shell .suggest-box {
     rgba(255, 255, 255, 0.026);
 }
 
+body.pwa-shell .popup-detail-loading {
+  border-color: color-mix(in srgb, var(--pwa-line) 62%, transparent);
+  background:
+    linear-gradient(90deg, rgba(var(--pwa-warm-rgb), 0.105) 0 4px, transparent 4px),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.046), rgba(255, 255, 255, 0.018)),
+    color-mix(in srgb, var(--pwa-panel) 58%, transparent);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.044),
+    0 10px 24px rgba(0, 0, 0, 0.16);
+}
+
 body.pwa-shell .series-list-item {
   border-color: color-mix(in srgb, var(--pwa-line) 48%, transparent);
   background:
@@ -1220,8 +1231,11 @@ body.pwa-shell .popup-detail-state,
 body.pwa-shell .series-panel-subtitle,
 body.pwa-shell .series-list-meta {
   border-color: color-mix(in srgb, var(--pwa-line) 48%, transparent);
-  background: rgba(var(--pwa-accent-rgb), 0.055);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.052), rgba(255, 255, 255, 0.018)),
+    rgba(var(--pwa-accent-rgb), 0.055);
   color: var(--pwa-accent-readable);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.040);
 }
 
 body.pwa-shell .series-list-title::before {
@@ -1244,7 +1258,10 @@ body.pwa-shell .popup-detail-state.error::before {
 
 body.pwa-shell .popup-detail-skeleton-line,
 body.pwa-shell .popup-detail-skeleton-chip-row span {
-  background: rgba(255, 255, 255, 0.060);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.050), rgba(255, 255, 255, 0.020)),
+    rgba(255, 255, 255, 0.056);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.030);
 }
 
 body.pwa-shell .popup-detail-skeleton-line::after,
