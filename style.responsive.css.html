@@ -322,7 +322,7 @@
   .search-container.shrink.compact .search-status-area,
   .search-container.centered .search-status-area {
     position: static;
-    width: fit-content;
+    width: min(100%, 520px);
     max-width: min(100%, 520px);
     margin: 0.2rem auto 0.72rem;
     flex-wrap: wrap;
@@ -337,7 +337,12 @@
   }
 
   .search-status-chips {
+    width: 100%;
     justify-content: center;
+  }
+
+  .search-status-chip {
+    max-width: 100%;
   }
 
   .logo {
@@ -628,6 +633,7 @@
   .released-range-row {
     min-width: 0;
     max-width: 100%;
+    padding: 0.58rem;
   }
 
   .input-group input,
@@ -645,6 +651,16 @@
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 0.86fr);
     gap: 0.55rem;
+  }
+
+  .advanced-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.55rem;
+  }
+
+  .advanced-actions button {
+    width: 100%;
   }
 
   .released-range-separator {

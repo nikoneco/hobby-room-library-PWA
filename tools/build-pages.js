@@ -1162,6 +1162,44 @@ body.pwa-shell .search-container.centered .input-group input {
   background: rgba(4, 9, 13, 0.36);
 }
 
+body.pwa-shell .search-status-area {
+  border-color: color-mix(in srgb, var(--pwa-line) 72%, transparent);
+  background:
+    linear-gradient(90deg, rgba(var(--pwa-warm-rgb), 0.10), rgba(var(--pwa-accent-rgb), 0.055)),
+    color-mix(in srgb, var(--pwa-panel-strong) 70%, transparent);
+}
+
+body.pwa-shell .search-status-area::before {
+  background: color-mix(in srgb, var(--pwa-warm-2) 62%, var(--pwa-accent));
+}
+
+body.pwa-shell .quick-browse-rail,
+body.pwa-shell .advanced-search-area {
+  border-color: color-mix(in srgb, var(--pwa-line) 66%, transparent);
+  background:
+    linear-gradient(90deg, rgba(var(--pwa-warm-rgb), 0.11) 0 5px, transparent 5px),
+    linear-gradient(145deg, rgba(var(--pwa-accent-rgb), 0.070), rgba(var(--pwa-warm-rgb), 0.042) 44%, rgba(255, 255, 255, 0.026)),
+    color-mix(in srgb, var(--pwa-panel-strong) 82%, transparent);
+}
+
+body.pwa-shell .quick-browse-rail {
+  background:
+    linear-gradient(90deg, rgba(var(--pwa-accent-rgb), 0.055), rgba(var(--pwa-warm-rgb), 0.035)),
+    color-mix(in srgb, var(--pwa-panel) 52%, transparent);
+}
+
+body.pwa-shell .advanced-grid .input-group,
+body.pwa-shell .released-range-row {
+  border-color: color-mix(in srgb, var(--pwa-line) 44%, transparent);
+  background: rgba(255, 255, 255, 0.028);
+}
+
+body.pwa-shell .advanced-grid .input-group input,
+body.pwa-shell .advanced-grid .input-group select,
+body.pwa-shell .released-range-controls select {
+  background: rgba(4, 9, 13, 0.32);
+}
+
 body.pwa-shell input,
 body.pwa-shell select,
 body.pwa-shell textarea {
@@ -1269,16 +1307,20 @@ body.pwa-shell .genre-chip,
 body.pwa-shell .summary-chip-toggle,
 body.pwa-shell .book-meta-pill,
 body.pwa-shell .search-status-chip,
+body.pwa-shell .quick-browse-chip,
 body.pwa-shell .shelf-view-stat,
 body.pwa-shell .bookshelf-level-title {
   border-color: color-mix(in srgb, var(--pwa-line) 62%, transparent);
-  background: rgba(var(--pwa-accent-rgb), 0.055);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.046), rgba(255, 255, 255, 0.022)),
+    rgba(var(--pwa-accent-rgb), 0.045);
   color: var(--pwa-accent-readable);
 }
 
 body.pwa-shell .summary-chip-toggle,
 body.pwa-shell .search-status-chip.shelf,
-body.pwa-shell .book-meta-pill.location {
+body.pwa-shell .book-meta-pill.location,
+body.pwa-shell .quick-browse-chip-count {
   border-color: color-mix(in srgb, var(--pwa-warm-2) 32%, transparent);
   background: rgba(var(--pwa-warm-rgb), 0.075);
   color: var(--pwa-accent-readable);
