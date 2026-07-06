@@ -942,6 +942,34 @@ body.pwa-shell .spinner-panel {
   border-color: var(--pwa-line);
 }
 
+body.pwa-shell .book-card {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.050), rgba(255, 255, 255, 0.026)),
+    color-mix(in srgb, var(--pwa-panel) 72%, transparent);
+  border-color: color-mix(in srgb, var(--pwa-line) 58%, transparent);
+}
+
+body.pwa-shell .book-card::before {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.050);
+}
+
+body.pwa-shell .book-card:hover {
+  border-color: color-mix(in srgb, var(--pwa-warm-2) 34%, transparent);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.064), rgba(255, 255, 255, 0.034)),
+    color-mix(in srgb, var(--pwa-panel-strong) 76%, transparent);
+}
+
+body.pwa-shell .book-cover,
+body.pwa-shell .list-thumb {
+  border-color: rgba(255, 255, 255, 0.075);
+}
+
+body.pwa-shell .list-title-author {
+  border-color: color-mix(in srgb, var(--pwa-line) 42%, transparent);
+  background: rgba(255, 255, 255, 0.028);
+}
+
 body.pwa-shell .search-container {
   box-shadow: 0 10px 34px rgba(var(--pwa-shadow-rgb), 0.30);
 }
@@ -1185,8 +1213,7 @@ body.pwa-shell .room-map-shelf {
 body.pwa-shell .room-map-shelf:hover,
 body.pwa-shell .room-map-shelf:focus-visible,
 body.pwa-shell .shelf-book:hover,
-body.pwa-shell .shelf-book:focus-visible,
-body.pwa-shell .book-card:hover {
+body.pwa-shell .shelf-book:focus-visible {
   border-color: var(--pwa-line-strong);
   box-shadow: 0 12px 28px rgba(var(--pwa-accent-rgb), 0.08), 0 12px 28px rgba(0, 0, 0, 0.24);
 }

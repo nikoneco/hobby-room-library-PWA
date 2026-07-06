@@ -399,20 +399,25 @@
 
   .card-view {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.7rem;
+    gap: 0.72rem;
     padding: 0.7rem;
     max-width: 100%;
   }
 
   .card-view .book-card {
-    padding: 0.68rem 0.58rem;
-    border-radius: 12px;
+    padding: 0.72rem 0.62rem;
+    border-radius: 14px;
     align-items: stretch;
   }
 
+  .card-info {
+    gap: 0.32rem;
+    margin-top: 0.62rem;
+  }
+
   .book-cover {
-    max-width: min(112px, 72%);
-    max-height: 164px;
+    max-width: min(116px, 74%);
+    max-height: 168px;
     align-self: center;
   }
 
@@ -474,8 +479,8 @@
   }
 
   .list-row {
-    gap: 0.46rem;
-    align-items: flex-start;
+    gap: 0.5rem;
+    align-items: center;
   }
 
   .list-title-row {
@@ -493,8 +498,8 @@
   }
 
   .list-view .book-card.list {
-    padding: 0.38rem 0.46rem;
-    border-radius: 8px;
+    padding: 0.42rem 0.5rem;
+    border-radius: 10px;
   }
 
   .list-view .list-thumb {
@@ -539,6 +544,7 @@
     grid-column: 2;
     grid-row: 1;
     max-width: 8.2em;
+    padding: 0.08rem 0.28rem;
     margin: 0.02rem 0 0;
     font-size: 0.48rem;
     line-height: 1.14;
