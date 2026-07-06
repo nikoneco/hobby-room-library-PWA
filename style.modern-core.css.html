@@ -1238,12 +1238,15 @@ button.quick-browse-chip:focus-visible {
   align-items: center;
   gap: 0.34rem;
   padding: 0.22rem 0.5rem;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.10);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.035);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.052), rgba(255, 255, 255, 0.020)),
+    rgba(9, 14, 20, 0.28);
   color: #dce7ec;
   font-size: 0.72rem;
   line-height: 1.35;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.055);
 }
 
 .book-meta-pills.compact .book-meta-pill {
@@ -1295,18 +1298,25 @@ button.quick-browse-chip:focus-visible {
 }
 
 .genre-chip {
+  position: relative;
   min-height: 0;
   padding: 0.18rem 0.52rem;
-  background: rgba(104, 191, 215, 0.075);
-  border-color: rgba(104, 191, 215, 0.18);
+  overflow: hidden;
+  background:
+    linear-gradient(180deg, rgba(104, 191, 215, 0.12), rgba(104, 191, 215, 0.045)),
+    rgba(8, 13, 19, 0.24);
+  border-color: rgba(104, 191, 215, 0.20);
   color: #c9e8ef;
   font-size: 0.72rem;
-  box-shadow: none;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.045);
+  transition: border-color var(--lib-ease), background var(--lib-ease), color var(--lib-ease);
 }
 
 .genre-chip.status {
-  background: rgba(214, 164, 95, 0.095);
-  border-color: rgba(214, 164, 95, 0.22);
+  background:
+    linear-gradient(180deg, rgba(214, 164, 95, 0.15), rgba(214, 164, 95, 0.052)),
+    rgba(8, 13, 19, 0.22);
+  border-color: rgba(214, 164, 95, 0.24);
   color: #f4dfbd;
 }
 
@@ -1330,32 +1340,64 @@ button.genre-chip.status:focus-visible {
 }
 
 .summary-chip-toggle {
+  position: relative;
   min-height: 28px;
-  padding: 0.22rem 0.62rem;
-  border-color: rgba(105, 198, 163, 0.28);
-  background: rgba(105, 198, 163, 0.12);
+  padding: 0.22rem 0.68rem;
+  overflow: hidden;
+  border-color: rgba(105, 198, 163, 0.30);
+  background:
+    linear-gradient(180deg, rgba(105, 198, 163, 0.16), rgba(105, 198, 163, 0.060)),
+    rgba(8, 13, 19, 0.28);
   color: #d6f6ea;
   font-size: 0.72rem;
   text-shadow: none;
-  box-shadow: none;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.055);
+  transition: border-color var(--lib-ease), background var(--lib-ease), color var(--lib-ease), transform var(--lib-ease);
 }
 
 .summary-chip-toggle::before {
-  background: rgba(255, 255, 255, 0.10);
+  content: "+";
+  background: rgba(255, 255, 255, 0.11);
+  color: rgba(233, 255, 247, 0.92);
 }
 
 .summary-chip-toggle:hover,
 .summary-chip-toggle[aria-expanded="true"] {
   border-color: rgba(105, 198, 163, 0.42);
-  background: rgba(105, 198, 163, 0.18);
-  box-shadow: none;
+  background:
+    linear-gradient(180deg, rgba(105, 198, 163, 0.22), rgba(105, 198, 163, 0.080)),
+    rgba(8, 13, 19, 0.30);
+  color: #effff9;
+}
+
+.summary-chip-toggle:active {
+  transform: translateY(1px);
+}
+
+.summary-chip-toggle:focus-visible {
+  outline: 2px solid rgba(105, 198, 163, 0.58);
+  outline-offset: 2px;
+}
+
+.summary-chip-toggle[aria-expanded="true"]::before {
+  content: "-";
+  background: rgba(255, 255, 255, 0.16);
 }
 
 .summary-text {
+  position: relative;
+  padding: 0.74rem 0.86rem 0.78rem 0.92rem;
+  border-left: 3px solid rgba(105, 198, 163, 0.30);
   color: #dce7ec;
-  background: rgba(255, 255, 255, 0.045);
-  border-color: var(--lib-line);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.052), rgba(255, 255, 255, 0.022)),
+    rgba(8, 13, 19, 0.34);
+  border-color: rgba(255, 255, 255, 0.085);
   border-radius: var(--lib-radius-sm);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.045),
+    0 10px 26px rgba(0, 0, 0, 0.16);
+  line-height: 1.68;
 }
 
 .list-thumb {
@@ -1411,7 +1453,19 @@ button.genre-chip.status:focus-visible {
   min-height: 36px;
   border: 1px solid rgba(214, 164, 95, 0.16) !important;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.032) !important;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.050), rgba(255, 255, 255, 0.016)),
+    rgba(8, 13, 19, 0.26) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.045) !important;
+  transition: border-color var(--lib-ease), background var(--lib-ease), color var(--lib-ease);
+}
+
+.accordion-toggle:hover,
+.accordion-toggle:focus-visible {
+  border-color: rgba(214, 164, 95, 0.34) !important;
+  background:
+    linear-gradient(180deg, rgba(214, 164, 95, 0.12), rgba(255, 255, 255, 0.018)),
+    rgba(8, 13, 19, 0.30) !important;
 }
 
 .accordion-toggle .arrow {

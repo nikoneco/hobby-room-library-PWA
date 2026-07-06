@@ -237,6 +237,7 @@ body.shelf-popup-open #image-popup-overlay {
   margin: 0.55rem 0 0.75rem;
   overflow-x: hidden;
   overflow-y: auto;
+  border-color: rgba(105, 198, 163, 0.18);
   border-radius: var(--lib-radius-sm);
   scrollbar-color: rgba(214, 164, 95, 0.46) rgba(255, 255, 255, 0.045);
 }
@@ -550,7 +551,23 @@ button.popup-arrow:focus-visible {
 
 #image-popup-info .summary-chip-toggle {
   border-color: rgba(214, 164, 95, 0.28);
-  background: rgba(214, 164, 95, 0.080);
+  background:
+    linear-gradient(180deg, rgba(214, 164, 95, 0.13), rgba(214, 164, 95, 0.045)),
+    rgba(8, 13, 19, 0.28);
+  color: #f6e8cf;
+}
+
+#image-popup-info .summary-chip-toggle::before {
+  color: #fff2dc;
+}
+
+#image-popup-info .summary-chip-toggle:hover,
+#image-popup-info .summary-chip-toggle[aria-expanded="true"] {
+  border-color: rgba(240, 195, 122, 0.44);
+  background:
+    linear-gradient(180deg, rgba(214, 164, 95, 0.18), rgba(214, 164, 95, 0.065)),
+    rgba(8, 13, 19, 0.30);
+  color: #fff3dd;
 }
 
 #image-popup-info .popup-action-btn:hover,
