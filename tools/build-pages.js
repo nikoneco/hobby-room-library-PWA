@@ -1357,17 +1357,29 @@ body.pwa-shell .shelf-jump-top-btn {
 }
 
 body.pwa-shell .mobile-app-dock {
+  border-color: color-mix(in srgb, var(--pwa-line) 62%, transparent);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.058), rgba(255, 255, 255, 0.022)),
-    color-mix(in srgb, var(--pwa-panel-strong) 88%, transparent);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.070), rgba(255, 255, 255, 0.024)),
+    color-mix(in srgb, var(--pwa-panel-strong) 90%, transparent);
   box-shadow:
-    0 18px 44px rgba(0, 0, 0, 0.38),
-    inset 0 1px 0 rgba(255, 255, 255, 0.060);
+    0 20px 50px rgba(0, 0, 0, 0.40),
+    inset 0 1px 0 rgba(255, 255, 255, 0.070);
 }
 
 body.pwa-shell .mobile-app-dock-btn,
 body.pwa-shell .mobile-dock-view-btn {
-  background: rgba(255, 255, 255, 0.030);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.046), rgba(255, 255, 255, 0.018)),
+    rgba(255, 255, 255, 0.024);
+}
+
+body.pwa-shell .mobile-app-dock-btn:hover,
+body.pwa-shell .mobile-dock-view-btn:hover {
+  border-color: color-mix(in srgb, var(--pwa-warm-2) 26%, var(--pwa-line));
+  background:
+    linear-gradient(180deg, rgba(var(--pwa-warm-rgb), 0.10), rgba(var(--pwa-accent-rgb), 0.045)),
+    rgba(255, 255, 255, 0.030);
+  color: rgba(237, 245, 247, 0.90);
 }
 
 body.pwa-shell .button-group button.accent,
