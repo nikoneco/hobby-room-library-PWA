@@ -771,6 +771,49 @@ body.pwa-shell .room-map-shelf {
     color-mix(in srgb, var(--pwa-panel-strong) 78%, transparent);
 }
 
+body.pwa-shell #image-popup-content {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.056), rgba(255, 255, 255, 0.024)),
+    color-mix(in srgb, var(--pwa-panel-strong) 92%, transparent);
+  border-color: color-mix(in srgb, var(--pwa-line) 56%, transparent);
+  box-shadow:
+    0 24px 70px rgba(var(--pwa-shadow-rgb), 0.42),
+    inset 0 1px 0 rgba(255, 255, 255, 0.060);
+}
+
+body.pwa-shell #image-popup-content::after {
+  background: linear-gradient(90deg, rgba(var(--pwa-warm-rgb), 0.060), transparent 22%, rgba(var(--pwa-accent-rgb), 0.034));
+}
+
+body.pwa-shell #image-popup-img,
+body.pwa-shell #cover-fullscreen-img {
+  border-color: rgba(255, 255, 255, 0.078);
+  box-shadow:
+    0 18px 42px rgba(var(--pwa-shadow-rgb), 0.35),
+    0 0 0 1px rgba(var(--pwa-warm-rgb), 0.050) inset;
+}
+
+body.pwa-shell #image-popup-close,
+body.pwa-shell #cover-fullscreen-close,
+body.pwa-shell .popup-arrow,
+body.pwa-shell .popup-action-btn,
+body.pwa-shell .popup-link-btn {
+  border-color: color-mix(in srgb, var(--pwa-line) 52%, transparent);
+  background: rgba(255, 255, 255, 0.044);
+}
+
+body.pwa-shell #image-popup-close:hover,
+body.pwa-shell #cover-fullscreen-close:hover,
+body.pwa-shell #cover-fullscreen-close:focus-visible,
+body.pwa-shell .popup-arrow:hover,
+body.pwa-shell .popup-action-btn:hover,
+body.pwa-shell .popup-link-btn:hover,
+body.pwa-shell .popup-action-btn:focus-visible,
+body.pwa-shell .popup-link-btn:focus-visible {
+  border-color: color-mix(in srgb, var(--pwa-warm-2) 34%, transparent);
+  background: rgba(var(--pwa-warm-rgb), 0.095);
+}
+
 body.pwa-shell .search-container {
   box-shadow: 0 10px 34px rgba(var(--pwa-shadow-rgb), 0.30);
 }
