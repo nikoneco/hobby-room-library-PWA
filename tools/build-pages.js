@@ -1200,8 +1200,7 @@ body.pwa-shell .popup-link-btn:focus-visible {
 
 body.pwa-shell .popup-detail-loading,
 body.pwa-shell .series-list,
-body.pwa-shell .series-empty,
-body.pwa-shell .suggest-box {
+body.pwa-shell .series-empty {
   border-color: color-mix(in srgb, var(--pwa-line) 54%, transparent);
   background:
     linear-gradient(90deg, rgba(var(--pwa-warm-rgb), 0.078) 0 4px, transparent 4px),
@@ -1281,22 +1280,36 @@ body.pwa-shell .series-list-item:focus-visible {
 }
 
 body.pwa-shell .suggest-box {
+  border-color: color-mix(in srgb, var(--pwa-line) 58%, transparent);
+  border-top-color: color-mix(in srgb, var(--pwa-warm-2) 30%, transparent);
   background:
-    linear-gradient(90deg, rgba(var(--pwa-warm-rgb), 0.082) 0 4px, transparent 4px),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.050), rgba(255, 255, 255, 0.020)),
+    radial-gradient(circle at 10% 0%, rgba(var(--pwa-warm-rgb), 0.082), transparent 34%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.054), rgba(255, 255, 255, 0.020)),
     color-mix(in srgb, var(--pwa-panel-strong) 94%, transparent);
+}
+
+body.pwa-shell .suggest-item {
+  border-color: color-mix(in srgb, var(--pwa-line) 34%, transparent);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.032), rgba(255, 255, 255, 0.012)),
+    color-mix(in srgb, var(--pwa-panel) 34%, transparent);
 }
 
 body.pwa-shell .suggest-item.active,
 body.pwa-shell .suggest-item:hover {
-  border-color: color-mix(in srgb, var(--pwa-warm-2) 26%, transparent);
+  border-color: color-mix(in srgb, var(--pwa-warm-2) 32%, transparent);
   background:
-    linear-gradient(90deg, rgba(var(--pwa-warm-rgb), 0.10), rgba(var(--pwa-accent-rgb), 0.045)),
-    rgba(255, 255, 255, 0.036);
+    linear-gradient(90deg, rgba(var(--pwa-warm-rgb), 0.13), rgba(var(--pwa-accent-rgb), 0.060)),
+    rgba(255, 255, 255, 0.044);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.054),
+    0 8px 18px rgba(var(--pwa-shadow-rgb), 0.22);
 }
 
 body.pwa-shell .highlight-match {
-  background: rgba(var(--pwa-warm-rgb), 0.18);
+  background:
+    linear-gradient(180deg, rgba(var(--pwa-warm-rgb), 0.24), rgba(var(--pwa-warm-rgb), 0.14)),
+    rgba(var(--pwa-warm-rgb), 0.12);
   color: var(--pwa-accent-readable);
 }
 
