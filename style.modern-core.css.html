@@ -1471,7 +1471,9 @@ button.quick-browse-chip:focus-visible {
 }
 
 .book-details {
-  border-top-color: var(--lib-line);
+  margin-top: 0.64rem;
+  padding-top: 0.64rem;
+  border-top: 1px solid rgba(148, 163, 184, 0.14);
 }
 
 .book-details div {
@@ -1606,13 +1608,50 @@ button.genre-chip.status:focus-visible {
 }
 
 .book-card.list {
+  isolation: isolate;
   padding: 0.62rem 0.72rem;
+  border-color: rgba(148, 163, 184, 0.12);
   border-radius: var(--lib-radius-sm);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.044), rgba(255, 255, 255, 0.020)),
+    rgba(10, 15, 22, 0.54);
+}
+
+.book-card.list::after {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: linear-gradient(180deg, rgba(104, 191, 215, 0.42), rgba(214, 164, 95, 0.30));
+  opacity: 0.24;
+  pointer-events: none;
+  transition: opacity var(--lib-ease);
+}
+
+.book-card.list:hover,
+.book-card.list.open {
+  border-color: rgba(214, 164, 95, 0.26);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.058), rgba(255, 255, 255, 0.026)),
+    rgba(12, 18, 25, 0.64);
+}
+
+.book-card.list:hover::after,
+.book-card.list.open::after {
+  opacity: 0.70;
+}
+
+.book-card.list.open {
+  box-shadow:
+    0 16px 36px rgba(0, 0, 0, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.052);
 }
 
 .list-row {
+  position: relative;
   align-items: center;
   gap: 0.78rem;
+  min-height: 78px;
 }
 
 .list-title-row {
@@ -1635,15 +1674,23 @@ button.genre-chip.status:focus-visible {
 
 .list-title-author {
   margin-left: auto;
-  padding: 0.16rem 0.48rem;
-  border: 1px solid rgba(148, 163, 184, 0.12);
+  max-width: 15em;
+  padding: 0.18rem 0.54rem;
+  border: 1px solid rgba(148, 163, 184, 0.15);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.028);
-  color: rgba(220, 232, 238, 0.62);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.050), rgba(255, 255, 255, 0.018)),
+    rgba(255, 255, 255, 0.026);
+  color: rgba(220, 232, 238, 0.68);
   line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.038);
 }
 
 .accordion-toggle {
+  position: relative;
   min-width: 36px;
   min-height: 36px;
   border: 1px solid rgba(214, 164, 95, 0.16) !important;
@@ -1651,8 +1698,11 @@ button.genre-chip.status:focus-visible {
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.050), rgba(255, 255, 255, 0.016)),
     rgba(8, 13, 19, 0.26) !important;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.045) !important;
-  transition: border-color var(--lib-ease), background var(--lib-ease), color var(--lib-ease);
+  color: rgba(240, 195, 122, 0.70);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.045),
+    0 8px 18px rgba(0, 0, 0, 0.14) !important;
+  transition: transform var(--lib-ease), border-color var(--lib-ease), background var(--lib-ease), color var(--lib-ease), box-shadow var(--lib-ease);
 }
 
 .accordion-toggle:hover,
@@ -1661,6 +1711,18 @@ button.genre-chip.status:focus-visible {
   background:
     linear-gradient(180deg, rgba(214, 164, 95, 0.12), rgba(255, 255, 255, 0.018)),
     rgba(8, 13, 19, 0.30) !important;
+  color: rgba(255, 231, 190, 0.94);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.060),
+    0 10px 22px rgba(0, 0, 0, 0.18) !important;
+}
+
+.accordion-toggle[aria-expanded="true"] {
+  border-color: rgba(104, 191, 215, 0.34) !important;
+  background:
+    linear-gradient(180deg, rgba(104, 191, 215, 0.14), rgba(214, 164, 95, 0.050)),
+    rgba(8, 13, 19, 0.34) !important;
+  color: #d6f6ff;
 }
 
 .accordion-toggle .arrow {
@@ -1670,7 +1732,8 @@ button.genre-chip.status:focus-visible {
   border: 0;
   padding: 0;
   transform: rotate(0deg);
-  color: var(--lib-muted);
+  color: currentColor;
+  transition: transform var(--lib-ease);
 }
 
 .accordion-toggle[aria-expanded="true"] .arrow {

@@ -1051,14 +1051,59 @@ body.pwa-shell .book-card:hover {
     color-mix(in srgb, var(--pwa-panel-strong) 76%, transparent);
 }
 
+body.pwa-shell .book-card.list {
+  border-color: color-mix(in srgb, var(--pwa-line) 56%, transparent);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.044), rgba(255, 255, 255, 0.020)),
+    color-mix(in srgb, var(--pwa-panel) 76%, transparent);
+}
+
+body.pwa-shell .book-card.list::after {
+  background: linear-gradient(180deg, rgba(var(--pwa-accent-rgb), 0.44), rgba(var(--pwa-warm-rgb), 0.32));
+}
+
+body.pwa-shell .book-card.list:hover,
+body.pwa-shell .book-card.list.open {
+  border-color: color-mix(in srgb, var(--pwa-warm-2) 32%, var(--pwa-line));
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.058), rgba(255, 255, 255, 0.026)),
+    color-mix(in srgb, var(--pwa-panel-strong) 78%, transparent);
+}
+
+body.pwa-shell .book-card.list.open {
+  box-shadow:
+    0 16px 36px rgba(0, 0, 0, 0.24),
+    inset 0 1px 0 rgba(255, 255, 255, 0.052);
+}
+
 body.pwa-shell .book-cover,
 body.pwa-shell .list-thumb {
   border-color: rgba(255, 255, 255, 0.075);
 }
 
 body.pwa-shell .list-title-author {
-  border-color: color-mix(in srgb, var(--pwa-line) 42%, transparent);
-  background: rgba(255, 255, 255, 0.028);
+  border-color: color-mix(in srgb, var(--pwa-line) 52%, transparent);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.050), rgba(255, 255, 255, 0.018)),
+    rgba(255, 255, 255, 0.026);
+}
+
+body.pwa-shell .accordion-toggle {
+  border-color: color-mix(in srgb, var(--pwa-warm-2) 24%, transparent) !important;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.050), rgba(255, 255, 255, 0.016)),
+    color-mix(in srgb, var(--pwa-panel-strong) 62%, transparent) !important;
+  color: color-mix(in srgb, var(--pwa-warm-2) 78%, white);
+}
+
+body.pwa-shell .accordion-toggle:hover,
+body.pwa-shell .accordion-toggle:focus-visible,
+body.pwa-shell .accordion-toggle[aria-expanded="true"] {
+  border-color: color-mix(in srgb, var(--pwa-accent) 34%, var(--pwa-warm-2)) !important;
+  background:
+    linear-gradient(180deg, rgba(var(--pwa-accent-rgb), 0.13), rgba(var(--pwa-warm-rgb), 0.050)),
+    color-mix(in srgb, var(--pwa-panel-strong) 72%, transparent) !important;
+  color: var(--pwa-accent-readable);
 }
 
 body.pwa-shell .shelf-view-overview,
