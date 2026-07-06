@@ -107,17 +107,7 @@ body::before {
 }
 
 .search-container.centered::before {
-  content: "";
-  position: absolute;
-  inset: clamp(1.2rem, 3vw, 2.5rem) clamp(1rem, 4vw, 4rem);
-  z-index: -1;
-  border: 1px solid rgba(214, 164, 95, 0.10);
-  border-radius: calc(var(--lib-radius-lg) + 10px);
-  background:
-    repeating-linear-gradient(90deg, rgba(214, 164, 95, 0.070) 0 1px, transparent 1px 42px),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.026), transparent 48%);
-  opacity: 0.64;
-  pointer-events: none;
+  content: none;
 }
 
 .search-container.centered::after {
@@ -288,9 +278,7 @@ body::before {
   position: absolute;
   inset: 0;
   z-index: -1;
-  background:
-    linear-gradient(135deg, rgba(104, 191, 215, 0.10), transparent 36%),
-    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.024) 0 1px, transparent 1px 34px);
+  background: linear-gradient(135deg, rgba(104, 191, 215, 0.08), transparent 38%);
   pointer-events: none;
 }
 

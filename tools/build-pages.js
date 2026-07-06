@@ -955,10 +955,7 @@ body.pwa-shell .search-container.centered {
 }
 
 body.pwa-shell .search-container.centered::before {
-  border-color: color-mix(in srgb, var(--pwa-warm-2) 14%, transparent);
-  background:
-    repeating-linear-gradient(90deg, rgba(var(--pwa-warm-rgb), 0.070) 0 1px, transparent 1px 42px),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.026), transparent 48%);
+  content: none;
 }
 
 body.pwa-shell .search-container.centered #logoResetBtn.logo {
@@ -993,9 +990,7 @@ body.pwa-shell .search-container.centered .search-form::before {
   inset: 0;
   z-index: -1;
   border-radius: inherit;
-  background:
-    linear-gradient(135deg, rgba(var(--pwa-accent-2-rgb), 0.10), transparent 36%),
-    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.024) 0 1px, transparent 1px 34px);
+  background: linear-gradient(135deg, rgba(var(--pwa-accent-2-rgb), 0.08), transparent 38%);
   pointer-events: none;
 }
 

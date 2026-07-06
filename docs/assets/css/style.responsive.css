@@ -226,12 +226,7 @@
   }
 
   .search-container.centered::before {
-    inset: 0.78rem 0.58rem 0.72rem;
-    border-radius: var(--lib-radius-lg);
-    background:
-      repeating-linear-gradient(90deg, rgba(214, 164, 95, 0.060) 0 1px, transparent 1px 34px),
-      linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent 58%);
-    opacity: 0.50;
+    content: none;
   }
 
   .search-container.centered::after {
@@ -280,7 +275,7 @@
     position: absolute;
     inset: 0;
     z-index: -1;
-    background: repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.022) 0 1px, transparent 1px 30px);
+    background: linear-gradient(135deg, rgba(104, 191, 215, 0.060), transparent 40%);
     pointer-events: none;
   }
 
