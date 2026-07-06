@@ -875,7 +875,8 @@ body.pwa-shell .popup-link-btn:focus-visible {
 
 body.pwa-shell .popup-detail-loading,
 body.pwa-shell .series-list,
-body.pwa-shell .series-empty {
+body.pwa-shell .series-empty,
+body.pwa-shell .suggest-box {
   border-color: color-mix(in srgb, var(--pwa-line) 54%, transparent);
   background:
     linear-gradient(90deg, rgba(var(--pwa-warm-rgb), 0.078) 0 4px, transparent 4px),
@@ -916,6 +917,26 @@ body.pwa-shell .series-list-item:focus-visible {
   background:
     linear-gradient(90deg, rgba(var(--pwa-warm-rgb), 0.072), rgba(var(--pwa-accent-rgb), 0.038)),
     rgba(255, 255, 255, 0.032);
+}
+
+body.pwa-shell .suggest-box {
+  background:
+    linear-gradient(90deg, rgba(var(--pwa-warm-rgb), 0.082) 0 4px, transparent 4px),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.050), rgba(255, 255, 255, 0.020)),
+    color-mix(in srgb, var(--pwa-panel-strong) 94%, transparent);
+}
+
+body.pwa-shell .suggest-item.active,
+body.pwa-shell .suggest-item:hover {
+  border-color: color-mix(in srgb, var(--pwa-warm-2) 26%, transparent);
+  background:
+    linear-gradient(90deg, rgba(var(--pwa-warm-rgb), 0.10), rgba(var(--pwa-accent-rgb), 0.045)),
+    rgba(255, 255, 255, 0.036);
+}
+
+body.pwa-shell .highlight-match {
+  background: rgba(var(--pwa-warm-rgb), 0.18);
+  color: var(--pwa-accent-readable);
 }
 
 body.pwa-shell .search-container {
@@ -1148,6 +1169,22 @@ body.pwa-shell .sensitive-toggle-input:checked + .sensitive-toggle-switch,
 body.pwa-shell .sensitive-toggle:has(.sensitive-toggle-input:checked) .sensitive-toggle-switch {
   background: rgba(var(--pwa-accent-rgb), 0.22);
   border-color: var(--pwa-line-strong);
+}
+
+body.pwa-shell .sensitive-toggle,
+body.pwa-shell .view-toggle {
+  border-color: color-mix(in srgb, var(--pwa-line) 56%, transparent);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.050), rgba(255, 255, 255, 0.020)),
+    color-mix(in srgb, var(--pwa-panel-strong) 72%, transparent);
+}
+
+body.pwa-shell .toggle-btn.active {
+  border-color: color-mix(in srgb, var(--pwa-warm-2) 34%, transparent);
+  background:
+    linear-gradient(180deg, rgba(var(--pwa-warm-rgb), 0.13), rgba(var(--pwa-accent-rgb), 0.055)),
+    rgba(255, 255, 255, 0.030);
+  color: var(--pwa-accent-readable);
 }
 
 body.pwa-quiet-motion .result-fade.show {

@@ -129,14 +129,25 @@ body::before {
   align-items: center;
   gap: 0.55rem;
   padding: 0.42rem 0.5rem 0.42rem 0.72rem;
-  border: 1px solid rgba(148, 163, 184, 0.20);
+  border: 1px solid rgba(148, 163, 184, 0.16);
   border-radius: 999px;
-  background: rgba(15, 19, 27, 0.56);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.050), rgba(255, 255, 255, 0.020)),
+    rgba(15, 19, 27, 0.62);
   color: rgba(220, 232, 238, 0.78);
-  box-shadow: none;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.045);
   backdrop-filter: blur(12px);
   cursor: pointer;
   user-select: none;
+  transition: border-color var(--lib-ease), background var(--lib-ease), color var(--lib-ease);
+}
+
+.sensitive-toggle:hover {
+  border-color: rgba(240, 195, 122, 0.26);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.060), rgba(255, 255, 255, 0.026)),
+    rgba(15, 19, 27, 0.72);
+  color: rgba(246, 241, 229, 0.88);
 }
 
 .sensitive-toggle-label {
@@ -164,8 +175,8 @@ body::before {
   height: 1.22rem;
   flex: 0 0 auto;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.09);
-  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(255, 255, 255, 0.070);
+  border: 1px solid rgba(148, 163, 184, 0.16);
   transition: background var(--lib-ease), border-color var(--lib-ease);
 }
 
@@ -944,10 +955,14 @@ button.quick-browse-chip:focus-visible {
   right: 24px;
   gap: 0;
   padding: 0.25rem;
-  border: 1px solid var(--lib-line);
+  border: 1px solid rgba(148, 163, 184, 0.14);
   border-radius: 999px;
-  background: rgba(15, 19, 27, 0.78);
-  box-shadow: var(--lib-shadow-sm);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.050), rgba(255, 255, 255, 0.020)),
+    rgba(11, 17, 24, 0.76);
+  box-shadow:
+    0 12px 30px rgba(0, 0, 0, 0.26),
+    inset 0 1px 0 rgba(255, 255, 255, 0.045);
   backdrop-filter: blur(14px);
 }
 
@@ -988,9 +1003,11 @@ button.quick-browse-chip:focus-visible {
 }
 
 .toggle-btn.active {
-  border-color: rgba(104, 191, 215, 0.38);
-  background: rgba(104, 191, 215, 0.18);
-  color: #e7fbff;
+  border-color: rgba(240, 195, 122, 0.30);
+  background:
+    linear-gradient(180deg, rgba(240, 195, 122, 0.14), rgba(104, 191, 215, 0.055)),
+    rgba(255, 255, 255, 0.030);
+  color: #fff1d8;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
@@ -1001,7 +1018,8 @@ button.quick-browse-chip:focus-visible {
 
 .toggle-btn:hover,
 .toggle-btn:focus-visible {
-  background: rgba(255, 255, 255, 0.065);
+  border-color: rgba(148, 163, 184, 0.18);
+  background: rgba(255, 255, 255, 0.060);
   color: var(--lib-text);
   outline: none;
 }

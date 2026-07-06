@@ -669,24 +669,62 @@ button.popup-arrow:focus-visible {
 }
 
 .suggest-box {
-  border: 1px solid var(--lib-line-strong);
-  border-top: 0;
-  border-radius: 0 0 var(--lib-radius-sm) var(--lib-radius-sm);
-  background: rgba(24, 30, 40, 0.98);
-  box-shadow: var(--lib-shadow-sm);
+  max-height: min(44vh, 360px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0.32rem;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-top: 1px solid rgba(240, 195, 122, 0.18);
+  border-radius: 0 0 14px 14px;
+  background:
+    linear-gradient(90deg, rgba(240, 195, 122, 0.080) 0 4px, transparent 4px),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.052), rgba(255, 255, 255, 0.020)),
+    rgba(13, 18, 26, 0.98);
+  box-shadow:
+    0 18px 44px rgba(0, 0, 0, 0.30),
+    inset 0 1px 0 rgba(255, 255, 255, 0.050);
+  backdrop-filter: blur(14px);
 }
 
 .suggest-item {
-  color: var(--lib-text);
+  min-height: 2.4rem;
+  padding: 0.55rem 0.68rem;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  color: rgba(236, 244, 248, 0.88);
+  font-size: 0.9rem;
+  line-height: 1.45;
+  transition: border-color var(--lib-ease), background var(--lib-ease), color var(--lib-ease);
 }
 
 .suggest-item.active,
 .suggest-item:hover {
-  background: rgba(104, 191, 215, 0.18);
+  border-color: rgba(240, 195, 122, 0.20);
+  background:
+    linear-gradient(90deg, rgba(240, 195, 122, 0.10), rgba(104, 191, 215, 0.045)),
+    rgba(255, 255, 255, 0.040);
   color: #ffffff;
 }
 
 .highlight-match {
-  background: rgba(214, 164, 95, 0.26);
-  color: #ffe6bd;
+  padding: 0 0.14em;
+  border-radius: 4px;
+  background: rgba(240, 195, 122, 0.18);
+  color: #fff0d1;
+  font-weight: 840;
+}
+
+.suggest-box::-webkit-scrollbar {
+  width: 10px;
+}
+
+.suggest-box::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.035);
+  border-radius: 999px;
+}
+
+.suggest-box::-webkit-scrollbar-thumb {
+  background: rgba(240, 195, 122, 0.28);
+  border: 3px solid rgba(13, 18, 26, 0.98);
+  border-radius: 999px;
 }
