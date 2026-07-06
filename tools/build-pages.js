@@ -1268,6 +1268,40 @@ body.pwa-shell .popup-detail-skeleton-chip-row span::after {
   background: linear-gradient(90deg, transparent, rgba(var(--pwa-accent-rgb), 0.16), transparent);
 }
 
+body.pwa-shell #image-popup-info .genre-chip-wrap.popup {
+  border-color: color-mix(in srgb, var(--pwa-line) 48%, transparent);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.038), rgba(255, 255, 255, 0.014)),
+    color-mix(in srgb, var(--pwa-panel) 44%, transparent);
+}
+
+body.pwa-shell .popup-book-primary-meta:has(.book-meta-pills),
+body.pwa-shell .popup-book-primary-meta:has(.book-note) {
+  border-color: color-mix(in srgb, var(--pwa-warm-2) 22%, transparent);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.040), rgba(255, 255, 255, 0.014)),
+    color-mix(in srgb, var(--pwa-panel) 48%, transparent);
+}
+
+body.pwa-shell #image-popup-info .book-meta-pill {
+  border-color: color-mix(in srgb, var(--pwa-warm-2) 24%, transparent);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.044), rgba(255, 255, 255, 0.016)),
+    rgba(var(--pwa-warm-rgb), 0.050);
+}
+
+body.pwa-shell #image-popup-info .book-note {
+  border-color: color-mix(in srgb, var(--pwa-line) 44%, transparent);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.014)),
+    rgba(var(--pwa-accent-rgb), 0.045);
+}
+
+body.pwa-shell .popup-position {
+  border-color: color-mix(in srgb, var(--pwa-line) 34%, transparent);
+  background: rgba(255, 255, 255, 0.026);
+}
+
 body.pwa-shell .series-list-item:hover,
 body.pwa-shell .series-list-item:focus-visible {
   border-color: color-mix(in srgb, var(--pwa-warm-2) 26%, transparent);

@@ -255,6 +255,8 @@ body.shelf-popup-open #image-popup-overlay {
 }
 
 .popup-book-detail {
+  display: grid;
+  gap: 0.72rem;
   min-width: 0;
   width: 100%;
   max-width: 100%;
@@ -262,6 +264,19 @@ body.shelf-popup-open #image-popup-overlay {
 
 .popup-book-detail .genre-chip-wrap.popup {
   justify-content: flex-start;
+  gap: 0.38rem;
+  margin: 0;
+  padding: 0.64rem 0.68rem;
+  border: 1px solid rgba(104, 191, 215, 0.13);
+  border-radius: 13px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.038), rgba(255, 255, 255, 0.014)),
+    rgba(8, 13, 19, 0.20);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.034);
+}
+
+.popup-book-detail .genre-chip-wrap.popup:empty {
+  display: none;
 }
 
 .popup-summary-text {
@@ -304,23 +319,43 @@ body.shelf-popup-open #image-popup-overlay {
 }
 
 #image-popup-info .book-meta-pills {
-  margin-top: 0.75rem;
+  gap: 0.42rem;
+  margin-top: 0;
 }
 
 #image-popup-info .book-meta-pill {
-  border-color: rgba(255, 255, 255, 0.078);
-  background: rgba(255, 255, 255, 0.038);
+  min-height: 1.95rem;
+  padding: 0.26rem 0.58rem;
+  border-color: rgba(240, 195, 122, 0.16);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.044), rgba(255, 255, 255, 0.016)),
+    rgba(214, 164, 95, 0.050);
+}
+
+#image-popup-info .book-meta-pill-label {
+  color: rgba(240, 195, 122, 0.90);
+}
+
+#image-popup-info .book-meta-pill-value {
+  color: rgba(235, 244, 247, 0.88);
 }
 
 #image-popup-info .book-note {
-  margin-top: 0.75rem;
-  color: #dbe7ed;
-  border-color: rgba(255, 255, 255, 0.080);
-  background: rgba(255, 255, 255, 0.028);
+  margin-top: 0.62rem;
+  color: rgba(229, 240, 244, 0.86);
+  border-color: rgba(104, 191, 215, 0.13);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.014)),
+    rgba(104, 191, 215, 0.045);
 }
 
 .popup-position {
-  margin-top: 0.72rem;
+  justify-self: flex-end;
+  margin-top: 0;
+  padding: 0.18rem 0.52rem;
+  border: 1px solid rgba(246, 241, 229, 0.10);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.026);
   color: var(--lib-subtle);
   font-size: 0.82rem;
   text-align: right;
@@ -657,7 +692,17 @@ button.popup-arrow:active {
 
 .popup-book-primary-meta {
   min-width: 0;
-  padding-top: 0.7rem;
+}
+
+.popup-book-primary-meta:has(.book-meta-pills),
+.popup-book-primary-meta:has(.book-note) {
+  padding: 0.68rem 0.72rem;
+  border: 1px solid rgba(240, 195, 122, 0.13);
+  border-radius: 13px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.040), rgba(255, 255, 255, 0.014)),
+    rgba(8, 13, 19, 0.22);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.034);
 }
 
 #image-popup-info .summary-chip-toggle {
