@@ -776,9 +776,38 @@ body.pwa-shell .spinner-panel,
 body.pwa-shell .empty-result {
   border-color: color-mix(in srgb, var(--pwa-line) 66%, transparent);
   background:
-    linear-gradient(90deg, rgba(var(--pwa-warm-rgb), 0.11) 0 5px, transparent 5px),
-    linear-gradient(145deg, rgba(var(--pwa-accent-rgb), 0.080), rgba(var(--pwa-warm-rgb), 0.046) 46%, rgba(255, 255, 255, 0.026)),
+    radial-gradient(circle at 50% 0%, rgba(var(--pwa-warm-rgb), 0.10), transparent 35%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.052), rgba(255, 255, 255, 0.018)),
     color-mix(in srgb, var(--pwa-panel-strong) 82%, transparent);
+}
+
+body.pwa-shell .empty-result::before {
+  border-color: color-mix(in srgb, var(--pwa-warm-2) 32%, transparent);
+  background:
+    radial-gradient(circle at 50% 50%, rgba(var(--pwa-warm-rgb), 0.22) 0 3px, transparent 4px),
+    linear-gradient(135deg, transparent 0 55%, rgba(var(--pwa-accent-rgb), 0.22) 55% 61%, transparent 61%),
+    rgba(255, 255, 255, 0.034);
+  box-shadow:
+    0 0 0 6px rgba(var(--pwa-warm-rgb), 0.035),
+    inset 0 1px 0 rgba(255, 255, 255, 0.050);
+}
+
+body.pwa-shell .empty-result-action {
+  border-color: color-mix(in srgb, var(--pwa-line) 54%, transparent);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.058), rgba(255, 255, 255, 0.022)),
+    color-mix(in srgb, var(--pwa-panel) 58%, transparent);
+}
+
+body.pwa-shell .empty-result-action .ui-icon {
+  color: color-mix(in srgb, var(--pwa-warm-2) 84%, white);
+}
+
+body.pwa-shell .empty-result-random {
+  border-color: color-mix(in srgb, var(--pwa-warm-2) 42%, transparent) !important;
+  background:
+    linear-gradient(180deg, rgba(var(--pwa-warm-rgb), 0.17), rgba(var(--pwa-warm-rgb), 0.068)),
+    color-mix(in srgb, var(--pwa-panel) 58%, transparent) !important;
 }
 
 body.pwa-shell .spinner::before {
