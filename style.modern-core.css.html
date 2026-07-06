@@ -654,6 +654,9 @@ button.quick-browse-chip:active {
 
 .button-group,
 .advanced-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 0.62rem;
 }
 
@@ -666,11 +669,23 @@ button.quick-browse-chip:active {
   display: grid;
   grid-template-columns: minmax(0, 1.08fr) minmax(0, 0.92fr) auto;
   align-items: stretch;
+  padding: 0.34rem;
+  border: 1px solid rgba(148, 163, 184, 0.13);
+  border-radius: calc(var(--lib-radius-sm) + 5px);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.046), rgba(255, 255, 255, 0.018)),
+    rgba(3, 8, 13, 0.24);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.050),
+    0 12px 28px rgba(0, 0, 0, 0.14);
 }
 
 button,
 .popup-action-btn,
 .popup-link-btn {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -687,6 +702,20 @@ button,
   transition: transform var(--lib-ease), border-color var(--lib-ease), background var(--lib-ease), color var(--lib-ease), box-shadow var(--lib-ease);
 }
 
+button::before,
+.popup-action-btn::before,
+.popup-link-btn::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.075), transparent 54%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--lib-ease);
+}
+
 button:hover,
 .popup-action-btn:hover,
 .popup-link-btn:hover {
@@ -695,6 +724,18 @@ button:hover,
   background: rgba(255, 255, 255, 0.085);
   color: #ffffff;
   box-shadow: none;
+}
+
+button:hover::before,
+.popup-action-btn:hover::before,
+.popup-link-btn:hover::before {
+  opacity: 1;
+}
+
+button:active,
+.popup-action-btn:active,
+.popup-link-btn:active {
+  transform: translateY(0) scale(0.985);
 }
 
 button:focus-visible,
@@ -708,13 +749,20 @@ button.primary-action,
 .advanced-actions button.primary-action,
 .popup-action-btn.primary {
   border-color: rgba(104, 191, 215, 0.40);
-  background: linear-gradient(180deg, rgba(104, 191, 215, 0.94), rgba(76, 147, 176, 0.94));
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.18), transparent 46%),
+    linear-gradient(180deg, rgba(104, 191, 215, 0.94), rgba(76, 147, 176, 0.94));
   color: #071116;
-  box-shadow: 0 10px 24px rgba(104, 191, 215, 0.14);
+  box-shadow:
+    0 10px 24px rgba(104, 191, 215, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.28);
 }
 
 .search-container.centered .button-group button {
   min-height: 46px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.045),
+    0 8px 16px rgba(0, 0, 0, 0.10);
 }
 
 .search-container.centered .button-group button.primary-action {
@@ -728,28 +776,40 @@ button.primary-action,
 button.primary-action:hover,
 .popup-action-btn.primary:hover {
   border-color: rgba(146, 220, 236, 0.72);
-  background: linear-gradient(180deg, #88d3e6, #5aa7c6);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.22), transparent 48%),
+    linear-gradient(180deg, #88d3e6, #5aa7c6);
 }
 
 button.quiet-action,
 .clear-btn,
 .sub-btn {
-  background: rgba(255, 255, 255, 0.045);
-  border-color: var(--lib-line);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.050), rgba(255, 255, 255, 0.020)),
+    rgba(255, 255, 255, 0.036);
+  border-color: rgba(148, 163, 184, 0.18);
   color: var(--lib-muted);
 }
 
 button.quiet-action:hover,
 .clear-btn:hover,
 .sub-btn:hover {
-  background: rgba(255, 255, 255, 0.075);
+  border-color: rgba(148, 163, 184, 0.30);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.070), rgba(255, 255, 255, 0.026)),
+    rgba(255, 255, 255, 0.050);
   color: var(--lib-text);
 }
 
 #advancedToggleBtn.active {
   color: #071116;
   border-color: rgba(214, 164, 95, 0.58);
-  background: linear-gradient(180deg, var(--lib-amber-2), var(--lib-amber));
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.24), transparent 48%),
+    linear-gradient(180deg, var(--lib-amber-2), var(--lib-amber));
+  box-shadow:
+    0 10px 22px rgba(214, 164, 95, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.30);
 }
 
 .bookshelf-cta-wrap {
@@ -874,6 +934,7 @@ button.quick-browse-chip:focus-visible {
 
 .bookshelf-cta-card.top-shelf-btn {
   position: relative;
+  overflow: hidden;
   width: min(460px, 92vw);
   min-height: 72px;
   padding: 0.78rem 1rem;
@@ -883,7 +944,18 @@ button.quick-browse-chip:focus-visible {
     linear-gradient(135deg, rgba(214, 164, 95, 0.18), rgba(104, 191, 215, 0.08)),
     rgba(255, 255, 255, 0.042);
   color: #f6ead8;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 12px 26px rgba(0, 0, 0, 0.15);
+}
+
+.bookshelf-cta-card.top-shelf-btn::after {
+  content: "";
+  position: absolute;
+  inset: 1px;
+  border-radius: calc(var(--lib-radius-md) - 1px);
+  border: 1px solid rgba(255, 255, 255, 0.045);
+  pointer-events: none;
 }
 
 .search-container.centered .bookshelf-cta-card.top-shelf-btn {
@@ -998,6 +1070,11 @@ button.quick-browse-chip:focus-visible {
   margin-top: 0.95rem;
   padding-top: 0.95rem;
   border-top: 1px solid rgba(148, 163, 184, 0.11);
+  justify-content: flex-end;
+}
+
+.advanced-actions button {
+  min-height: 42px;
 }
 
 .view-toggle {
