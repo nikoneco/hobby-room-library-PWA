@@ -211,6 +211,38 @@
 
   .search-container.centered {
     top: 7vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: auto;
+    padding: 1rem 0.6rem 1.25rem;
+    text-align: center;
+  }
+
+  .search-container.centered::after {
+    inset: auto 0 0;
+  }
+
+  .search-container.centered .logo {
+    height: 104px;
+    margin-bottom: 1.15rem;
+    justify-self: auto;
+  }
+
+  .search-container.centered .search-form {
+    width: 100%;
+    max-width: 100%;
+    margin: 0 auto;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .search-container.centered .button-group,
+  .search-container.centered .advanced-actions {
+    justify-content: center;
   }
 
   .search-container {
