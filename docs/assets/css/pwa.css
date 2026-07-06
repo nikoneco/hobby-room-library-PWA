@@ -960,12 +960,28 @@ body.pwa-shell .suggest-box {
     rgba(255, 255, 255, 0.026);
 }
 
+body.pwa-shell .series-list-item {
+  border-color: color-mix(in srgb, var(--pwa-line) 48%, transparent);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.038), rgba(255, 255, 255, 0.014)),
+    color-mix(in srgb, var(--pwa-panel) 54%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.032);
+}
+
 body.pwa-shell .popup-detail-state,
 body.pwa-shell .series-panel-subtitle,
 body.pwa-shell .series-list-meta {
   border-color: color-mix(in srgb, var(--pwa-line) 48%, transparent);
   background: rgba(var(--pwa-accent-rgb), 0.055);
   color: var(--pwa-accent-readable);
+}
+
+body.pwa-shell .series-list-title::before {
+  border-color: color-mix(in srgb, var(--pwa-warm-2) 26%, transparent);
+  background:
+    linear-gradient(180deg, rgba(var(--pwa-warm-rgb), 0.13), rgba(var(--pwa-warm-rgb), 0.040)),
+    color-mix(in srgb, var(--pwa-panel-strong) 54%, transparent);
+  color: color-mix(in srgb, var(--pwa-warm-2) 88%, white);
 }
 
 body.pwa-shell .popup-detail-state::before {
@@ -994,6 +1010,9 @@ body.pwa-shell .series-list-item:focus-visible {
   background:
     linear-gradient(90deg, rgba(var(--pwa-warm-rgb), 0.072), rgba(var(--pwa-accent-rgb), 0.038)),
     rgba(255, 255, 255, 0.032);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.048),
+    0 10px 22px rgba(0, 0, 0, 0.18);
 }
 
 body.pwa-shell .suggest-box {
