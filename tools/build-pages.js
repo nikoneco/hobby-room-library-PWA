@@ -970,6 +970,55 @@ body.pwa-shell .list-title-author {
   background: rgba(255, 255, 255, 0.028);
 }
 
+body.pwa-shell .shelf-view-overview,
+body.pwa-shell .bookshelf-group,
+body.pwa-shell .shelf-room-map,
+body.pwa-shell .shelf-room-map-modal-panel {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.050), rgba(255, 255, 255, 0.024)),
+    color-mix(in srgb, var(--pwa-panel) 78%, transparent);
+  border-color: color-mix(in srgb, var(--pwa-line) 58%, transparent);
+}
+
+body.pwa-shell .bookshelf-group::before {
+  background: linear-gradient(90deg, rgba(var(--pwa-warm-rgb), 0.070), transparent 24%);
+}
+
+body.pwa-shell .bookshelf-group.is-active,
+body.pwa-shell .shelf-jump-chip.is-active,
+body.pwa-shell .room-map-shelf.is-active {
+  border-color: color-mix(in srgb, var(--pwa-warm-2) 42%, transparent);
+}
+
+body.pwa-shell .shelf-book {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.048), rgba(255, 255, 255, 0.022)),
+    color-mix(in srgb, var(--pwa-bg-bottom) 38%, transparent);
+  border-color: color-mix(in srgb, var(--pwa-line) 46%, transparent);
+}
+
+body.pwa-shell .shelf-book-cover-wrap,
+body.pwa-shell .shelf-room-map-canvas {
+  border-color: rgba(255, 255, 255, 0.064);
+}
+
+body.pwa-shell .shelf-room-map-canvas {
+  background:
+    radial-gradient(circle at 48% 38%, rgba(var(--pwa-warm-rgb), 0.060), transparent 33%),
+    linear-gradient(135deg, color-mix(in srgb, var(--pwa-panel-strong) 86%, transparent), color-mix(in srgb, var(--pwa-bg-bottom) 96%, transparent));
+}
+
+body.pwa-shell .room-map-fixture,
+body.pwa-shell .room-map-outline {
+  border-color: color-mix(in srgb, var(--pwa-line) 58%, transparent);
+}
+
+body.pwa-shell .room-map-shelf {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.046), rgba(255, 255, 255, 0.018)),
+    color-mix(in srgb, var(--pwa-panel-strong) 78%, transparent);
+}
+
 body.pwa-shell .search-container {
   box-shadow: 0 10px 34px rgba(var(--pwa-shadow-rgb), 0.30);
 }
@@ -1207,15 +1256,19 @@ body.pwa-shell .shelf-room-map-overlay {
 
 body.pwa-shell .room-map-shelf {
   border-color: color-mix(in srgb, var(--pwa-warm-2) 24%, transparent);
-  background: linear-gradient(135deg, rgba(var(--pwa-warm-rgb), 0.10), rgba(var(--pwa-accent-rgb), 0.045));
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.046), rgba(255, 255, 255, 0.018)),
+    color-mix(in srgb, var(--pwa-panel-strong) 78%, transparent);
 }
 
 body.pwa-shell .room-map-shelf:hover,
 body.pwa-shell .room-map-shelf:focus-visible,
 body.pwa-shell .shelf-book:hover,
 body.pwa-shell .shelf-book:focus-visible {
-  border-color: var(--pwa-line-strong);
-  box-shadow: 0 12px 28px rgba(var(--pwa-accent-rgb), 0.08), 0 12px 28px rgba(0, 0, 0, 0.24);
+  border-color: color-mix(in srgb, var(--pwa-warm-2) 38%, var(--pwa-line-strong));
+  box-shadow:
+    0 14px 30px rgba(0, 0, 0, 0.26),
+    0 0 0 1px rgba(var(--pwa-warm-rgb), 0.070) inset;
 }
 
 body.pwa-shell .pwa-theme-settings label:has(input:checked) {
