@@ -369,19 +369,73 @@ button.popup-arrow:focus-visible {
 
 .popup-action-btn,
 .popup-link-btn {
+  display: inline-flex;
+  position: relative;
+  isolation: isolate;
   min-height: 34px;
+  align-items: center;
+  justify-content: center;
+  gap: 0.42rem;
   margin: 0;
-  padding: 0.46rem 0.72rem;
+  padding: 0.48rem 0.78rem;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.096);
+  border-radius: 999px;
   text-decoration: none;
   font-size: 0.82rem;
-  border-color: rgba(255, 255, 255, 0.084);
-  background: rgba(255, 255, 255, 0.044);
+  font-weight: 790;
+  line-height: 1.25;
+  color: rgba(226, 239, 245, 0.86);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.056), rgba(255, 255, 255, 0.018)),
+    rgba(8, 13, 19, 0.28);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.050);
+  cursor: pointer;
+  transition: border-color var(--lib-ease), background var(--lib-ease), color var(--lib-ease), transform var(--lib-ease);
+}
+
+.popup-action-btn.primary {
+  border-color: rgba(240, 195, 122, 0.34);
+  color: #fff1d8;
+  background:
+    linear-gradient(180deg, rgba(214, 164, 95, 0.20), rgba(214, 164, 95, 0.070)),
+    rgba(8, 13, 19, 0.30);
+}
+
+.popup-action-btn .ui-icon,
+.popup-link-btn .ui-icon {
+  color: rgba(240, 195, 122, 0.92);
 }
 
 .popup-link-row {
   justify-content: flex-start;
   gap: 0.45rem;
   margin: 0;
+}
+
+.popup-action-btn:hover,
+.popup-link-btn:hover,
+.popup-action-btn:focus-visible,
+.popup-link-btn:focus-visible {
+  border-color: rgba(240, 195, 122, 0.36);
+  background:
+    linear-gradient(180deg, rgba(240, 195, 122, 0.13), rgba(104, 191, 215, 0.042)),
+    rgba(8, 13, 19, 0.32);
+  color: #ffffff;
+  outline: none;
+}
+
+.popup-action-btn.primary:hover,
+.popup-action-btn.primary:focus-visible {
+  border-color: rgba(240, 195, 122, 0.48);
+  background:
+    linear-gradient(180deg, rgba(214, 164, 95, 0.26), rgba(214, 164, 95, 0.090)),
+    rgba(8, 13, 19, 0.34);
+}
+
+.popup-action-btn:active,
+.popup-link-btn:active {
+  transform: translateY(1px);
 }
 
 .popup-book-head {

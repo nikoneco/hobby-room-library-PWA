@@ -1,4 +1,4 @@
-const CACHE_NAME = "shumi-library-pwa-d4c55e16fd0d";
+const CACHE_NAME = "shumi-library-pwa-8cff9b3b39ff";
 const APP_SHELL = [
   "./",
   "./index.html",
