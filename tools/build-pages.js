@@ -1276,10 +1276,12 @@ body.pwa-shell .search-container.centered .input-group input {
 }
 
 body.pwa-shell .search-status-area {
-  border-color: color-mix(in srgb, var(--pwa-line) 72%, transparent);
+  border-color: color-mix(in srgb, var(--pwa-line) 68%, transparent);
   background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.050), rgba(255, 255, 255, 0.020)),
     linear-gradient(90deg, rgba(var(--pwa-warm-rgb), 0.10), rgba(var(--pwa-accent-rgb), 0.055)),
-    color-mix(in srgb, var(--pwa-panel-strong) 70%, transparent);
+    color-mix(in srgb, var(--pwa-panel-strong) 74%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.052);
 }
 
 body.pwa-shell .search-status-area::before {
@@ -1290,15 +1292,18 @@ body.pwa-shell .quick-browse-rail,
 body.pwa-shell .advanced-search-area {
   border-color: color-mix(in srgb, var(--pwa-line) 66%, transparent);
   background:
-    linear-gradient(90deg, rgba(var(--pwa-warm-rgb), 0.11) 0 5px, transparent 5px),
+    linear-gradient(90deg, rgba(var(--pwa-warm-rgb), 0.10) 0 5px, transparent 5px),
     linear-gradient(145deg, rgba(var(--pwa-accent-rgb), 0.070), rgba(var(--pwa-warm-rgb), 0.042) 44%, rgba(255, 255, 255, 0.026)),
     color-mix(in srgb, var(--pwa-panel-strong) 82%, transparent);
 }
 
 body.pwa-shell .quick-browse-rail {
+  border-color: color-mix(in srgb, var(--pwa-line) 58%, transparent);
   background:
-    linear-gradient(90deg, rgba(var(--pwa-accent-rgb), 0.055), rgba(var(--pwa-warm-rgb), 0.035)),
-    color-mix(in srgb, var(--pwa-panel) 52%, transparent);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.048), rgba(255, 255, 255, 0.018)),
+    linear-gradient(90deg, rgba(var(--pwa-accent-rgb), 0.060), rgba(var(--pwa-warm-rgb), 0.040)),
+    color-mix(in srgb, var(--pwa-panel) 56%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.046);
 }
 
 body.pwa-shell .advanced-grid .input-group,
