@@ -1308,14 +1308,43 @@ body.pwa-shell .quick-browse-rail {
 
 body.pwa-shell .advanced-grid .input-group,
 body.pwa-shell .released-range-row {
-  border-color: color-mix(in srgb, var(--pwa-line) 44%, transparent);
-  background: rgba(255, 255, 255, 0.028);
+  border-color: color-mix(in srgb, var(--pwa-line) 52%, transparent);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.046), rgba(255, 255, 255, 0.018)),
+    rgba(255, 255, 255, 0.026);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.044);
+}
+
+body.pwa-shell .advanced-grid .input-group:focus-within,
+body.pwa-shell .released-range-row:focus-within {
+  border-color: color-mix(in srgb, var(--pwa-accent) 42%, var(--pwa-line));
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.060), rgba(255, 255, 255, 0.024)),
+    rgba(255, 255, 255, 0.034);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.054),
+    0 12px 26px rgba(0, 0, 0, 0.18);
+}
+
+body.pwa-shell .advanced-grid .input-group:focus-within label,
+body.pwa-shell .released-range-row:focus-within > label {
+  color: color-mix(in srgb, var(--pwa-warm-2) 88%, white);
 }
 
 body.pwa-shell .advanced-grid .input-group input,
 body.pwa-shell .advanced-grid .input-group select,
 body.pwa-shell .released-range-controls select {
-  background: rgba(4, 9, 13, 0.32);
+  border-color: color-mix(in srgb, var(--pwa-line) 66%, transparent);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.034), rgba(255, 255, 255, 0.012)),
+    rgba(4, 9, 13, 0.36);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.036);
+}
+
+body.pwa-shell .released-range-controls select:disabled {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.018), rgba(255, 255, 255, 0.006)),
+    rgba(4, 9, 13, 0.24);
 }
 
 body.pwa-shell input,
