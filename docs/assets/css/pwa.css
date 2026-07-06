@@ -1216,22 +1216,30 @@ body.pwa-shell .bookshelf-group-title::before {
 
 body.pwa-shell .sensitive-toggle-input:checked + .sensitive-toggle-switch,
 body.pwa-shell .sensitive-toggle:has(.sensitive-toggle-input:checked) .sensitive-toggle-switch {
-  background: rgba(var(--pwa-accent-rgb), 0.22);
+  background:
+    linear-gradient(180deg, rgba(var(--pwa-accent-2-rgb), 0.30), rgba(var(--pwa-accent-rgb), 0.16)),
+    rgba(var(--pwa-accent-rgb), 0.18);
   border-color: var(--pwa-line-strong);
+  box-shadow:
+    inset 0 1px 4px rgba(0, 0, 0, 0.18),
+    0 0 0 1px rgba(var(--pwa-accent-rgb), 0.060);
 }
 
 body.pwa-shell .sensitive-toggle,
 body.pwa-shell .view-toggle {
-  border-color: color-mix(in srgb, var(--pwa-line) 56%, transparent);
+  border-color: color-mix(in srgb, var(--pwa-line) 58%, transparent);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.050), rgba(255, 255, 255, 0.020)),
-    color-mix(in srgb, var(--pwa-panel-strong) 72%, transparent);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.058), rgba(255, 255, 255, 0.022)),
+    color-mix(in srgb, var(--pwa-panel-strong) 76%, transparent);
+  box-shadow:
+    0 12px 28px rgba(0, 0, 0, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.054);
 }
 
 body.pwa-shell .toggle-btn.active {
   border-color: color-mix(in srgb, var(--pwa-warm-2) 34%, transparent);
   background:
-    linear-gradient(180deg, rgba(var(--pwa-warm-rgb), 0.13), rgba(var(--pwa-accent-rgb), 0.055)),
+    linear-gradient(180deg, rgba(var(--pwa-warm-rgb), 0.15), rgba(var(--pwa-accent-rgb), 0.060)),
     rgba(255, 255, 255, 0.030);
   color: var(--pwa-accent-readable);
 }
