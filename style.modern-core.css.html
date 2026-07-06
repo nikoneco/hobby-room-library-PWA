@@ -83,21 +83,42 @@ body::before {
 
 .search-container.centered {
   top: clamp(38px, 8vh, 72px);
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
   display: grid;
-  grid-template-columns: minmax(210px, 310px) minmax(420px, 640px);
+  grid-template-columns: minmax(230px, 340px) minmax(440px, 690px);
   grid-template-areas:
     "logo status"
     "logo form";
   align-items: center;
   justify-content: center;
-  column-gap: clamp(2rem, 6vw, 5.5rem);
-  row-gap: 0.8rem;
-  min-height: min(560px, calc(100dvh - 112px));
+  column-gap: clamp(2.4rem, 7vw, 6.5rem);
+  row-gap: 1rem;
+  min-height: min(640px, calc(100dvh - 86px));
   padding:
-    clamp(2.8rem, 7vw, 5.4rem)
+    clamp(3.2rem, 7vw, 5.8rem)
     clamp(1rem, 5vw, 4.5rem)
-    clamp(2.2rem, 5vw, 4.2rem);
+    clamp(2.8rem, 5vw, 4.8rem);
+  border-bottom-color: rgba(214, 164, 95, 0.18);
+  background:
+    linear-gradient(90deg, rgba(214, 164, 95, 0.075), transparent 30%, rgba(104, 191, 215, 0.040)),
+    linear-gradient(180deg, rgba(6, 10, 14, 0.22), rgba(15, 19, 27, 0.68));
   text-align: left;
+}
+
+.search-container.centered::before {
+  content: "";
+  position: absolute;
+  inset: clamp(1.2rem, 3vw, 2.5rem) clamp(1rem, 4vw, 4rem);
+  z-index: -1;
+  border: 1px solid rgba(214, 164, 95, 0.10);
+  border-radius: calc(var(--lib-radius-lg) + 10px);
+  background:
+    repeating-linear-gradient(90deg, rgba(214, 164, 95, 0.070) 0 1px, transparent 1px 42px),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.026), transparent 48%);
+  opacity: 0.64;
+  pointer-events: none;
 }
 
 .search-container.centered::after {
@@ -211,9 +232,20 @@ body::before {
 .search-container.centered .logo {
   grid-area: logo;
   justify-self: end;
-  height: clamp(164px, 22vw, 248px);
+  width: clamp(188px, 24vw, 286px);
+  height: clamp(188px, 24vw, 286px);
   margin: 0;
-  filter: drop-shadow(0 22px 42px rgba(0, 0, 0, 0.36));
+  padding: clamp(0.9rem, 2vw, 1.35rem);
+  border: 1px solid rgba(214, 164, 95, 0.22);
+  border-radius: calc(var(--lib-radius-lg) + 4px);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.052), rgba(255, 255, 255, 0.020)),
+    rgba(9, 13, 18, 0.42);
+  object-fit: contain;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.055),
+    0 24px 58px rgba(0, 0, 0, 0.38);
+  filter: saturate(0.96) contrast(1.04);
 }
 
 .search-container.shrink .logo {
@@ -233,18 +265,34 @@ body::before {
 
 .search-container.centered .search-form {
   grid-area: form;
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
   align-items: stretch;
-  width: min(640px, 100%);
+  width: min(690px, 100%);
   margin: 0;
-  padding: clamp(1rem, 2.2vw, 1.35rem);
-  border: 1px solid rgba(148, 163, 184, 0.14);
-  border-radius: var(--lib-radius-lg);
+  padding: clamp(1.08rem, 2.4vw, 1.55rem);
+  border: 1px solid rgba(214, 164, 95, 0.20);
+  border-radius: calc(var(--lib-radius-lg) + 2px);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.054), rgba(255, 255, 255, 0.032)),
-    rgba(12, 16, 23, 0.42);
+    linear-gradient(90deg, rgba(214, 164, 95, 0.090) 0 6px, transparent 6px),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.064), rgba(255, 255, 255, 0.026)),
+    rgba(10, 15, 21, 0.70);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.045),
-    0 18px 54px rgba(0, 0, 0, 0.22);
+    inset 0 1px 0 rgba(255, 255, 255, 0.060),
+    inset 7px 0 0 rgba(214, 164, 95, 0.12),
+    0 22px 62px rgba(0, 0, 0, 0.32);
+}
+
+.search-container.centered .search-form::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    linear-gradient(135deg, rgba(104, 191, 215, 0.10), transparent 36%),
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.024) 0 1px, transparent 1px 34px);
+  pointer-events: none;
 }
 
 .search-container.shrink .search-form,
@@ -464,6 +512,10 @@ body::before {
   max-width: none;
 }
 
+.search-container.centered .input-group label {
+  color: rgba(240, 195, 122, 0.84);
+}
+
 .input-group label,
 .released-range-row > label {
   margin-bottom: 0.38rem;
@@ -485,6 +537,16 @@ body::before {
   color-scheme: dark;
   font-size: 0.98rem;
   transition: border-color var(--lib-ease), background var(--lib-ease), box-shadow var(--lib-ease);
+}
+
+.search-container.centered .input-group input,
+.search-container.centered .input-group select {
+  min-height: 50px;
+  border-color: rgba(148, 163, 184, 0.18);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.052), rgba(255, 255, 255, 0.028)),
+    rgba(2, 6, 10, 0.28);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.045);
 }
 
 .input-group select option,
@@ -519,6 +581,12 @@ body::before {
 .search-container.centered .button-group,
 .search-container.centered .advanced-actions {
   justify-content: flex-start;
+}
+
+.search-container.centered .button-group {
+  display: grid;
+  grid-template-columns: minmax(0, 1.08fr) minmax(0, 0.92fr) auto;
+  align-items: stretch;
 }
 
 button,
@@ -564,6 +632,18 @@ button.primary-action,
   background: linear-gradient(180deg, rgba(104, 191, 215, 0.94), rgba(76, 147, 176, 0.94));
   color: #071116;
   box-shadow: 0 10px 24px rgba(104, 191, 215, 0.14);
+}
+
+.search-container.centered .button-group button {
+  min-height: 46px;
+}
+
+.search-container.centered .button-group button.primary-action {
+  border-color: rgba(104, 191, 215, 0.50);
+}
+
+.search-container.centered .button-group button.quiet-action {
+  border-color: rgba(214, 164, 95, 0.20);
 }
 
 button.primary-action:hover,
