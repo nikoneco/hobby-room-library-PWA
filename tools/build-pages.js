@@ -856,15 +856,20 @@ body.pwa-settings-open {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 10px;
-  border: 1px solid var(--pwa-line);
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--pwa-panel-strong) 88%, transparent);
+  padding: 11px;
+  border: 1px solid color-mix(in srgb, var(--pwa-line) 70%, transparent);
+  border-radius: 15px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.065), rgba(255, 255, 255, 0.022)),
+    color-mix(in srgb, var(--pwa-panel-strong) 94%, transparent);
   color: rgba(237, 245, 247, 0.92);
-  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.44);
+  box-shadow:
+    0 20px 58px rgba(0, 0, 0, 0.44),
+    inset 0 1px 0 rgba(255, 255, 255, 0.070);
   backdrop-filter: blur(16px);
   font-size: 12px;
   line-height: 1.35;
+  scrollbar-color: rgba(var(--pwa-warm-rgb), 0.44) rgba(255, 255, 255, 0.040);
 }
 
 .pwa-perf-hud[hidden] {
@@ -876,10 +881,13 @@ body.pwa-settings-open {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid color-mix(in srgb, var(--pwa-line) 52%, transparent);
 }
 
 .pwa-perf-hud-title {
   margin: 0;
+  color: rgba(237, 245, 247, 0.95);
   font-size: 0.78rem;
   font-weight: 900;
   letter-spacing: 0;
@@ -892,32 +900,51 @@ body.pwa-settings-open {
 
 .pwa-perf-hud-actions button {
   min-height: 28px;
-  padding: 4px 8px;
-  border: 1px solid color-mix(in srgb, var(--pwa-line) 76%, transparent);
+  padding: 4px 9px;
+  border: 1px solid color-mix(in srgb, var(--pwa-line) 68%, transparent);
   border-radius: 999px;
-  background: var(--pwa-panel-soft);
-  color: rgba(237, 245, 247, 0.84);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.070), rgba(255, 255, 255, 0.026)),
+    color-mix(in srgb, var(--pwa-panel-soft) 82%, transparent);
+  color: rgba(237, 245, 247, 0.86);
   font-size: 0.68rem;
   font-weight: 800;
+  cursor: pointer;
+  transition: border-color 160ms ease, background 160ms ease, color 160ms ease, transform 160ms ease;
+}
+
+.pwa-perf-hud-actions button:hover,
+.pwa-perf-hud-actions button:focus-visible {
+  border-color: color-mix(in srgb, var(--pwa-warm-2) 38%, var(--pwa-line));
+  background:
+    linear-gradient(180deg, rgba(var(--pwa-warm-rgb), 0.15), rgba(var(--pwa-accent-rgb), 0.050)),
+    color-mix(in srgb, var(--pwa-panel-strong) 88%, transparent);
+  color: var(--pwa-accent-readable);
+}
+
+.pwa-perf-hud-actions button:active {
+  transform: translateY(1px);
 }
 
 .pwa-perf-hud-summary {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px;
+  gap: 7px;
 }
 
 .pwa-perf-hud-stat {
   min-width: 0;
-  padding: 6px 7px;
-  border: 1px solid color-mix(in srgb, var(--pwa-line) 58%, transparent);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.045);
+  padding: 7px 8px;
+  border: 1px solid color-mix(in srgb, var(--pwa-line) 55%, transparent);
+  border-radius: 10px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.052), rgba(255, 255, 255, 0.022)),
+    rgba(255, 255, 255, 0.028);
 }
 
 .pwa-perf-hud-stat-label {
   display: block;
-  color: rgba(220, 232, 238, 0.56);
+  color: rgba(220, 232, 238, 0.60);
   font-size: 0.62rem;
   font-weight: 800;
 }
@@ -935,9 +962,9 @@ body.pwa-settings-open {
 
 .pwa-perf-hud-rows {
   display: grid;
-  gap: 5px;
+  gap: 6px;
   overflow: auto;
-  padding-right: 2px;
+  padding-right: 3px;
 }
 
 .pwa-perf-hud-row {
@@ -945,15 +972,20 @@ body.pwa-settings-open {
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 8px;
   align-items: center;
-  padding: 6px 7px;
-  border: 1px solid color-mix(in srgb, var(--pwa-line) 50%, transparent);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.035);
+  min-height: 31px;
+  padding: 6px 8px;
+  border: 1px solid color-mix(in srgb, var(--pwa-line) 48%, transparent);
+  border-radius: 10px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.044), rgba(255, 255, 255, 0.018)),
+    rgba(255, 255, 255, 0.022);
 }
 
 .pwa-perf-hud-row.is-slow {
-  border-color: rgba(236, 187, 107, 0.50);
-  background: rgba(236, 187, 107, 0.075);
+  border-color: rgba(236, 187, 107, 0.54);
+  background:
+    linear-gradient(180deg, rgba(236, 187, 107, 0.12), rgba(236, 187, 107, 0.048)),
+    rgba(255, 255, 255, 0.020);
 }
 
 .pwa-perf-hud-name {
@@ -973,7 +1005,7 @@ body.pwa-settings-open {
 
 .pwa-perf-hud-note {
   margin: 0;
-  color: rgba(220, 232, 238, 0.56);
+  color: rgba(220, 232, 238, 0.58);
   font-size: 0.66rem;
 }
 
@@ -1593,6 +1625,7 @@ body.pwa-update-visible .mobile-app-dock {
   font: inherit;
   font-weight: 800;
   cursor: pointer;
+  transition: border-color 160ms ease, background 160ms ease, color 160ms ease, transform 160ms ease;
 }
 
 .pwa-network-banner-action-muted {
@@ -1600,6 +1633,26 @@ body.pwa-update-visible .mobile-app-dock {
   border-color: color-mix(in srgb, var(--pwa-line) 56%, transparent);
   background: rgba(255, 255, 255, 0.048);
   color: rgba(237, 245, 247, 0.78);
+}
+
+.pwa-network-banner-action:hover,
+.pwa-network-banner-action:focus-visible {
+  border-color: color-mix(in srgb, var(--pwa-warm-2) 56%, transparent);
+  background:
+    linear-gradient(180deg, rgba(var(--pwa-warm-rgb), 0.26), rgba(var(--pwa-accent-rgb), 0.090)),
+    color-mix(in srgb, var(--pwa-panel-strong) 88%, transparent);
+  color: #fff6e6;
+}
+
+.pwa-network-banner-action-muted:hover,
+.pwa-network-banner-action-muted:focus-visible {
+  border-color: color-mix(in srgb, var(--pwa-line-strong) 54%, transparent);
+  background: rgba(255, 255, 255, 0.078);
+  color: rgba(237, 245, 247, 0.92);
+}
+
+.pwa-network-banner-action:active {
+  transform: translateY(1px);
 }
 
 @media (max-width: 900px) {
