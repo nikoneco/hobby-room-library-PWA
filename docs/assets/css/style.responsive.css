@@ -50,6 +50,31 @@
     max-width: 100%;
   }
 
+  .popup-detail-loading {
+    padding: 0.64rem;
+  }
+
+  .series-panel-subtitle {
+    display: flex;
+    border-radius: 12px;
+    line-height: 1.5;
+    white-space: normal;
+  }
+
+  .series-list {
+    padding: 0.34rem;
+  }
+
+  .series-list-item {
+    padding: 0.62rem;
+  }
+
+  .series-list-meta {
+    width: fit-content;
+    max-width: 100%;
+    margin-top: 0.42rem;
+  }
+
   #cover-fullscreen-img {
     max-width: 94vw;
     max-height: 82vh;

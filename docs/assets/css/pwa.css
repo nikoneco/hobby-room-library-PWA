@@ -873,6 +873,51 @@ body.pwa-shell .popup-link-btn:focus-visible {
   background: rgba(var(--pwa-warm-rgb), 0.095);
 }
 
+body.pwa-shell .popup-detail-loading,
+body.pwa-shell .series-list,
+body.pwa-shell .series-empty {
+  border-color: color-mix(in srgb, var(--pwa-line) 54%, transparent);
+  background:
+    linear-gradient(90deg, rgba(var(--pwa-warm-rgb), 0.078) 0 4px, transparent 4px),
+    rgba(255, 255, 255, 0.026);
+}
+
+body.pwa-shell .popup-detail-state,
+body.pwa-shell .series-panel-subtitle,
+body.pwa-shell .series-list-meta {
+  border-color: color-mix(in srgb, var(--pwa-line) 48%, transparent);
+  background: rgba(var(--pwa-accent-rgb), 0.055);
+  color: var(--pwa-accent-readable);
+}
+
+body.pwa-shell .popup-detail-state::before {
+  background: var(--pwa-warm-2);
+  box-shadow: 0 0 0 3px rgba(var(--pwa-warm-rgb), 0.11);
+}
+
+body.pwa-shell .popup-detail-state.error::before {
+  background: rgba(234, 147, 116, 0.86);
+  box-shadow: 0 0 0 3px rgba(234, 147, 116, 0.12);
+}
+
+body.pwa-shell .popup-detail-skeleton-line,
+body.pwa-shell .popup-detail-skeleton-chip-row span {
+  background: rgba(255, 255, 255, 0.060);
+}
+
+body.pwa-shell .popup-detail-skeleton-line::after,
+body.pwa-shell .popup-detail-skeleton-chip-row span::after {
+  background: linear-gradient(90deg, transparent, rgba(var(--pwa-accent-rgb), 0.16), transparent);
+}
+
+body.pwa-shell .series-list-item:hover,
+body.pwa-shell .series-list-item:focus-visible {
+  border-color: color-mix(in srgb, var(--pwa-warm-2) 26%, transparent);
+  background:
+    linear-gradient(90deg, rgba(var(--pwa-warm-rgb), 0.072), rgba(var(--pwa-accent-rgb), 0.038)),
+    rgba(255, 255, 255, 0.032);
+}
+
 body.pwa-shell .search-container {
   box-shadow: 0 10px 34px rgba(var(--pwa-shadow-rgb), 0.30);
 }
