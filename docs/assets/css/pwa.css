@@ -698,6 +698,38 @@ body.pwa-shell .search-container {
   box-shadow: 0 10px 34px rgba(var(--pwa-shadow-rgb), 0.30);
 }
 
+body.pwa-shell .search-container.centered {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+body.pwa-shell .search-container.centered .search-form {
+  position: relative;
+  border-color: color-mix(in srgb, var(--pwa-line-strong) 74%, transparent);
+  background:
+    linear-gradient(145deg, rgba(var(--pwa-accent-rgb), 0.12), rgba(var(--pwa-warm-rgb), 0.055) 44%, rgba(255, 255, 255, 0.035)),
+    color-mix(in srgb, var(--pwa-panel-strong) 88%, transparent);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.075),
+    0 18px 52px rgba(var(--pwa-shadow-rgb), 0.34),
+    0 0 0 1px rgba(var(--pwa-accent-rgb), 0.035);
+}
+
+body.pwa-shell .search-container.centered .search-form::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: radial-gradient(circle at 18% 0%, rgba(var(--pwa-accent-2-rgb), 0.16), transparent 42%);
+  pointer-events: none;
+}
+
+body.pwa-shell .search-container.centered .input-group input {
+  background: rgba(4, 9, 13, 0.36);
+}
+
 body.pwa-shell input,
 body.pwa-shell select,
 body.pwa-shell textarea {
@@ -1011,6 +1043,33 @@ body.pwa-update-visible .mobile-app-dock {
 
   .pwa-settings-panel {
     top: max(56px, calc(env(safe-area-inset-top) + 50px));
+  }
+
+  body.pwa-shell .search-container.centered {
+    min-height: calc(100svh - 72px - var(--pwa-safe-top) - env(safe-area-inset-bottom));
+    padding-inline: 10px;
+  }
+
+  body.pwa-shell .search-container.centered .search-form {
+    width: min(100%, 390px);
+    max-width: calc(100vw - 20px);
+    padding: 0.82rem;
+    border-radius: var(--lib-radius-lg);
+  }
+
+  body.pwa-shell .search-container.centered .button-group {
+    display: grid;
+    width: 100%;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.55rem;
+  }
+
+  body.pwa-shell .search-container.centered #advancedToggleBtn {
+    grid-column: 1 / -1;
+  }
+
+  body.pwa-shell .search-container.centered .button-group button {
+    width: 100%;
   }
 }
 
