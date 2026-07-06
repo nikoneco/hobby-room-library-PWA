@@ -586,17 +586,25 @@ button.popup-arrow:focus-visible {
 .series-panel {
   position: relative;
   isolation: isolate;
-  padding: 0.18rem 0.12rem 0.1rem;
+  display: flex;
+  width: min(760px, 84vw);
+  max-height: min(76vh, 680px);
+  flex-direction: column;
+  min-width: 0;
+  padding: 0.2rem 0.12rem 0.1rem;
+  overflow: hidden;
   color: var(--lib-text);
 }
 
 .series-panel-title {
+  max-width: 100%;
   color: rgba(246, 241, 229, 0.96);
-  font-size: 1.05rem;
+  font-size: clamp(1.02rem, 2vw, 1.18rem);
   font-weight: 840;
   line-height: 1.45;
   text-align: left;
   margin-bottom: 0.32rem;
+  overflow-wrap: anywhere;
 }
 
 .series-panel-subtitle,
@@ -609,14 +617,17 @@ button.popup-arrow:focus-visible {
   display: inline-flex;
   max-width: 100%;
   margin-bottom: 0.74rem;
-  padding: 0.28rem 0.58rem;
-  border: 1px solid rgba(148, 163, 184, 0.12);
+  padding: 0.3rem 0.62rem;
+  border: 1px solid rgba(214, 164, 95, 0.16);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.032);
+  background:
+    linear-gradient(180deg, rgba(214, 164, 95, 0.085), rgba(255, 255, 255, 0.018)),
+    rgba(8, 13, 19, 0.24);
   overflow: hidden;
   text-align: left;
   text-overflow: ellipsis;
   white-space: nowrap;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.040);
 }
 
 .series-panel-actions {
@@ -629,23 +640,32 @@ button.popup-arrow:focus-visible {
 }
 
 .series-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: 48vh;
   margin: 0.72rem 0 0.86rem;
-  padding: 0.42rem;
+  padding: 0.46rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   border: 1px solid rgba(148, 163, 184, 0.12);
   border-radius: 14px;
   background:
+    linear-gradient(90deg, rgba(240, 195, 122, 0.070) 0 4px, transparent 4px),
     linear-gradient(180deg, rgba(255, 255, 255, 0.040), rgba(255, 255, 255, 0.018)),
     rgba(8, 13, 19, 0.26);
+  scrollbar-color: rgba(214, 164, 95, 0.46) rgba(255, 255, 255, 0.045);
 }
 
 .series-list-item {
+  position: relative;
   min-height: 3.2rem;
   padding: 0.68rem 0.74rem;
+  border: 1px solid transparent;
   border-bottom-color: rgba(148, 163, 184, 0.10);
   border-radius: 10px;
   color: var(--lib-text);
   background: transparent;
-  transition: border-color var(--lib-ease), background var(--lib-ease), color var(--lib-ease);
+  transition: border-color var(--lib-ease), background var(--lib-ease), color var(--lib-ease), transform var(--lib-ease);
 }
 
 .series-list-item:last-child {
@@ -654,36 +674,56 @@ button.popup-arrow:focus-visible {
 
 .series-list-item:hover,
 .series-list-item:focus-visible {
-  border-color: rgba(240, 195, 122, 0.18);
+  border-color: rgba(240, 195, 122, 0.28);
   background:
-    linear-gradient(90deg, rgba(240, 195, 122, 0.070), rgba(104, 191, 215, 0.035)),
+    linear-gradient(90deg, rgba(240, 195, 122, 0.12), rgba(104, 191, 215, 0.040)),
     rgba(255, 255, 255, 0.036);
   color: #ffffff;
+  transform: translateY(-1px);
+  outline: none;
+}
+
+.series-list-item:active {
+  transform: translateY(1px);
 }
 
 .series-list-title {
+  min-width: 0;
   color: rgba(246, 241, 229, 0.94);
   font-weight: 790;
   line-height: 1.45;
+  overflow-wrap: anywhere;
 }
 
 .series-list-meta {
-  padding: 0.18rem 0.46rem;
+  display: inline-flex;
+  max-width: 100%;
+  flex: 0 1 auto;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0.2rem 0.48rem;
   border: 1px solid rgba(104, 191, 215, 0.16);
   border-radius: 999px;
-  background: rgba(104, 191, 215, 0.070);
+  background:
+    linear-gradient(180deg, rgba(104, 191, 215, 0.10), rgba(104, 191, 215, 0.035)),
+    rgba(8, 13, 19, 0.22);
   font-size: 0.76rem;
+  line-height: 1.35;
+  text-align: right;
+  white-space: normal;
 }
 
 .series-empty {
   margin: 0.1rem;
-  padding: 1.1rem 0.9rem;
-  border: 1px solid rgba(148, 163, 184, 0.12);
+  padding: 1.15rem 1rem;
+  border: 1px solid rgba(214, 164, 95, 0.16);
   border-radius: 12px;
   background:
-    linear-gradient(90deg, rgba(240, 195, 122, 0.080) 0 4px, transparent 4px),
-    rgba(255, 255, 255, 0.030);
+    linear-gradient(90deg, rgba(240, 195, 122, 0.11) 0 4px, transparent 4px),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.042), rgba(255, 255, 255, 0.018)),
+    rgba(8, 13, 19, 0.26);
   line-height: 1.7;
+  text-align: left;
 }
 
 .suggest-box {
