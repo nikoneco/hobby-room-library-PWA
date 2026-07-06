@@ -292,14 +292,19 @@ body.pwa-launch-splash-visible {
   right: max(12px, env(safe-area-inset-right));
   bottom: max(12px, env(safe-area-inset-bottom));
   z-index: 12000;
-  padding: 12px 14px;
-  border: 1px solid rgba(47, 95, 74, 0.22);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.96);
-  color: #1d352b;
-  box-shadow: 0 10px 26px rgba(26, 37, 32, 0.16);
+  padding: 11px 13px;
+  border: 1px solid color-mix(in srgb, var(--pwa-line) 58%, transparent);
+  border-radius: 12px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.058), rgba(255, 255, 255, 0.022)),
+    color-mix(in srgb, var(--pwa-panel-strong) 92%, transparent);
+  color: rgba(237, 245, 247, 0.90);
+  box-shadow:
+    0 16px 34px rgba(0, 0, 0, 0.30),
+    inset 0 1px 0 rgba(255, 255, 255, 0.055);
   font-size: 0.92rem;
   line-height: 1.55;
+  backdrop-filter: blur(14px);
 }
 
 body.pwa-shell .mobile-app-dock {
@@ -351,11 +356,15 @@ body.pwa-settings-open {
   display: grid;
   place-content: center;
   gap: 4px;
-  border: 1px solid var(--pwa-line);
+  border: 1px solid color-mix(in srgb, var(--pwa-line) 62%, transparent);
   border-radius: 999px;
-  background: color-mix(in srgb, var(--pwa-panel-strong) 58%, transparent);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.058), rgba(255, 255, 255, 0.022)),
+    color-mix(in srgb, var(--pwa-panel-strong) 72%, transparent);
   color: rgba(234, 241, 248, 0.82);
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.24);
+  box-shadow:
+    0 12px 28px rgba(0, 0, 0, 0.26),
+    inset 0 1px 0 rgba(255, 255, 255, 0.050);
   backdrop-filter: blur(14px);
   cursor: pointer;
 }
@@ -368,7 +377,10 @@ body.pwa-settings-open {
 }
 
 .pwa-settings-button[aria-expanded="true"] {
-  border-color: var(--pwa-line-strong);
+  border-color: color-mix(in srgb, var(--pwa-warm-2) 42%, var(--pwa-line-strong));
+  background:
+    linear-gradient(180deg, rgba(var(--pwa-warm-rgb), 0.14), rgba(255, 255, 255, 0.028)),
+    color-mix(in srgb, var(--pwa-panel-strong) 84%, transparent);
   color: var(--pwa-accent-readable);
 }
 
@@ -376,8 +388,10 @@ body.pwa-settings-open {
   position: fixed;
   inset: 0;
   z-index: 12100;
-  background: color-mix(in srgb, var(--pwa-bg-bottom) 62%, transparent);
-  backdrop-filter: blur(5px);
+  background:
+    radial-gradient(circle at 82% 10%, rgba(var(--pwa-warm-rgb), 0.055), transparent 30%),
+    color-mix(in srgb, var(--pwa-bg-bottom) 72%, transparent);
+  backdrop-filter: blur(7px);
 }
 
 .pwa-settings-panel {
@@ -385,13 +399,21 @@ body.pwa-settings-open {
   top: max(64px, calc(env(safe-area-inset-top) + 58px));
   right: max(12px, env(safe-area-inset-right));
   z-index: 12200;
-  width: min(340px, calc(100vw - 24px - env(safe-area-inset-left) - env(safe-area-inset-right)));
-  padding: 14px;
-  border: 1px solid var(--pwa-line);
-  border-radius: 8px;
-  background: var(--pwa-panel-strong);
+  width: min(380px, calc(100vw - 24px - env(safe-area-inset-left) - env(safe-area-inset-right)));
+  max-height: min(760px, calc(100svh - 84px - env(safe-area-inset-top) - env(safe-area-inset-bottom)));
+  padding: 15px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid color-mix(in srgb, var(--pwa-line) 68%, transparent);
+  border-radius: 16px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.058), rgba(255, 255, 255, 0.024)),
+    color-mix(in srgb, var(--pwa-panel-strong) 96%, transparent);
   color: #edf5f7;
-  box-shadow: 0 20px 54px rgba(0, 0, 0, 0.46);
+  box-shadow:
+    0 24px 70px rgba(0, 0, 0, 0.48),
+    inset 0 1px 0 rgba(255, 255, 255, 0.060);
+  scrollbar-color: rgba(var(--pwa-warm-rgb), 0.46) rgba(255, 255, 255, 0.045);
 }
 
 .pwa-settings-header {
@@ -404,20 +426,29 @@ body.pwa-settings-open {
 
 .pwa-settings-header h2 {
   margin: 0;
-  font-size: 1rem;
+  color: rgba(237, 245, 247, 0.96);
+  font-size: 1.02rem;
+  font-weight: 900;
   letter-spacing: 0;
 }
 
 .pwa-settings-close {
   width: 36px;
   height: 36px;
-  border: 1px solid var(--pwa-line);
+  border: 1px solid color-mix(in srgb, var(--pwa-line) 58%, transparent);
   border-radius: 999px;
-  background: var(--pwa-panel-soft);
+  background: rgba(255, 255, 255, 0.046);
   color: rgba(234, 241, 248, 0.78);
   font-size: 1.35rem;
   line-height: 1;
   cursor: pointer;
+}
+
+.pwa-settings-close:hover,
+.pwa-settings-close:focus-visible {
+  border-color: color-mix(in srgb, var(--pwa-warm-2) 34%, transparent);
+  background: rgba(var(--pwa-warm-rgb), 0.090);
+  color: rgba(255, 246, 232, 0.94);
 }
 
 .pwa-settings-section {
@@ -440,6 +471,11 @@ body.pwa-settings-open {
   align-items: center;
   justify-content: space-between;
   gap: 14px;
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid color-mix(in srgb, var(--pwa-line) 42%, transparent);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.032);
 }
 
 .pwa-settings-row-title,
@@ -462,10 +498,16 @@ body.pwa-settings-open {
 .pwa-settings-toggle-row {
   min-height: 48px;
   cursor: pointer;
+  transition: border-color 160ms ease, background 160ms ease;
 }
 
 .pwa-settings-toggle-row + .pwa-settings-toggle-row {
-  margin-top: 10px;
+  margin-top: 8px;
+}
+
+.pwa-settings-toggle-row:hover {
+  border-color: color-mix(in srgb, var(--pwa-warm-2) 24%, var(--pwa-line));
+  background: rgba(var(--pwa-warm-rgb), 0.050);
 }
 
 .pwa-settings-toggle-row input {
@@ -481,9 +523,9 @@ body.pwa-settings-open {
   flex: 0 0 auto;
   width: 42px;
   height: 24px;
-  border: 1px solid var(--pwa-line);
+  border: 1px solid color-mix(in srgb, var(--pwa-line) 70%, transparent);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.070);
   transition: background 160ms ease, border-color 160ms ease;
 }
 
@@ -501,8 +543,8 @@ body.pwa-settings-open {
 }
 
 .pwa-settings-toggle-row input:checked + .pwa-mini-switch {
-  border-color: var(--pwa-line-strong);
-  background: rgba(var(--pwa-accent-rgb), 0.22);
+  border-color: color-mix(in srgb, var(--pwa-warm-2) 42%, var(--pwa-line-strong));
+  background: rgba(var(--pwa-warm-rgb), 0.16);
 }
 
 .pwa-settings-toggle-row input:checked + .pwa-mini-switch::after {
@@ -525,7 +567,7 @@ body.pwa-settings-open {
 
 .pwa-theme-settings {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
 }
 
@@ -538,14 +580,16 @@ body.pwa-settings-open {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  min-height: 38px;
-  padding: 7px 8px;
-  border: 1px solid color-mix(in srgb, var(--pwa-line) 72%, transparent);
-  border-radius: 8px;
-  background: var(--pwa-panel-soft);
+  min-height: 40px;
+  padding: 8px 9px;
+  border: 1px solid color-mix(in srgb, var(--pwa-line) 56%, transparent);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.032);
   color: rgba(234, 241, 248, 0.78);
   font-size: 0.78rem;
   font-weight: 800;
+  cursor: pointer;
+  transition: border-color 160ms ease, background 160ms ease;
 }
 
 .pwa-theme-settings input {
@@ -913,6 +957,20 @@ body.pwa-shell .shelf-jump-top-btn {
   background: color-mix(in srgb, var(--pwa-panel-strong) 78%, transparent);
 }
 
+body.pwa-shell .mobile-app-dock {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.058), rgba(255, 255, 255, 0.022)),
+    color-mix(in srgb, var(--pwa-panel-strong) 88%, transparent);
+  box-shadow:
+    0 18px 44px rgba(0, 0, 0, 0.38),
+    inset 0 1px 0 rgba(255, 255, 255, 0.060);
+}
+
+body.pwa-shell .mobile-app-dock-btn,
+body.pwa-shell .mobile-dock-view-btn {
+  background: rgba(255, 255, 255, 0.030);
+}
+
 body.pwa-shell .button-group button.accent,
 body.pwa-shell .top-shelf-btn,
 body.pwa-shell .bookshelf-cta-card.top-shelf-btn,
@@ -1067,8 +1125,10 @@ body.pwa-shell .shelf-book:focus-visible {
 }
 
 body.pwa-shell .pwa-theme-settings label:has(input:checked) {
-  border-color: var(--pwa-line-strong);
-  background: rgba(var(--pwa-accent-rgb), 0.105);
+  border-color: color-mix(in srgb, var(--pwa-warm-2) 42%, var(--pwa-line-strong));
+  background:
+    linear-gradient(180deg, rgba(var(--pwa-warm-rgb), 0.14), rgba(255, 255, 255, 0.024)),
+    rgba(var(--pwa-accent-rgb), 0.052);
   color: var(--pwa-accent-readable);
 }
 
@@ -1097,14 +1157,19 @@ body.pwa-update-visible .mobile-app-dock {
 }
 
 .pwa-network-banner.is-error {
-  border-color: rgba(166, 73, 58, 0.28);
-  color: #5f2f26;
+  border-color: rgba(234, 147, 116, 0.34);
+  color: rgba(255, 224, 212, 0.92);
+  background:
+    linear-gradient(180deg, rgba(234, 147, 116, 0.11), rgba(255, 255, 255, 0.018)),
+    color-mix(in srgb, var(--pwa-panel-strong) 92%, transparent);
 }
 
 .pwa-network-banner.is-update {
-  border-color: rgba(104, 191, 215, 0.34);
+  border-color: color-mix(in srgb, var(--pwa-line-strong) 72%, transparent);
   color: #dff8ff;
-  background: rgba(13, 22, 31, 0.94);
+  background:
+    linear-gradient(180deg, rgba(var(--pwa-accent-rgb), 0.12), rgba(255, 255, 255, 0.022)),
+    color-mix(in srgb, var(--pwa-panel-strong) 94%, transparent);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1119,17 +1184,22 @@ body.pwa-update-visible .mobile-app-dock {
 }
 
 .pwa-network-banner.is-notice {
-  border-color: rgba(214, 164, 95, 0.34);
-  color: #4c3820;
+  border-color: rgba(var(--pwa-warm-rgb), 0.34);
+  color: rgba(255, 241, 214, 0.92);
+  background:
+    linear-gradient(180deg, rgba(var(--pwa-warm-rgb), 0.12), rgba(255, 255, 255, 0.018)),
+    color-mix(in srgb, var(--pwa-panel-strong) 92%, transparent);
 }
 
 .pwa-network-banner-action {
   margin-left: 0.75em;
   padding: 0.34em 0.78em;
-  border: 1px solid rgba(47, 95, 74, 0.28);
+  border: 1px solid color-mix(in srgb, var(--pwa-warm-2) 36%, transparent);
   border-radius: 999px;
-  background: #2f5f4a;
-  color: #fff;
+  background:
+    linear-gradient(180deg, rgba(var(--pwa-warm-rgb), 0.20), rgba(var(--pwa-accent-rgb), 0.060)),
+    color-mix(in srgb, var(--pwa-panel-strong) 84%, transparent);
+  color: var(--pwa-accent-readable);
   font: inherit;
   font-weight: 800;
   cursor: pointer;
@@ -1137,9 +1207,9 @@ body.pwa-update-visible .mobile-app-dock {
 
 .pwa-network-banner-action-muted {
   margin-left: 0.45em;
-  border-color: rgba(47, 95, 74, 0.20);
-  background: rgba(255, 255, 255, 0.60);
-  color: #2f453d;
+  border-color: color-mix(in srgb, var(--pwa-line) 56%, transparent);
+  background: rgba(255, 255, 255, 0.048);
+  color: rgba(237, 245, 247, 0.78);
 }
 
 @media (max-width: 900px) {

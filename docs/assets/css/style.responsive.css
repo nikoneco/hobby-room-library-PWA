@@ -94,13 +94,17 @@
     z-index: 2300;
     display: grid;
     grid-template-columns: 1fr;
-    gap: 0.34rem;
-    min-height: 94px;
-    padding: 0.36rem;
+    gap: 0.38rem;
+    min-height: 96px;
+    padding: 0.4rem;
     border: 1px solid rgba(167, 183, 204, 0.24);
     border-radius: 18px;
-    background: rgba(12, 16, 23, 0.86);
-    box-shadow: 0 14px 36px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.058), rgba(255, 255, 255, 0.022)),
+      rgba(12, 16, 23, 0.88);
+    box-shadow:
+      0 16px 38px rgba(0, 0, 0, 0.42),
+      inset 0 1px 0 rgba(255, 255, 255, 0.080);
     backdrop-filter: blur(18px);
     transition: opacity 160ms ease, transform 180ms ease;
   }
@@ -121,16 +125,16 @@
   .mobile-dock-view-switch {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 0.32rem;
+    gap: 0.34rem;
   }
 
   .mobile-app-dock-btn {
     min-width: 0;
     min-height: 44px;
     padding: 0.34rem 0.28rem;
-    border: 1px solid transparent;
+    border: 1px solid rgba(167, 183, 204, 0.12);
     border-radius: 12px;
-    background: transparent;
+    background: rgba(255, 255, 255, 0.026);
     color: rgba(234, 241, 248, 0.72);
     font-size: 0.68rem;
     font-weight: 800;
@@ -147,8 +151,10 @@
 
   .mobile-app-dock-btn.active,
   .mobile-app-dock-btn:focus-visible {
-    border-color: rgba(104, 191, 215, 0.44);
-    background: rgba(104, 191, 215, 0.18);
+    border-color: rgba(214, 164, 95, 0.38);
+    background:
+      linear-gradient(180deg, rgba(214, 164, 95, 0.14), rgba(104, 191, 215, 0.052)),
+      rgba(255, 255, 255, 0.034);
     color: #ecfbff;
     outline: none;
   }
@@ -160,13 +166,15 @@
   .mobile-app-dock-btn.primary.active,
   .mobile-app-dock-btn.primary:focus-visible {
     border-color: rgba(255, 206, 129, 0.46);
-    background: rgba(98, 69, 36, 0.42);
+    background:
+      linear-gradient(180deg, rgba(255, 206, 129, 0.16), rgba(255, 255, 255, 0.030)),
+      rgba(98, 69, 36, 0.30);
     color: #fff1d8;
   }
 
   .mobile-dock-view-switch {
     padding-top: 0.28rem;
-    border-top: 1px solid rgba(167, 183, 204, 0.14);
+    border-top: 1px solid rgba(167, 183, 204, 0.12);
   }
 
   .mobile-dock-view-btn {
@@ -191,8 +199,8 @@
 
   .mobile-dock-view-btn.active,
   .mobile-dock-view-btn:focus-visible {
-    border-color: rgba(104, 191, 215, 0.44);
-    background: rgba(104, 191, 215, 0.16);
+    border-color: rgba(214, 164, 95, 0.34);
+    background: rgba(214, 164, 95, 0.10);
     color: #ecfbff;
     outline: none;
   }
