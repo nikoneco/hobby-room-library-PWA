@@ -1187,10 +1187,12 @@ body.pwa-shell .search-container.centered .input-group input {
 body.pwa-shell .search-status-area {
   border-color: color-mix(in srgb, var(--pwa-line) 68%, transparent);
   background:
+    radial-gradient(circle at 0% 0%, rgba(var(--pwa-warm-rgb), 0.075), transparent 34%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.050), rgba(255, 255, 255, 0.020)),
-    linear-gradient(90deg, rgba(var(--pwa-warm-rgb), 0.10), rgba(var(--pwa-accent-rgb), 0.055)),
     color-mix(in srgb, var(--pwa-panel-strong) 74%, transparent);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.052);
+  box-shadow:
+    0 10px 24px rgba(var(--pwa-shadow-rgb), 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.052);
 }
 
 body.pwa-shell .search-status-area::before {
@@ -1417,6 +1419,33 @@ body.pwa-shell .quick-browse-chip-count {
   border-color: color-mix(in srgb, var(--pwa-warm-2) 32%, transparent);
   background: rgba(var(--pwa-warm-rgb), 0.075);
   color: var(--pwa-accent-readable);
+}
+
+body.pwa-shell .search-status-chip {
+  border-color: color-mix(in srgb, var(--pwa-line) 56%, transparent);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.050), rgba(255, 255, 255, 0.018)),
+    color-mix(in srgb, var(--pwa-panel) 64%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.036);
+}
+
+body.pwa-shell .search-status-chip-key {
+  background: rgba(var(--pwa-warm-rgb), 0.12);
+  color: color-mix(in srgb, var(--pwa-warm-2) 88%, white);
+  box-shadow: inset 0 0 0 1px rgba(var(--pwa-warm-rgb), 0.11);
+}
+
+body.pwa-shell .search-status-chip-remove {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.060), rgba(255, 255, 255, 0.020)),
+    rgba(255, 255, 255, 0.042);
+}
+
+body.pwa-shell .search-status-reroll {
+  border-color: color-mix(in srgb, var(--pwa-line-strong) 54%, transparent);
+  background:
+    linear-gradient(180deg, rgba(var(--pwa-accent-rgb), 0.16), rgba(var(--pwa-accent-rgb), 0.070)),
+    rgba(255, 255, 255, 0.018);
 }
 
 body.pwa-shell .toggle-btn.active::after,
