@@ -37,8 +37,16 @@ function getShelfViewStats_(groups, totalCount) {
 function renderShelfViewOverview_(groups, totalCount, immersive) {
   const stats = getShelfViewStats_(groups, totalCount);
   const overview = document.createElement('section');
-  overview.className = immersive ? 'shelf-view-overview immersive' : 'shelf-view-overview';
+  overview.className = immersive ? 'shelf-view-overview immersive' : 'shelf-view-overview result';
   overview.setAttribute('aria-label', '本棚表示の概要');
+
+  const headingBlock = document.createElement('div');
+  headingBlock.className = 'shelf-view-heading';
+
+  const modeBadge = document.createElement('span');
+  modeBadge.className = 'shelf-view-mode-badge';
+  modeBadge.textContent = immersive ? '全体本棚' : '検索結果';
+  headingBlock.appendChild(modeBadge);
 
   const heading = document.createElement('div');
   heading.className = 'shelf-view-mode';
@@ -49,7 +57,33 @@ function renderShelfViewOverview_(groups, totalCount, immersive) {
     immersive ? 'shelfOverview.heading.immersive' : 'shelfOverview.heading.result',
     headingText
   );
-  overview.appendChild(heading);
+  headingBlock.appendChild(heading);
+
+  if (!immersive) {
+    const note = document.createElement('div');
+    note.className = 'shelf-view-note';
+    note.textContent = getPwaLibrarianText_(
+      'shelfOverview.note.result',
+      '検索結果だけを棚順に並べています。全体を眺めるときはトップの「本棚を見る」を使います。'
+    );
+    headingBlock.appendChild(note);
+  }
+
+  if (immersive) {
+    const librarianNoteText = getPwaLibrarianText_(
+      'status.note.shelf',
+      '',
+      { count: stats.total }
+    );
+    if (librarianNoteText) {
+      const librarianNote = document.createElement('div');
+      librarianNote.className = 'shelf-view-librarian-note';
+      librarianNote.textContent = librarianNoteText;
+      headingBlock.appendChild(librarianNote);
+    }
+  }
+
+  overview.appendChild(headingBlock);
 
   const statGrid = document.createElement('div');
   statGrid.className = 'shelf-view-stat-grid';
@@ -70,30 +104,6 @@ function renderShelfViewOverview_(groups, totalCount, immersive) {
   });
 
   overview.appendChild(statGrid);
-
-  if (!immersive) {
-    const note = document.createElement('div');
-    note.className = 'shelf-view-note';
-    note.textContent = getPwaLibrarianText_(
-      'shelfOverview.note.result',
-      '検索結果だけを棚順に並べています。全体を眺めるときはトップの「本棚を見る」を使います。'
-    );
-    overview.appendChild(note);
-  }
-
-  if (immersive) {
-    const librarianNoteText = getPwaLibrarianText_(
-      'status.note.shelf',
-      '',
-      { count: stats.total }
-    );
-    if (librarianNoteText) {
-      const librarianNote = document.createElement('div');
-      librarianNote.className = 'shelf-view-librarian-note';
-      librarianNote.textContent = librarianNoteText;
-      overview.appendChild(librarianNote);
-    }
-  }
 
   return overview;
 }
