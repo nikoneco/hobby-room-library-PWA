@@ -853,8 +853,29 @@ button.quiet-action:hover,
 .search-container.centered .quick-browse-rail {
   width: 100%;
   margin: 0.04rem 0 0.3rem;
+  padding: 0.64rem 0.68rem;
+  border-radius: calc(var(--lib-radius-md) + 3px);
   justify-content: flex-start;
   align-items: flex-start;
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 4% 0%, rgba(240, 195, 122, 0.12), transparent 34%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.052), rgba(255, 255, 255, 0.018)),
+    rgba(8, 13, 19, 0.42);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.055),
+    0 10px 22px rgba(0, 0, 0, 0.12);
+}
+
+.search-container.centered .quick-browse-rail::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  z-index: -1;
+  width: 5px;
+  background: linear-gradient(180deg, rgba(240, 195, 122, 0.44), rgba(104, 191, 215, 0.26));
 }
 
 .search-container.centered .quick-browse-chips {
@@ -874,10 +895,13 @@ button.quiet-action:hover,
 
 .quick-browse-kicker {
   flex: 0 0 auto;
-  padding: 0.18rem 0.32rem 0;
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0.12rem 0.42rem 0.1rem 0.22rem;
   font-size: 0.76rem;
   font-weight: 760;
-  color: rgba(240, 195, 122, 0.88);
+  color: rgba(246, 234, 216, 0.76);
 }
 
 .quick-browse-chips {
@@ -891,15 +915,18 @@ button.quiet-action:hover,
 
 button.quick-browse-chip {
   min-height: 34px;
-  padding: 0.3rem 0.42rem 0.3rem 0.6rem;
-  gap: 0.36rem;
+  max-width: min(100%, 24rem);
+  padding: 0.3rem 0.44rem 0.3rem 0.58rem;
+  gap: 0.38rem;
   border-radius: 999px;
-  border-color: rgba(148, 163, 184, 0.17);
+  border-color: rgba(148, 163, 184, 0.20);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.058), rgba(255, 255, 255, 0.024)),
     rgba(13, 19, 27, 0.62);
   color: #dce8ee;
-  box-shadow: none;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.045),
+    0 7px 15px rgba(0, 0, 0, 0.12);
   font-size: 0.78rem;
   line-height: 1.25;
   transition: border-color 160ms ease, background 160ms ease, color 160ms ease, transform 160ms ease;
@@ -919,9 +946,14 @@ button.quick-browse-chip:focus-visible {
   color: rgba(240, 195, 122, 0.82);
   font-size: 0.72em;
   font-weight: 760;
+  white-space: nowrap;
 }
 
 .quick-browse-chip-value {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-weight: 780;
 }
 
@@ -939,7 +971,8 @@ button.quick-browse-chip:focus-visible {
   .quick-browse-rail {
     margin-top: -0.02rem;
     flex-direction: column;
-    gap: 0.38rem;
+    align-items: stretch;
+    gap: 0.42rem;
   }
 
   button.quick-browse-chip {
@@ -1009,17 +1042,17 @@ button.quick-browse-chip:focus-visible {
   position: relative;
   isolation: isolate;
   overflow: hidden;
-  margin-top: 0.4rem;
-  padding: 1rem 1rem 1.05rem;
-  border: 1px solid rgba(148, 163, 184, 0.14);
-  border-radius: var(--lib-radius-lg);
+  margin-top: 0.52rem;
+  padding: 1.05rem;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: calc(var(--lib-radius-lg) + 4px);
   background:
-    linear-gradient(90deg, rgba(240, 195, 122, 0.10) 0 5px, transparent 5px),
-    linear-gradient(145deg, rgba(104, 191, 215, 0.085), rgba(214, 164, 95, 0.040) 44%, rgba(255, 255, 255, 0.026)),
+    linear-gradient(90deg, rgba(240, 195, 122, 0.085) 0 5px, transparent 5px),
+    linear-gradient(145deg, rgba(104, 191, 215, 0.095), rgba(214, 164, 95, 0.046) 44%, rgba(255, 255, 255, 0.030)),
     rgba(13, 18, 26, 0.82);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.050),
-    0 14px 34px rgba(0, 0, 0, 0.18);
+    inset 0 1px 0 rgba(255, 255, 255, 0.060),
+    0 18px 44px rgba(0, 0, 0, 0.20);
 }
 
 .advanced-search-area::before {
@@ -1034,17 +1067,17 @@ button.quick-browse-chip:focus-visible {
 }
 
 .advanced-grid {
-  gap: 0.86rem 1rem;
+  gap: 0.78rem;
 }
 
 .advanced-grid .input-group {
   position: relative;
   overflow: hidden;
-  padding: 0.62rem;
-  border: 1px solid rgba(148, 163, 184, 0.12);
-  border-radius: 12px;
+  padding: 0.66rem;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: calc(var(--lib-radius-md) + 1px);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.044), rgba(255, 255, 255, 0.020)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.052), rgba(255, 255, 255, 0.020)),
     rgba(255, 255, 255, 0.028);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.040);
   transition: border-color var(--lib-ease), background var(--lib-ease), box-shadow var(--lib-ease), transform var(--lib-ease);
@@ -1081,6 +1114,7 @@ button.quick-browse-chip:focus-visible {
 .advanced-grid .input-group label {
   color: rgba(217, 231, 240, 0.72);
   font-size: 0.78rem;
+  font-weight: 760;
   transition: color var(--lib-ease);
 }
 
@@ -1092,6 +1126,7 @@ button.quick-browse-chip:focus-visible {
 .advanced-grid .input-group input,
 .advanced-grid .input-group select {
   min-height: 42px;
+  margin-top: 0.34rem;
   border-color: rgba(148, 163, 184, 0.16);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.012)),
@@ -1102,10 +1137,10 @@ button.quick-browse-chip:focus-visible {
   position: relative;
   overflow: hidden;
   padding: 0.68rem 0.72rem 0.74rem;
-  border: 1px solid rgba(148, 163, 184, 0.12);
-  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: calc(var(--lib-radius-md) + 1px);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.044), rgba(255, 255, 255, 0.020)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.052), rgba(255, 255, 255, 0.020)),
     rgba(255, 255, 255, 0.028);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.040);
   transition: border-color var(--lib-ease), background var(--lib-ease), box-shadow var(--lib-ease);
@@ -1114,7 +1149,13 @@ button.quick-browse-chip:focus-visible {
 .released-range-row > label {
   color: rgba(217, 231, 240, 0.72);
   font-size: 0.78rem;
+  font-weight: 760;
   transition: color var(--lib-ease);
+}
+
+.released-range-controls {
+  margin-top: 0.34rem;
+  gap: 0.42rem;
 }
 
 .released-range-controls select {
@@ -1139,14 +1180,31 @@ button.quick-browse-chip:focus-visible {
 }
 
 .advanced-actions {
-  margin-top: 0.95rem;
-  padding-top: 0.95rem;
+  margin-top: 1rem;
+  padding-top: 0.92rem;
   border-top: 1px solid rgba(148, 163, 184, 0.11);
   justify-content: flex-end;
+  gap: 0.5rem;
 }
 
 .advanced-actions button {
   min-height: 42px;
+}
+
+@media (max-width: 720px) {
+  .advanced-search-area {
+    padding: 0.88rem;
+  }
+
+  .released-range-controls {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .released-range-separator {
+    grid-column: 1 / -1;
+    justify-self: center;
+    line-height: 1;
+  }
 }
 
 .view-toggle {
