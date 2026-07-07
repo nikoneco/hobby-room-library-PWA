@@ -2006,8 +2006,13 @@ button.genre-chip.status:focus-visible {
 
 .accordion-toggle {
   position: relative;
-  min-width: 36px;
+  display: inline-flex;
+  min-width: 0;
   min-height: 36px;
+  align-items: center;
+  justify-content: center;
+  gap: 0.34rem;
+  padding: 0.26rem 0.58rem 0.26rem 0.68rem;
   border: 1px solid rgba(214, 164, 95, 0.16) !important;
   border-radius: 999px;
   background:
@@ -2018,6 +2023,13 @@ button.genre-chip.status:focus-visible {
     inset 0 1px 0 rgba(255, 255, 255, 0.045),
     0 8px 18px rgba(0, 0, 0, 0.14) !important;
   transition: transform var(--lib-ease), border-color var(--lib-ease), background var(--lib-ease), color var(--lib-ease), box-shadow var(--lib-ease);
+}
+
+.accordion-label {
+  color: currentColor;
+  font-size: 0.68rem;
+  font-weight: 820;
+  line-height: 1;
 }
 
 .accordion-toggle:hover,
@@ -2041,8 +2053,8 @@ button.genre-chip.status:focus-visible {
 }
 
 .accordion-toggle .arrow {
-  width: 1rem;
-  height: 1rem;
+  width: 0.95rem;
+  height: 0.95rem;
   margin: 0;
   border: 0;
   padding: 0;

@@ -1160,15 +1160,20 @@ function showResult(data) {
       row.appendChild(thumb);
       row.appendChild(titleRow);
 
+      const detailId = `book-details-${shelfRenderRunId}-${idx}`;
       const btn = document.createElement('button');
       btn.className = 'accordion-toggle';
       btn.setAttribute('aria-expanded', 'false');
-      btn.innerHTML = uiIcon_('chevronDown', 'arrow');
+      btn.setAttribute('aria-controls', detailId);
+      btn.setAttribute('aria-label', '補足情報を開く');
+      btn.title = '補足情報を開く';
+      btn.innerHTML = `<span class="accordion-label">補足</span>${uiIcon_('chevronDown', 'arrow')}`;
       row.appendChild(btn);
 
       card.appendChild(row);
 
       const details = document.createElement('div');
+      details.id = detailId;
       details.className = 'book-details';
       details.style.display = 'none';
       details.innerHTML = `
@@ -1182,6 +1187,8 @@ function showResult(data) {
 
         const expanded = card.classList.toggle('open');
         btn.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+        btn.setAttribute('aria-label', expanded ? '補足情報を閉じる' : '補足情報を開く');
+        btn.title = expanded ? '補足情報を閉じる' : '補足情報を開く';
         details.style.display = expanded ? 'block' : 'none';
       };
 

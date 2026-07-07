@@ -762,7 +762,18 @@
   .list-row .accordion-toggle {
     min-width: 28px;
     min-height: 28px;
+    padding: 0.16rem;
     margin-left: 0.1rem;
+    gap: 0;
+  }
+
+  .list-row .accordion-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
   }
 
   .advanced-search-area {
