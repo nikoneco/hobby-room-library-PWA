@@ -403,18 +403,20 @@ body.pwa-settings-open {
   z-index: 12200;
   width: min(380px, calc(100vw - 24px - env(safe-area-inset-left) - env(safe-area-inset-right)));
   max-height: min(760px, calc(100svh - 84px - env(safe-area-inset-top) - env(safe-area-inset-bottom)));
-  padding: 15px;
+  padding: 14px;
   overflow-y: auto;
   overscroll-behavior: contain;
-  border: 1px solid color-mix(in srgb, var(--pwa-line) 68%, transparent);
-  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--pwa-line) 72%, transparent);
+  border-radius: 18px;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.058), rgba(255, 255, 255, 0.024)),
+    radial-gradient(circle at 0% 0%, rgba(var(--pwa-warm-rgb), 0.10), transparent 35%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.064), rgba(255, 255, 255, 0.024)),
     color-mix(in srgb, var(--pwa-panel-strong) 96%, transparent);
   color: #edf5f7;
   box-shadow:
-    0 24px 70px rgba(0, 0, 0, 0.48),
-    inset 0 1px 0 rgba(255, 255, 255, 0.060);
+    0 26px 76px rgba(0, 0, 0, 0.50),
+    0 0 0 1px rgba(255, 255, 255, 0.035) inset,
+    inset 0 1px 0 rgba(255, 255, 255, 0.070);
   scrollbar-color: rgba(var(--pwa-warm-rgb), 0.46) rgba(255, 255, 255, 0.045);
 }
 
@@ -423,7 +425,9 @@ body.pwa-settings-open {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
+  padding: 2px 2px 12px;
+  border-bottom: 1px solid color-mix(in srgb, var(--pwa-line) 56%, transparent);
 }
 
 .pwa-settings-header h2 {
@@ -454,10 +458,14 @@ body.pwa-settings-open {
 }
 
 .pwa-settings-section {
-  margin: 0;
-  padding: 12px 0;
-  border: 0;
-  border-top: 1px solid color-mix(in srgb, var(--pwa-line) 68%, transparent);
+  margin: 10px 0 0;
+  padding: 11px;
+  border: 1px solid color-mix(in srgb, var(--pwa-line) 50%, transparent);
+  border-radius: 13px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.040), rgba(255, 255, 255, 0.014)),
+    rgba(255, 255, 255, 0.020);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.040);
 }
 
 .pwa-settings-section-title {
@@ -474,10 +482,12 @@ body.pwa-settings-open {
   justify-content: space-between;
   gap: 14px;
   min-width: 0;
-  padding: 9px 10px;
-  border: 1px solid color-mix(in srgb, var(--pwa-line) 42%, transparent);
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.032);
+  padding: 10px;
+  border: 1px solid color-mix(in srgb, var(--pwa-line) 48%, transparent);
+  border-radius: 11px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.040), rgba(255, 255, 255, 0.012)),
+    rgba(255, 255, 255, 0.024);
 }
 
 .pwa-settings-row-title,
@@ -500,7 +510,7 @@ body.pwa-settings-open {
 .pwa-settings-toggle-row {
   min-height: 48px;
   cursor: pointer;
-  transition: border-color 160ms ease, background 160ms ease;
+  transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
 }
 
 .pwa-settings-toggle-row + .pwa-settings-toggle-row {
@@ -510,6 +520,10 @@ body.pwa-settings-open {
 .pwa-settings-toggle-row:hover {
   border-color: color-mix(in srgb, var(--pwa-warm-2) 24%, var(--pwa-line));
   background: rgba(var(--pwa-warm-rgb), 0.050);
+}
+
+.pwa-settings-toggle-row:active {
+  transform: translateY(1px);
 }
 
 .pwa-settings-toggle-row input {
@@ -584,14 +598,20 @@ body.pwa-settings-open {
   gap: 6px;
   min-height: 40px;
   padding: 8px 9px;
-  border: 1px solid color-mix(in srgb, var(--pwa-line) 56%, transparent);
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.032);
+  border: 1px solid color-mix(in srgb, var(--pwa-line) 58%, transparent);
+  border-radius: 11px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.038), rgba(255, 255, 255, 0.012)),
+    rgba(255, 255, 255, 0.024);
   color: rgba(234, 241, 248, 0.78);
   font-size: 0.78rem;
   font-weight: 800;
   cursor: pointer;
-  transition: border-color 160ms ease, background 160ms ease;
+  transition: border-color 160ms ease, background 160ms ease, color 160ms ease, transform 160ms ease;
+}
+
+.pwa-theme-settings label:active {
+  transform: translateY(1px);
 }
 
 .pwa-theme-settings input {
@@ -1529,19 +1549,25 @@ body.pwa-shell .shelf-jump-top-btn {
 
 body.pwa-shell .mobile-app-dock {
   border-color: color-mix(in srgb, var(--pwa-line) 62%, transparent);
+  border-radius: 20px;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.070), rgba(255, 255, 255, 0.024)),
+    radial-gradient(circle at 8% 0%, rgba(var(--pwa-warm-rgb), 0.12), transparent 34%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.074), rgba(255, 255, 255, 0.024)),
     color-mix(in srgb, var(--pwa-panel-strong) 90%, transparent);
   box-shadow:
-    0 20px 50px rgba(0, 0, 0, 0.40),
-    inset 0 1px 0 rgba(255, 255, 255, 0.070);
+    0 22px 54px rgba(0, 0, 0, 0.42),
+    0 0 0 1px rgba(255, 255, 255, 0.035) inset,
+    inset 0 1px 0 rgba(255, 255, 255, 0.082);
 }
 
 body.pwa-shell .mobile-app-dock-btn,
 body.pwa-shell .mobile-dock-view-btn {
+  overflow: hidden;
+  border-color: color-mix(in srgb, var(--pwa-line) 58%, transparent);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.046), rgba(255, 255, 255, 0.018)),
     rgba(255, 255, 255, 0.024);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.040);
 }
 
 body.pwa-shell .mobile-app-dock-btn:hover,
@@ -1561,7 +1587,7 @@ body.pwa-shell .shelf-jump-chip.is-active,
 body.pwa-shell .room-map-shelf.is-active {
   border-color: color-mix(in srgb, var(--pwa-warm-2) 38%, transparent);
   background:
-    linear-gradient(135deg, rgba(var(--pwa-warm-rgb), 0.14), rgba(var(--pwa-accent-rgb), 0.055)),
+    linear-gradient(135deg, rgba(var(--pwa-warm-rgb), 0.17), rgba(var(--pwa-accent-rgb), 0.064)),
     color-mix(in srgb, var(--pwa-panel-strong) 88%, transparent);
   color: var(--pwa-accent-readable);
 }
