@@ -1588,8 +1588,12 @@ body.pwa-shell #image-popup-info .popup-book-primary-meta:has(.book-meta-pills),
 body.pwa-shell #image-popup-info .popup-book-primary-meta:has(.book-note) {
   border-color: color-mix(in srgb, var(--pwa-warm-2) 20%, transparent);
   background:
+    radial-gradient(circle at 0% 0%, rgba(var(--pwa-warm-rgb), 0.075), transparent 34%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.040), rgba(255, 255, 255, 0.014)),
     color-mix(in srgb, var(--pwa-panel) 42%, transparent);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.040),
+    0 8px 18px rgba(var(--pwa-shadow-rgb), 0.12);
 }
 
 body.pwa-shell #image-popup-info .popup-book-head {
@@ -1597,7 +1601,38 @@ body.pwa-shell #image-popup-info .popup-book-head {
 }
 
 body.pwa-shell #image-popup-info .popup-action-area {
-  border-top-color: color-mix(in srgb, var(--pwa-line) 44%, transparent);
+  border-color: color-mix(in srgb, var(--pwa-line) 52%, transparent);
+  background:
+    linear-gradient(90deg, rgba(var(--pwa-warm-rgb), 0.085) 0 4px, transparent 4px),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.042), rgba(255, 255, 255, 0.014)),
+    color-mix(in srgb, var(--pwa-panel) 40%, transparent);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.040),
+    0 10px 22px rgba(var(--pwa-shadow-rgb), 0.14);
+}
+
+body.pwa-shell #image-popup-info .popup-action-btn,
+body.pwa-shell #image-popup-info .popup-link-btn {
+  border-color: color-mix(in srgb, var(--pwa-line) 58%, transparent);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.056), rgba(255, 255, 255, 0.018)),
+    color-mix(in srgb, var(--pwa-panel-strong) 42%, transparent);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.050),
+    0 6px 14px rgba(var(--pwa-shadow-rgb), 0.12);
+}
+
+body.pwa-shell #image-popup-info .popup-action-btn.primary {
+  border-color: color-mix(in srgb, var(--pwa-warm-2) 38%, transparent);
+  background:
+    linear-gradient(180deg, rgba(var(--pwa-warm-rgb), 0.20), rgba(var(--pwa-warm-rgb), 0.070)),
+    color-mix(in srgb, var(--pwa-panel-strong) 46%, transparent);
+}
+
+body.pwa-shell #image-popup-info .popup-book-kicker span {
+  border-color: color-mix(in srgb, var(--pwa-warm-2) 24%, transparent);
+  background: rgba(var(--pwa-warm-rgb), 0.080);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.034);
 }
 
 body.pwa-shell #image-popup-info .series-list {
