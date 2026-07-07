@@ -39,6 +39,7 @@ let PREVIEW_INDEX_READY = false;
 let PREVIEW_COUNT_REQUEST_SEQ = 0;
 let PREVIEW_COUNT_DEBOUNCE_TIMER = null;
 let QUICK_BROWSE_COUNTS = null;
+let quickBrowseLastSignature = '';
 
 const QUICK_BROWSE_CONFIG = [
   {
@@ -775,6 +776,12 @@ function buildQuickBrowseItems_() {
   return shuffledCopy_(items).slice(0, 7);
 }
 
+function getQuickBrowseSignature_(items) {
+  return Array.isArray(items)
+    ? items.map(item => `${item.config && item.config.field ? item.config.field : ''}:${item.value}`).join('|')
+    : '';
+}
+
 function syncQuickBrowseRailVisibility_() {
   const rail = document.getElementById('quickBrowseRail');
   if (!rail) return;
@@ -783,12 +790,22 @@ function syncQuickBrowseRailVisibility_() {
   rail.hidden = !ready || isAdvancedOpen();
 }
 
-function renderQuickBrowseRail_() {
+function renderQuickBrowseRail_(options) {
   const rail = document.getElementById('quickBrowseRail');
   const chips = document.getElementById('quickBrowseChips');
   if (!rail || !chips) return;
 
-  const items = buildQuickBrowseItems_();
+  const shouldAvoidSame = Boolean(options && options.avoidSame);
+  let items = buildQuickBrowseItems_();
+  let signature = getQuickBrowseSignature_(items);
+
+  if (shouldAvoidSame && quickBrowseLastSignature && signature === quickBrowseLastSignature && items.length > 1) {
+    for (let i = 0; i < 4 && signature === quickBrowseLastSignature; i++) {
+      items = buildQuickBrowseItems_();
+      signature = getQuickBrowseSignature_(items);
+    }
+  }
+
   chips.innerHTML = items.map(item => `
     <button
       type="button"
@@ -803,8 +820,30 @@ function renderQuickBrowseRail_() {
     </button>
   `).join('');
 
+  quickBrowseLastSignature = signature;
   rail.dataset.ready = items.length ? 'true' : 'false';
   syncQuickBrowseRailVisibility_();
+}
+
+function shuffleQuickBrowseRail_() {
+  const rail = document.getElementById('quickBrowseRail');
+  const button = document.getElementById('quickBrowseRefresh');
+
+  if (button) {
+    button.disabled = true;
+    button.setAttribute('aria-busy', 'true');
+  }
+  if (rail) rail.classList.add('is-refreshing');
+
+  renderQuickBrowseRail_({ avoidSame: true });
+
+  window.setTimeout(() => {
+    if (rail) rail.classList.remove('is-refreshing');
+    if (button) {
+      button.disabled = false;
+      button.setAttribute('aria-busy', 'false');
+    }
+  }, 180);
 }
 
 function applyQuickBrowseCondition_(field, value) {

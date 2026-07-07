@@ -1894,6 +1894,23 @@ body.pwa-shell .quick-browse-kicker {
   color: rgba(246, 234, 216, 0.76);
 }
 
+body.pwa-shell .quick-browse-refresh {
+  border-color: color-mix(in srgb, var(--pwa-warm-2) 30%, transparent);
+  background:
+    linear-gradient(180deg, rgba(var(--pwa-warm-rgb), 0.11), rgba(255, 255, 255, 0.020)),
+    color-mix(in srgb, var(--pwa-panel-strong) 42%, transparent);
+  color: rgba(246, 234, 216, 0.88);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.045);
+}
+
+body.pwa-shell .quick-browse-refresh:hover,
+body.pwa-shell .quick-browse-refresh:focus-visible {
+  border-color: color-mix(in srgb, var(--pwa-warm-2) 54%, transparent);
+  background:
+    linear-gradient(180deg, rgba(var(--pwa-warm-rgb), 0.15), rgba(255, 255, 255, 0.024)),
+    color-mix(in srgb, var(--pwa-panel-strong) 48%, transparent);
+}
+
 body.pwa-shell button.quick-browse-chip {
   max-width: min(100%, 24rem);
   padding: 0.3rem 0.44rem 0.3rem 0.58rem;

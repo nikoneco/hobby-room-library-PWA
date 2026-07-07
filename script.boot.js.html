@@ -203,6 +203,17 @@ window.addEventListener('DOMContentLoaded', function() {
     });
   }
 
+  const quickBrowseRefresh = document.getElementById('quickBrowseRefresh');
+  if (quickBrowseRefresh) {
+    quickBrowseRefresh.addEventListener('click', function(event) {
+      event.preventDefault();
+      event.stopPropagation();
+      if (typeof shuffleQuickBrowseRail_ === 'function') {
+        shuffleQuickBrowseRail_();
+      }
+    });
+  }
+
   document.addEventListener('click', function(event) {
     const chip = event.target.closest('.genre-chip[data-genre-field]');
     if (!chip) return;

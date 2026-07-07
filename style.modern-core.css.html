@@ -1022,6 +1022,15 @@ button.quiet-action:hover,
   white-space: nowrap;
 }
 
+.quick-browse-heading {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
 .quick-browse-kicker::before {
   content: "";
   width: 0.46rem;
@@ -1038,6 +1047,58 @@ button.quiet-action:hover,
   height: 1.12rem;
   margin-left: 0.46rem;
   background: rgba(148, 163, 184, 0.20);
+}
+
+.quick-browse-refresh {
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.28rem;
+  padding: 0.16rem 0.5rem;
+  border: 1px solid rgba(240, 195, 122, 0.22);
+  border-radius: 999px;
+  background:
+    linear-gradient(180deg, rgba(240, 195, 122, 0.078), rgba(255, 255, 255, 0.020)),
+    rgba(8, 13, 19, 0.26);
+  color: rgba(246, 234, 216, 0.86);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.045);
+  font-size: 0.72rem;
+  font-weight: 760;
+  line-height: 1.2;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color 160ms ease, background 160ms ease, color 160ms ease, transform 160ms ease, opacity 160ms ease;
+}
+
+.quick-browse-refresh .ui-icon {
+  width: 0.92rem;
+  height: 0.92rem;
+}
+
+.quick-browse-refresh:hover,
+.quick-browse-refresh:focus-visible {
+  border-color: rgba(240, 195, 122, 0.46);
+  background:
+    linear-gradient(180deg, rgba(240, 195, 122, 0.12), rgba(255, 255, 255, 0.024)),
+    rgba(255, 255, 255, 0.030);
+  color: #fff5e4;
+  transform: translateY(-1px);
+}
+
+.quick-browse-refresh:focus-visible {
+  outline: 2px solid rgba(240, 195, 122, 0.48);
+  outline-offset: 2px;
+}
+
+.quick-browse-refresh:disabled {
+  cursor: default;
+  opacity: 0.72;
+  transform: none;
+}
+
+.quick-browse-rail.is-refreshing .quick-browse-chips {
+  opacity: 0.86;
 }
 
 .quick-browse-chips {
@@ -1156,6 +1217,16 @@ button.quick-browse-chip:focus-visible {
 
   .quick-browse-kicker::after {
     display: none;
+  }
+
+  .quick-browse-heading {
+    width: 100%;
+  }
+
+  .quick-browse-refresh {
+    min-height: 30px;
+    padding-inline: 0.48rem;
+    font-size: 0.7rem;
   }
 
   button.quick-browse-chip {
