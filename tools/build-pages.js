@@ -622,6 +622,7 @@ body.pwa-settings-open {
     inset 0 1px 0 rgba(255, 255, 255, 0.050);
   backdrop-filter: blur(14px);
   cursor: pointer;
+  transition: border-color 160ms ease, background 160ms ease, color 160ms ease, transform 160ms ease;
 }
 
 .pwa-settings-button span {
@@ -637,6 +638,19 @@ body.pwa-settings-open {
     linear-gradient(180deg, rgba(var(--pwa-warm-rgb), 0.14), rgba(255, 255, 255, 0.028)),
     color-mix(in srgb, var(--pwa-panel-strong) 84%, transparent);
   color: var(--pwa-accent-readable);
+}
+
+.pwa-settings-button:hover,
+.pwa-settings-button:focus-visible {
+  border-color: color-mix(in srgb, var(--pwa-warm-2) 38%, var(--pwa-line-strong));
+  background:
+    linear-gradient(180deg, rgba(var(--pwa-warm-rgb), 0.12), rgba(255, 255, 255, 0.026)),
+    color-mix(in srgb, var(--pwa-panel-strong) 82%, transparent);
+  color: var(--pwa-accent-readable);
+}
+
+.pwa-settings-button:active {
+  transform: translateY(1px);
 }
 
 .pwa-settings-backdrop {
@@ -662,7 +676,8 @@ body.pwa-settings-open {
   border: 1px solid color-mix(in srgb, var(--pwa-line) 72%, transparent);
   border-radius: 18px;
   background:
-    radial-gradient(circle at 0% 0%, rgba(var(--pwa-warm-rgb), 0.10), transparent 35%),
+    radial-gradient(circle at 0% 0%, rgba(var(--pwa-warm-rgb), 0.13), transparent 35%),
+    radial-gradient(circle at 100% 16%, rgba(var(--pwa-accent-rgb), 0.080), transparent 32%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.064), rgba(255, 255, 255, 0.024)),
     color-mix(in srgb, var(--pwa-panel-strong) 96%, transparent);
   color: #edf5f7;
@@ -711,14 +726,20 @@ body.pwa-settings-open {
 }
 
 .pwa-settings-section {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
   margin: 10px 0 0;
   padding: 11px;
   border: 1px solid color-mix(in srgb, var(--pwa-line) 50%, transparent);
   border-radius: 13px;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.040), rgba(255, 255, 255, 0.014)),
-    rgba(255, 255, 255, 0.020);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.040);
+    linear-gradient(90deg, rgba(var(--pwa-warm-rgb), 0.070) 0 4px, transparent 4px),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.048), rgba(255, 255, 255, 0.014)),
+    rgba(255, 255, 255, 0.024);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.046),
+    0 8px 18px rgba(var(--pwa-shadow-rgb), 0.12);
 }
 
 .pwa-settings-section-title {
@@ -741,6 +762,7 @@ body.pwa-settings-open {
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.040), rgba(255, 255, 255, 0.012)),
     rgba(255, 255, 255, 0.024);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.036);
 }
 
 .pwa-settings-row-title,
@@ -772,7 +794,9 @@ body.pwa-settings-open {
 
 .pwa-settings-toggle-row:hover {
   border-color: color-mix(in srgb, var(--pwa-warm-2) 24%, var(--pwa-line));
-  background: rgba(var(--pwa-warm-rgb), 0.050);
+  background:
+    linear-gradient(180deg, rgba(var(--pwa-warm-rgb), 0.082), rgba(255, 255, 255, 0.016)),
+    rgba(var(--pwa-warm-rgb), 0.040);
 }
 
 .pwa-settings-toggle-row:active {
@@ -816,6 +840,13 @@ body.pwa-settings-open {
   background: rgba(var(--pwa-warm-rgb), 0.16);
 }
 
+.pwa-settings-toggle-row:has(input:checked) {
+  border-color: color-mix(in srgb, var(--pwa-warm-2) 34%, var(--pwa-line));
+  background:
+    linear-gradient(90deg, rgba(var(--pwa-warm-rgb), 0.10), rgba(var(--pwa-accent-rgb), 0.044)),
+    rgba(255, 255, 255, 0.030);
+}
+
 .pwa-settings-toggle-row input:checked + .pwa-mini-switch::after {
   transform: translateX(18px);
   background: var(--pwa-warm-2);
@@ -845,12 +876,13 @@ body.pwa-settings-open {
 }
 
 .pwa-theme-settings label {
+  position: relative;
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 6px;
-  min-height: 40px;
-  padding: 8px 9px;
+  justify-content: flex-start;
+  gap: 8px;
+  min-height: 44px;
+  padding: 8px 10px;
   border: 1px solid color-mix(in srgb, var(--pwa-line) 58%, transparent);
   border-radius: 11px;
   background:
@@ -863,12 +895,58 @@ body.pwa-settings-open {
   transition: border-color 160ms ease, background 160ms ease, color 160ms ease, transform 160ms ease;
 }
 
+.pwa-theme-settings label::before {
+  content: "";
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  border: 1px solid rgba(255, 255, 255, 0.20);
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--theme-swatch-1, #0a1217), var(--theme-swatch-2, #7fb2bd));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    0 6px 14px rgba(0, 0, 0, 0.28);
+}
+
+.pwa-theme-settings label:has(input[value="shinhaku"]) {
+  --theme-swatch-1: #0a1217;
+  --theme-swatch-2: #7fb2bd;
+}
+
+.pwa-theme-settings label:has(input[value="kohi"]) {
+  --theme-swatch-1: #151015;
+  --theme-swatch-2: #e99a88;
+}
+
+.pwa-theme-settings label:has(input[value="shikon"]) {
+  --theme-swatch-1: #10111c;
+  --theme-swatch-2: #b3a2ff;
+}
+
+.pwa-theme-settings label:has(input[value="kohaku"]) {
+  --theme-swatch-1: #14110b;
+  --theme-swatch-2: #f0c37a;
+}
+
+.pwa-theme-settings label:hover,
+.pwa-theme-settings label:focus-within {
+  border-color: color-mix(in srgb, var(--pwa-warm-2) 28%, var(--pwa-line));
+  background:
+    linear-gradient(180deg, rgba(var(--pwa-warm-rgb), 0.082), rgba(255, 255, 255, 0.016)),
+    rgba(255, 255, 255, 0.030);
+  color: rgba(237, 245, 247, 0.92);
+}
+
 .pwa-theme-settings label:active {
   transform: translateY(1px);
 }
 
 .pwa-theme-settings input {
-  accent-color: var(--pwa-accent);
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .pwa-perf-hud {
