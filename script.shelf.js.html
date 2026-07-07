@@ -1092,6 +1092,7 @@ function showResult(data) {
         <div class="genre-chip-wrap card-chip-wrap">${buildGenreChips(book, { limit: 4 })}</div>
         ${buildBookMetaPillsHtml_(book, { mode: 'card' })}
         ${buildBookMemoHtml_(book)}
+        <div class="book-open-cue" aria-hidden="true"><span>詳細</span>${uiIcon_('chevronDown', 'book-open-cue-icon')}</div>
       `;
 
       appendSummaryAccordion_(info.querySelector('.genre-chip-wrap'), book);
@@ -1142,6 +1143,7 @@ function showResult(data) {
         ${buildListBookMetaHtml_(book)}
         <div class="genre-chip-wrap compact">${buildGenreChips(book)}</div>
         ${buildBookMetaPillsHtml_(book, { compact: true })}
+        <div class="book-open-cue list-open-cue" aria-hidden="true"><span>詳細</span>${uiIcon_('chevronDown', 'book-open-cue-icon')}</div>
       `;
 
       appendSummaryAccordion_(titleBlock.querySelector('.genre-chip-wrap'), book);
