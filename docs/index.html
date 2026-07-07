@@ -296,6 +296,7 @@
   <div id="result"></div>
 
   <nav id="mobileAppDock" class="mobile-app-dock" aria-label="主要操作">
+    <div id="mobileDockStatus" class="mobile-app-dock-status" aria-live="polite">検索前</div>
     <div class="mobile-app-dock-primary">
       <button type="button" class="mobile-app-dock-btn" data-action="focus-search" aria-label="検索欄へ移動">
         <span class="ui-icon" aria-hidden="true">
@@ -309,11 +310,11 @@
         </span>
         <span>ランダム</span>
       </button>
-      <button type="button" class="mobile-app-dock-btn primary" data-action="bookshelf" aria-label="本棚を見る">
+      <button type="button" class="mobile-app-dock-btn primary" data-action="bookshelf" aria-label="本棚を開く">
         <span class="ui-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24"><path d="M4 20h16"></path><path d="M5 4h3v13H5z"></path><path d="M10 4h3v13h-3z"></path><path d="M15 5l3-.8 3.4 12.8-3 .8z"></path></svg>
         </span>
-        <span>本棚</span>
+        <span>棚へ</span>
       </button>
     </div>
     <div class="mobile-dock-view-switch" role="group" aria-label="表示モード">
@@ -329,11 +330,11 @@
         </span>
         <span>リスト</span>
       </button>
-      <button type="button" class="mobile-dock-view-btn" data-view-mode="shelf" aria-label="本棚表示" aria-pressed="false">
+      <button type="button" class="mobile-dock-view-btn" data-view-mode="shelf" aria-label="棚表示" aria-pressed="false">
         <span class="ui-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24"><path d="M4 20h16"></path><path d="M5 4h3v13H5z"></path><path d="M10 4h3v13h-3z"></path><path d="M15 5l3-.8 3.4 12.8-3 .8z"></path></svg>
         </span>
-        <span>本棚</span>
+        <span>棚表示</span>
       </button>
     </div>
   </nav>
@@ -373,6 +374,6 @@
   <script src="./assets/js/script.render.62b59777f9.js"></script>
   <script src="./assets/js/script.shelf.fe414d8c62.js"></script>
   <script src="./assets/js/script.modal.832c6724b5.js"></script>
-  <script src="./assets/js/script.boot.ab98affc4d.js"></script>
+  <script src="./assets/js/script.boot.6c908a3df9.js"></script>
 </body>
 </html>

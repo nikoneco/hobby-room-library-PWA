@@ -248,12 +248,42 @@ function getMobileAppDockActiveAction_() {
   return 'focus-search';
 }
 
+function getMobileDockViewLabel_(mode) {
+  switch (mode) {
+    case 'list':
+      return 'リスト表示';
+    case 'shelf':
+      return '棚表示';
+    case 'card':
+    default:
+      return 'タイル表示';
+  }
+}
+
+function getMobileDockStatusText_(hasResults) {
+  if (!hasResults) return '検索前';
+
+  const count = Array.isArray(lastResult) ? lastResult.length : 0;
+  if (searchStatusState && searchStatusState.mode === 'random') {
+    return `${count}冊をランダム表示`;
+  }
+  if (searchStatusState && searchStatusState.mode === 'shelf') {
+    return `全${count}冊 / 棚表示`;
+  }
+  return `${count}冊 / ${getMobileDockViewLabel_(getCurrentViewMode_())}`;
+}
+
 function syncMobileAppDockState_(activeAction) {
   const dock = document.getElementById('mobileAppDock');
   if (!dock) return;
 
   const hasResults = Array.isArray(lastResult) && lastResult.length > 0;
   dock.classList.toggle('has-results', hasResults);
+  dock.setAttribute('aria-label', hasResults ? '主要操作と表示切替' : '主要操作');
+  const status = document.getElementById('mobileDockStatus');
+  if (status) {
+    status.textContent = getMobileDockStatusText_(hasResults);
+  }
   if (document.body) {
     document.body.classList.toggle('mobile-dock-has-results', hasResults);
   }
