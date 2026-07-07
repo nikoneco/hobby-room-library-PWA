@@ -425,9 +425,31 @@
     text-align: center;
   }
 
+  .search-status-area.has-condition-stack {
+    display: flex;
+    width: min(100%, 520px);
+    max-width: min(100%, 520px);
+    padding: 0.58rem 0.72rem 0.62rem 0.82rem;
+  }
+
+  .search-status-area.has-condition-stack .search-status-count {
+    align-self: auto;
+    justify-content: center;
+    padding-right: 0;
+    border-right: 0;
+  }
+
   .search-status-chips {
     width: 100%;
     justify-content: center;
+  }
+
+  .search-status-area.has-condition-stack .search-status-chips {
+    justify-content: center;
+  }
+
+  .search-status-area.has-condition-stack .search-status-librarian-note {
+    text-align: center;
   }
 
   .search-status-chip {

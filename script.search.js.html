@@ -1341,7 +1341,13 @@ function renderSearchStatus_() {
   }
   els.area.classList.toggle('has-librarian-note', Boolean(librarianNote));
 
+  const chipCount = searchStatusState.chips.length;
   const removableChipCount = searchStatusState.chips.filter(chip => chip && chip.removable).length;
+  els.area.classList.toggle('has-condition-stack', chipCount > 1 || Boolean(librarianNote));
+  els.chips.setAttribute(
+    'aria-label',
+    chipCount > 0 ? '現在の絞り込み条件' : '検索状態'
+  );
 
   els.chips.innerHTML = searchStatusState.chips.map(chip => {
     const canRemoveChip = chip.removable && removableChipCount > 1;
@@ -1365,6 +1371,7 @@ function renderSearchStatus_() {
         data-action="remove-chip"
         data-key="${escapeHtml(chip.key || '')}"
         aria-label="${escapeHtml(visibleLabel + ' を削除')}"
+        title="${escapeHtml(visibleLabel + ' を外す')}"
       >${uiIcon_('close', 'ui-icon-inline')}</button>
     ` : '';
 
@@ -1388,6 +1395,7 @@ function renderSearchStatus_() {
         class="search-status-reroll"
         data-action="random-reroll"
         aria-label="ランダムで別の10冊を表示"
+        title="ランダム選書をやり直す"
         ${rerollBusyAttrs}
       >${uiIcon_('shuffle', 'ui-icon-inline')}<span>もう一度ひく</span></button>
     `);
