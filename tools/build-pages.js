@@ -1190,7 +1190,7 @@ body.pwa-shell .spinner-label {
 
 body.pwa-shell .book-card {
   background:
-    radial-gradient(circle at 50% 0%, rgba(var(--pwa-accent-rgb), 0.055), transparent 38%),
+    radial-gradient(circle at 50% 0%, rgba(var(--pwa-accent-rgb), 0.070), transparent 42%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.046), rgba(255, 255, 255, 0.020)),
     color-mix(in srgb, var(--pwa-panel) 76%, transparent);
   border-color: color-mix(in srgb, var(--pwa-line) 58%, transparent);
@@ -1210,9 +1210,18 @@ body.pwa-shell .book-card:hover {
     color-mix(in srgb, var(--pwa-panel-strong) 78%, transparent);
 }
 
+body.pwa-shell .card-view .book-card::after {
+  background: linear-gradient(90deg, transparent, rgba(var(--pwa-warm-rgb), 0.20), transparent);
+}
+
+body.pwa-shell .card-info {
+  border-top-color: color-mix(in srgb, var(--pwa-line) 46%, transparent);
+}
+
 body.pwa-shell .book-card.list {
   border-color: color-mix(in srgb, var(--pwa-line) 56%, transparent);
   background:
+    radial-gradient(circle at 0% 50%, rgba(var(--pwa-accent-rgb), 0.052), transparent 34%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.044), rgba(255, 255, 255, 0.020)),
     color-mix(in srgb, var(--pwa-panel) 76%, transparent);
 }
@@ -1225,6 +1234,7 @@ body.pwa-shell .book-card.list:hover,
 body.pwa-shell .book-card.list.open {
   border-color: color-mix(in srgb, var(--pwa-warm-2) 32%, var(--pwa-line));
   background:
+    radial-gradient(circle at 0% 50%, rgba(var(--pwa-warm-rgb), 0.070), transparent 36%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.058), rgba(255, 255, 255, 0.026)),
     color-mix(in srgb, var(--pwa-panel-strong) 78%, transparent);
 }
@@ -1238,6 +1248,12 @@ body.pwa-shell .book-card.list.open {
 body.pwa-shell .book-cover,
 body.pwa-shell .list-thumb {
   border-color: rgba(255, 255, 255, 0.075);
+}
+
+body.pwa-shell .book-card:hover .book-cover,
+body.pwa-shell .book-card.list:hover .list-thumb,
+body.pwa-shell .book-card.list.open .list-thumb {
+  border-color: color-mix(in srgb, var(--pwa-warm-2) 24%, transparent);
 }
 
 body.pwa-shell .card-view .book-meta-pill {
