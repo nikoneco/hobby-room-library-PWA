@@ -1221,9 +1221,30 @@ body.pwa-shell .bookshelf-group,
 body.pwa-shell .shelf-room-map,
 body.pwa-shell .shelf-room-map-modal-panel {
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.050), rgba(255, 255, 255, 0.024)),
-    color-mix(in srgb, var(--pwa-panel) 78%, transparent);
+    radial-gradient(circle at 0% 0%, rgba(var(--pwa-warm-rgb), 0.078), transparent 34%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.054), rgba(255, 255, 255, 0.020)),
+    color-mix(in srgb, var(--pwa-panel) 82%, transparent);
   border-color: color-mix(in srgb, var(--pwa-line) 58%, transparent);
+}
+
+body.pwa-shell .shelf-room-map,
+body.pwa-shell .shelf-room-map-modal-panel {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border-color: color-mix(in srgb, var(--pwa-warm-2) 22%, var(--pwa-line));
+  box-shadow:
+    0 18px 42px rgba(var(--pwa-shadow-rgb), 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.052);
+}
+
+body.pwa-shell .shelf-room-map-summary,
+body.pwa-shell .shelf-room-map-modal-header {
+  border-bottom-color: rgba(var(--pwa-warm-rgb), 0.16);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.046), rgba(255, 255, 255, 0.014)),
+    color-mix(in srgb, var(--pwa-panel-strong) 78%, transparent);
+  color: var(--pwa-accent-readable);
 }
 
 body.pwa-shell .bookshelf-group::before {
@@ -1250,8 +1271,12 @@ body.pwa-shell .shelf-room-map-canvas {
 
 body.pwa-shell .shelf-room-map-canvas {
   background:
-    radial-gradient(circle at 48% 38%, rgba(var(--pwa-warm-rgb), 0.060), transparent 33%),
+    radial-gradient(circle at 48% 38%, rgba(var(--pwa-warm-rgb), 0.072), transparent 33%),
+    radial-gradient(circle at 82% 72%, rgba(var(--pwa-accent-rgb), 0.050), transparent 24%),
     linear-gradient(135deg, color-mix(in srgb, var(--pwa-panel-strong) 86%, transparent), color-mix(in srgb, var(--pwa-bg-bottom) 96%, transparent));
+  box-shadow:
+    inset 0 0 46px rgba(0, 0, 0, 0.50),
+    0 12px 28px rgba(var(--pwa-shadow-rgb), 0.30);
 }
 
 body.pwa-shell .room-map-fixture,
@@ -1260,9 +1285,28 @@ body.pwa-shell .room-map-outline {
 }
 
 body.pwa-shell .room-map-shelf {
+  border-color: color-mix(in srgb, var(--pwa-warm-2) 30%, transparent);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.046), rgba(255, 255, 255, 0.018)),
-    color-mix(in srgb, var(--pwa-panel-strong) 78%, transparent);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.062), rgba(255, 255, 255, 0.018)),
+    color-mix(in srgb, var(--pwa-panel-strong) 84%, transparent);
+  box-shadow:
+    0 8px 18px rgba(var(--pwa-shadow-rgb), 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.048);
+}
+
+body.pwa-shell .room-map-shelf-count {
+  border: 1px solid rgba(var(--pwa-warm-rgb), 0.18);
+  background: rgba(0, 0, 0, 0.20);
+  color: color-mix(in srgb, var(--pwa-accent-readable) 82%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+}
+
+body.pwa-shell .shelf-room-map-modal-hint {
+  border-color: rgba(var(--pwa-warm-rgb), 0.14);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.042), rgba(255, 255, 255, 0.016)),
+    rgba(0, 0, 0, 0.16);
+  color: color-mix(in srgb, var(--pwa-accent-readable) 76%, transparent);
 }
 
 body.pwa-shell #image-popup-content {
@@ -1949,18 +1993,45 @@ body.pwa-shell .shelf-view .shelf-view-stat {
 }
 
 body.pwa-shell .shelf-view .shelf-jump-nav {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  padding: 0.78rem 0.88rem 0.82rem;
   border-color: color-mix(in srgb, var(--pwa-line) 62%, transparent);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.060), rgba(255, 255, 255, 0.024)),
-    color-mix(in srgb, var(--pwa-panel-strong) 76%, transparent);
+    radial-gradient(circle at 0% 0%, rgba(var(--pwa-warm-rgb), 0.10), transparent 34%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.072), rgba(255, 255, 255, 0.026)),
+    color-mix(in srgb, var(--pwa-panel-strong) 80%, transparent);
   box-shadow:
     0 16px 38px rgba(var(--pwa-shadow-rgb), 0.25),
-    inset 0 1px 0 rgba(255, 255, 255, 0.050);
+    inset 0 1px 0 rgba(255, 255, 255, 0.060),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.18);
+}
+
+body.pwa-shell .shelf-view .shelf-jump-nav::before {
+  background: linear-gradient(180deg, rgba(var(--pwa-warm-rgb), 0.78), rgba(var(--pwa-warm-rgb), 0.18));
+}
+
+body.pwa-shell .shelf-view .shelf-jump-nav-header {
+  margin-bottom: 0.58rem;
+  padding-bottom: 0.58rem;
+  border-bottom-color: rgba(255, 255, 255, 0.070);
+}
+
+body.pwa-shell .shelf-view .shelf-jump-chip-row {
+  gap: 0.44rem;
+  padding-bottom: 0.08rem;
+  scrollbar-color: rgba(var(--pwa-warm-rgb), 0.54) rgba(255, 255, 255, 0.045);
 }
 
 body.pwa-shell .shelf-view .shelf-jump-chip,
 body.pwa-shell .shelf-view .shelf-jump-top-btn {
-  background: rgba(255, 255, 255, 0.038);
+  min-height: 36px;
+  border-color: color-mix(in srgb, var(--pwa-line) 68%, transparent);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.052), rgba(255, 255, 255, 0.018)),
+    rgba(255, 255, 255, 0.032);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.044);
 }
 
 body.pwa-shell .shelf-view .shelf-jump-chip:hover,
@@ -2189,10 +2260,13 @@ body.pwa-shell .shelf-room-map-overlay {
 }
 
 body.pwa-shell .room-map-shelf {
-  border-color: color-mix(in srgb, var(--pwa-warm-2) 24%, transparent);
+  border-color: color-mix(in srgb, var(--pwa-warm-2) 30%, transparent);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.046), rgba(255, 255, 255, 0.018)),
-    color-mix(in srgb, var(--pwa-panel-strong) 78%, transparent);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.062), rgba(255, 255, 255, 0.018)),
+    color-mix(in srgb, var(--pwa-panel-strong) 84%, transparent);
+  box-shadow:
+    0 8px 18px rgba(var(--pwa-shadow-rgb), 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.048);
 }
 
 body.pwa-shell .room-map-shelf:hover,
@@ -2203,6 +2277,24 @@ body.pwa-shell .shelf-book:focus-visible {
   box-shadow:
     0 14px 30px rgba(0, 0, 0, 0.26),
     0 0 0 1px rgba(var(--pwa-warm-rgb), 0.070) inset;
+}
+
+body.pwa-shell .room-map-shelf:hover,
+body.pwa-shell .room-map-shelf:focus-visible {
+  background:
+    linear-gradient(180deg, rgba(var(--pwa-warm-rgb), 0.12), rgba(255, 255, 255, 0.024)),
+    color-mix(in srgb, var(--pwa-panel-strong) 88%, transparent);
+}
+
+body.pwa-shell .room-map-shelf.is-active {
+  border-color: color-mix(in srgb, var(--pwa-warm-2) 54%, white);
+  background:
+    linear-gradient(180deg, rgba(var(--pwa-warm-rgb), 0.18), rgba(255, 255, 255, 0.026)),
+    color-mix(in srgb, var(--pwa-panel-strong) 92%, transparent);
+  box-shadow:
+    0 0 0 2px rgba(var(--pwa-warm-rgb), 0.18),
+    0 16px 32px rgba(0, 0, 0, 0.40),
+    inset 0 1px 0 rgba(255, 255, 255, 0.075);
 }
 
 body.pwa-shell .pwa-theme-settings label:has(input:checked) {

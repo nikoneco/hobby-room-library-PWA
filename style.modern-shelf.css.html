@@ -108,16 +108,37 @@
 
 .shelf-jump-nav,
 .shelf-jump-nav.immersive {
-  padding: 0.72rem 0.84rem;
-  border-color: rgba(255, 255, 255, 0.085);
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  padding: 0.78rem 0.88rem 0.82rem;
+  border-color: rgba(255, 255, 255, 0.11);
   border-radius: calc(var(--lib-radius-md) + 6px);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.060), rgba(255, 255, 255, 0.028)),
-    rgba(9, 14, 20, 0.78);
+    radial-gradient(circle at 0% 0%, rgba(214, 164, 95, 0.10), transparent 34%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.072), rgba(255, 255, 255, 0.026)),
+    rgba(9, 14, 20, 0.82);
   box-shadow:
     0 16px 38px rgba(0, 0, 0, 0.25),
-    inset 0 1px 0 rgba(255, 255, 255, 0.050);
+    inset 0 1px 0 rgba(255, 255, 255, 0.060),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.18);
   backdrop-filter: blur(14px);
+}
+
+.shelf-jump-nav::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  z-index: -1;
+  width: 4px;
+  background: linear-gradient(180deg, rgba(240, 195, 122, 0.78), rgba(214, 164, 95, 0.18));
+  pointer-events: none;
+}
+
+.shelf-jump-nav-header {
+  margin-bottom: 0.58rem;
+  padding-bottom: 0.58rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.070);
 }
 
 .shelf-jump-nav-label {
@@ -125,12 +146,21 @@
   letter-spacing: 0;
 }
 
+.shelf-jump-chip-row {
+  gap: 0.44rem;
+  padding-bottom: 0.08rem;
+  scrollbar-color: rgba(214, 164, 95, 0.54) rgba(255, 255, 255, 0.045);
+}
+
 .shelf-jump-top-btn,
 .shelf-jump-chip {
-  min-height: 34px;
-  border-color: rgba(255, 255, 255, 0.082);
-  background: rgba(255, 255, 255, 0.038);
+  min-height: 36px;
+  border-color: rgba(255, 255, 255, 0.10);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.052), rgba(255, 255, 255, 0.018)),
+    rgba(255, 255, 255, 0.032);
   color: var(--lib-muted);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.044);
 }
 
 .shelf-jump-chip:hover,
@@ -144,7 +174,9 @@
 
 .shelf-jump-map-chip {
   border-color: rgba(214, 164, 95, 0.34);
-  background: rgba(214, 164, 95, 0.12);
+  background:
+    linear-gradient(180deg, rgba(214, 164, 95, 0.16), rgba(214, 164, 95, 0.070)),
+    rgba(214, 164, 95, 0.12);
   color: #f5ddb7;
 }
 
@@ -375,15 +407,25 @@ body.shelf-immersive-active .shelf-book:focus-visible {
 
 .shelf-room-map,
 .shelf-room-map-modal-panel {
-  border-color: rgba(240, 195, 122, 0.18);
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border-color: rgba(240, 195, 122, 0.22);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.046), rgba(255, 255, 255, 0.020)),
-    rgba(8, 13, 18, 0.86);
+    radial-gradient(circle at 0% 0%, rgba(240, 195, 122, 0.078), transparent 34%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.054), rgba(255, 255, 255, 0.020)),
+    rgba(8, 13, 18, 0.88);
+  box-shadow:
+    0 18px 42px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.052);
 }
 
 .shelf-room-map-summary,
 .shelf-room-map-modal-header {
-  background: rgba(10, 15, 21, 0.72);
+  border-bottom-color: rgba(240, 195, 122, 0.16);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.046), rgba(255, 255, 255, 0.014)),
+    rgba(10, 15, 21, 0.76);
   color: #f6ead8;
 }
 
@@ -392,17 +434,24 @@ body.shelf-immersive-active .shelf-book:focus-visible {
 }
 
 .shelf-room-map-canvas {
-  border-color: rgba(240, 195, 122, 0.18);
+  border-color: rgba(240, 195, 122, 0.20);
   background:
-    radial-gradient(circle at 48% 38%, rgba(240, 195, 122, 0.060), transparent 33%),
+    radial-gradient(circle at 48% 38%, rgba(240, 195, 122, 0.072), transparent 33%),
+    radial-gradient(circle at 82% 72%, rgba(126, 173, 181, 0.050), transparent 24%),
     linear-gradient(135deg, rgba(18, 24, 31, 0.94), rgba(8, 11, 15, 0.96));
+  box-shadow:
+    inset 0 0 46px rgba(0, 0, 0, 0.50),
+    0 12px 28px rgba(0, 0, 0, 0.30);
 }
 
 .room-map-shelf {
-  border-color: rgba(240, 195, 122, 0.26);
+  border-color: rgba(240, 195, 122, 0.30);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.050), rgba(255, 255, 255, 0.018)),
-    rgba(20, 28, 36, 0.82);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.062), rgba(255, 255, 255, 0.018)),
+    rgba(20, 28, 36, 0.86);
+  box-shadow:
+    0 8px 18px rgba(0, 0, 0, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.048);
 }
 
 .room-map-shelf:hover,
@@ -416,11 +465,24 @@ body.shelf-immersive-active .shelf-book:focus-visible {
 
 .room-map-shelf.is-active {
   border-color: rgba(255, 232, 190, 0.92);
-  box-shadow: 0 0 0 2px rgba(214, 164, 95, 0.18), 0 12px 26px rgba(0, 0, 0, 0.36);
+  background:
+    linear-gradient(180deg, rgba(240, 195, 122, 0.18), rgba(255, 255, 255, 0.026)),
+    rgba(24, 32, 40, 0.92);
+  box-shadow:
+    0 0 0 2px rgba(214, 164, 95, 0.18),
+    0 16px 32px rgba(0, 0, 0, 0.40),
+    inset 0 1px 0 rgba(255, 255, 255, 0.075);
 }
 
 .room-map-shelf-label {
   color: #f6ead8;
+}
+
+.room-map-shelf-count {
+  border: 1px solid rgba(240, 195, 122, 0.18);
+  background: rgba(0, 0, 0, 0.20);
+  color: rgba(255, 242, 214, 0.82);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
 }
 
 body.shelf-immersive-active .shelf-room-map-fab {
@@ -446,6 +508,14 @@ body.shelf-immersive-active .shelf-room-map-fab:focus-visible {
   color: #f6ead8;
 }
 
+.shelf-room-map-modal-hint {
+  border: 1px solid rgba(240, 195, 122, 0.14);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.042), rgba(255, 255, 255, 0.016)),
+    rgba(0, 0, 0, 0.16);
+  color: rgba(246, 234, 216, 0.76);
+}
+
 @media (max-width: 760px) {
   .shelf-view {
     padding-inline: clamp(0.64rem, 3vw, 0.92rem);
@@ -466,6 +536,15 @@ body.shelf-immersive-active .shelf-room-map-fab:focus-visible {
   .bookshelf-group,
   .bookshelf-level {
     border-radius: calc(var(--lib-radius-md) + 2px);
+  }
+
+  .shelf-jump-nav {
+    padding: 0.74rem 0.76rem 0.78rem;
+  }
+
+  .shelf-jump-top-btn,
+  .shelf-jump-chip {
+    min-height: 38px;
   }
 
   .bookshelf-group::after {
