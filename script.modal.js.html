@@ -1313,14 +1313,15 @@ function showSeriesPanel(sourceBook, seriesBooks, returnContext) {
   clearPopupTouchHandlers_();
 
   const listHtml = items.length
-    ? items.map((item, idx) => `
-        <button type="button" class="series-list-item" data-series-index="${idx}">
+    ? items.map((item, idx) => {
+      const isCurrent = isCurrentSeriesBook_(sourceBook, item);
+      return `
+        <button type="button" class="series-list-item${isCurrent ? ' is-current' : ''}" data-series-index="${idx}" aria-label="${escapeHtml(item.title || 'シリーズ内の本')} の詳細を開く">
           <span class="series-list-title">${escapeHtml(item.title || '(タイトルなし)')}</span>
-          <span class="series-list-meta">
-            発: ${escapeHtml(item.released || '-')} ／ 棚: ${escapeHtml(item.shelf || '-')}-${escapeHtml(item.location || '')}
-          </span>
+          ${buildSeriesListMetaHtml_(item, isCurrent)}
         </button>
-      `).join('')
+      `;
+    }).join('')
     : '<div class="series-empty">同じシリーズの本が見つかりませんでした。</div>';
 
   info.innerHTML = `
@@ -1376,6 +1377,51 @@ function showSeriesPanel(sourceBook, seriesBooks, returnContext) {
       document.onkeydown = null;
     }
   };
+}
+
+function isCurrentSeriesBook_(sourceBook, item) {
+  if (!sourceBook || !item) return false;
+  if (hasDisplayValue_(sourceBook.rowIndex) && hasDisplayValue_(item.rowIndex)) {
+    return String(sourceBook.rowIndex) === String(item.rowIndex);
+  }
+  if (hasDisplayValue_(sourceBook.isbn) && hasDisplayValue_(item.isbn)) {
+    return String(sourceBook.isbn).trim() === String(item.isbn).trim();
+  }
+  return (
+    hasDisplayValue_(sourceBook.title) &&
+    hasDisplayValue_(item.title) &&
+    String(sourceBook.title).trim() === String(item.title).trim() &&
+    String(sourceBook.released || '').trim() === String(item.released || '').trim()
+  );
+}
+
+function buildSeriesListMetaHtml_(item, isCurrent) {
+  const chips = [];
+  const shelfLabel = typeof formatShelfLabel_ === 'function' ? formatShelfLabel_(item) : '';
+
+  if (hasDisplayValue_(item && item.released)) {
+    chips.push({ label: '発売', value: item.released, kind: 'released' });
+  }
+  if (shelfLabel) {
+    chips.push({ label: '棚', value: shelfLabel, kind: 'location' });
+  }
+  if (isCurrent) {
+    chips.push({ label: '', value: '表示中', kind: 'current' });
+  }
+  if (!chips.length) {
+    chips.push({ label: '', value: '詳細未登録', kind: 'empty' });
+  }
+
+  return `
+    <span class="series-list-meta">
+      ${chips.map(chip => `
+        <span class="series-list-meta-chip ${escapeHtml(chip.kind)}">
+          ${chip.label ? `<span class="series-list-meta-label">${escapeHtml(chip.label)}</span>` : ''}
+          <span class="series-list-meta-value">${escapeHtml(chip.value)}</span>
+        </span>
+      `).join('')}
+    </span>
+  `;
 }
 
 function showPopup(book, index, dataArr, seriesContext, options) {

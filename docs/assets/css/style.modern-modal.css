@@ -915,9 +915,9 @@ button.popup-arrow:active {
   position: relative;
   counter-increment: series-item;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) max-content;
-  align-items: center;
-  gap: 0.42rem 0.72rem;
+  grid-template-columns: minmax(0, 1fr) minmax(9.5rem, auto);
+  align-items: start;
+  gap: 0.42rem 0.74rem;
   min-height: 3.05rem;
   padding: 0.62rem 0.72rem;
   border: 1px solid rgba(148, 163, 184, 0.10);
@@ -928,6 +928,13 @@ button.popup-arrow:active {
     rgba(8, 13, 19, 0.18);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.030);
   transition: border-color var(--lib-ease), background var(--lib-ease), color var(--lib-ease), transform var(--lib-ease), box-shadow var(--lib-ease);
+}
+
+.series-list-item.is-current {
+  border-color: rgba(240, 195, 122, 0.34);
+  background:
+    linear-gradient(90deg, rgba(240, 195, 122, 0.120), rgba(104, 191, 215, 0.035)),
+    rgba(8, 13, 19, 0.26);
 }
 
 .series-list-item:last-child {
@@ -981,22 +988,59 @@ button.popup-arrow:active {
 }
 
 .series-list-meta {
-  display: inline-flex;
+  display: flex;
   max-width: 100%;
   flex: 0 1 auto;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
-  padding: 0.2rem 0.48rem;
+  gap: 0.28rem;
+  font-size: 0.76rem;
+  line-height: 1.35;
+  text-align: right;
+}
+
+.series-list-meta-chip {
+  display: inline-flex;
+  min-width: 0;
+  min-height: 1.58rem;
+  align-items: center;
+  gap: 0.26rem;
+  padding: 0.18rem 0.46rem;
   border: 1px solid rgba(104, 191, 215, 0.16);
   border-radius: 999px;
   background:
     linear-gradient(180deg, rgba(104, 191, 215, 0.10), rgba(104, 191, 215, 0.035)),
     rgba(8, 13, 19, 0.22);
-  font-size: 0.76rem;
-  line-height: 1.35;
-  text-align: right;
-  white-space: normal;
+  color: rgba(217, 231, 240, 0.76);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.034);
+}
+
+.series-list-meta-chip.current {
+  border-color: rgba(240, 195, 122, 0.26);
+  background:
+    linear-gradient(180deg, rgba(240, 195, 122, 0.14), rgba(240, 195, 122, 0.045)),
+    rgba(8, 13, 19, 0.24);
+  color: rgba(255, 242, 214, 0.90);
+}
+
+.series-list-meta-chip.empty {
+  border-color: rgba(148, 163, 184, 0.11);
+  background: rgba(255, 255, 255, 0.020);
+  color: rgba(217, 231, 240, 0.56);
+}
+
+.series-list-meta-label {
+  color: rgba(240, 195, 122, 0.82);
+  font-size: 0.68rem;
+  font-weight: 840;
+}
+
+.series-list-meta-value {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .series-panel > #series-panel-back-detail {
