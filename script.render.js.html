@@ -324,19 +324,38 @@ function setViewMode_(mode) {
 
 function updateViewToggleButtons_() {
   const mode = getCurrentViewMode_();
+  const viewToggle = document.getElementById('viewToggle');
+  const labelMap = {
+    card: 'タイル',
+    list: 'リスト',
+    shelf: '本棚'
+  };
+  const currentLabel = labelMap[mode] || labelMap.card;
   const buttonMap = {
     card: document.getElementById('tileViewBtn'),
     list: document.getElementById('listViewBtn'),
     shelf: document.getElementById('shelfViewBtn')
   };
 
+  if (viewToggle) {
+    viewToggle.dataset.currentMode = mode;
+    viewToggle.setAttribute('aria-label', `表示モード。現在は${currentLabel}表示`);
+  }
+
   Object.keys(buttonMap).forEach(key => {
     const btn = buttonMap[key];
     if (!btn) return;
     const active = key === mode;
+    const label = labelMap[key] || key;
     btn.classList.toggle('active', active);
     btn.setAttribute('aria-pressed', active ? 'true' : 'false');
     btn.setAttribute('data-state', active ? 'active' : 'idle');
+    btn.setAttribute('aria-label', active
+      ? `${label}表示を選択中`
+      : `${label}表示に切り替え`);
+    btn.title = active
+      ? `${label}表示を選択中`
+      : `${label}表示に切り替え`;
   });
 
   document.querySelectorAll('[data-view-mode]').forEach(btn => {
