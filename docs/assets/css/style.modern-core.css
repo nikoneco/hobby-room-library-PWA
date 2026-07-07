@@ -1885,9 +1885,10 @@ button.genre-chip.status:focus-visible {
 
 #spinner-overlay {
   background:
-    radial-gradient(circle at 50% 30%, rgba(104, 191, 215, 0.10), transparent 34%),
-    rgba(7, 10, 15, 0.74);
-  backdrop-filter: blur(10px) saturate(118%);
+    radial-gradient(circle at 50% 22%, rgba(240, 195, 122, 0.09), transparent 30%),
+    radial-gradient(circle at 50% 38%, rgba(104, 191, 215, 0.12), transparent 38%),
+    rgba(7, 10, 15, 0.78);
+  backdrop-filter: blur(12px) saturate(120%);
   padding: 24px;
 }
 
@@ -1896,22 +1897,23 @@ button.genre-chip.status:focus-visible {
   isolation: isolate;
   overflow: hidden;
   display: flex;
-  width: min(380px, 100%);
-  min-height: 224px;
+  width: min(410px, 100%);
+  min-height: 232px;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 0.78rem;
-  padding: 1.35rem 1.2rem 1.18rem;
-  border: 1px solid rgba(148, 163, 184, 0.16);
-  border-radius: 16px;
+  padding: 1.42rem 1.26rem 1.22rem;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 18px;
   background:
-    linear-gradient(90deg, rgba(240, 195, 122, 0.12) 0 5px, transparent 5px),
-    linear-gradient(145deg, rgba(104, 191, 215, 0.11), rgba(214, 164, 95, 0.050) 46%, rgba(255, 255, 255, 0.026)),
+    linear-gradient(90deg, rgba(240, 195, 122, 0.11) 0 5px, transparent 5px),
+    linear-gradient(145deg, rgba(104, 191, 215, 0.12), rgba(214, 164, 95, 0.056) 46%, rgba(255, 255, 255, 0.030)),
     rgba(15, 19, 27, 0.84);
   box-shadow:
-    0 24px 68px rgba(0, 0, 0, 0.38),
-    inset 0 1px 0 rgba(255, 255, 255, 0.060);
+    0 26px 74px rgba(0, 0, 0, 0.42),
+    0 0 0 1px rgba(255, 255, 255, 0.034) inset,
+    inset 0 1px 0 rgba(255, 255, 255, 0.070);
 }
 
 .spinner-panel::before {
@@ -1922,6 +1924,18 @@ button.genre-chip.status:focus-visible {
   background:
     radial-gradient(circle at 20% 0%, rgba(240, 195, 122, 0.13), transparent 35%),
     radial-gradient(circle at 82% 8%, rgba(104, 191, 215, 0.12), transparent 38%);
+  pointer-events: none;
+}
+
+.spinner-panel::after {
+  content: "";
+  position: absolute;
+  right: 1rem;
+  bottom: 0.92rem;
+  left: 1rem;
+  z-index: -1;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(240, 195, 122, 0.20), transparent);
   pointer-events: none;
 }
 
@@ -2003,20 +2017,21 @@ button.genre-chip.status:focus-visible {
 .empty-result {
   position: relative;
   isolation: isolate;
-  width: min(600px, calc(100vw - 32px));
+  width: min(640px, calc(100vw - 32px));
   margin: 2.5rem auto 0;
-  padding: 1.58rem 1.45rem 1.36rem;
-  border: 1px solid rgba(148, 163, 184, 0.17);
-  border-radius: 18px;
+  padding: 1.68rem 1.52rem 1.42rem;
+  border: 1px solid rgba(148, 163, 184, 0.19);
+  border-radius: 20px;
   background:
-    radial-gradient(circle at 50% 0%, rgba(240, 195, 122, 0.10), transparent 35%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.052), rgba(255, 255, 255, 0.018)),
+    radial-gradient(circle at 50% 0%, rgba(240, 195, 122, 0.11), transparent 35%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.058), rgba(255, 255, 255, 0.020)),
     rgba(13, 18, 26, 0.86);
   color: var(--lib-text);
   text-align: center;
   box-shadow:
-    0 20px 48px rgba(0, 0, 0, 0.28),
-    inset 0 1px 0 rgba(255, 255, 255, 0.058);
+    0 22px 54px rgba(0, 0, 0, 0.30),
+    0 0 0 1px rgba(255, 255, 255, 0.034) inset,
+    inset 0 1px 0 rgba(255, 255, 255, 0.066);
   overflow: hidden;
 }
 
@@ -2024,18 +2039,19 @@ button.genre-chip.status:focus-visible {
   content: "";
   position: relative;
   display: block;
-  width: 46px;
-  height: 46px;
-  margin: 0 auto 0.9rem;
-  border: 1px solid rgba(240, 195, 122, 0.28);
+  width: 50px;
+  height: 50px;
+  margin: 0 auto 0.96rem;
+  border: 1px solid rgba(240, 195, 122, 0.32);
   border-radius: 999px;
   background:
     radial-gradient(circle at 50% 50%, rgba(240, 195, 122, 0.22) 0 3px, transparent 4px),
     linear-gradient(135deg, transparent 0 55%, rgba(104, 191, 215, 0.22) 55% 61%, transparent 61%),
     rgba(255, 255, 255, 0.034);
   box-shadow:
-    0 0 0 6px rgba(240, 195, 122, 0.035),
-    inset 0 1px 0 rgba(255, 255, 255, 0.050);
+    0 0 0 7px rgba(240, 195, 122, 0.038),
+    0 12px 24px rgba(0, 0, 0, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.058);
 }
 
 .empty-result::after {
@@ -2051,8 +2067,8 @@ button.genre-chip.status:focus-visible {
 
 .empty-result-title {
   color: rgba(246, 241, 229, 0.96);
-  font-size: clamp(1.05rem, 2vw, 1.22rem);
-  font-weight: 860;
+  font-size: clamp(1.08rem, 2vw, 1.28rem);
+  font-weight: 880;
   line-height: 1.38;
 }
 
@@ -2069,16 +2085,21 @@ button.genre-chip.status:focus-visible {
   flex-wrap: wrap;
   justify-content: center;
   gap: 0.5rem;
-  margin-top: 1.08rem;
+  margin-top: 1.12rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(148, 163, 184, 0.12);
 }
 
 .empty-result-action {
-  min-height: 40px;
-  padding-inline: 0.86rem;
-  border-color: rgba(148, 163, 184, 0.18);
+  min-height: 42px;
+  padding-inline: 0.92rem;
+  border-color: rgba(148, 163, 184, 0.20);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.058), rgba(255, 255, 255, 0.022)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.064), rgba(255, 255, 255, 0.024)),
     rgba(11, 17, 24, 0.58);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.046),
+    0 8px 18px rgba(0, 0, 0, 0.12);
 }
 
 .empty-result-action .ui-icon {
@@ -2140,14 +2161,18 @@ button.genre-chip.status:focus-visible {
 
 .spinner-label {
   color: rgba(246, 241, 229, 0.96);
-  font-size: 0.98rem;
+  font-size: 1rem;
+  font-weight: 820;
   max-width: min(72vw, 22rem);
-  padding: 0.42rem 0.78rem;
-  border: 1px solid rgba(148, 163, 184, 0.16);
+  padding: 0.44rem 0.84rem;
+  border: 1px solid rgba(148, 163, 184, 0.18);
   border-radius: 999px;
-  background: rgba(5, 10, 15, 0.38);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.052), rgba(255, 255, 255, 0.016)),
+    rgba(5, 10, 15, 0.42);
   line-height: 1.45;
   text-align: center;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.040);
 }
 
 .spinner-detail {

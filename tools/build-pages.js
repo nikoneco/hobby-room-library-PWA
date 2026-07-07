@@ -541,17 +541,22 @@ body.pwa-launch-splash-visible {
   bottom: max(12px, env(safe-area-inset-bottom));
   z-index: 12000;
   overflow: hidden;
-  padding: 12px 14px 12px 17px;
-  border: 1px solid color-mix(in srgb, var(--pwa-line) 62%, transparent);
-  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px 12px 18px;
+  border: 1px solid color-mix(in srgb, var(--pwa-line) 68%, transparent);
+  border-radius: 16px;
   background:
-    linear-gradient(90deg, rgba(var(--pwa-warm-rgb), 0.12) 0 5px, transparent 5px),
-    linear-gradient(145deg, rgba(var(--pwa-accent-rgb), 0.080), rgba(var(--pwa-warm-rgb), 0.050) 46%, rgba(255, 255, 255, 0.024)),
+    linear-gradient(90deg, rgba(var(--pwa-warm-rgb), 0.13) 0 5px, transparent 5px),
+    radial-gradient(circle at 0% 0%, rgba(var(--pwa-warm-rgb), 0.11), transparent 34%),
+    linear-gradient(145deg, rgba(var(--pwa-accent-rgb), 0.086), rgba(var(--pwa-warm-rgb), 0.052) 46%, rgba(255, 255, 255, 0.026)),
     color-mix(in srgb, var(--pwa-panel-strong) 92%, transparent);
   color: rgba(237, 245, 247, 0.90);
   box-shadow:
-    0 18px 44px rgba(0, 0, 0, 0.34),
-    inset 0 1px 0 rgba(255, 255, 255, 0.060);
+    0 20px 50px rgba(0, 0, 0, 0.36),
+    0 0 0 1px rgba(255, 255, 255, 0.034) inset,
+    inset 0 1px 0 rgba(255, 255, 255, 0.070);
   font-size: 0.92rem;
   line-height: 1.55;
   backdrop-filter: blur(14px);
@@ -1043,10 +1048,21 @@ body.pwa-shell .spinner-panel {
 body.pwa-shell .spinner-panel,
 body.pwa-shell .empty-result {
   border-color: color-mix(in srgb, var(--pwa-line) 66%, transparent);
+  border-radius: 20px;
   background:
-    radial-gradient(circle at 50% 0%, rgba(var(--pwa-warm-rgb), 0.10), transparent 35%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.052), rgba(255, 255, 255, 0.018)),
+    radial-gradient(circle at 50% 0%, rgba(var(--pwa-warm-rgb), 0.11), transparent 35%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.058), rgba(255, 255, 255, 0.020)),
     color-mix(in srgb, var(--pwa-panel-strong) 82%, transparent);
+  box-shadow:
+    0 22px 54px rgba(var(--pwa-shadow-rgb), 0.30),
+    0 0 0 1px rgba(255, 255, 255, 0.034) inset,
+    inset 0 1px 0 rgba(255, 255, 255, 0.066);
+}
+
+body.pwa-shell .spinner-panel {
+  width: min(410px, 100%);
+  min-height: 232px;
+  padding: 1.42rem 1.26rem 1.22rem;
 }
 
 body.pwa-shell .empty-result::before {
@@ -1063,8 +1079,11 @@ body.pwa-shell .empty-result::before {
 body.pwa-shell .empty-result-action {
   border-color: color-mix(in srgb, var(--pwa-line) 54%, transparent);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.058), rgba(255, 255, 255, 0.022)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.064), rgba(255, 255, 255, 0.024)),
     color-mix(in srgb, var(--pwa-panel) 58%, transparent);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.046),
+    0 8px 18px rgba(var(--pwa-shadow-rgb), 0.12);
 }
 
 body.pwa-shell .empty-result-action .ui-icon {
@@ -1080,6 +1099,15 @@ body.pwa-shell .empty-result-random {
 
 body.pwa-shell .spinner::before {
   background: linear-gradient(90deg, rgba(var(--pwa-accent-rgb), 0.08), rgba(var(--pwa-accent-rgb), 0.92), rgba(var(--pwa-warm-rgb), 0.72));
+}
+
+body.pwa-shell .spinner-label {
+  border-color: color-mix(in srgb, var(--pwa-line) 60%, transparent);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.052), rgba(255, 255, 255, 0.016)),
+    rgba(5, 10, 15, 0.42);
+  font-weight: 820;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.040);
 }
 
 body.pwa-shell .book-card {
