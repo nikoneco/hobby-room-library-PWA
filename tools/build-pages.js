@@ -2197,18 +2197,22 @@ body.pwa-shell .shelf-view .shelf-jump-top-btn:focus-visible {
 }
 
 body.pwa-shell .shelf-view .bookshelf-group {
-  border-color: color-mix(in srgb, var(--pwa-line) 56%, transparent);
+  isolation: isolate;
+  border-color: color-mix(in srgb, var(--pwa-line) 62%, transparent);
   background:
     radial-gradient(circle at 0% 0%, rgba(var(--pwa-warm-rgb), 0.070), transparent 28%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.052), rgba(255, 255, 255, 0.022)),
-    color-mix(in srgb, var(--pwa-panel) 62%, transparent);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.062), rgba(255, 255, 255, 0.020)),
+    color-mix(in srgb, var(--pwa-panel) 68%, transparent);
   box-shadow:
-    0 16px 38px rgba(var(--pwa-shadow-rgb), 0.14),
-    inset 0 1px 0 rgba(255, 255, 255, 0.046);
+    0 18px 46px rgba(var(--pwa-shadow-rgb), 0.17),
+    0 1px 0 rgba(255, 255, 255, 0.035) inset;
 }
 
 body.pwa-shell .shelf-view .bookshelf-group::before {
-  background: linear-gradient(90deg, rgba(var(--pwa-warm-rgb), 0.055), transparent 24%);
+  z-index: 0;
+  background:
+    linear-gradient(90deg, rgba(var(--pwa-warm-rgb), 0.070), transparent 24%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.052), transparent 18%);
 }
 
 body.pwa-shell .shelf-view .bookshelf-group::after {
@@ -2217,9 +2221,15 @@ body.pwa-shell .shelf-view .bookshelf-group::after {
   right: 1rem;
   bottom: 0.92rem;
   left: 1rem;
+  z-index: 0;
   height: 1px;
   pointer-events: none;
   background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.10), transparent);
+}
+
+body.pwa-shell .shelf-view .bookshelf-group > * {
+  position: relative;
+  z-index: 1;
 }
 
 body.pwa-shell .shelf-view .bookshelf-group.is-active {
@@ -2234,17 +2244,49 @@ body.pwa-shell .shelf-view .bookshelf-group-title::before {
   background: linear-gradient(180deg, rgba(var(--pwa-warm-rgb), 0.82), rgba(var(--pwa-accent-rgb), 0.30));
 }
 
+body.pwa-shell .shelf-view .bookshelf-group-count,
+body.pwa-shell .shelf-view .bookshelf-level-count {
+  border-color: color-mix(in srgb, var(--pwa-line) 46%, transparent);
+  background: rgba(255, 255, 255, 0.038);
+  color: color-mix(in srgb, var(--pwa-text) 72%, transparent);
+}
+
 body.pwa-shell .shelf-view .bookshelf-level {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
   border-color: color-mix(in srgb, var(--pwa-line) 48%, transparent);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.030), rgba(255, 255, 255, 0.010)),
-    rgba(2, 7, 11, 0.20);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.026);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.038), rgba(255, 255, 255, 0.012)),
+    rgba(2, 7, 11, 0.24);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.034),
+    inset 0 -16px 34px rgba(0, 0, 0, 0.13);
+}
+
+body.pwa-shell .shelf-view .bookshelf-level::before {
+  content: "";
+  position: absolute;
+  right: 0.75rem;
+  bottom: 0;
+  left: 0.75rem;
+  z-index: 0;
+  height: 2px;
+  border-radius: 999px 999px 0 0;
+  background: linear-gradient(90deg, transparent, rgba(var(--pwa-warm-rgb), 0.22), rgba(var(--pwa-accent-rgb), 0.11), transparent);
+  pointer-events: none;
+}
+
+body.pwa-shell .shelf-view .bookshelf-level > * {
+  position: relative;
+  z-index: 1;
 }
 
 body.pwa-shell .shelf-view .bookshelf-level-title {
-  border-color: color-mix(in srgb, var(--pwa-line) 58%, transparent);
-  background: rgba(255, 255, 255, 0.036);
+  border-color: color-mix(in srgb, var(--pwa-line) 64%, transparent);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.052), rgba(255, 255, 255, 0.020)),
+    rgba(255, 255, 255, 0.026);
   color: var(--lib-muted);
 }
 
@@ -2254,12 +2296,28 @@ body.pwa-shell .shelf-view .bookshelf-strip {
 }
 
 body.pwa-shell .shelf-view .shelf-book {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
   border-color: color-mix(in srgb, var(--pwa-line) 44%, transparent);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.048), rgba(255, 255, 255, 0.022)),
     rgba(5, 8, 12, 0.44);
   color: var(--pwa-text);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.040);
+}
+
+body.pwa-shell .shelf-view .shelf-book::after {
+  content: "";
+  position: absolute;
+  right: 0.48rem;
+  bottom: 0.42rem;
+  left: 0.48rem;
+  z-index: 0;
+  height: 1px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.13), transparent);
+  pointer-events: none;
 }
 
 body.pwa-shell .shelf-view .shelf-book:hover,
@@ -2274,11 +2332,27 @@ body.pwa-shell .shelf-view .shelf-book:focus-visible {
 }
 
 body.pwa-shell .shelf-view .shelf-book-cover-wrap {
+  position: relative;
+  z-index: 1;
   border-color: rgba(255, 255, 255, 0.060);
   background: rgba(0, 0, 0, 0.28);
   box-shadow:
     0 10px 22px rgba(var(--pwa-shadow-rgb), 0.30),
     inset 0 1px 0 rgba(255, 255, 255, 0.040);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+}
+
+body.pwa-shell .shelf-view .shelf-book:hover .shelf-book-cover-wrap,
+body.pwa-shell .shelf-view .shelf-book:focus-visible .shelf-book-cover-wrap {
+  border-color: rgba(var(--pwa-warm-rgb), 0.24);
+  box-shadow:
+    0 12px 24px rgba(var(--pwa-shadow-rgb), 0.34),
+    0 0 0 1px rgba(var(--pwa-warm-rgb), 0.055) inset;
+}
+
+body.pwa-shell .shelf-view .shelf-book-title {
+  position: relative;
+  z-index: 1;
 }
 
 body.pwa-shell .summary-chip-toggle,

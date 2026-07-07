@@ -200,24 +200,28 @@
 
 .bookshelf-group {
   position: relative;
+  isolation: isolate;
   overflow: hidden;
   border-radius: calc(var(--lib-radius-lg) + 6px);
-  border-color: rgba(255, 255, 255, 0.082);
+  border-color: rgba(255, 255, 255, 0.095);
   background:
     radial-gradient(circle at 0% 0%, rgba(214, 164, 95, 0.070), transparent 28%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.052), rgba(255, 255, 255, 0.022)),
-    rgba(10, 15, 21, 0.60);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.062), rgba(255, 255, 255, 0.020)),
+    rgba(10, 15, 21, 0.66);
   box-shadow:
-    0 16px 38px rgba(0, 0, 0, 0.14),
-    inset 0 1px 0 rgba(255, 255, 255, 0.046);
+    0 18px 46px rgba(0, 0, 0, 0.17),
+    0 1px 0 rgba(255, 255, 255, 0.035) inset;
 }
 
 .bookshelf-group::before {
   content: "";
   position: absolute;
   inset: 0;
+  z-index: 0;
   pointer-events: none;
-  background: linear-gradient(90deg, rgba(214, 164, 95, 0.055), transparent 24%);
+  background:
+    linear-gradient(90deg, rgba(214, 164, 95, 0.070), transparent 24%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.052), transparent 18%);
 }
 
 .bookshelf-group::after {
@@ -226,9 +230,15 @@
   right: 1rem;
   bottom: 0.92rem;
   left: 1rem;
+  z-index: 0;
   height: 1px;
   pointer-events: none;
   background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.10), transparent);
+}
+
+.bookshelf-group > * {
+  position: relative;
+  z-index: 1;
 }
 
 .bookshelf-group.is-active {
@@ -245,7 +255,7 @@
 .bookshelf-group-title {
   position: relative;
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: 0.8rem;
   padding-left: 0.82rem;
@@ -278,10 +288,25 @@
 
 .bookshelf-group-count,
 .bookshelf-level-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   flex: 0 0 auto;
-  color: var(--lib-subtle);
+  border: 1px solid rgba(255, 255, 255, 0.070);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.038);
+  color: rgba(232, 242, 247, 0.72);
   font-size: 0.78rem;
   font-weight: 800;
+  line-height: 1.12;
+}
+
+.bookshelf-group-count {
+  padding: 0.24rem 0.52rem;
+}
+
+.bookshelf-level-count {
+  padding: 0.16rem 0.42rem;
 }
 
 .bookshelf-section-title {
@@ -290,12 +315,35 @@
 }
 
 .bookshelf-level {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.066);
   border-radius: calc(var(--lib-radius-md) + 4px);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.030), rgba(255, 255, 255, 0.010)),
-    rgba(2, 7, 11, 0.20);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.026);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.038), rgba(255, 255, 255, 0.012)),
+    rgba(2, 7, 11, 0.24);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.034),
+    inset 0 -16px 34px rgba(0, 0, 0, 0.13);
+}
+
+.bookshelf-level::before {
+  content: "";
+  position: absolute;
+  right: 0.75rem;
+  bottom: 0;
+  left: 0.75rem;
+  z-index: 0;
+  height: 2px;
+  border-radius: 999px 999px 0 0;
+  background: linear-gradient(90deg, transparent, rgba(214, 164, 95, 0.22), rgba(104, 191, 215, 0.11), transparent);
+  pointer-events: none;
+}
+
+.bookshelf-level > * {
+  position: relative;
+  z-index: 1;
 }
 
 .bookshelf-level-title {
@@ -304,8 +352,10 @@
   width: fit-content;
   max-width: 100%;
   min-height: 30px;
-  background: rgba(255, 255, 255, 0.036);
-  border-color: rgba(255, 255, 255, 0.078);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.052), rgba(255, 255, 255, 0.020)),
+    rgba(255, 255, 255, 0.026);
+  border-color: rgba(255, 255, 255, 0.092);
   color: var(--lib-muted);
 }
 
@@ -318,6 +368,9 @@
 }
 
 .shelf-book {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
   border-radius: calc(var(--lib-radius-sm) + 3px);
   border-color: rgba(255, 255, 255, 0.070);
   background:
@@ -325,6 +378,19 @@
     rgba(5, 8, 12, 0.44);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.040);
   color: var(--lib-text);
+}
+
+.shelf-book::after {
+  content: "";
+  position: absolute;
+  right: 0.48rem;
+  bottom: 0.42rem;
+  left: 0.48rem;
+  z-index: 0;
+  height: 1px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.13), transparent);
+  pointer-events: none;
 }
 
 .shelf-book:hover,
@@ -339,14 +405,27 @@
 }
 
 .shelf-book-cover-wrap {
+  position: relative;
+  z-index: 1;
   border: 1px solid rgba(255, 255, 255, 0.060);
   background: rgba(0, 0, 0, 0.28);
   box-shadow:
     0 10px 22px rgba(0, 0, 0, 0.30),
     inset 0 1px 0 rgba(255, 255, 255, 0.040);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+}
+
+.shelf-book:hover .shelf-book-cover-wrap,
+.shelf-book:focus-visible .shelf-book-cover-wrap {
+  border-color: rgba(214, 164, 95, 0.24);
+  box-shadow:
+    0 12px 24px rgba(0, 0, 0, 0.34),
+    0 0 0 1px rgba(214, 164, 95, 0.055) inset;
 }
 
 .shelf-book-title {
+  position: relative;
+  z-index: 1;
   color: #dce7ec;
   line-height: 1.32;
 }
