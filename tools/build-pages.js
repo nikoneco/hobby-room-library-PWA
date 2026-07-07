@@ -565,6 +565,10 @@ body.pwa-launch-splash-visible {
   -webkit-backdrop-filter: blur(14px) saturate(130%);
 }
 
+.pwa-network-banner[hidden] {
+  display: none !important;
+}
+
 body.pwa-shell .mobile-app-dock {
   touch-action: manipulation;
 }
@@ -2377,6 +2381,11 @@ body.pwa-shell .shelf-view .shelf-book:focus-visible .shelf-book-cover-wrap {
 body.pwa-shell .shelf-view .shelf-book-title {
   position: relative;
   z-index: 1;
+  min-height: 2.64em;
+  word-break: keep-all;
+  overflow-wrap: normal;
+  text-overflow: ellipsis;
+  -webkit-line-clamp: 2;
 }
 
 body.pwa-shell .summary-chip-toggle,

@@ -991,6 +991,39 @@
   }
 }
 
+@media (max-width: 600px) {
+  .shelf-view .bookshelf-strip {
+    gap: 0.72rem;
+  }
+
+  .shelf-view .shelf-book,
+  body.shelf-immersive-active .shelf-view .shelf-book {
+    flex: 0 0 104px;
+    width: 104px;
+    min-height: 158px;
+    padding: 0.46rem 0.42rem 0.52rem;
+  }
+
+  .shelf-view .shelf-book-cover-wrap,
+  body.shelf-immersive-active .shelf-view .shelf-book-cover-wrap {
+    width: 72px;
+    height: 104px;
+  }
+
+  .shelf-view .shelf-book-title,
+  body.shelf-immersive-active .shelf-view .shelf-book-title {
+    min-height: 2.72em;
+    padding: 0.34rem 0.38rem;
+    font-size: 0.68rem;
+    line-height: 1.32;
+    word-break: keep-all;
+    overflow-wrap: normal;
+    hyphens: none;
+    text-overflow: ellipsis;
+    -webkit-line-clamp: 2;
+  }
+}
+
 @media (max-width: 340px) {
   .card-view {
     grid-template-columns: 1fr;

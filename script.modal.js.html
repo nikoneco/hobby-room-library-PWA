@@ -91,27 +91,6 @@ function buildPopupActionsHtml(book, seriesContext) {
   `;
 }
 
-function buildPopupBookKickerHtml_(book, index, totalCount) {
-  const items = [];
-  const shelfLabel = typeof formatShelfLabel_ === 'function' ? formatShelfLabel_(book) : '';
-  const position = Number.isFinite(index) && Number.isFinite(totalCount) && totalCount > 1
-    ? `${index + 1}/${totalCount}`
-    : '';
-
-  if (shelfLabel) items.push(`棚 ${shelfLabel}`);
-  if (position) items.push(`表示 ${position}`);
-  if (hasDisplayValue_(book && book.released)) items.push(String(book.released).trim());
-  if (hasDisplayValue_(book && book.brand)) items.push(String(book.brand).trim());
-
-  if (!items.length) return '';
-
-  return `
-    <div class="popup-book-kicker" aria-label="本の位置と概要">
-      ${items.slice(0, 4).map(item => `<span>${escapeHtml(item)}</span>`).join('')}
-    </div>
-  `;
-}
-
 function attachPopupActionHandlers(book, seriesContext) {
   const seriesBtn = document.getElementById('popup-series-btn');
   if (seriesBtn) {
@@ -1507,7 +1486,6 @@ function showPopup(book, index, dataArr, seriesContext, options) {
   info.innerHTML = `
     <div class="popup-book-detail">
       <div class="popup-book-head">
-        ${buildPopupBookKickerHtml_(renderBook, popupIndex, popupData.length)}
         <div class="popup-book-title">${escapeHtml(renderBook.title || '(タイトルなし)')}</div>
         ${buildPopupBookLeadHtml_(renderBook)}
         ${buildPopupDetailLoadingHtml_(renderBook)}
