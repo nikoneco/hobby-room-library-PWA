@@ -643,16 +643,28 @@ function isAdvancedOpen() {
   return area && area.style.display !== 'none';
 }
 
+function setAdvancedToggleButtonState_(open) {
+  const btn = document.getElementById('advancedToggleBtn');
+  if (!btn) return;
+
+  const label = btn.querySelector('.advanced-toggle-label') || btn.querySelector('span:last-child');
+  btn.classList.toggle('active', Boolean(open));
+  btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  btn.setAttribute('title', open ? '詳細検索を閉じる' : '詳細検索を開く');
+  if (label) {
+    label.textContent = open ? '閉じる' : '詳細';
+  }
+}
+
 function toggleAdvancedSearch() {
   const area = document.getElementById('advancedSearchArea');
-  const btn = document.getElementById('advancedToggleBtn');
-  if (!area || !btn) return;
+  if (!area) return;
 
   const opening = area.style.display === 'none' || area.style.display === '';
   if (opening) {
     area.style.display = 'block';
-    btn.classList.add('active');
-    btn.textContent = '詳細検索を閉じる';
+    area.setAttribute('aria-hidden', 'false');
+    setAdvancedToggleButtonState_(true);
   } else {
     closeAdvancedSearchPanel_();
   }
@@ -670,13 +682,12 @@ function toggleAdvancedSearch() {
 
 function closeAdvancedSearchPanel_() {
   const area = document.getElementById('advancedSearchArea');
-  const btn = document.getElementById('advancedToggleBtn');
 
-  if (area) area.style.display = 'none';
-  if (btn) {
-    btn.classList.remove('active');
-    btn.textContent = '詳細検索';
+  if (area) {
+    area.style.display = 'none';
+    area.setAttribute('aria-hidden', 'true');
   }
+  setAdvancedToggleButtonState_(false);
   syncBookshelfCtaVisibility_();
 }
 

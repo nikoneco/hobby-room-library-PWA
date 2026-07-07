@@ -875,6 +875,14 @@ button.quiet-action:hover,
     inset 0 1px 0 rgba(255, 255, 255, 0.30);
 }
 
+.advanced-toggle-icon {
+  transition: transform 180ms ease;
+}
+
+#advancedToggleBtn.active .advanced-toggle-icon {
+  transform: rotate(180deg);
+}
+
 .bookshelf-cta-wrap {
   margin-top: 0.15rem;
 }
@@ -951,6 +959,15 @@ button.quiet-action:hover,
   color: rgba(246, 234, 216, 0.76);
 }
 
+.quick-browse-kicker::after {
+  content: "";
+  display: inline-block;
+  width: 1px;
+  height: 1.12rem;
+  margin-left: 0.46rem;
+  background: rgba(148, 163, 184, 0.20);
+}
+
 .quick-browse-chips {
   min-width: 0;
   display: flex;
@@ -977,6 +994,10 @@ button.quick-browse-chip {
   font-size: 0.78rem;
   line-height: 1.25;
   transition: border-color 160ms ease, background 160ms ease, color 160ms ease, transform 160ms ease;
+}
+
+button.quick-browse-chip::before {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.080), transparent 52%);
 }
 
 button.quick-browse-chip:hover,
@@ -1020,6 +1041,10 @@ button.quick-browse-chip:focus-visible {
     flex-direction: column;
     align-items: stretch;
     gap: 0.42rem;
+  }
+
+  .quick-browse-kicker::after {
+    display: none;
   }
 
   button.quick-browse-chip {
@@ -1100,6 +1125,10 @@ button.quick-browse-chip:focus-visible {
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.060),
     0 18px 44px rgba(0, 0, 0, 0.20);
+}
+
+.advanced-search-area[aria-hidden="true"] {
+  pointer-events: none;
 }
 
 .advanced-search-area::before {

@@ -48,11 +48,11 @@
           </span>
           <span>ランダム</span>
         </button>
-        <button type="button" class="quiet-action" id="advancedToggleBtn" data-action="toggle-advanced">
-          <span class="ui-icon" aria-hidden="true">
+        <button type="button" class="quiet-action" id="advancedToggleBtn" data-action="toggle-advanced" aria-controls="advancedSearchArea" aria-expanded="false" title="詳細検索を開く">
+          <span class="ui-icon advanced-toggle-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24"><path d="M4 7h16"></path><path d="M7 12h10"></path><path d="M10 17h4"></path></svg>
           </span>
-          <span>詳細</span>
+          <span class="advanced-toggle-label">詳細</span>
         </button>
       </div>
 
@@ -62,7 +62,7 @@
       </div>
 
       <!-- 詳細検索 -->
-      <div id="advancedSearchArea" class="advanced-search-area" style="display:none;">
+      <div id="advancedSearchArea" class="advanced-search-area" style="display:none;" aria-hidden="true">
         <div class="advanced-grid">
           <div class="input-group">
             <label for="detailTitle">タイトル</label>
