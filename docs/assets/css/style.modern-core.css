@@ -2274,6 +2274,7 @@ button.genre-chip.status:focus-visible {
   border: 0;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.080);
+  animation: none;
 }
 
 .spinner::before {
