@@ -1388,9 +1388,10 @@ button.quick-browse-chip:focus-visible {
 }
 
 .card-view {
-  grid-template-columns: repeat(auto-fill, minmax(226px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(216px, 1fr));
   gap: clamp(0.95rem, 1.8vw, 1.36rem);
   max-width: 1240px;
+  align-items: stretch;
 }
 
 .list-view {
@@ -1438,29 +1439,36 @@ button.quick-browse-chip:focus-visible {
 .card-view .book-card {
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: stretch;
   min-height: 100%;
-  padding: 1.06rem 0.96rem 1rem;
+  padding: 0.9rem 0.86rem 0.82rem;
+  border-radius: var(--lib-radius-sm);
+  background:
+    radial-gradient(circle at 50% 0%, rgba(104, 191, 215, 0.062), transparent 40%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.048), rgba(255, 255, 255, 0.018)),
+    rgba(10, 15, 22, 0.66);
 }
 
 .card-view .book-card::after {
   content: "";
   position: absolute;
-  right: 0.86rem;
-  bottom: 0;
-  left: 0.86rem;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(214, 164, 95, 0.20), transparent);
-  opacity: 0.64;
+  right: 0.72rem;
+  bottom: 0.64rem;
+  left: 0.72rem;
+  height: 3px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(104, 191, 215, 0.20), rgba(214, 164, 95, 0.28), rgba(105, 198, 163, 0.16));
+  opacity: 0.42;
   pointer-events: none;
 }
 
 .card-info {
   width: 100%;
   display: grid;
-  gap: 0.38rem;
-  margin-top: 0.92rem;
-  padding-top: 0.72rem;
+  grid-template-rows: auto auto minmax(0, auto) auto auto;
+  gap: 0.34rem;
+  margin-top: 0.76rem;
+  padding-top: 0.64rem;
   border-top: 1px solid rgba(148, 163, 184, 0.105);
 }
 
@@ -1484,6 +1492,14 @@ button.quick-browse-chip:focus-visible {
   text-wrap: pretty;
 }
 
+.card-view .book-author-line {
+  min-height: 1.38em;
+}
+
+.card-view .book-author-line span {
+  color: rgba(220, 232, 238, 0.50);
+}
+
 .book-cover {
   width: auto;
   max-width: min(172px, 82%);
@@ -1496,6 +1512,16 @@ button.quick-browse-chip:focus-visible {
     0 0 0 1px rgba(0, 0, 0, 0.16);
   filter: saturate(0.94) contrast(1.02);
   transition: transform var(--lib-ease), box-shadow var(--lib-ease), filter var(--lib-ease), border-color var(--lib-ease);
+}
+
+.card-view .book-cover {
+  align-self: center;
+  max-width: min(158px, 78%);
+  max-height: 228px;
+  margin: 0.08rem auto 0;
+  box-shadow:
+    0 14px 30px rgba(0, 0, 0, 0.30),
+    0 0 0 1px rgba(0, 0, 0, 0.18);
 }
 
 .book-card:hover .book-cover {
@@ -1566,6 +1592,18 @@ button.quick-browse-chip:focus-visible {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.042);
   pointer-events: none;
   transition: border-color var(--lib-ease), background var(--lib-ease), color var(--lib-ease), transform var(--lib-ease);
+}
+
+.card-view .book-open-cue {
+  justify-self: stretch;
+  width: auto;
+  justify-content: center;
+  margin-top: 0.4rem;
+  padding: 0.2rem 0.46rem;
+  border-radius: 7px;
+  background:
+    linear-gradient(180deg, rgba(214, 164, 95, 0.095), rgba(214, 164, 95, 0.030)),
+    rgba(8, 13, 19, 0.20);
 }
 
 .book-open-cue-icon {
@@ -1668,9 +1706,9 @@ button.quick-browse-chip:focus-visible {
 
 .card-view .book-meta-pills.card-meta {
   display: grid;
-  grid-template-columns: 1fr;
-  gap: 0.28rem;
-  margin-top: 0.18rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.3rem;
+  margin-top: 0.2rem;
 }
 
 .book-meta-pills.compact {
@@ -1698,21 +1736,28 @@ button.quick-browse-chip:focus-visible {
 
 .card-view .book-meta-pill {
   justify-content: space-between;
-  padding: 0.22rem 0.48rem;
+  min-width: 0;
+  padding: 0.2rem 0.46rem;
   border-color: rgba(148, 163, 184, 0.11);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.038), rgba(255, 255, 255, 0.014)),
     rgba(5, 10, 15, 0.24);
   color: rgba(220, 232, 238, 0.76);
+  font-size: 0.68rem;
   box-shadow: none;
 }
 
 .card-view .book-meta-pill.location {
+  grid-column: 1 / -1;
   border-color: rgba(214, 164, 95, 0.22);
   background:
     linear-gradient(180deg, rgba(214, 164, 95, 0.12), rgba(214, 164, 95, 0.040)),
     rgba(8, 13, 19, 0.24);
   color: #f2ddb8;
+}
+
+.card-view .book-meta-pill:not(.location) .book-meta-pill-label {
+  color: rgba(170, 183, 194, 0.64);
 }
 
 .book-meta-pills.compact .book-meta-pill {
