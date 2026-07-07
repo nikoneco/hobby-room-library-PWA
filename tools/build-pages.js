@@ -1375,6 +1375,92 @@ body.pwa-shell .series-list-item:focus-visible {
     0 10px 22px rgba(0, 0, 0, 0.18);
 }
 
+body.pwa-shell #image-popup-content {
+  border-color: color-mix(in srgb, var(--pwa-line) 58%, var(--pwa-warm-2) 12%);
+  background:
+    radial-gradient(circle at 0% 0%, rgba(var(--pwa-warm-rgb), 0.10), transparent 30%),
+    radial-gradient(circle at 98% 8%, rgba(var(--pwa-accent-rgb), 0.070), transparent 28%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.056), rgba(255, 255, 255, 0.024)),
+    color-mix(in srgb, var(--pwa-panel-strong) 92%, transparent);
+  box-shadow:
+    0 24px 70px rgba(var(--pwa-shadow-rgb), 0.42),
+    inset 0 1px 0 rgba(255, 255, 255, 0.060);
+}
+
+body.pwa-shell #image-popup-content::after {
+  background:
+    linear-gradient(90deg, rgba(var(--pwa-warm-rgb), 0.058), transparent 24%, rgba(var(--pwa-accent-rgb), 0.032)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.020), transparent 38%);
+}
+
+body.pwa-shell #image-popup-info .popup-summary-text {
+  border-color: color-mix(in srgb, var(--pwa-line) 54%, transparent);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.034), rgba(255, 255, 255, 0.012)),
+    rgba(4, 9, 14, 0.22);
+  color: rgba(232, 242, 246, 0.9);
+}
+
+body.pwa-shell #image-popup-info .genre-chip-wrap.popup,
+body.pwa-shell #image-popup-info .popup-book-primary-meta:has(.book-meta-pills),
+body.pwa-shell #image-popup-info .popup-book-primary-meta:has(.book-note) {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.034);
+}
+
+body.pwa-shell #image-popup-info .genre-chip-wrap.popup {
+  border-color: color-mix(in srgb, var(--pwa-line) 46%, transparent);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.034), rgba(255, 255, 255, 0.012)),
+    color-mix(in srgb, var(--pwa-panel) 30%, transparent);
+}
+
+body.pwa-shell #image-popup-info .popup-book-primary-meta:has(.book-meta-pills),
+body.pwa-shell #image-popup-info .popup-book-primary-meta:has(.book-note) {
+  border-color: color-mix(in srgb, var(--pwa-warm-2) 20%, transparent);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.040), rgba(255, 255, 255, 0.014)),
+    color-mix(in srgb, var(--pwa-panel) 42%, transparent);
+}
+
+body.pwa-shell #image-popup-info .popup-book-head {
+  border-bottom-color: color-mix(in srgb, var(--pwa-line) 42%, transparent);
+}
+
+body.pwa-shell #image-popup-info .popup-action-area {
+  border-top-color: color-mix(in srgb, var(--pwa-line) 44%, transparent);
+}
+
+body.pwa-shell #image-popup-info .series-list {
+  border-color: color-mix(in srgb, var(--pwa-line) 50%, transparent);
+  background:
+    linear-gradient(90deg, rgba(var(--pwa-warm-rgb), 0.070) 0 4px, transparent 4px),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.040), rgba(255, 255, 255, 0.018)),
+    color-mix(in srgb, var(--pwa-panel) 34%, transparent);
+}
+
+body.pwa-shell #image-popup-info .series-list-item {
+  border-color: color-mix(in srgb, var(--pwa-line) 42%, transparent);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.036), rgba(255, 255, 255, 0.014)),
+    color-mix(in srgb, var(--pwa-panel) 34%, transparent);
+}
+
+body.pwa-shell #image-popup-info .series-list-item:hover,
+body.pwa-shell #image-popup-info .series-list-item:focus-visible {
+  border-color: color-mix(in srgb, var(--pwa-warm-2) 30%, transparent);
+  background:
+    linear-gradient(90deg, rgba(var(--pwa-warm-rgb), 0.10), rgba(var(--pwa-accent-rgb), 0.042)),
+    rgba(255, 255, 255, 0.034);
+}
+
+body.pwa-shell #image-popup-info .series-empty {
+  border-color: color-mix(in srgb, var(--pwa-warm-2) 22%, transparent);
+  background:
+    linear-gradient(90deg, rgba(var(--pwa-warm-rgb), 0.10) 0 4px, transparent 4px),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.042), rgba(255, 255, 255, 0.018)),
+    color-mix(in srgb, var(--pwa-panel) 36%, transparent);
+}
+
 body.pwa-shell .suggest-box {
   border-color: color-mix(in srgb, var(--pwa-line) 58%, transparent);
   border-top-color: color-mix(in srgb, var(--pwa-warm-2) 30%, transparent);
