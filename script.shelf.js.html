@@ -276,6 +276,30 @@ function getRoomMapGroupCount_(groups, mapKey) {
   return Number(group && (group.count || getShelfGroupBookCount_(group)) || 0);
 }
 
+function getShelfRoomMapStats_(groups) {
+  const configs = getRoomMapShelfConfigs_();
+  const stats = {
+    shelves: configs.length,
+    activeShelves: 0,
+    mappedBooks: 0
+  };
+
+  configs.forEach(config => {
+    const count = getRoomMapGroupCount_(groups, config.key);
+    if (count > 0) {
+      stats.activeShelves += 1;
+      stats.mappedBooks += count;
+    }
+  });
+
+  return stats;
+}
+
+function formatShelfRoomMapMeta_(stats) {
+  const safeStats = stats || { activeShelves: 0, shelves: 0, mappedBooks: 0 };
+  return `${safeStats.activeShelves}/${safeStats.shelves}棚 ${safeStats.mappedBooks}冊`;
+}
+
 function scrollToRoomMapShelf_(groups, mapKey) {
   const index = getRoomMapGroupIndex_(groups, mapKey);
   if (index < 0) return;
@@ -334,8 +358,12 @@ function createShelfRoomMapViewport_(groups, options) {
     if (targetIndex >= 0) {
       button.dataset.shelfTarget = getShelfNavTargetId_(targetIndex);
     }
+    button.classList.toggle('has-books', count > 0);
     button.disabled = targetIndex < 0;
-    button.setAttribute('aria-label', `${config.label} 本棚へ移動`);
+    button.setAttribute(
+      'aria-label',
+      count ? `${config.label} 本棚 ${count}冊へ移動` : `${config.label} 本棚は登録なし`
+    );
     button.innerHTML = `
       <span class="room-map-shelf-label">${escapeHtml(config.label)}</span>
       <span class="room-map-shelf-count">${count ? `${count}冊` : '0冊'}</span>
@@ -355,6 +383,7 @@ function createShelfRoomMapViewport_(groups, options) {
 }
 
 function renderShelfRoomMap_(groups) {
+  const stats = getShelfRoomMapStats_(groups);
   const details = document.createElement('details');
   details.className = 'shelf-room-map';
 
@@ -365,6 +394,12 @@ function renderShelfRoomMap_(groups) {
   summaryLabel.className = 'shelf-room-map-summary-label';
   summaryLabel.textContent = '趣味部屋マップを開く';
   summary.appendChild(summaryLabel);
+
+  const summaryMeta = document.createElement('span');
+  summaryMeta.className = 'shelf-room-map-summary-meta';
+  summaryMeta.textContent = formatShelfRoomMapMeta_(stats);
+  summary.appendChild(summaryMeta);
+
   details.appendChild(summary);
 
   details.addEventListener('toggle', function() {
@@ -410,6 +445,7 @@ function mountShelfRoomMapPortal_(groups) {
 }
 
 function renderShelfRoomMapOverlay_(groups) {
+  const stats = getShelfRoomMapStats_(groups);
   const overlay = document.createElement('div');
   overlay.className = 'shelf-room-map-overlay';
   overlay.hidden = true;
@@ -427,10 +463,20 @@ function renderShelfRoomMapOverlay_(groups) {
   const header = document.createElement('div');
   header.className = 'shelf-room-map-modal-header';
 
+  const titleBlock = document.createElement('div');
+  titleBlock.className = 'shelf-room-map-modal-title-block';
+
   const title = document.createElement('div');
   title.className = 'shelf-room-map-modal-title';
   title.textContent = '趣味部屋マップ';
-  header.appendChild(title);
+  titleBlock.appendChild(title);
+
+  const meta = document.createElement('div');
+  meta.className = 'shelf-room-map-modal-meta';
+  meta.textContent = formatShelfRoomMapMeta_(stats);
+  titleBlock.appendChild(meta);
+
+  header.appendChild(titleBlock);
 
   const closeButton = document.createElement('button');
   closeButton.type = 'button';
@@ -445,7 +491,10 @@ function renderShelfRoomMapOverlay_(groups) {
 
   const hint = document.createElement('div');
   hint.className = 'shelf-room-map-modal-hint';
-  hint.textContent = '棚を選ぶと、その本棚へ移動します。';
+  hint.innerHTML = `
+    <span>棚を選ぶと、その本棚へ移動します。</span>
+    <span class="shelf-room-map-hint-meta">登録棚 ${escapeHtml(String(stats.activeShelves))}件</span>
+  `;
   panel.appendChild(hint);
 
   panel.appendChild(createShelfRoomMapViewport_(groups, {
