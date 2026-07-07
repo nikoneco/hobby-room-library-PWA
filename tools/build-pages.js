@@ -1603,12 +1603,36 @@ body.pwa-shell #image-popup-content::after {
     linear-gradient(180deg, rgba(255, 255, 255, 0.020), transparent 38%);
 }
 
+body.pwa-shell #image-popup-content:not(.series-mode) #image-popup-img {
+  background:
+    radial-gradient(circle at 50% 0%, rgba(var(--pwa-warm-rgb), 0.10), transparent 34%),
+    rgba(0, 0, 0, 0.24);
+}
+
+body.pwa-shell #image-popup-content:not(.series-mode) #image-popup-info {
+  border-color: color-mix(in srgb, var(--pwa-line) 52%, transparent);
+  background:
+    radial-gradient(circle at 0% 0%, rgba(var(--pwa-warm-rgb), 0.072), transparent 36%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.040), rgba(255, 255, 255, 0.014)),
+    color-mix(in srgb, var(--pwa-panel) 36%, transparent);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.040),
+    0 14px 34px rgba(var(--pwa-shadow-rgb), 0.18);
+}
+
+body.pwa-shell #image-popup-content:not(.series-mode) #image-popup-info::before {
+  background: linear-gradient(180deg, rgba(var(--pwa-warm-rgb), 0.48), rgba(var(--pwa-accent-rgb), 0.24), transparent);
+}
+
 body.pwa-shell #image-popup-info .popup-summary-text {
   border-color: color-mix(in srgb, var(--pwa-line) 54%, transparent);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.034), rgba(255, 255, 255, 0.012)),
     rgba(4, 9, 14, 0.22);
   color: rgba(232, 242, 246, 0.9);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.034),
+    0 8px 18px rgba(var(--pwa-shadow-rgb), 0.12);
 }
 
 body.pwa-shell #image-popup-info .genre-chip-wrap.popup,
