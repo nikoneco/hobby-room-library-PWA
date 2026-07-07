@@ -43,15 +43,19 @@ function shouldShowSeriesButton(book) {
 function buildExternalLinksHtml(book) {
   if (!book || !book.links) return '';
 
-  const googleUrl = escapeHtml(book.links.googleUrl || '');
-  const bellUrl = escapeHtml(book.links.bellUrl || '');
-  const amazonUrl = escapeHtml(book.links.amazonUrl || '');
+  const links = [
+    { url: book.links.googleUrl, icon: 'search', label: 'Googleで新刊検索' },
+    { url: book.links.bellUrl, icon: 'bell', label: 'BellAlert' },
+    { url: book.links.amazonUrl, icon: 'store', label: 'Amazon' }
+  ].filter(item => hasDisplayValue_(item.url));
+
+  if (!links.length) return '';
 
   return `
     <div class="popup-link-row">
-      <a href="${googleUrl}" target="_blank" rel="noopener noreferrer" class="popup-link-btn">${uiIcon_('search', 'ui-icon-inline')}<span>Googleで新刊検索</span></a>
-      <a href="${bellUrl}" target="_blank" rel="noopener noreferrer" class="popup-link-btn">${uiIcon_('bell', 'ui-icon-inline')}<span>BellAlert</span></a>
-      <a href="${amazonUrl}" target="_blank" rel="noopener noreferrer" class="popup-link-btn">${uiIcon_('store', 'ui-icon-inline')}<span>Amazon</span></a>
+      ${links.map(item => `
+        <a href="${escapeHtml(String(item.url).trim())}" target="_blank" rel="noopener noreferrer" class="popup-link-btn">${uiIcon_(item.icon, 'ui-icon-inline')}<span>${escapeHtml(item.label)}</span></a>
+      `).join('')}
     </div>
   `;
 }

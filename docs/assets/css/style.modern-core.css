@@ -1745,6 +1745,7 @@ button.genre-chip.status:focus-visible {
 
 .summary-text {
   position: relative;
+  scroll-margin-block: 1rem;
   padding: 0.74rem 0.86rem 0.78rem 0.92rem;
   border-left: 3px solid rgba(105, 198, 163, 0.30);
   color: #dce7ec;

@@ -13,6 +13,8 @@ function hasDisplayValue_(value) {
   return Boolean(text && text !== '-');
 }
 
+let summaryAccordionIdSeed_ = 0;
+
 function formatShelfLabel_(book) {
   const shelf = hasDisplayValue_(book && book.shelf) ? String(book.shelf).trim() : '';
   const location = hasDisplayValue_(book && book.location) ? String(book.location).trim() : '';
@@ -205,13 +207,16 @@ function buildGenreChips(book, options) {
 function appendSummaryAccordion_(chipWrap, book) {
   if (!chipWrap || !book || !book.summary) return;
 
+  const summaryId = `summaryText-${++summaryAccordionIdSeed_}`;
   const summaryBtn = document.createElement('button');
   summaryBtn.type = 'button';
   summaryBtn.className = 'summary-chip-toggle';
   summaryBtn.textContent = 'あらすじを見る';
   summaryBtn.setAttribute('aria-expanded', 'false');
+  summaryBtn.setAttribute('aria-controls', summaryId);
 
   const summaryText = document.createElement('div');
+  summaryText.id = summaryId;
   summaryText.className = 'summary-text';
   summaryText.textContent = book.summary || '';
   summaryText.style.display = 'none';
@@ -219,9 +224,12 @@ function appendSummaryAccordion_(chipWrap, book) {
   summaryBtn.onclick = function(e) {
     e.stopPropagation();
     const visible = summaryText.style.display === 'block';
-    summaryText.style.display = visible ? 'none' : 'block';
-    summaryBtn.textContent = visible ? 'あらすじを見る' : 'あらすじを閉じる';
-    summaryBtn.setAttribute('aria-expanded', visible ? 'false' : 'true');
+    const nextOpen = !visible;
+    summaryText.style.display = nextOpen ? 'block' : 'none';
+    summaryText.classList.toggle('is-open', nextOpen);
+    summaryBtn.classList.toggle('is-expanded', nextOpen);
+    summaryBtn.textContent = nextOpen ? 'あらすじを閉じる' : 'あらすじを見る';
+    summaryBtn.setAttribute('aria-expanded', nextOpen ? 'true' : 'false');
   };
 
   chipWrap.appendChild(summaryBtn);
@@ -231,13 +239,16 @@ function appendSummaryAccordion_(chipWrap, book) {
 function appendPopupSummaryAccordion_(chipWrap, book) {
   if (!chipWrap || !book || !book.summary) return;
 
+  const summaryId = `popupSummaryText-${++summaryAccordionIdSeed_}`;
   const summaryBtn = document.createElement('button');
   summaryBtn.type = 'button';
   summaryBtn.className = 'summary-chip-toggle popup-summary-toggle';
   summaryBtn.textContent = 'あらすじを見る';
   summaryBtn.setAttribute('aria-expanded', 'false');
+  summaryBtn.setAttribute('aria-controls', summaryId);
 
   const summaryText = document.createElement('div');
+  summaryText.id = summaryId;
   summaryText.className = 'summary-text popup-summary-text';
   summaryText.textContent = book.summary || '';
   summaryText.style.display = 'none';
@@ -245,9 +256,17 @@ function appendPopupSummaryAccordion_(chipWrap, book) {
   summaryBtn.onclick = function(e) {
     e.stopPropagation();
     const visible = summaryText.style.display === 'block';
-    summaryText.style.display = visible ? 'none' : 'block';
-    summaryBtn.textContent = visible ? 'あらすじを見る' : 'あらすじを閉じる';
-    summaryBtn.setAttribute('aria-expanded', visible ? 'false' : 'true');
+    const nextOpen = !visible;
+    summaryText.style.display = nextOpen ? 'block' : 'none';
+    summaryText.classList.toggle('is-open', nextOpen);
+    summaryBtn.classList.toggle('is-expanded', nextOpen);
+    summaryBtn.textContent = nextOpen ? 'あらすじを閉じる' : 'あらすじを見る';
+    summaryBtn.setAttribute('aria-expanded', nextOpen ? 'true' : 'false');
+    if (nextOpen && typeof summaryText.scrollIntoView === 'function') {
+      window.requestAnimationFrame(function() {
+        summaryText.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      });
+    }
   };
 
   chipWrap.appendChild(summaryBtn);
