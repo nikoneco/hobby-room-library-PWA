@@ -540,10 +540,12 @@ body.pwa-launch-splash-visible {
   right: max(12px, env(safe-area-inset-right));
   bottom: max(12px, env(safe-area-inset-bottom));
   z-index: 12000;
+  isolation: isolate;
   overflow: hidden;
   display: flex;
   align-items: center;
   gap: 10px;
+  min-height: 48px;
   padding: 12px 14px 12px 18px;
   border: 1px solid color-mix(in srgb, var(--pwa-line) 68%, transparent);
   border-radius: 16px;
@@ -559,7 +561,8 @@ body.pwa-launch-splash-visible {
     inset 0 1px 0 rgba(255, 255, 255, 0.070);
   font-size: 0.92rem;
   line-height: 1.55;
-  backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px) saturate(130%);
+  -webkit-backdrop-filter: blur(14px) saturate(130%);
 }
 
 body.pwa-shell .mobile-app-dock {
@@ -1138,9 +1141,15 @@ body.pwa-shell .empty-result {
 }
 
 body.pwa-shell .spinner-panel {
-  width: min(410px, 100%);
-  min-height: 232px;
-  padding: 1.42rem 1.26rem 1.22rem;
+  width: min(430px, 100%);
+  min-height: 238px;
+  padding: 1.5rem 1.34rem 1.28rem;
+}
+
+body.pwa-shell .spinner-panel::before {
+  background:
+    radial-gradient(circle at 82% 8%, rgba(var(--pwa-accent-rgb), 0.12), transparent 38%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.052), transparent 42%);
 }
 
 body.pwa-shell .empty-result::before {
@@ -1152,6 +1161,13 @@ body.pwa-shell .empty-result::before {
   box-shadow:
     0 0 0 6px rgba(var(--pwa-warm-rgb), 0.035),
     inset 0 1px 0 rgba(255, 255, 255, 0.050);
+}
+
+body.pwa-shell .empty-result::after {
+  background:
+    radial-gradient(circle at 20% 0%, rgba(var(--pwa-warm-rgb), 0.12), transparent 34%),
+    radial-gradient(circle at 84% 4%, rgba(var(--pwa-accent-rgb), 0.10), transparent 36%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.044), transparent 44%);
 }
 
 body.pwa-shell .empty-result-action {
@@ -1166,6 +1182,14 @@ body.pwa-shell .empty-result-action {
 
 body.pwa-shell .empty-result-action .ui-icon {
   color: color-mix(in srgb, var(--pwa-warm-2) 84%, white);
+}
+
+body.pwa-shell .empty-result-action:hover,
+body.pwa-shell .empty-result-action:focus-visible {
+  border-color: color-mix(in srgb, var(--pwa-line-strong) 54%, transparent);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.076), rgba(255, 255, 255, 0.028)),
+    color-mix(in srgb, var(--pwa-panel-strong) 64%, transparent);
 }
 
 body.pwa-shell .empty-result-random {
