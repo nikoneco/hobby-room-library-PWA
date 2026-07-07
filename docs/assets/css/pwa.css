@@ -2423,7 +2423,7 @@ body.pwa-update-visible .mobile-app-dock {
 
 @media (max-width: 640px) {
   body.pwa-network-visible {
-    padding-bottom: calc(196px + env(safe-area-inset-bottom));
+    padding-bottom: calc(168px + env(safe-area-inset-bottom));
   }
 
   body.pwa-network-visible:not(.mobile-dock-has-results) {
@@ -2504,6 +2504,43 @@ body.pwa-update-visible .mobile-app-dock {
     grid-column: 1 / -1;
     justify-self: center;
     line-height: 1;
+  }
+
+  body.pwa-shell #image-popup-overlay {
+    box-sizing: border-box;
+    width: 100dvw;
+    height: 100dvh;
+    align-items: center;
+    justify-content: center;
+    padding: max(10px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
+  }
+
+  body.pwa-shell #image-popup-content,
+  body.pwa-shell #image-popup-content:not(.series-mode),
+  body.pwa-shell #image-popup-content.series-mode {
+    box-sizing: border-box;
+    grid-template-columns: minmax(0, 1fr) !important;
+    width: min(520px, calc(100dvw - 20px - env(safe-area-inset-left) - env(safe-area-inset-right)));
+    max-width: none;
+    max-height: calc(100dvh - 20px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    gap: 0.72rem;
+    padding: 1.12rem 0.76rem 0.82rem;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+  }
+
+  body.pwa-shell #image-popup-content:not(.series-mode) #image-popup-img,
+  body.pwa-shell #image-popup-img {
+    width: auto;
+    max-width: min(210px, 62vw);
+    max-height: 34svh;
+    justify-self: center;
+  }
+
+  body.pwa-shell #image-popup-content:not(.series-mode) #image-popup-info,
+  body.pwa-shell #image-popup-info {
+    width: 100%;
+    min-width: 0;
   }
 }
 
