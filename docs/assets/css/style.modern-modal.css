@@ -1006,21 +1006,27 @@ button.popup-arrow:active {
 }
 
 .suggest-box {
-  position: relative;
+  position: absolute;
+  inset: calc(100% + 0.34rem) 0 auto 0;
   isolation: isolate;
+  z-index: 4200;
   max-height: min(44vh, 360px);
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 0.38rem;
+  min-width: 100%;
+  padding: 0.34rem;
   border: 1px solid rgba(148, 163, 184, 0.20);
   border-top-color: rgba(240, 195, 122, 0.22);
-  border-radius: 0 0 16px 16px;
+  border-radius: 15px;
   background:
-    radial-gradient(circle at 10% 0%, rgba(240, 195, 122, 0.075), transparent 34%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.060), rgba(255, 255, 255, 0.020)),
-    rgba(13, 18, 26, 0.98);
+    linear-gradient(90deg, rgba(240, 195, 122, 0.14) 0 3px, transparent 3px),
+    radial-gradient(circle at 10% 0%, rgba(240, 195, 122, 0.090), transparent 34%),
+    radial-gradient(circle at 92% 0%, rgba(104, 191, 215, 0.070), transparent 38%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.070), rgba(255, 255, 255, 0.022)),
+    rgba(12, 17, 24, 0.98);
   box-shadow:
-    0 20px 48px rgba(0, 0, 0, 0.34),
+    0 24px 58px rgba(0, 0, 0, 0.42),
+    0 0 0 1px rgba(255, 255, 255, 0.030),
     inset 0 1px 0 rgba(255, 255, 255, 0.060);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
@@ -1031,10 +1037,10 @@ button.popup-arrow:active {
   position: relative;
   display: flex;
   align-items: center;
-  min-height: 2.4rem;
-  padding: 0.58rem 0.74rem;
+  min-height: 2.45rem;
+  padding: 0.62rem 0.76rem 0.62rem 0.86rem;
   border: 1px solid rgba(148, 163, 184, 0.10);
-  border-radius: 11px;
+  border-radius: 10px;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.030), rgba(255, 255, 255, 0.010)),
     rgba(255, 255, 255, 0.012);
@@ -1044,6 +1050,17 @@ button.popup-arrow:active {
   line-height: 1.45;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.028);
   transition: transform var(--lib-ease), border-color var(--lib-ease), background var(--lib-ease), color var(--lib-ease), box-shadow var(--lib-ease);
+}
+
+.suggest-item::before {
+  content: "";
+  position: absolute;
+  inset: 0.52rem auto 0.52rem 0.44rem;
+  width: 2px;
+  border-radius: 999px;
+  background: rgba(104, 191, 215, 0.46);
+  opacity: 0;
+  transition: opacity var(--lib-ease), background var(--lib-ease);
 }
 
 .suggest-item + .suggest-item {
@@ -1063,13 +1080,19 @@ button.popup-arrow:active {
     0 8px 18px rgba(0, 0, 0, 0.20);
 }
 
+.suggest-item.active::before,
+.suggest-item:hover::before {
+  background: linear-gradient(180deg, rgba(240, 195, 122, 0.86), rgba(104, 191, 215, 0.62));
+  opacity: 1;
+}
+
 .suggest-item:active {
   transform: translateY(0);
 }
 
 .highlight-match {
-  padding: 0.02em 0.16em;
-  border-radius: 5px;
+  padding: 0.015em 0.18em;
+  border-radius: 6px;
   background:
     linear-gradient(180deg, rgba(240, 195, 122, 0.24), rgba(240, 195, 122, 0.14)),
     rgba(240, 195, 122, 0.12);

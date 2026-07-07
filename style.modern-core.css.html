@@ -291,7 +291,7 @@ body::before {
   grid-area: form;
   position: relative;
   isolation: isolate;
-  overflow: hidden;
+  overflow: visible;
   align-items: stretch;
   width: min(690px, 100%);
   margin: 0;
@@ -646,8 +646,13 @@ button.quick-browse-chip:active {
 }
 
 .input-group {
+  position: relative;
   width: 100%;
   max-width: 760px;
+}
+
+.input-group:focus-within {
+  z-index: 45;
 }
 
 .search-container.centered .input-group {
@@ -1114,7 +1119,7 @@ button.quick-browse-chip:focus-visible {
 .advanced-search-area {
   position: relative;
   isolation: isolate;
-  overflow: hidden;
+  overflow: visible;
   margin-top: 0.52rem;
   padding: 1.05rem;
   border: 1px solid rgba(148, 163, 184, 0.16);
@@ -1149,7 +1154,7 @@ button.quick-browse-chip:focus-visible {
 
 .advanced-grid .input-group {
   position: relative;
-  overflow: hidden;
+  overflow: visible;
   padding: 0.66rem;
   border: 1px solid rgba(148, 163, 184, 0.14);
   border-radius: calc(var(--lib-radius-md) + 1px);
