@@ -1,7 +1,8 @@
 <style>
 .shelf-view {
-  max-width: 1280px;
-  padding-inline: clamp(0.72rem, 2vw, 1.35rem);
+  max-width: 1320px;
+  padding-inline: clamp(0.72rem, 2.4vw, 1.65rem);
+  padding-bottom: 2rem;
 }
 
 .logo[role="button"] {
@@ -14,22 +15,40 @@
 }
 
 .shelf-view-overview {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
   display: grid;
-  gap: 0.72rem;
-  margin: 0 0 0.86rem;
-  padding: 0.86rem 0.94rem;
+  grid-template-columns: minmax(0, 1.05fr) minmax(320px, 1.65fr);
+  align-items: center;
+  gap: 0.9rem;
+  margin: 0 0 1rem;
+  padding: 1rem 1.08rem;
   border: 1px solid var(--lib-line);
-  border-radius: calc(var(--lib-radius-md) + 2px);
+  border-radius: calc(var(--lib-radius-md) + 6px);
   background:
-    linear-gradient(135deg, rgba(214, 164, 95, 0.060), rgba(104, 191, 215, 0.035)),
+    radial-gradient(circle at 2% 0%, rgba(214, 164, 95, 0.10), transparent 32%),
+    linear-gradient(135deg, rgba(104, 191, 215, 0.060), rgba(214, 164, 95, 0.042)),
     rgba(255, 255, 255, 0.036);
   color: var(--lib-muted);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.045);
+  box-shadow:
+    0 14px 34px rgba(0, 0, 0, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.055);
+}
+
+.shelf-view-overview::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  z-index: -1;
+  width: 5px;
+  border-radius: inherit;
+  background: linear-gradient(180deg, rgba(214, 164, 95, 0.72), rgba(104, 191, 215, 0.26));
 }
 
 .shelf-view-mode {
   color: var(--lib-text);
-  font-size: 0.96rem;
+  font-size: 1rem;
   font-weight: 850;
   line-height: 1.35;
 }
@@ -37,15 +56,18 @@
 .shelf-view-stat-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0.42rem;
+  gap: 0.5rem;
 }
 
 .shelf-view-stat {
   min-width: 0;
-  padding: 0.5rem 0.56rem;
+  padding: 0.58rem 0.62rem;
   border: 1px solid rgba(255, 255, 255, 0.075);
-  border-radius: var(--lib-radius-sm);
-  background: rgba(0, 0, 0, 0.18);
+  border-radius: calc(var(--lib-radius-sm) + 3px);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.040), rgba(255, 255, 255, 0.010)),
+    rgba(0, 0, 0, 0.18);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.036);
 }
 
 .shelf-view-stat-label,
@@ -86,12 +108,14 @@
 
 .shelf-jump-nav,
 .shelf-jump-nav.immersive {
+  padding: 0.72rem 0.84rem;
   border-color: rgba(255, 255, 255, 0.085);
+  border-radius: calc(var(--lib-radius-md) + 6px);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.060), rgba(255, 255, 255, 0.028)),
-    rgba(11, 16, 22, 0.82);
+    rgba(9, 14, 20, 0.78);
   box-shadow:
-    0 14px 32px rgba(0, 0, 0, 0.26),
+    0 16px 38px rgba(0, 0, 0, 0.25),
     inset 0 1px 0 rgba(255, 255, 255, 0.050);
   backdrop-filter: blur(14px);
 }
@@ -103,6 +127,7 @@
 
 .shelf-jump-top-btn,
 .shelf-jump-chip {
+  min-height: 34px;
   border-color: rgba(255, 255, 255, 0.082);
   background: rgba(255, 255, 255, 0.038);
   color: var(--lib-muted);
@@ -144,12 +169,15 @@
 .bookshelf-group {
   position: relative;
   overflow: hidden;
-  border-radius: calc(var(--lib-radius-lg) + 2px);
+  border-radius: calc(var(--lib-radius-lg) + 6px);
   border-color: rgba(255, 255, 255, 0.082);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.054), rgba(255, 255, 255, 0.027)),
+    radial-gradient(circle at 0% 0%, rgba(214, 164, 95, 0.070), transparent 28%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.052), rgba(255, 255, 255, 0.022)),
     rgba(10, 15, 21, 0.60);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.042);
+  box-shadow:
+    0 16px 38px rgba(0, 0, 0, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.046);
 }
 
 .bookshelf-group::before {
@@ -157,7 +185,18 @@
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background: linear-gradient(90deg, rgba(214, 164, 95, 0.065), transparent 22%);
+  background: linear-gradient(90deg, rgba(214, 164, 95, 0.055), transparent 24%);
+}
+
+.bookshelf-group::after {
+  content: "";
+  position: absolute;
+  right: 1rem;
+  bottom: 0.92rem;
+  left: 1rem;
+  height: 1px;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.10), transparent);
 }
 
 .bookshelf-group.is-active {
@@ -177,9 +216,21 @@
   align-items: baseline;
   justify-content: space-between;
   gap: 0.8rem;
+  padding-left: 0.82rem;
   color: var(--lib-text);
   letter-spacing: 0;
   text-shadow: none;
+}
+
+.bookshelf-group-title::before {
+  content: "";
+  position: absolute;
+  top: 0.14rem;
+  bottom: 0.1rem;
+  left: 0;
+  width: 4px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(214, 164, 95, 0.82), rgba(104, 191, 215, 0.30));
 }
 
 .bookshelf-group-label,
@@ -206,9 +257,21 @@
   letter-spacing: 0;
 }
 
+.bookshelf-level {
+  border: 1px solid rgba(255, 255, 255, 0.066);
+  border-radius: calc(var(--lib-radius-md) + 4px);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.030), rgba(255, 255, 255, 0.010)),
+    rgba(2, 7, 11, 0.20);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.026);
+}
+
 .bookshelf-level-title {
   gap: 0.5rem;
   justify-content: space-between;
+  width: fit-content;
+  max-width: 100%;
+  min-height: 30px;
   background: rgba(255, 255, 255, 0.036);
   border-color: rgba(255, 255, 255, 0.078);
   color: var(--lib-muted);
@@ -216,12 +279,14 @@
 
 .bookshelf-strip {
   position: relative;
-  padding-top: 0.48rem;
+  padding: 0.58rem 0.15rem 0.78rem;
   border-bottom-color: rgba(255, 255, 255, 0.060);
   scrollbar-color: rgba(214, 164, 95, 0.54) rgba(255, 255, 255, 0.045);
+  scroll-padding-left: 0.2rem;
 }
 
 .shelf-book {
+  border-radius: calc(var(--lib-radius-sm) + 3px);
   border-color: rgba(255, 255, 255, 0.070);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.048), rgba(255, 255, 255, 0.022)),
@@ -251,6 +316,7 @@
 
 .shelf-book-title {
   color: #dce7ec;
+  line-height: 1.32;
 }
 
 body.shelf-immersive-active {
@@ -378,5 +444,33 @@ body.shelf-immersive-active .shelf-room-map-fab:focus-visible {
 
 .shelf-room-map-modal-close {
   color: #f6ead8;
+}
+
+@media (max-width: 760px) {
+  .shelf-view {
+    padding-inline: clamp(0.64rem, 3vw, 0.92rem);
+  }
+
+  .shelf-view-overview {
+    grid-template-columns: 1fr;
+    padding: 0.88rem 0.9rem;
+    border-radius: calc(var(--lib-radius-md) + 3px);
+  }
+
+  .shelf-view-stat-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .shelf-jump-nav,
+  .shelf-jump-nav.immersive,
+  .bookshelf-group,
+  .bookshelf-level {
+    border-radius: calc(var(--lib-radius-md) + 2px);
+  }
+
+  .bookshelf-group::after {
+    right: 0.72rem;
+    left: 0.72rem;
+  }
 }
 </style>
