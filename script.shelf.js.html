@@ -212,11 +212,16 @@ function renderShelfJumpNav_(groups, totalCount, immersive) {
   }
 
   groups.forEach((group, index) => {
+    const groupCount = group.count || getShelfGroupBookCount_(group);
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'shelf-jump-chip';
     button.dataset.shelfTarget = getShelfNavTargetId_(index);
-    button.textContent = `${group.label} ${group.count || getShelfGroupBookCount_(group)}冊`;
+    button.setAttribute('aria-label', `${group.label} ${groupCount}冊へ移動`);
+    button.innerHTML = `
+      <span class="shelf-jump-chip-label">${escapeHtml(group.label)}</span>
+      <span class="shelf-jump-chip-count">${escapeHtml(String(groupCount))}冊</span>
+    `;
     button.onclick = function() {
       const target = document.getElementById(button.dataset.shelfTarget);
       if (!target) return;

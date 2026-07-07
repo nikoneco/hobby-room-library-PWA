@@ -224,6 +224,11 @@
 
 .shelf-jump-top-btn,
 .shelf-jump-chip {
+  display: inline-grid;
+  grid-template-columns: minmax(0, auto) auto;
+  align-items: center;
+  justify-content: center;
+  gap: 0.34rem;
   min-height: 34px;
   padding: 0.32rem 0.68rem;
   border-color: rgba(255, 255, 255, 0.10);
@@ -236,6 +241,32 @@
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.044);
 }
 
+.shelf-jump-chip-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: inherit;
+  font-weight: 850;
+  letter-spacing: 0;
+}
+
+.shelf-jump-chip-count {
+  display: inline-flex;
+  min-width: 2.35em;
+  min-height: 1.48em;
+  align-items: center;
+  justify-content: center;
+  padding: 0.04rem 0.34rem;
+  border: 1px solid rgba(255, 255, 255, 0.070);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.18);
+  color: rgba(232, 242, 247, 0.72);
+  font-size: 0.68rem;
+  font-weight: 850;
+  line-height: 1;
+}
+
 .shelf-jump-chip:hover,
 .shelf-jump-chip:focus-visible,
 .shelf-jump-top-btn:hover,
@@ -246,6 +277,7 @@
 }
 
 .shelf-jump-map-chip {
+  display: inline-flex;
   border-color: rgba(214, 164, 95, 0.34);
   background:
     linear-gradient(180deg, rgba(214, 164, 95, 0.16), rgba(214, 164, 95, 0.070)),
@@ -254,6 +286,7 @@
 }
 
 .shelf-jump-chip.is-active {
+  grid-template-columns: minmax(0, auto) auto auto;
   border-color: rgba(214, 164, 95, 0.58);
   background:
     linear-gradient(180deg, rgba(214, 164, 95, 0.22), rgba(214, 164, 95, 0.080)),
@@ -264,9 +297,15 @@
     0 8px 18px rgba(0, 0, 0, 0.16);
 }
 
+.shelf-jump-chip.is-active .shelf-jump-chip-count {
+  border-color: rgba(255, 242, 214, 0.16);
+  background: rgba(214, 164, 95, 0.16);
+  color: #fff2d6;
+}
+
 .shelf-jump-chip.is-active::after {
   content: '現在';
-  margin-left: 0.34rem;
+  margin-left: 0;
   padding: 0.08rem 0.32rem;
   border-radius: 999px;
   background: rgba(214, 164, 95, 0.18);
@@ -717,6 +756,10 @@ body.shelf-immersive-active .shelf-room-map-fab:focus-visible {
   .shelf-jump-chip {
     min-height: 38px;
     padding-inline: 0.62rem;
+  }
+
+  .shelf-jump-chip {
+    max-width: min(74vw, 18rem);
   }
 
   .bookshelf-group::after {
