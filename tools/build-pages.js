@@ -1895,20 +1895,20 @@ body.pwa-shell .quick-browse-kicker {
 }
 
 body.pwa-shell .quick-browse-refresh {
-  border-color: color-mix(in srgb, var(--pwa-warm-2) 30%, transparent);
+  border-color: color-mix(in srgb, var(--pwa-warm-2) 18%, transparent);
   background:
-    linear-gradient(180deg, rgba(var(--pwa-warm-rgb), 0.11), rgba(255, 255, 255, 0.020)),
-    color-mix(in srgb, var(--pwa-panel-strong) 42%, transparent);
-  color: rgba(246, 234, 216, 0.88);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.045);
+    linear-gradient(180deg, rgba(var(--pwa-warm-rgb), 0.052), rgba(255, 255, 255, 0.012)),
+    color-mix(in srgb, var(--pwa-panel-strong) 26%, transparent);
+  color: rgba(246, 234, 216, 0.70);
+  box-shadow: none;
 }
 
 body.pwa-shell .quick-browse-refresh:hover,
 body.pwa-shell .quick-browse-refresh:focus-visible {
-  border-color: color-mix(in srgb, var(--pwa-warm-2) 54%, transparent);
+  border-color: color-mix(in srgb, var(--pwa-warm-2) 38%, transparent);
   background:
-    linear-gradient(180deg, rgba(var(--pwa-warm-rgb), 0.15), rgba(255, 255, 255, 0.024)),
-    color-mix(in srgb, var(--pwa-panel-strong) 48%, transparent);
+    linear-gradient(180deg, rgba(var(--pwa-warm-rgb), 0.085), rgba(255, 255, 255, 0.016)),
+    color-mix(in srgb, var(--pwa-panel-strong) 34%, transparent);
 }
 
 body.pwa-shell button.quick-browse-chip {
