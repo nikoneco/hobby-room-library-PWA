@@ -195,10 +195,12 @@
   .mobile-app-dock-status {
     min-width: 0;
     min-height: 24px;
-    display: flex;
+    display: grid;
+    grid-template-columns: minmax(0, auto) minmax(0, 1fr);
     align-items: center;
-    justify-content: center;
-    padding: 0.16rem 0.52rem;
+    justify-content: stretch;
+    gap: 0.28rem;
+    padding: 0.16rem 0.2rem;
     border: 1px solid rgba(167, 183, 204, 0.12);
     border-radius: 999px;
     background:
@@ -212,6 +214,30 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+
+  .mobile-app-dock-status-count,
+  .mobile-app-dock-status-mode {
+    min-width: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .mobile-app-dock-status-count {
+    padding: 0.08rem 0.46rem;
+    border-radius: 999px;
+    background: rgba(214, 164, 95, 0.12);
+    color: rgba(255, 232, 194, 0.92);
+  }
+
+  .mobile-app-dock-status-mode {
+    padding: 0.08rem 0.42rem 0.08rem 0.22rem;
+    color: rgba(220, 232, 238, 0.76);
+    justify-content: flex-start;
   }
 
   .mobile-app-dock-btn {

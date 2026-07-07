@@ -273,17 +273,55 @@ function getMobileDockStatusText_(hasResults) {
   return `${count}冊 / ${getMobileDockViewLabel_(getCurrentViewMode_())}`;
 }
 
+function getMobileDockStatusParts_(hasResults) {
+  if (!hasResults) {
+    return { count: '検索前', mode: '' };
+  }
+
+  const count = Array.isArray(lastResult) ? lastResult.length : 0;
+  if (searchStatusState && searchStatusState.mode === 'random') {
+    return { count: `${count}冊`, mode: 'ランダム' };
+  }
+  if (searchStatusState && searchStatusState.mode === 'shelf') {
+    return { count: `全${count}冊`, mode: '棚表示' };
+  }
+  return {
+    count: `${count}冊`,
+    mode: getMobileDockViewLabel_(getCurrentViewMode_())
+  };
+}
+
+function renderMobileDockStatus_(status, hasResults) {
+  if (!status) return;
+  const parts = getMobileDockStatusParts_(hasResults);
+
+  status.textContent = '';
+  if (!hasResults) {
+    status.textContent = parts.count;
+    return;
+  }
+
+  const countSpan = document.createElement('span');
+  countSpan.className = 'mobile-app-dock-status-count';
+  countSpan.textContent = parts.count;
+
+  const modeSpan = document.createElement('span');
+  modeSpan.className = 'mobile-app-dock-status-mode';
+  modeSpan.textContent = parts.mode;
+
+  status.appendChild(countSpan);
+  status.appendChild(modeSpan);
+}
+
 function syncMobileAppDockState_(activeAction) {
   const dock = document.getElementById('mobileAppDock');
   if (!dock) return;
 
   const hasResults = Array.isArray(lastResult) && lastResult.length > 0;
   dock.classList.toggle('has-results', hasResults);
-  dock.setAttribute('aria-label', hasResults ? '主要操作と表示切替' : '主要操作');
+  dock.setAttribute('aria-label', hasResults ? `主要操作と表示切替。${getMobileDockStatusText_(hasResults)}` : '主要操作');
   const status = document.getElementById('mobileDockStatus');
-  if (status) {
-    status.textContent = getMobileDockStatusText_(hasResults);
-  }
+  renderMobileDockStatus_(status, hasResults);
   if (document.body) {
     document.body.classList.toggle('mobile-dock-has-results', hasResults);
   }
