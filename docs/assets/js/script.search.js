@@ -307,7 +307,7 @@ function applyInitialSearchData_(data) {
   PREVIEW_INDEX_READY = true;
 
   if (!resultViewModeChangedLocally && payload.userPreferences) {
-    const initialViewMode = hydratePreferredResultViewMode_(payload.userPreferences.resultViewMode);
+    const initialViewMode = getPreferredResultViewMode_();
     currentViewMode = initialViewMode;
     isCardView = initialViewMode === 'card';
     updateViewToggleButtons_();

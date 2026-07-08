@@ -18,8 +18,7 @@ const WEB_APP_API_REGISTRY_ = Object.freeze({
     { name: 'getBookDetailByRowIndex', calledBy: 'script.js.html: showPopup', role: 'PWA本棚一覧から開いた本の詳細取得' },
     { name: 'getBookDetailsByRowIndexes', calledBy: 'script.js.html: detail prefetch', role: 'PWA本棚詳細の少量先読み' },
     { name: 'getBooksBySeriesKey', calledBy: 'script.js.html: loadSeriesPanel', role: 'シリーズ一覧表示' },
-    { name: 'getWebAppUserPreferences', calledBy: 'script.js.html: fetchInitialSearchData', role: 'Webアプリ表示設定取得' },
-    { name: 'saveWebAppUserPreferences', calledBy: 'script.js.html: savePreferredResultViewModeToServer_', role: 'Webアプリ表示設定保存' }
+    { name: 'getWebAppUserPreferences', calledBy: 'script.js.html: fetchInitialSearchData', role: 'Webアプリ表示設定取得' }
   ],
   compatibility: [
     { name: 'searchBooks', role: '旧来互換のタイトル/作者検索' },
@@ -519,22 +518,6 @@ function getWebAppUserPreferences() {
     return {
       resultViewMode: 'card'
     };
-  }
-}
-
-function saveWebAppUserPreferences(preferences) {
-  try {
-    const prefs = preferences || {};
-    const resultViewMode = normalizeWebAppResultViewMode_(prefs.resultViewMode);
-    PropertiesService
-      .getScriptProperties()
-      .setProperty(WEBAPP_PREF_RESULT_VIEW_MODE_KEY, resultViewMode);
-    return {
-      resultViewMode
-    };
-  } catch (e) {
-    console.warn('saveWebAppUserPreferences error:', e);
-    return getWebAppUserPreferences();
   }
 }
 
@@ -1871,6 +1854,49 @@ function getBooksBySeriesKey(seriesKeyAuto) {
 
 const WEBAPP_JSONP_CALLBACK_PATTERN_ = /^[A-Za-z_$][0-9A-Za-z_$]*(?:\.[A-Za-z_$][0-9A-Za-z_$]*)*$/;
 const WEBAPP_JSONP_DEFAULT_CALLBACK_ = '__shumiLibraryJsonpCallback';
+const PUBLIC_WEBAPP_JSONP_API_HANDLERS_ = Object.freeze({
+  initial: () => getInitialSearchDataForPwa_(),
+  suggest: () => getSuggestData(),
+  advancedOptions: () => getAdvancedSearchOptions(),
+  previewIndex: () => [],
+  countPreview: params => countPreviewMatchesAuthoritative(
+    params.keyword,
+    params.detailTitle,
+    params.detailYomi,
+    params.detailAuthor,
+    params.detailPublisher,
+    params.detailStory,
+    params.detailTheme,
+    params.detailMood,
+    params.detailStatus,
+    params.detailReleasedFromYear,
+    params.detailReleasedFromMonth,
+    params.detailReleasedToYear,
+    params.detailReleasedToMonth
+  ),
+  searchSimple: params => searchBooksSimple(params.keyword || ''),
+  searchAdvanced: params => searchBooksAdvanced(
+    params.keyword,
+    params.detailTitle,
+    params.detailYomi,
+    params.detailAuthor,
+    params.detailPublisher,
+    params.detailStory,
+    params.detailTheme,
+    params.detailMood,
+    params.detailStatus,
+    params.detailReleasedFromYear,
+    params.detailReleasedFromMonth,
+    params.detailReleasedToYear,
+    params.detailReleasedToMonth
+  ),
+  random: params => getRandomBooks(params.count || 10),
+  shelf: () => getBookshelfBooks(),
+  shelfChunk: params => getBookshelfBooksChunk(params.offset, params.limit),
+  bookDetail: params => getBookDetailByRowIndex(params.rowIndex),
+  bookDetails: params => getBookDetailsByRowIndexes(params.rowIndexes || params.rowIndexesCsv || ''),
+  series: params => getBooksBySeriesKey(params.seriesKeyAuto || params.seriesKey || '')
+});
 
 /**
  * JSONP APIまたはWebアプリHTML入口。
@@ -2001,77 +2027,12 @@ function buildWebAppJsonpEnvelope_(apiName, params) {
  * @returns {*}
  */
 function dispatchWebAppJsonpApi_(apiName, params) {
-  switch (String(apiName || '').trim()) {
-    case 'initial':
-      return getInitialSearchDataForPwa_();
-
-    case 'suggest':
-      return getSuggestData();
-
-    case 'advancedOptions':
-      return getAdvancedSearchOptions();
-
-    case 'previewIndex':
-      return [];
-
-    case 'countPreview':
-      return countPreviewMatchesAuthoritative(
-        params.keyword,
-        params.detailTitle,
-        params.detailYomi,
-        params.detailAuthor,
-        params.detailPublisher,
-        params.detailStory,
-        params.detailTheme,
-        params.detailMood,
-        params.detailStatus,
-        params.detailReleasedFromYear,
-        params.detailReleasedFromMonth,
-        params.detailReleasedToYear,
-        params.detailReleasedToMonth
-      );
-
-    case 'searchSimple':
-      return searchBooksSimple(params.keyword || '');
-
-    case 'searchAdvanced':
-      return searchBooksAdvanced(
-        params.keyword,
-        params.detailTitle,
-        params.detailYomi,
-        params.detailAuthor,
-        params.detailPublisher,
-        params.detailStory,
-        params.detailTheme,
-        params.detailMood,
-        params.detailStatus,
-        params.detailReleasedFromYear,
-        params.detailReleasedFromMonth,
-        params.detailReleasedToYear,
-        params.detailReleasedToMonth
-      );
-
-    case 'random':
-      return getRandomBooks(params.count || 10);
-
-    case 'shelf':
-      return getBookshelfBooks();
-
-    case 'shelfChunk':
-      return getBookshelfBooksChunk(params.offset, params.limit);
-
-    case 'bookDetail':
-      return getBookDetailByRowIndex(params.rowIndex);
-
-    case 'bookDetails':
-      return getBookDetailsByRowIndexes(params.rowIndexes || params.rowIndexesCsv || '');
-
-    case 'series':
-      return getBooksBySeriesKey(params.seriesKeyAuto || params.seriesKey || '');
-
-    default:
-      throw new Error(`Unknown API: ${apiName}`);
+  const normalizedApiName = String(apiName || '').trim();
+  const handler = PUBLIC_WEBAPP_JSONP_API_HANDLERS_[normalizedApiName];
+  if (typeof handler !== 'function') {
+    throw new Error(`Unknown API: ${apiName}`);
   }
+  return handler(params || {});
 }
 
 

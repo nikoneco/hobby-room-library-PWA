@@ -214,7 +214,19 @@ function buildStaticIndex() {
   return source;
 }
 
+function cleanupGeneratedJsAssets() {
+  if (!fs.existsSync(jsDir)) return;
+
+  fs.readdirSync(jsDir)
+    .filter(name => /^script\.(boot|images|modal|render|search|shelf|state)\.[0-9a-f]{10}\.js$/.test(name))
+    .forEach(name => {
+      fs.unlinkSync(path.join(jsDir, name));
+    });
+}
+
 function writeStaticAssets() {
+  cleanupGeneratedJsAssets();
+
   cssFiles.forEach(fileName => {
     const source = stripWrapper(readUtf8(fileName), 'style');
     fs.writeFileSync(
@@ -2963,15 +2975,6 @@ function writeGasRunShim() {
       args = [];
     }
     if (!config) {
-      if (methodName === 'saveWebAppUserPreferences') {
-        if (typeof successHandler === 'function') {
-          window.setTimeout(function() {
-            successHandler(args[0] || {});
-          }, 0);
-        }
-        return;
-      }
-
       invokeFailure_(
         failureHandler,
         createError_('未対応のAPIです: ' + methodName, 'UNSUPPORTED_API')

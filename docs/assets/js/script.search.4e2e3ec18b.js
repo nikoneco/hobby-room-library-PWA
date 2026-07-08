@@ -38,6 +38,7 @@ let PREVIEW_INDEX_READY = false;
 let PREVIEW_COUNT_REQUEST_SEQ = 0;
 let PREVIEW_COUNT_DEBOUNCE_TIMER = null;
 let QUICK_BROWSE_COUNTS = null;
+let quickBrowseLastSignature = '';
 
 const QUICK_BROWSE_CONFIG = [
   {
@@ -306,7 +307,7 @@ function applyInitialSearchData_(data) {
   PREVIEW_INDEX_READY = true;
 
   if (!resultViewModeChangedLocally && payload.userPreferences) {
-    const initialViewMode = hydratePreferredResultViewMode_(payload.userPreferences.resultViewMode);
+    const initialViewMode = getPreferredResultViewMode_();
     currentViewMode = initialViewMode;
     isCardView = initialViewMode === 'card';
     updateViewToggleButtons_();
@@ -642,16 +643,28 @@ function isAdvancedOpen() {
   return area && area.style.display !== 'none';
 }
 
+function setAdvancedToggleButtonState_(open) {
+  const btn = document.getElementById('advancedToggleBtn');
+  if (!btn) return;
+
+  const label = btn.querySelector('.advanced-toggle-label') || btn.querySelector('span:last-child');
+  btn.classList.toggle('active', Boolean(open));
+  btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  btn.setAttribute('title', open ? '詳細検索を閉じる' : '詳細検索を開く');
+  if (label) {
+    label.textContent = open ? '閉じる' : '詳細';
+  }
+}
+
 function toggleAdvancedSearch() {
   const area = document.getElementById('advancedSearchArea');
-  const btn = document.getElementById('advancedToggleBtn');
-  if (!area || !btn) return;
+  if (!area) return;
 
   const opening = area.style.display === 'none' || area.style.display === '';
   if (opening) {
     area.style.display = 'block';
-    btn.classList.add('active');
-    btn.textContent = '詳細検索を閉じる';
+    area.setAttribute('aria-hidden', 'false');
+    setAdvancedToggleButtonState_(true);
   } else {
     closeAdvancedSearchPanel_();
   }
@@ -669,13 +682,12 @@ function toggleAdvancedSearch() {
 
 function closeAdvancedSearchPanel_() {
   const area = document.getElementById('advancedSearchArea');
-  const btn = document.getElementById('advancedToggleBtn');
 
-  if (area) area.style.display = 'none';
-  if (btn) {
-    btn.classList.remove('active');
-    btn.textContent = '詳細検索';
+  if (area) {
+    area.style.display = 'none';
+    area.setAttribute('aria-hidden', 'true');
   }
+  setAdvancedToggleButtonState_(false);
   syncBookshelfCtaVisibility_();
 }
 
@@ -763,6 +775,12 @@ function buildQuickBrowseItems_() {
   return shuffledCopy_(items).slice(0, 7);
 }
 
+function getQuickBrowseSignature_(items) {
+  return Array.isArray(items)
+    ? items.map(item => `${item.config && item.config.field ? item.config.field : ''}:${item.value}`).join('|')
+    : '';
+}
+
 function syncQuickBrowseRailVisibility_() {
   const rail = document.getElementById('quickBrowseRail');
   if (!rail) return;
@@ -771,12 +789,22 @@ function syncQuickBrowseRailVisibility_() {
   rail.hidden = !ready || isAdvancedOpen();
 }
 
-function renderQuickBrowseRail_() {
+function renderQuickBrowseRail_(options) {
   const rail = document.getElementById('quickBrowseRail');
   const chips = document.getElementById('quickBrowseChips');
   if (!rail || !chips) return;
 
-  const items = buildQuickBrowseItems_();
+  const shouldAvoidSame = Boolean(options && options.avoidSame);
+  let items = buildQuickBrowseItems_();
+  let signature = getQuickBrowseSignature_(items);
+
+  if (shouldAvoidSame && quickBrowseLastSignature && signature === quickBrowseLastSignature && items.length > 1) {
+    for (let i = 0; i < 4 && signature === quickBrowseLastSignature; i++) {
+      items = buildQuickBrowseItems_();
+      signature = getQuickBrowseSignature_(items);
+    }
+  }
+
   chips.innerHTML = items.map(item => `
     <button
       type="button"
@@ -791,8 +819,30 @@ function renderQuickBrowseRail_() {
     </button>
   `).join('');
 
+  quickBrowseLastSignature = signature;
   rail.dataset.ready = items.length ? 'true' : 'false';
   syncQuickBrowseRailVisibility_();
+}
+
+function shuffleQuickBrowseRail_() {
+  const rail = document.getElementById('quickBrowseRail');
+  const button = document.getElementById('quickBrowseRefresh');
+
+  if (button) {
+    button.disabled = true;
+    button.setAttribute('aria-busy', 'true');
+  }
+  if (rail) rail.classList.add('is-refreshing');
+
+  renderQuickBrowseRail_({ avoidSame: true });
+
+  window.setTimeout(() => {
+    if (rail) rail.classList.remove('is-refreshing');
+    if (button) {
+      button.disabled = false;
+      button.setAttribute('aria-busy', 'false');
+    }
+  }, 180);
 }
 
 function applyQuickBrowseCondition_(field, value) {
@@ -1340,7 +1390,13 @@ function renderSearchStatus_() {
   }
   els.area.classList.toggle('has-librarian-note', Boolean(librarianNote));
 
+  const chipCount = searchStatusState.chips.length;
   const removableChipCount = searchStatusState.chips.filter(chip => chip && chip.removable).length;
+  els.area.classList.toggle('has-condition-stack', chipCount > 1 || Boolean(librarianNote));
+  els.chips.setAttribute(
+    'aria-label',
+    chipCount > 0 ? '現在の絞り込み条件' : '検索状態'
+  );
 
   els.chips.innerHTML = searchStatusState.chips.map(chip => {
     const canRemoveChip = chip.removable && removableChipCount > 1;
@@ -1364,6 +1420,7 @@ function renderSearchStatus_() {
         data-action="remove-chip"
         data-key="${escapeHtml(chip.key || '')}"
         aria-label="${escapeHtml(visibleLabel + ' を削除')}"
+        title="${escapeHtml(visibleLabel + ' を外す')}"
       >${uiIcon_('close', 'ui-icon-inline')}</button>
     ` : '';
 
@@ -1387,6 +1444,7 @@ function renderSearchStatus_() {
         class="search-status-reroll"
         data-action="random-reroll"
         aria-label="ランダムで別の10冊を表示"
+        title="ランダム選書をやり直す"
         ${rerollBusyAttrs}
       >${uiIcon_('shuffle', 'ui-icon-inline')}<span>もう一度ひく</span></button>
     `);

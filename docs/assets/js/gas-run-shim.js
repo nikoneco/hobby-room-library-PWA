@@ -131,15 +131,6 @@
       args = [];
     }
     if (!config) {
-      if (methodName === 'saveWebAppUserPreferences') {
-        if (typeof successHandler === 'function') {
-          window.setTimeout(function() {
-            successHandler(args[0] || {});
-          }, 0);
-        }
-        return;
-      }
-
       invokeFailure_(
         failureHandler,
         createError_('未対応のAPIです: ' + methodName, 'UNSUPPORTED_API')

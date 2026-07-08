@@ -19,6 +19,7 @@ assert(source.includes('WEBAPP_JSONP_CALLBACK_PATTERN_'), 'JSONP validates callb
 assert(source.includes('stringifyForJsonp_'), 'JSONP escapes script-sensitive separators');
 assert(source.includes('decodeWebAppJsonpParams_'), 'JSONP decodes Base64URL parameters');
 assert(source.includes('Utilities.base64DecodeWebSafe'), 'JSONP uses web-safe Base64 decoding');
+assert(source.includes('PUBLIC_WEBAPP_JSONP_API_HANDLERS_'), 'JSONP uses an explicit public API whitelist');
 assert(source.includes('buildQuickBrowseCountsPayload_'), 'PWA initial data includes quick browse counts');
 assert(source.includes('SHELF_DATASET_KEY'), 'server defines a separate bookshelf dataset cache key');
 assert(source.includes('getBookshelfLiteDataset_'), 'server has a lightweight bookshelf dataset path');
@@ -44,7 +45,22 @@ assert(source.includes('BOOK_DETAIL_BATCH_MAX'), 'server caps detail batch size'
   'bookDetails',
   'series'
 ].forEach(apiName => {
-  assert(source.includes(`case '${apiName}':`), `JSONP API includes ${apiName}`);
+  assert(new RegExp(`\\b${apiName}\\s*:`).test(source), `JSONP API whitelist includes ${apiName}`);
+});
+
+[
+  'setup',
+  'initialize',
+  'save',
+  'update',
+  'delete',
+  'clear',
+  'sync',
+  'admin',
+  'import',
+  'write'
+].forEach(apiName => {
+  assert(!new RegExp(`\\b${apiName}\\s*:`).test(source), `JSONP API whitelist excludes ${apiName}`);
 });
 
 [
@@ -64,7 +80,8 @@ assert(source.includes('BOOK_DETAIL_BATCH_MAX'), 'server caps detail batch size'
   assert(source.includes(call), `JSONP dispatch calls ${call}`);
 });
 
-assert(source.includes("case 'previewIndex':\n      return [];"), 'PWA previewIndex avoids full-index JSONP transfer');
+assert(source.includes('previewIndex: () => []'), 'PWA previewIndex avoids full-index JSONP transfer');
+assert(!source.includes('function saveWebAppUserPreferences('), 'server does not expose preference writes to google.script.run');
 assert(source.includes('const dataset = getBookshelfLiteDataset_();'), 'bookshelf API uses lightweight dataset cache');
 assert(source.includes('max: WEBAPP_API_LIMITS_.SHELF_CHUNK_MAX_LIMIT'), 'bookshelf chunk API applies max limit');
 assert(source.includes('max: Math.min(WEBAPP_API_LIMITS_.RANDOM_MAX_COUNT, rows.length)'), 'random API applies max limit');

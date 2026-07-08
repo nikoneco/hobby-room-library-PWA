@@ -1,6 +1,10 @@
 node_modules/
 .env
+.env.*
 *.log
+.clasp.json
 .clasprc.json
 LOCAL_URLS.md
+*.local
+secrets.*
 tmp/

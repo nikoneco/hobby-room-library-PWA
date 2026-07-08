@@ -74,22 +74,9 @@ function hydratePreferredResultViewMode_(mode) {
   return normalized;
 }
 
-function savePreferredResultViewModeToServer_(mode) {
-  if (!window.google || !google.script || !google.script.run) return;
-
-  google.script.run
-    .withFailureHandler(function(err) {
-      console.warn('saveWebAppUserPreferences failed:', err);
-    })
-    .saveWebAppUserPreferences({
-      resultViewMode: normalizeResultViewMode_(mode)
-    });
-}
-
 function savePreferredResultViewMode_(mode) {
   const normalized = hydratePreferredResultViewMode_(mode);
   resultViewModeChangedLocally = true;
-  savePreferredResultViewModeToServer_(normalized);
   return normalized;
 }
 
