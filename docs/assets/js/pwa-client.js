@@ -298,11 +298,21 @@
     button.className = 'pwa-network-banner-action';
     button.textContent = '更新';
     button.addEventListener('click', function() {
-      if (!updateWaitingWorker) return;
-      reloadForUpdate = true;
-      updateWaitingWorker.postMessage({ type: 'SKIP_WAITING' });
+      applyServiceWorkerUpdate_(updateWaitingWorker);
     });
     banner.appendChild(button);
+
+    window.setTimeout(function() {
+      if (updateWaitingWorker === worker) {
+        applyServiceWorkerUpdate_(worker);
+      }
+    }, 900);
+  }
+
+  function applyServiceWorkerUpdate_(worker) {
+    if (!worker || reloadForUpdate) return;
+    reloadForUpdate = true;
+    worker.postMessage({ type: 'SKIP_WAITING' });
   }
 
   function syncOnlineState_() {
