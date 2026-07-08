@@ -518,6 +518,16 @@
     max-width: 100%;
   }
 
+  body:not(.shelf-view-active) .search-container.shrink ~ #result {
+    padding-top: clamp(0.9rem, 3.5vh, 1.7rem);
+    scroll-margin-top: clamp(5.2rem, 18vh, 7.4rem);
+  }
+
+  body:not(.shelf-view-active) .search-container.shrink.compact ~ #result {
+    padding-top: clamp(1.6rem, 7vh, 3.2rem);
+    scroll-margin-top: clamp(6.4rem, 20vh, 8.8rem);
+  }
+
   .button-group {
     width: min(420px, calc(100vw - 28px));
   }
