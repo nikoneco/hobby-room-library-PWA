@@ -119,9 +119,15 @@ function assertEqual(actual, expected, message) {
 }
 
 assert(!/\son(?:click|change|input|submit|keydown)=/i.test(indexSource), 'index.html has no inline event handlers');
-['search', 'focus-search', 'random', 'bookshelf', 'toggle-advanced', 'clear-conditions', 'reset-search'].forEach(action => {
+['search', 'focus-search', 'random', 'top', 'toggle-advanced', 'clear-conditions', 'reset-search'].forEach(action => {
   assert(indexSource.includes(`data-action="${action}"`), `index.html exposes data-action="${action}"`);
 });
+assert(
+  indexSource.includes('data-action="top"') &&
+    indexSource.includes('>トップへ<') &&
+    !indexSource.includes('data-action="bookshelf" aria-label="本棚を開く"'),
+  'mobile dock replaces the shelf shortcut with a same-weight return-to-top action'
+);
 ['card', 'list', 'shelf'].forEach(mode => {
   assert(indexSource.includes(`data-view-mode="${mode}"`), `mobile dock exposes data-view-mode="${mode}"`);
 });
@@ -135,7 +141,7 @@ assert(serverSource.includes('compatibility'), 'Webアプリ.js registry classif
 const actionKeys = vm.runInContext('Object.keys(STATIC_ACTION_HANDLERS).sort().join(",")', sandbox);
 assertEqual(
   actionKeys,
-  'bookshelf,clear-conditions,focus-search,random,reset-search,search,toggle-advanced',
+  'bookshelf,clear-conditions,focus-search,random,reset-search,search,toggle-advanced,top',
   'STATIC_ACTION_HANDLERS maps static data-actions'
 );
 
