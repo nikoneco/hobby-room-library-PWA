@@ -104,6 +104,10 @@ function attachPopupActionHandlers(book, seriesContext) {
   if (backBtn && seriesContext && Array.isArray(seriesContext.items)) {
     backBtn.onclick = function(e) {
       e.stopPropagation();
+      if (seriesContext.kind === 'search-result' && seriesContext.group) {
+        showSearchResultSeriesPanel_(seriesContext.group);
+        return;
+      }
       showSeriesPanel(seriesContext.sourceBook || book, seriesContext.items, seriesContext.returnContext || null);
     };
   }
@@ -1264,11 +1268,18 @@ function openSeriesPanel(sourceBook) {
   const info = document.getElementById('image-popup-info');
   const prevBtn = document.getElementById('popup-prev');
   const nextBtn = document.getElementById('popup-next');
-  const returnContext = { index: popupIndex, data: popupData };
+  const returnContext = {
+    index: popupIndex,
+    data: popupData,
+    seriesContext: popupSeriesContext
+  };
 
   overlay.style.display = 'flex';
   document.body.classList.add('modal-open');
-  if (popupContent) popupContent.classList.add('series-mode');
+  if (popupContent) {
+    popupContent.classList.add('series-mode');
+    popupContent.classList.remove('search-result-series-mode');
+  }
   img.style.display = 'none';
   prevBtn.style.display = 'none';
   nextBtn.style.display = 'none';
@@ -1296,10 +1307,102 @@ function openSeriesPanel(sourceBook) {
       const backBtn = document.getElementById('series-panel-back-detail');
       if (backBtn) backBtn.onclick = function(e) {
         e.stopPropagation();
-        showPopup(sourceBook, returnContext.index, returnContext.data);
+        showPopup(sourceBook, returnContext.index, returnContext.data, returnContext.seriesContext || null);
       };
     })
     .getBooksBySeriesKey(sourceBook.seriesKeyAuto);
+}
+
+function showSearchResultSeriesPanel_(group) {
+  if (!group || !Array.isArray(group.books) || group.books.length < 2) return;
+
+  const overlay = document.getElementById('image-popup-overlay');
+  const popupContent = document.getElementById('image-popup-content');
+  const img = document.getElementById('image-popup-img');
+  const info = document.getElementById('image-popup-info');
+  const closeBtn = document.getElementById('image-popup-close');
+  const prevBtn = document.getElementById('popup-prev');
+  const nextBtn = document.getElementById('popup-next');
+  const items = group.books;
+  const sourceBook = group.representativeBook || items[0];
+  const sourceTitle = group.title || sourceBook.seriesSearchTitle || sourceBook.title || 'シリーズ';
+
+  if (!document.body.classList.contains('modal-open')) {
+    popupReturnScrollY = window.scrollY || 0;
+  }
+  overlay.style.display = 'flex';
+  document.body.classList.add('modal-open');
+  if (popupContent) popupContent.classList.add('series-mode', 'search-result-series-mode');
+  img.style.display = 'none';
+  prevBtn.style.display = 'none';
+  nextBtn.style.display = 'none';
+  clearPopupTouchHandlers_();
+
+  info.innerHTML = `
+    <div class="series-panel search-result-series-panel">
+      <div class="series-panel-title">${escapeHtml(sourceTitle)}</div>
+      <div class="series-panel-subtitle">検索一致 ${items.length}冊</div>
+      <div class="search-result-series-list" role="list" aria-label="${escapeHtml(sourceTitle)}の検索一致巻"></div>
+    </div>
+  `;
+
+  const list = info.querySelector('.search-result-series-list');
+  if (list) {
+    const fragment = document.createDocumentFragment();
+    items.forEach((book, idx) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'search-result-series-book';
+      button.setAttribute('role', 'listitem');
+      button.setAttribute('aria-label', `${book && book.title ? book.title : '検索一致巻'}の詳細を開く`);
+
+      const cover = document.createElement('img');
+      cover.className = 'search-result-series-book-cover';
+      cover.alt = book && book.title ? book.title : '表紙';
+      setupBookImageElement_(cover, book, {
+        track: false,
+        loading: idx < 4 ? 'eager' : 'lazy',
+        fetchPriority: idx < 4 ? 'high' : 'low'
+      });
+
+      const title = document.createElement('span');
+      title.className = 'search-result-series-book-title';
+      title.textContent = book && book.title ? book.title : '(タイトルなし)';
+
+      button.appendChild(cover);
+      button.appendChild(title);
+      button.onclick = function(e) {
+        e.stopPropagation();
+        showPopup(book, idx, items, {
+          kind: 'search-result',
+          sourceBook,
+          items,
+          group
+        });
+      };
+      fragment.appendChild(button);
+    });
+    list.appendChild(fragment);
+  }
+
+  function closeSearchResultSeriesPanel_() {
+    overlay.style.display = 'none';
+    document.body.classList.remove('modal-open');
+    if (popupContent) popupContent.classList.remove('series-mode', 'search-result-series-mode');
+    setShelfPopupPerformanceMode_(false);
+    document.onkeydown = null;
+    window.requestAnimationFrame(function() {
+      window.scrollTo({ top: popupReturnScrollY || 0, behavior: 'auto' });
+    });
+  }
+
+  overlay.onclick = function(e) {
+    if (e.target === overlay) closeSearchResultSeriesPanel_();
+  };
+  closeBtn.onclick = closeSearchResultSeriesPanel_;
+  document.onkeydown = function(e) {
+    if (e.key === 'Escape') closeSearchResultSeriesPanel_();
+  };
 }
 
 function showSeriesPanel(sourceBook, seriesBooks, returnContext) {
@@ -1316,7 +1419,10 @@ function showSeriesPanel(sourceBook, seriesBooks, returnContext) {
   const linksHtml = buildExternalLinksHtml(sourceBook);
 
   img.style.display = 'none';
-  if (popupContent) popupContent.classList.add('series-mode');
+  if (popupContent) {
+    popupContent.classList.add('series-mode');
+    popupContent.classList.remove('search-result-series-mode');
+  }
   prevBtn.style.display = 'none';
   nextBtn.style.display = 'none';
   clearPopupTouchHandlers_();
@@ -1348,7 +1454,12 @@ function showSeriesPanel(sourceBook, seriesBooks, returnContext) {
       e.stopPropagation();
       const targetIndex = returnContext && typeof returnContext.index === 'number' ? returnContext.index : popupIndex;
       const targetData = returnContext && Array.isArray(returnContext.data) ? returnContext.data : popupData;
-      showPopup(sourceBook, targetIndex, targetData);
+      showPopup(
+        sourceBook,
+        targetIndex,
+        targetData,
+        returnContext && returnContext.seriesContext ? returnContext.seriesContext : null
+      );
     };
   }
 
@@ -1484,7 +1595,7 @@ function showPopup(book, index, dataArr, seriesContext, options) {
     clearPopupMotionState_(popupContent);
   }
   img.style.display = '';
-  if (popupContent) popupContent.classList.remove('series-mode');
+  if (popupContent) popupContent.classList.remove('series-mode', 'search-result-series-mode');
   img.alt = renderBook.title || '表紙';
   img.setAttribute('role', 'button');
   img.setAttribute('tabindex', '0');

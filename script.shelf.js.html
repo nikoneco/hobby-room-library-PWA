@@ -1162,6 +1162,136 @@ function scheduleIncrementalResultRender_(result, data, viewMode, appendItems, r
   observeNextChunk_();
 }
 
+function isGroupableSearchResultBook_(book) {
+  if (!book || typeof book !== 'object') return false;
+  const key = String(book.seriesKeyAuto || '').trim();
+  if (!key) return false;
+  if (book.isExtraSeries) return false;
+  return !/^__extra__/i.test(key);
+}
+
+function getSearchResultSeriesTitle_(group) {
+  if (!group || !Array.isArray(group.books) || !group.books.length) return 'シリーズ';
+  const representativeBook = group.representativeBook || group.books[0] || {};
+  return String(representativeBook.seriesSearchTitle || representativeBook.title || 'シリーズ').trim();
+}
+
+function buildSearchResultPresentation_(books) {
+  const sourceBooks = Array.isArray(books) ? books : [];
+  const entries = [];
+  const groupByKey = new Map();
+
+  sourceBooks.forEach((book, originalIndex) => {
+    if (!isGroupableSearchResultBook_(book)) {
+      entries.push({
+        kind: 'book',
+        book,
+        originalIndex
+      });
+      return;
+    }
+
+    const key = String(book.seriesKeyAuto || '').trim();
+    let group = groupByKey.get(key);
+    if (!group) {
+      group = {
+        kind: 'series-candidate',
+        key,
+        books: [],
+        originalIndexes: [],
+        representativeBook: book,
+        originalIndex
+      };
+      groupByKey.set(key, group);
+      entries.push(group);
+    }
+
+    group.books.push(book);
+    group.originalIndexes.push(originalIndex);
+  });
+
+  let seriesGroupCount = 0;
+  const presentationEntries = entries.map(entry => {
+    if (entry.kind !== 'series-candidate') return entry;
+    if (entry.books.length < 2) {
+      return {
+        kind: 'book',
+        book: entry.books[0],
+        originalIndex: entry.originalIndexes[0]
+      };
+    }
+
+    seriesGroupCount += 1;
+    entry.kind = 'series';
+    entry.title = getSearchResultSeriesTitle_(entry);
+    entry.matchCount = entry.books.length;
+    return entry;
+  });
+
+  return {
+    entries: presentationEntries,
+    seriesGroupCount,
+    rawBookCount: sourceBooks.length,
+    displayItemCount: presentationEntries.length
+  };
+}
+
+function createSearchResultSeriesCard_(group, viewMode, displayIndex) {
+  const representativeBook = group && group.representativeBook ? group.representativeBook : {};
+  const title = getSearchResultSeriesTitle_(group);
+  const matchCount = Array.isArray(group && group.books) ? group.books.length : 0;
+  const card = document.createElement('button');
+  card.type = 'button';
+  card.className = viewMode === 'list'
+    ? 'book-card list search-series-card'
+    : 'book-card search-series-card';
+  card.setAttribute('aria-label', `${title}。検索に一致した${matchCount}冊を見る`);
+  setBookRevealIndex_(card, displayIndex);
+  card.onclick = function() {
+    showSearchResultSeriesPanel_(group);
+  };
+
+  const img = document.createElement('img');
+  img.className = viewMode === 'list' ? 'list-thumb search-series-cover' : 'book-cover search-series-cover';
+  img.alt = representativeBook.title || `${title}の代表表紙`;
+  setupBookImageElement_(img, representativeBook, {
+    track: true,
+    trackKey: getBookImageTrackKey_(representativeBook, group.originalIndex),
+    loading: displayIndex < (viewMode === 'list' ? 8 : 4) ? 'eager' : 'lazy',
+    fetchPriority: displayIndex < (viewMode === 'list' ? 8 : 4) ? 'high' : 'low'
+  });
+
+  const content = document.createElement('div');
+  content.className = viewMode === 'list' ? 'search-series-list-content' : 'card-info search-series-info';
+  content.innerHTML = `
+    <div class="search-series-kicker">${uiIcon_('collection', 'ui-icon-inline')}<span>シリーズ</span></div>
+    <div class="book-title">${escapeHtml(title)}</div>
+    <div class="search-series-match-count">検索一致 ${matchCount}冊</div>
+    <div class="book-open-cue${viewMode === 'list' ? ' list-open-cue' : ''}" aria-hidden="true"><span>一致した巻を見る</span>${uiIcon_('chevronDown', 'book-open-cue-icon')}</div>
+  `;
+
+  if (viewMode === 'list') {
+    const row = document.createElement('div');
+    row.className = 'list-row search-series-list-row';
+    row.appendChild(img);
+    row.appendChild(content);
+    card.appendChild(row);
+  } else {
+    card.appendChild(img);
+    card.appendChild(content);
+  }
+
+  return card;
+}
+
+function syncSearchResultPresentationStats_(stats) {
+  currentSearchResultPresentationStats = stats || null;
+  if (!searchStatusState || searchStatusState.mode !== 'result') return;
+  searchStatusState.seriesGroupCount = stats ? Number(stats.seriesGroupCount || 0) : 0;
+  renderSearchStatus_();
+  if (typeof syncMobileAppDockState_ === 'function') syncMobileAppDockState_();
+}
+
 function showResult(data) {
   hideSpinner();
   if (typeof syncMobileAppDockState_ === 'function') syncMobileAppDockState_();
@@ -1170,7 +1300,16 @@ function showResult(data) {
   result.innerHTML = '';
   resetResultRenderQueue_();
 
+  if (lastResultKind !== 'search') {
+    currentSearchResultPresentationStats = null;
+  }
+
   if (!data || !Array.isArray(data) || data.length === 0) {
+    syncSearchResultPresentationStats_(lastResultKind === 'search' ? {
+      seriesGroupCount: 0,
+      rawBookCount: 0,
+      displayItemCount: 0
+    } : null);
     shelfRenderRunId += 1;
     resetBookDetailPrefetchObserver_();
     renderEmptyResult_(result);
@@ -1183,7 +1322,17 @@ function showResult(data) {
   updateViewToggleButtons_();
 
   const viewMode = getCurrentViewMode_();
-  const renderPerfToken = pwaPerfStart_('render:' + viewMode, { count: data.length });
+  const shouldGroupSearchResults = lastResultKind === 'search' && viewMode !== 'shelf';
+  const presentation = shouldGroupSearchResults
+    ? buildSearchResultPresentation_(data)
+    : null;
+  const renderItems = presentation ? presentation.entries : data;
+  syncSearchResultPresentationStats_(presentation);
+  const renderPerfToken = pwaPerfStart_('render:' + viewMode, {
+    count: renderItems.length,
+    rawCount: data.length,
+    seriesGroups: presentation ? presentation.seriesGroupCount : 0
+  });
   syncShelfViewUiState_(viewMode);
   if (viewMode !== 'shelf') {
     shelfRenderRunId += 1;
@@ -1192,7 +1341,10 @@ function showResult(data) {
 
   // 本棚ビューは小型表紙を大量に並べるため、画像取得率デバッグ集計には含めない。
   // カード/リストの既存集計だけを維持する。
-  resetImageLoadStats_(viewMode === 'shelf' ? [] : data);
+  const trackedImageBooks = presentation
+    ? renderItems.map(entry => entry.kind === 'series' ? entry.representativeBook : entry.book)
+    : data;
+  resetImageLoadStats_(viewMode === 'shelf' ? [] : trackedImageBooks);
 
   if (viewMode === 'shelf') {
     const shelfView = renderShelfView_(data);
@@ -1211,14 +1363,20 @@ function showResult(data) {
     container.className = 'card-view';
     result.appendChild(container);
 
-    scheduleIncrementalResultRender_(result, data, viewMode, function(start, end) {
+    scheduleIncrementalResultRender_(result, renderItems, viewMode, function(start, end) {
       const fragment = document.createDocumentFragment();
       for (let idx = start; idx < end; idx += 1) {
-      const book = data[idx];
+      const entry = renderItems[idx];
+      if (entry && entry.kind === 'series') {
+        fragment.appendChild(createSearchResultSeriesCard_(entry, viewMode, idx));
+        continue;
+      }
+      const book = presentation ? entry.book : entry;
+      const originalIndex = presentation ? entry.originalIndex : idx;
       const card = document.createElement('div');
       card.className = 'book-card';
       setBookRevealIndex_(card, idx);
-      setupBookOpenSurface_(card, book, idx, data);
+      setupBookOpenSurface_(card, book, originalIndex, data);
 
       const img = document.createElement('img');
       img.className = 'book-cover';
@@ -1226,12 +1384,12 @@ function showResult(data) {
       img.style.cursor = 'zoom-in';
       img.onclick = function(e) {
         e.stopPropagation();
-        showPopup(book, idx, data);
+        showPopup(book, originalIndex, data);
       };
 
       setupBookImageElement_(img, book, {
         track: true,
-        trackKey: getBookImageTrackKey_(book, idx),
+        trackKey: getBookImageTrackKey_(book, originalIndex),
         loading: idx < 4 ? 'eager' : 'lazy',
         fetchPriority: idx < 4 ? 'high' : 'low'
       });
@@ -1250,7 +1408,7 @@ function showResult(data) {
       `;
 
       appendSummaryAccordion_(info.querySelector('.genre-chip-wrap'), book);
-      setupBookKeyboardOpenSurface_(info.querySelector('.book-title'), book, idx, data);
+      setupBookKeyboardOpenSurface_(info.querySelector('.book-title'), book, originalIndex, data);
 
       card.appendChild(info);
       fragment.appendChild(card);
@@ -1263,10 +1421,16 @@ function showResult(data) {
     container.className = 'list-view';
     result.appendChild(container);
 
-    scheduleIncrementalResultRender_(result, data, viewMode, function(start, end) {
+    scheduleIncrementalResultRender_(result, renderItems, viewMode, function(start, end) {
       const fragment = document.createDocumentFragment();
       for (let idx = start; idx < end; idx += 1) {
-      const book = data[idx];
+      const entry = renderItems[idx];
+      if (entry && entry.kind === 'series') {
+        fragment.appendChild(createSearchResultSeriesCard_(entry, viewMode, idx));
+        continue;
+      }
+      const book = presentation ? entry.book : entry;
+      const originalIndex = presentation ? entry.originalIndex : idx;
       const card = document.createElement('div');
       card.className = 'book-card list';
       setBookRevealIndex_(card, idx);
@@ -1277,19 +1441,19 @@ function showResult(data) {
       thumb.style.cursor = 'zoom-in';
       thumb.onclick = function(e) {
         e.stopPropagation();
-        showPopup(book, idx, data);
+        showPopup(book, originalIndex, data);
       };
 
       setupBookImageElement_(thumb, book, {
         track: true,
-        trackKey: getBookImageTrackKey_(book, idx),
+        trackKey: getBookImageTrackKey_(book, originalIndex),
         loading: idx < 8 ? 'eager' : 'lazy',
         fetchPriority: idx < 8 ? 'high' : 'low'
       });
 
       const row = document.createElement('div');
       row.className = 'list-row';
-      setupBookOpenSurface_(row, book, idx, data);
+      setupBookOpenSurface_(row, book, originalIndex, data);
 
       const titleRow = document.createElement('div');
       titleRow.className = 'list-title-row';
@@ -1305,7 +1469,7 @@ function showResult(data) {
       `;
 
       appendSummaryAccordion_(titleBlock.querySelector('.genre-chip-wrap'), book);
-      setupBookKeyboardOpenSurface_(titleBlock.querySelector('.book-title'), book, idx, data);
+      setupBookKeyboardOpenSurface_(titleBlock.querySelector('.book-title'), book, originalIndex, data);
 
       titleRow.appendChild(titleBlock);
       if (hasDisplayValue_(book && book.author)) {

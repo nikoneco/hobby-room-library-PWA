@@ -1047,6 +1047,94 @@ button.popup-arrow:active {
   align-self: flex-start;
 }
 
+.search-result-series-panel {
+  width: min(900px, 88vw);
+  max-height: min(78vh, 720px);
+}
+
+.search-result-series-list {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(132px, 164px);
+  gap: 0.72rem;
+  min-width: 0;
+  margin-top: 0.34rem;
+  padding: 0.72rem 0.68rem 0.86rem;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  scroll-padding-inline: 0.68rem;
+  touch-action: pan-x;
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  border-radius: calc(var(--lib-radius-md) + 4px);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.014)),
+    rgba(8, 13, 19, 0.26);
+  scrollbar-color: rgba(214, 164, 95, 0.46) rgba(255, 255, 255, 0.045);
+}
+
+.search-result-series-book {
+  scroll-snap-align: start;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  align-content: start;
+  gap: 0.56rem;
+  min-width: 0;
+  padding: 0.58rem;
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  border-radius: calc(var(--lib-radius-sm) + 4px);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.044), rgba(255, 255, 255, 0.016)),
+    rgba(8, 13, 19, 0.3);
+  color: var(--lib-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--lib-ease), background var(--lib-ease), transform var(--lib-ease);
+}
+
+.search-result-series-book:hover,
+.search-result-series-book:focus-visible {
+  border-color: rgba(240, 195, 122, 0.34);
+  background:
+    linear-gradient(180deg, rgba(240, 195, 122, 0.1), rgba(255, 255, 255, 0.02)),
+    rgba(8, 13, 19, 0.36);
+  outline: none;
+  transform: translateY(-2px);
+}
+
+.search-result-series-book:focus-visible {
+  box-shadow: 0 0 0 2px rgba(104, 191, 215, 0.52);
+}
+
+.search-result-series-book:active {
+  transform: translateY(1px);
+}
+
+.search-result-series-book-cover {
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  border: 0;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.035);
+  object-fit: contain;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.26);
+}
+
+.search-result-series-book-title {
+  display: -webkit-box;
+  min-width: 0;
+  overflow: hidden;
+  color: rgba(246, 241, 229, 0.92);
+  font-size: 0.78rem;
+  font-weight: 760;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
 .series-empty {
   margin: 0.1rem;
   padding: 1.05rem 1rem;

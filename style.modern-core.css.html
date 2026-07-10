@@ -1619,6 +1619,72 @@ button.quick-browse-chip:focus-visible {
   box-shadow: 0 16px 38px rgba(0, 0, 0, 0.22);
 }
 
+.search-series-card {
+  width: 100%;
+  appearance: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.search-series-card:focus-visible {
+  border-color: rgba(214, 164, 95, 0.42);
+  outline: 2px solid rgba(104, 191, 215, 0.58);
+  outline-offset: 3px;
+}
+
+.search-series-kicker {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  gap: 0.34rem;
+  padding: 0.2rem 0.48rem;
+  border: 1px solid rgba(214, 164, 95, 0.18);
+  border-radius: 999px;
+  background: rgba(214, 164, 95, 0.07);
+  color: rgba(240, 195, 122, 0.9);
+  font-size: 0.68rem;
+  font-weight: 820;
+  line-height: 1.2;
+}
+
+.search-series-kicker .ui-icon {
+  width: 0.86rem;
+  height: 0.86rem;
+}
+
+.search-series-match-count {
+  width: fit-content;
+  margin-top: 0.18rem;
+  color: rgba(217, 231, 240, 0.72);
+  font-size: 0.76rem;
+  font-weight: 740;
+}
+
+.search-series-info {
+  align-content: start;
+}
+
+.search-series-info .book-title {
+  margin-top: 0.16rem;
+}
+
+.search-series-list-row {
+  width: 100%;
+}
+
+.search-series-list-content {
+  display: grid;
+  min-width: 0;
+  flex: 1 1 auto;
+  align-content: center;
+  gap: 0.28rem;
+}
+
+.search-series-list-content .book-title {
+  min-height: 0;
+}
+
 .card-view .book-card {
   display: flex;
   flex-direction: column;
@@ -2190,6 +2256,10 @@ button.genre-chip.status:focus-visible {
     radial-gradient(circle at 0% 50%, rgba(104, 191, 215, 0.052), transparent 34%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.044), rgba(255, 255, 255, 0.020)),
     rgba(10, 15, 22, 0.54);
+}
+
+.book-card.list.search-series-card {
+  padding: 0.68rem 0.78rem;
 }
 
 .book-card.list::after {

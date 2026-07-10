@@ -30,7 +30,8 @@ let searchStatusState = {
   previewPending: false,
   removingChipKey: '',
   message: '',
-  sourceMode: ''
+  sourceMode: '',
+  seriesGroupCount: 0
 };
 
 let PREVIEW_INDEX = [];
@@ -1304,6 +1305,9 @@ function getSearchStatusCountText_() {
   }
 
   if (searchStatusState.mode === 'result') {
+    if (searchStatusState.seriesGroupCount > 0) {
+      return `${searchStatusState.seriesGroupCount}シリーズ・${searchStatusState.resultCount}冊`;
+    }
     return getPwaLibrarianText_(
       'status.result',
       `${searchStatusState.resultCount}冊見つかりました`,
@@ -1472,6 +1476,7 @@ function showSearchStatusPreview_(mode, params, previewCount, previewReady) {
   searchStatusState.removingChipKey = '';
   searchStatusState.message = '';
   searchStatusState.sourceMode = mode || 'preview';
+  searchStatusState.seriesGroupCount = 0;
   renderSearchStatus_();
 }
 
@@ -1486,6 +1491,9 @@ function showSearchStatusResult_(mode, resultCount, params) {
   searchStatusState.removingChipKey = '';
   searchStatusState.message = '';
   searchStatusState.sourceMode = mode || searchStatusState.mode;
+  searchStatusState.seriesGroupCount = searchStatusState.mode === 'result' && currentSearchResultPresentationStats
+    ? Number(currentSearchResultPresentationStats.seriesGroupCount || 0)
+    : 0;
   renderSearchStatus_();
   if (typeof syncMobileAppDockState_ === 'function') syncMobileAppDockState_();
 }
@@ -1501,6 +1509,7 @@ function showSearchStatusNotice_(message) {
   searchStatusState.removingChipKey = '';
   searchStatusState.message = message || '';
   searchStatusState.sourceMode = 'notice';
+  searchStatusState.seriesGroupCount = 0;
   renderSearchStatus_();
   if (typeof syncMobileAppDockState_ === 'function') syncMobileAppDockState_('focus-search');
 }
@@ -1526,6 +1535,7 @@ function hideSearchStatus_() {
   searchStatusState.removingChipKey = '';
   searchStatusState.message = '';
   searchStatusState.sourceMode = '';
+  searchStatusState.seriesGroupCount = 0;
   renderSearchStatus_();
 }
 
@@ -1670,6 +1680,7 @@ function rerunSearchWithParams_(params, loadingMessage) {
   if (hasAdvancedCondition) {
     google.script.run
       .withSuccessHandler(function(data) {
+        lastResultKind = 'search';
         lastResult = data;
         showResult(data);
         showSearchStatusResult_('advanced', data.length, params);
@@ -1699,6 +1710,7 @@ function rerunSearchWithParams_(params, loadingMessage) {
 
   google.script.run
     .withSuccessHandler(function(data) {
+      lastResultKind = 'search';
       lastResult = data;
       showResult(data);
       showSearchStatusResult_('normal', data.length, { keyword: params.keyword });
@@ -1816,6 +1828,8 @@ function showEmptySearchNotice_(message) {
   }
 
   lastResult = null;
+  lastResultKind = 'none';
+  currentSearchResultPresentationStats = null;
   if (typeof syncMobileAppDockState_ === 'function') syncMobileAppDockState_();
   showSearchStatusNotice_(getLibrarianNoticeText_(message));
 }
@@ -1844,6 +1858,7 @@ function search() {
     google.script.run
       .withSuccessHandler(function(data) {
         closeAdvancedSearchPanel_();
+        lastResultKind = 'search';
         lastResult = data;
         showResult(data);
         showSearchStatusResult_('advanced', data.length, params);
@@ -1887,6 +1902,7 @@ function search() {
 
   google.script.run
     .withSuccessHandler(function(data) {
+      lastResultKind = 'search';
       lastResult = data;
       showResult(data);
       showSearchStatusResult_('normal', data.length, { keyword: keyword });
@@ -1911,6 +1927,7 @@ function showRandomBooks() {
   google.script.run
     .withSuccessHandler(function(data) {
       isRandomBooksLoading = false;
+      lastResultKind = 'random';
       lastResult = data;
       showResult(data);
       showSearchStatusResult_('random', data.length, {});
@@ -2088,6 +2105,7 @@ function showAllBookshelf() {
       if (!resultBooks.length && renderedFromCache) return;
 
       bookshelfPendingRestoreScroll = Boolean(opt.restoreScroll);
+      lastResultKind = 'shelf';
       lastResult = resultBooks;
       showResult(resultBooks);
       showSearchStatusResult_('shelf', resultBooks.length, opt.statusParams || {});
@@ -2162,6 +2180,8 @@ function resetSearch() {
   resetViewModeToCardForNewSearch_();
 
   lastResult = null;
+  lastResultKind = 'none';
+  currentSearchResultPresentationStats = null;
   if (typeof syncMobileAppDockState_ === 'function') syncMobileAppDockState_();
   hideAllSuggest();
   syncSearchStatusPreviewFromForm_();

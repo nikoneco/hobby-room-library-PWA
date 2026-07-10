@@ -81,6 +81,9 @@ assertBalancedBraces(combinedCss);
   /body\.sandbox-redesign\s+\.preview-brand\b/,
   /body\.sandbox-redesign\.pwa-librarian-presence\s+\.app-brand-librarian-image\s*\{[\s\S]*?display:\s*block/,
   /body\.sandbox-redesign\s+\.pwa-settings-panel\s*\{[\s\S]*?calc\(env\(safe-area-inset-top\)\s*\+\s*0\.75rem\)/,
+  /\.search-series-card\s*\{/,
+  /\.search-result-series-list\s*\{[\s\S]*?scroll-snap-type:\s*x\s+mandatory/,
+  /\.search-result-series-book-cover\s*\{[\s\S]*?aspect-ratio:\s*2\s*\/\s*3/,
   /@media\s*\(max-width:\s*760px\)[\s\S]*?\.search-container\.shrink[\s\S]*?flex-direction:\s*column/
 ].forEach(pattern => {
   assert(pattern.test(combinedCss), `required interactive style is present: ${pattern}`);

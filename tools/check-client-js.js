@@ -472,6 +472,68 @@ assertEqual(
   JSON.stringify([[0, 12], [12, 24], [24, 36], [36, 40]]),
   'incremental result renderer keeps every result available in bounded chunks'
 );
+
+const groupedSearchPresentation = sandbox.buildSearchResultPresentation_([
+  { title: 'フラジャイル 1', seriesKeyAuto: 'fragile', seriesSearchTitle: 'フラジャイル' },
+  { title: '単巻作品', seriesKeyAuto: '' },
+  { title: 'フラジャイル 10', seriesKeyAuto: 'fragile', seriesSearchTitle: 'フラジャイル' },
+  { title: '暫定本 A', seriesKeyAuto: '__extra__temporary', isExtraSeries: true },
+  { title: 'フラジャイル 11', seriesKeyAuto: 'fragile', seriesSearchTitle: 'フラジャイル' },
+  { title: '一冊だけ一致', seriesKeyAuto: 'single-match', seriesSearchTitle: '別シリーズ' },
+  { title: '暫定本 B', seriesKeyAuto: '__extra__temporary', isExtraSeries: true }
+]);
+assertEqual(groupedSearchPresentation.seriesGroupCount, 1, 'search presentation counts grouped series');
+assertEqual(groupedSearchPresentation.rawBookCount, 7, 'search presentation preserves raw matching book count');
+assertEqual(groupedSearchPresentation.displayItemCount, 5, 'search presentation reduces only repeated valid series');
+assertEqual(groupedSearchPresentation.entries[0].kind, 'series', 'first repeated series becomes one series result');
+assertEqual(groupedSearchPresentation.entries[0].title, 'フラジャイル', 'series result uses canonical series title');
+assertEqual(groupedSearchPresentation.entries[0].representativeBook.title, 'フラジャイル 1', 'series result uses first matching cover representative');
+assertEqual(
+  groupedSearchPresentation.entries[0].books.map(book => book.title).join(','),
+  'フラジャイル 1,フラジャイル 10,フラジャイル 11',
+  'series result keeps only matching books in original search order'
+);
+assertEqual(groupedSearchPresentation.entries[3].kind, 'book', 'single matching series remains a direct book result');
+assertEqual(
+  groupedSearchPresentation.entries.filter(entry => entry.book && entry.book.isExtraSeries).length,
+  2,
+  'temporary series keys remain separate book results'
+);
+
+vm.runInContext(`
+  searchStatusState.mode = 'result';
+  searchStatusState.resultCount = 7;
+  searchStatusState.seriesGroupCount = 1;
+`, sandbox);
+assertEqual(sandbox.getSearchStatusCountText_(), '1シリーズ・7冊', 'search status shows series and raw book counts');
+
+{
+  const modalSource = clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')];
+  const searchSeriesStart = modalSource.indexOf('function showSearchResultSeriesPanel_(group)');
+  const nextSeriesFunction = modalSource.indexOf('function showSeriesPanel(', searchSeriesStart);
+  const searchSeriesSource = searchSeriesStart >= 0 && nextSeriesFunction > searchSeriesStart
+    ? modalSource.slice(searchSeriesStart, nextSeriesFunction)
+    : '';
+  assert(
+    searchSeriesSource.includes('const items = group.books;') &&
+      searchSeriesSource.includes("kind: 'search-result'") &&
+      searchSeriesSource.includes('showPopup(book, idx, items') &&
+      searchSeriesSource.includes('setupBookImageElement_') &&
+      !searchSeriesSource.includes('getBooksBySeriesKey'),
+    'search-result series popup uses only matched books and never expands through the full-series API'
+  );
+  assert(
+    modalSource.includes("seriesContext.kind === 'search-result'") &&
+      modalSource.includes('showSearchResultSeriesPanel_(seriesContext.group);'),
+    'book detail returns to the filtered search-result series popup'
+  );
+}
+assert(
+  searchScriptSource.includes("lastResultKind = 'search';") &&
+    searchScriptSource.includes("lastResultKind = 'random';") &&
+    searchScriptSource.includes("lastResultKind = 'shelf';"),
+  'result kind keeps search grouping out of random and bookshelf views'
+);
 assert(
   clientScriptSources[clientScriptFiles.indexOf('script.state.js.html')].includes('BOOK_DETAIL_PREFETCH_WARM_DELAY_MS') &&
     clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('function scheduleBookDetailPrefetchQueue_') &&

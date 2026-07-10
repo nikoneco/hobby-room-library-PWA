@@ -287,7 +287,11 @@ function getMobileDockStatusText_(hasResults) {
   if (searchStatusState && searchStatusState.mode === 'shelf') {
     return `全${count}冊 / 棚表示`;
   }
-  return `${count}冊 / ${getMobileDockViewLabel_(getCurrentViewMode_())}`;
+  const seriesCount = searchStatusState && searchStatusState.mode === 'result'
+    ? Number(searchStatusState.seriesGroupCount || 0)
+    : 0;
+  const countLabel = seriesCount > 0 ? `${seriesCount}シリーズ・${count}冊` : `${count}冊`;
+  return `${countLabel} / ${getMobileDockViewLabel_(getCurrentViewMode_())}`;
 }
 
 function getMobileDockStatusParts_(hasResults) {
@@ -302,8 +306,11 @@ function getMobileDockStatusParts_(hasResults) {
   if (searchStatusState && searchStatusState.mode === 'shelf') {
     return { count: `全${count}冊`, mode: '棚表示' };
   }
+  const seriesCount = searchStatusState && searchStatusState.mode === 'result'
+    ? Number(searchStatusState.seriesGroupCount || 0)
+    : 0;
   return {
-    count: `${count}冊`,
+    count: seriesCount > 0 ? `${seriesCount}シリーズ・${count}冊` : `${count}冊`,
     mode: getMobileDockViewLabel_(getCurrentViewMode_())
   };
 }
