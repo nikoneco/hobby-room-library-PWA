@@ -79,7 +79,8 @@ assertBalancedBraces(combinedCss);
   /body\.shelf-popup-open\s+#result\s*\{[\s\S]*?visibility:\s*hidden/,
   /body\.shelf-popup-open\s+#image-popup-overlay\s*\{[\s\S]*?backdrop-filter:\s*none/,
   /body\.sandbox-redesign\s+\.preview-brand\b/,
-  /body\.sandbox-redesign\.pwa-librarian-presence\s+\.app-brand-librarian-image\s*\{[\s\S]*?display:\s*block/
+  /body\.sandbox-redesign\.pwa-librarian-presence\s+\.app-brand-librarian-image\s*\{[\s\S]*?display:\s*block/,
+  /@media\s*\(max-width:\s*760px\)[\s\S]*?\.search-container\.shrink[\s\S]*?flex-direction:\s*column/
 ].forEach(pattern => {
   assert(pattern.test(combinedCss), `required interactive style is present: ${pattern}`);
 });

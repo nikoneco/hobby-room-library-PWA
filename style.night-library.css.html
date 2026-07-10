@@ -1543,14 +1543,20 @@ body.sandbox-redesign .mobile-dock-view-btn[aria-pressed="true"] {
     position: relative;
     top: 0;
     display: flex;
+    flex-direction: column;
+    align-items: stretch;
     gap: 0;
+    min-width: 0;
     padding: calc(4rem + env(safe-area-inset-top)) 0.8rem 1rem;
+    overflow-x: hidden;
     box-shadow: none;
   }
 
   body.sandbox-redesign .search-container.shrink .preview-brand,
   body.sandbox-redesign .search-container.shrink.compact .preview-brand,
   body.sandbox-redesign .search-container.shrink.shelf-view-active .preview-brand {
+    flex: 0 0 auto;
+    min-width: 0;
     width: 100%;
     margin-bottom: 0.85rem;
   }
@@ -1558,8 +1564,19 @@ body.sandbox-redesign .mobile-dock-view-btn[aria-pressed="true"] {
   body.sandbox-redesign .search-container.shrink .search-status-area,
   body.sandbox-redesign .search-container.shrink.compact .search-status-area,
   body.sandbox-redesign .search-container.shrink.shelf-view-active .search-status-area {
+    flex: 0 0 auto;
+    min-width: 0;
+    max-width: 100%;
     width: 100%;
     margin-bottom: 0.7rem;
+  }
+
+  body.sandbox-redesign .search-container.shrink .search-form,
+  body.sandbox-redesign .search-container.shrink.compact .search-form,
+  body.sandbox-redesign .search-container.shrink.shelf-view-active .search-form {
+    flex: 0 0 auto;
+    min-width: 0;
+    width: 100%;
   }
 
   body.sandbox-redesign .view-toggle {
