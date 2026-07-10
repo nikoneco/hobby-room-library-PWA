@@ -4,7 +4,7 @@ const STATIC_ACTION_HANDLERS = {
   'focus-search': focusSearchEntry_,
   'random': showRandomBooks,
   'bookshelf': showAllBookshelf,
-  'top': returnToSearchTop_,
+  'top': returnToTopPage_,
   'toggle-advanced': toggleAdvancedSearch,
   'clear-conditions': clearSearchConditions,
   'reset-search': resetSearch
@@ -254,17 +254,9 @@ function focusSearchEntry_() {
   syncMobileAppDockState_('focus-search');
 }
 
-function returnToSearchTop_() {
+function returnToTopPage_() {
   hideAllSuggest();
-
-  const container = document.getElementById('searchContainer');
-  if (container) {
-    container.classList.remove('compact');
-    compactLocked = false;
-  }
-
-  window.scrollTo({ top: 0, behavior: 'smooth' });
-  syncMobileAppDockState_();
+  resetSearch();
 }
 
 function getMobileAppDockActiveAction_() {

@@ -124,9 +124,11 @@ assert(!/\son(?:click|change|input|submit|keydown)=/i.test(indexSource), 'index.
 });
 assert(
   indexSource.includes('data-action="top"') &&
-    indexSource.includes('>トップへ<') &&
+    indexSource.includes('>トップページへ<') &&
+    clientScriptSources[clientScriptFiles.indexOf('script.boot.js.html')].includes('function returnToTopPage_()') &&
+    clientScriptSources[clientScriptFiles.indexOf('script.boot.js.html')].includes('resetSearch();') &&
     !indexSource.includes('data-action="bookshelf" aria-label="本棚を開く"'),
-  'mobile dock replaces the shelf shortcut with a same-weight return-to-top action'
+  'mobile dock replaces the shelf shortcut with a same-weight return-to-top-page action'
 );
 ['card', 'list', 'shelf'].forEach(mode => {
   assert(indexSource.includes(`data-view-mode="${mode}"`), `mobile dock exposes data-view-mode="${mode}"`);
