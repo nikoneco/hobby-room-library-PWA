@@ -4460,6 +4460,7 @@ function writePwaFiles() {
 
   const sw = `
 const CACHE_NAME = ${JSON.stringify(cacheName)};
+const CACHE_PREFIX = 'shumi-library-pwa-';
 const APP_SHELL = [
 ${appShellSource}
 ];
@@ -4479,10 +4480,19 @@ function isAppShellUrl_(url) {
 }
 
 function putCache_(cacheKey, response) {
-  if (!response || !response.ok) return response;
+  if (!response || !response.ok) return Promise.resolve();
   const copy = response.clone();
-  caches.open(CACHE_NAME).then(cache => cache.put(cacheKey, copy));
-  return response;
+  return caches.open(CACHE_NAME).then(cache => cache.put(cacheKey, copy));
+}
+
+function fetchAndRefreshCache_(event, cacheKey, request) {
+  return fetch(request).then(response => {
+    event.waitUntil(
+      putCache_(cacheKey, response)
+        .catch(error => console.warn('Service Worker cache update failed:', error))
+    );
+    return response;
+  });
 }
 
 self.addEventListener('install', event => {
@@ -4502,7 +4512,7 @@ self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys()
       .then(keys => Promise.all(keys
-        .filter(key => key !== CACHE_NAME)
+        .filter(key => key.startsWith(CACHE_PREFIX) && key !== CACHE_NAME)
         .map(key => caches.delete(key))
       ))
       .then(() => self.clients.claim())
@@ -4521,8 +4531,7 @@ self.addEventListener('fetch', event => {
     const cacheKey = new URL(NAVIGATION_FALLBACK, self.location.href).href;
     event.respondWith(
       caches.match(cacheKey).then(cached => {
-        const refresh = fetch(request)
-          .then(response => putCache_(cacheKey, response))
+        const refresh = fetchAndRefreshCache_(event, cacheKey, request)
           .catch(() => null);
         return cached || refresh.then(response => response || caches.match(OFFLINE_FALLBACK));
       })
@@ -4534,19 +4543,17 @@ self.addEventListener('fetch', event => {
     const cacheKey = getCacheKey_(url);
     event.respondWith(
       caches.match(cacheKey).then(cached => {
-        const refresh = fetch(request)
-          .then(response => putCache_(cacheKey, response))
+        const refresh = fetchAndRefreshCache_(event, cacheKey, request)
           .catch(() => null);
-        return cached || refresh.then(response => response || caches.match(OFFLINE_FALLBACK));
+        return cached || refresh.then(response => response || Response.error());
       })
     );
     return;
   }
 
   event.respondWith(
-    fetch(request)
-      .then(response => putCache_(getCacheKey_(url), response))
-      .catch(() => caches.match(getCacheKey_(url)).then(cached => cached || caches.match(OFFLINE_FALLBACK)))
+    fetchAndRefreshCache_(event, getCacheKey_(url), request)
+      .catch(() => caches.match(getCacheKey_(url)).then(cached => cached || Response.error()))
   );
 });
 `.trim();

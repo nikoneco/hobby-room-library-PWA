@@ -165,9 +165,69 @@ assert(sw.includes('isAppShellUrl_'), 'service worker recognizes app shell asset
 assert(sw.includes("if (request.mode === 'navigate')"), 'service worker handles app navigation requests');
 assert(sw.includes('caches.match(cacheKey).then(cached => {'), 'service worker serves cached app shell for navigation');
 assert(sw.includes('return cached || refresh.then'), 'service worker serves app shell cache before network refresh');
+assert(sw.includes("const CACHE_PREFIX = 'shumi-library-pwa-'"), 'service worker scopes cache cleanup to this app prefix');
+assert(sw.includes('key.startsWith(CACHE_PREFIX) && key !== CACHE_NAME'), 'service worker preserves foreign origin caches');
+assert(sw.includes('function fetchAndRefreshCache_'), 'service worker centralizes stale-while-revalidate updates');
+assert(sw.includes('event.waitUntil('), 'service worker keeps cache writes alive through waitUntil');
+assert(sw.includes('response || Response.error()'), 'service worker never returns offline HTML for failed asset requests');
+
+{
+  const handlers = {};
+  const deletedCaches = [];
+  const immediate = value => ({
+    then(callback) {
+      return immediate(callback(value));
+    },
+    catch() {
+      return this;
+    }
+  });
+  const serviceWorkerSandbox = {
+    URL,
+    console,
+    Promise: {
+      all(values) {
+        return immediate(values);
+      }
+    },
+    self: {
+      location: { href: 'https://nikoneco.github.io/hobby-room-library-PWA/sw.js' },
+      addEventListener(name, handler) {
+        handlers[name] = handler;
+      },
+      skipWaiting() {},
+      clients: {
+        claim() {
+          return immediate(true);
+        }
+      }
+    },
+    caches: {
+      keys() {
+        return immediate(['shumi-library-pwa-old', 'other-pwa-v1', 'shared-cache']);
+      },
+      delete(key) {
+        deletedCaches.push(key);
+        return immediate(true);
+      }
+    }
+  };
+  vm.createContext(serviceWorkerSandbox);
+  vm.runInContext(sw, serviceWorkerSandbox, { filename: 'sw.js' });
+  const activateWaits = [];
+  handlers.activate({
+    waitUntil(work) {
+      activateWaits.push(work);
+    }
+  });
+  assert(activateWaits.length === 1, 'service worker activation keeps cleanup work alive');
+  assert(deletedCaches.join(',') === 'shumi-library-pwa-old', 'service worker deletes only its own old cache');
+}
 const buildScript = read(path.join(root, 'tools', 'build-pages.js'));
 assert(buildScript.includes("crypto.createHash('sha256')"), 'build script hashes app shell for service worker cache');
 assert(buildScript.includes('buildAppShellCacheName_'), 'build script derives service worker cache name from app shell');
+assert(buildScript.includes("const CACHE_PREFIX = 'shumi-library-pwa-'"), 'build script emits app-scoped cache cleanup');
+assert(buildScript.includes('fetchAndRefreshCache_'), 'build script emits waitUntil-backed cache refreshes');
 
 const pwaCss = read(path.join(docs, 'assets', 'css', 'pwa.css'));
 const pwaClient = read(path.join(docs, 'assets', 'js', 'pwa-client.js'));
