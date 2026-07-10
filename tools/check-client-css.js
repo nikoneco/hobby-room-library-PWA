@@ -80,6 +80,7 @@ assertBalancedBraces(combinedCss);
   /body\.shelf-popup-open\s+#image-popup-overlay\s*\{[\s\S]*?backdrop-filter:\s*none/,
   /body\.sandbox-redesign\s+\.preview-brand\b/,
   /body\.sandbox-redesign\.pwa-librarian-presence\s+\.app-brand-librarian-image\s*\{[\s\S]*?display:\s*block/,
+  /body\.sandbox-redesign\s+\.pwa-settings-panel\s*\{[\s\S]*?calc\(env\(safe-area-inset-top\)\s*\+\s*0\.75rem\)/,
   /@media\s*\(max-width:\s*760px\)[\s\S]*?\.search-container\.shrink[\s\S]*?flex-direction:\s*column/
 ].forEach(pattern => {
   assert(pattern.test(combinedCss), `required interactive style is present: ${pattern}`);

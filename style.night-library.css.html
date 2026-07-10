@@ -733,7 +733,11 @@ body.sandbox-redesign .pwa-settings-panel {
   bottom: 0;
   width: min(420px, calc(100vw - 28px));
   max-height: none;
-  padding: 1.35rem;
+  padding:
+    max(1.35rem, calc(env(safe-area-inset-top) + 0.75rem))
+    max(1.35rem, env(safe-area-inset-right))
+    max(1.35rem, env(safe-area-inset-bottom))
+    max(1.35rem, env(safe-area-inset-left));
   border: 0;
   border-left: 1px solid var(--night-line-strong);
   border-radius: 0;
