@@ -62,6 +62,23 @@ function loadPreferredResultViewMode_() {
   }
 }
 
+function getPreferredResultViewMode_(userPreferences) {
+  if (RESULT_VIEW_MODES.includes(preferredResultViewMode)) {
+    return preferredResultViewMode;
+  }
+
+  try {
+    const storedMode = localStorage.getItem(RESULT_VIEW_MODE_STORAGE_KEY);
+    if (RESULT_VIEW_MODES.includes(storedMode)) {
+      return storedMode;
+    }
+  } catch (e) {
+    // localStorageが使えない環境ではサーバー設定へフォールバックする。
+  }
+
+  return normalizeResultViewMode_(userPreferences && userPreferences.resultViewMode);
+}
+
 function hydratePreferredResultViewMode_(mode) {
   const normalized = normalizeResultViewMode_(mode);
   preferredResultViewMode = normalized;

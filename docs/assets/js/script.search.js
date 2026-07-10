@@ -307,7 +307,7 @@ function applyInitialSearchData_(data) {
   PREVIEW_INDEX_READY = true;
 
   if (!resultViewModeChangedLocally && payload.userPreferences) {
-    const initialViewMode = getPreferredResultViewMode_();
+    const initialViewMode = getPreferredResultViewMode_(payload.userPreferences);
     currentViewMode = initialViewMode;
     isCardView = initialViewMode === 'card';
     updateViewToggleButtons_();
@@ -609,19 +609,20 @@ function addSuggestKeyHandler(inputId, suggestId, type) {
 }
 
 function highlightMatch(text, input) {
-  if (!input) return text;
+  const sourceText = String(text || '');
+  if (!input) return escapeHtml(sourceText);
 
-  const nText = normalizeKana(text);
+  const nText = normalizeKana(sourceText);
   const nInput = normalizeKana(input);
   const index = nText.indexOf(nInput);
-  if (index === -1) return text;
+  if (index === -1) return escapeHtml(sourceText);
 
   let origStart = 0;
   let origLen = 0;
   let normCount = 0;
 
-  for (let i = 0; i < text.length; i++) {
-    const cNorm = normalizeKana(text[i]);
+  for (let i = 0; i < sourceText.length; i++) {
+    const cNorm = normalizeKana(sourceText[i]);
     if (normCount === index) origStart = i;
     normCount += cNorm.length;
     if (normCount >= index + nInput.length) {
@@ -630,12 +631,12 @@ function highlightMatch(text, input) {
     }
   }
 
-  if (origLen <= 0) return text;
+  if (origLen <= 0) return escapeHtml(sourceText);
 
-  const before = text.slice(0, origStart);
-  const match = text.slice(origStart, origStart + origLen);
-  const after = text.slice(origStart + origLen);
-  return `${before}<span class="highlight-match">${match}</span>${after}`;
+  const before = sourceText.slice(0, origStart);
+  const match = sourceText.slice(origStart, origStart + origLen);
+  const after = sourceText.slice(origStart + origLen);
+  return `${escapeHtml(before)}<span class="highlight-match">${escapeHtml(match)}</span>${escapeHtml(after)}`;
 }
 
 function isAdvancedOpen() {

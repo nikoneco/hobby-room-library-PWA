@@ -134,6 +134,70 @@ assertEqual(
 
 assertEqual(sandbox.normalizeKana('ＡＢＣ カタカナ'), 'abcかたかな', 'normalizeKana normalizes width and kana');
 
+{
+  const originalPopulateAdvancedOptions = sandbox.populateAdvancedOptions;
+  const originalRenderQuickBrowseRail = sandbox.renderQuickBrowseRail_;
+  const originalSyncSearchStatus = sandbox.syncSearchStatusPreviewFromForm_;
+  const originalUpdateViewToggleButtons = sandbox.updateViewToggleButtons_;
+  let populateCount = 0;
+  let quickBrowseCount = 0;
+  let searchStatusCount = 0;
+  let viewToggleCount = 0;
+
+  sandbox.populateAdvancedOptions = () => { populateCount++; };
+  sandbox.renderQuickBrowseRail_ = () => { quickBrowseCount++; };
+  sandbox.syncSearchStatusPreviewFromForm_ = () => { searchStatusCount++; };
+  sandbox.updateViewToggleButtons_ = () => { viewToggleCount++; };
+
+  sandbox.localStorage.removeItem('shumiLibrary.resultViewMode');
+  vm.runInContext(`
+    preferredResultViewMode = '';
+    resultViewModeChangedLocally = false;
+    currentViewMode = 'card';
+    isCardView = true;
+    lastResult = null;
+  `, sandbox);
+  sandbox.applyInitialSearchData_({
+    suggest: { titles: ['初期化テスト'] },
+    advancedOptions: { publishers: ['テスト出版社'] },
+    previewIndex: [],
+    userPreferences: { resultViewMode: 'list' }
+  });
+
+  assertEqual(vm.runInContext('currentViewMode', sandbox), 'list', 'initial data uses server view mode when storage is unset');
+  assertEqual(vm.runInContext('isCardView', sandbox), false, 'initial data synchronizes card view state');
+  assertEqual(populateCount, 1, 'initial data completes advanced-option initialization');
+  assertEqual(quickBrowseCount, 1, 'initial data completes quick-browse initialization');
+  assertEqual(searchStatusCount, 1, 'initial data completes search-status initialization');
+  assertEqual(viewToggleCount, 1, 'initial data completes view-toggle initialization');
+
+  sandbox.localStorage.setItem('shumiLibrary.resultViewMode', 'card');
+  vm.runInContext(`
+    preferredResultViewMode = '';
+    resultViewModeChangedLocally = false;
+  `, sandbox);
+  sandbox.applyInitialSearchData_({ userPreferences: { resultViewMode: 'shelf' } });
+  assertEqual(vm.runInContext('currentViewMode', sandbox), 'card', 'explicitly stored card mode takes priority over server preferences');
+
+  sandbox.populateAdvancedOptions = originalPopulateAdvancedOptions;
+  sandbox.renderQuickBrowseRail_ = originalRenderQuickBrowseRail;
+  sandbox.syncSearchStatusPreviewFromForm_ = originalSyncSearchStatus;
+  sandbox.updateViewToggleButtons_ = originalUpdateViewToggleButtons;
+}
+
+{
+  const hostileSuggest = '<img src=x onerror="alert(1)">&"日本語';
+  const expectedPlainText = '&lt;img src=x onerror=&quot;alert(1)&quot;&gt;&amp;&quot;日本語';
+  const highlighted = sandbox.highlightMatch(hostileSuggest, 'img');
+
+  assertEqual(sandbox.highlightMatch(hostileSuggest, ''), expectedPlainText, 'suggestion text escapes HTML without a query');
+  assertEqual(sandbox.highlightMatch(hostileSuggest, '一致しない'), expectedPlainText, 'suggestion text escapes HTML without a match');
+  assert(!highlighted.includes('<img'), 'suggestion text never emits an HTML image element');
+  assert(!highlighted.includes('onerror="alert(1)"'), 'suggestion text never emits an event attribute');
+  assert(highlighted.includes('&lt;'), 'suggestion text escapes angle brackets around a highlighted match');
+  assert(highlighted.includes('<span class="highlight-match">img</span>'), 'suggestion text preserves safe match highlighting');
+}
+
 const mixedIndex = {
   title: sandbox.normalizeKana('葬送のフリーレン'),
   yomi: sandbox.normalizeKana('そうそうのふりーれん'),
