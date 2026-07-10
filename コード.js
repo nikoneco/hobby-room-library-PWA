@@ -31,18 +31,18 @@ function onEdit(e) {
   if (sheetName === MAIN && notation === 'A1') {
     switch (value) {
       case 'Filter初期化':
-        resetAndSortFilter();
+        resetAndSortFilter_();
         a1.setValue('機能選択');
-        setDropdownNML();
+        setDropdownNML_();
         break;
       case 'ISBN入力モード':
-        resetAndSortFilterISBN();
+        resetAndSortFilterISBN_();
         break;
       case '入力モード終了':
-        convertFormulasAndClearRange();
-        resetAndSortFilter();
+        convertFormulasAndClearRange_();
+        resetAndSortFilter_();
         a1.setValue('機能選択');
-        setDropdownNML();
+        setDropdownNML_();
         break;
     }
     return;
@@ -292,7 +292,7 @@ function colInRange_(sheetCol, rangeStartCol) {
   return sheetCol - rangeStartCol + 1; // sort用（Range内の相対列）
 }
 
-function resetAndSortFilter() {
+function resetAndSortFilter_() {
   const sheet = getSheet(CONFIG.SHEETS.MAIN);
 
   ensureSynopsisColumns_(sheet);
@@ -339,7 +339,7 @@ function resetAndSortFilter() {
  * ISBN入力モード用フィルター＆ハイライト
  *  - ISBN入力中だけ用の色味・ドロップダウン等
  */
-function resetAndSortFilterISBN() {
+function resetAndSortFilterISBN_() {
   const sheet = getSheet(CONFIG.SHEETS.MAIN);
 
   ensureSynopsisColumns_(sheet);
@@ -349,8 +349,8 @@ function resetAndSortFilterISBN() {
 
   const last = getLastDataRow(sheet, CONFIG.COL.TITLE);
   if (last < 2) {
-    highlightISBNMode(sheet);
-    setDropdownISBN();
+    highlightISBNMode_(sheet);
+    setDropdownISBN_();
     return;
   }
 
@@ -363,8 +363,8 @@ function resetAndSortFilterISBN() {
     restoreGenreFormulaAfterSort_(sheet, genreFormula);
   }
 
-  highlightISBNMode(sheet);
-  setDropdownISBN();
+  highlightISBNMode_(sheet);
+  setDropdownISBN_();
 }
 
 /**
@@ -372,7 +372,7 @@ function resetAndSortFilterISBN() {
  *  - ISBN、画像、著者列等をdisplayValuesで書き戻し
  *  - サブ範囲はクリア
  */
-function convertFormulasAndClearRange() {
+function convertFormulasAndClearRange_() {
   const sh = getSheet(CONFIG.SHEETS.MAIN);
   const last = getLastDataRow(sh, CONFIG.COL.ISBN);
   const rows = last - 1;
@@ -388,7 +388,7 @@ function convertFormulasAndClearRange() {
 
   sh.getRange(2, 2, rows, 7).clearContent();
 
-  resetSheetStyle(sh);
+  resetSheetStyle_(sh);
   SpreadsheetApp.flush();
   clearLibrarySearchCache_();
 }
@@ -396,9 +396,9 @@ function convertFormulasAndClearRange() {
 /**
  * ドロップダウン切り替え：通常/ISBN
  */
-function setDropdownNML()  { setDropdownFromList(DROPDOWN_VALUES.NML);  }
-function setDropdownISBN() { setDropdownFromList(DROPDOWN_VALUES.ISBN); }
-function setDropdownFromList(values) {
+function setDropdownNML_()  { setDropdownFromList_(DROPDOWN_VALUES.NML);  }
+function setDropdownISBN_() { setDropdownFromList_(DROPDOWN_VALUES.ISBN); }
+function setDropdownFromList_(values) {
   const cell = getSheet(CONFIG.SHEETS.MAIN).getRange('A1');
   cell.clearDataValidations();
   const rule = SpreadsheetApp.newDataValidation().requireValueInList(values, true).build();
@@ -408,12 +408,12 @@ function setDropdownFromList(values) {
 /**
  * 行全体の背景色リセット・モードごとのハイライト
  */
-function highlightISBNMode(sheet) {
+function highlightISBNMode_(sheet) {
   const r = getLastDataRow(sheet, CONFIG.COL.ISBN);
   const c = sheet.getLastColumn();
   sheet.getRange(1, 1, r, c).setBackground('#FFF8DC').setFontColor('#003366');
 }
-function resetSheetStyle(sheet) {
+function resetSheetStyle_(sheet) {
   const r = getLastDataRow(sheet, CONFIG.COL.ISBN);
   const c = sheet.getLastColumn();
   sheet.getRange(1, 1, r, c).setBackground(null).setFontColor(null)
@@ -506,7 +506,7 @@ t = t.replace(/\s+\d+\s*.*$/i, '');
  * 目録シートの X列(series_key_auto) を既存データから一括生成する
  * 資料系（写真集/画集/資料集）は __extra__ プレフィックス付きで本編から分離する
  */
-function fillSeriesKeyAutoAll() {
+function fillSeriesKeyAutoAll_() {
   const sheet = SpreadsheetApp.getActiveSpreadsheet()
     .getSheetByName(CONFIG.SHEETS.MAIN);
 

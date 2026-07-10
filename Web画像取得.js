@@ -37,25 +37,25 @@ const FALLBACK_IMAGE_FETCH_CONFIG = {
   RAKUTEN_ORIGIN: 'https://script.google.com'
 };
 
-function batchFillFallbackImageUrls() {
+function batchFillFallbackImageUrls_() {
   return batchFillFallbackImageUrlsByLimit_(FALLBACK_IMAGE_FETCH_CONFIG.BATCH_SIZE, {
     retryFailed: false
   });
 }
 
-function batchFillFallbackImageUrlsTest10() {
+function batchFillFallbackImageUrlsTest10_() {
   return batchFillFallbackImageUrlsByLimit_(FALLBACK_IMAGE_FETCH_CONFIG.TEST_BATCH_SIZE, {
     retryFailed: false
   });
 }
 
-function retryFailedFallbackImageUrls() {
+function retryFailedFallbackImageUrls_() {
   return batchFillFallbackImageUrlsByLimit_(FALLBACK_IMAGE_FETCH_CONFIG.RETRY_BATCH_SIZE, {
     retryFailed: true
   });
 }
 
-function setFallbackImageSourceValidation() {
+function setFallbackImageSourceValidation_() {
   const sheet = getSheet(CONFIG.SHEETS.MAIN);
   ensureFallbackImageColumns_(sheet);
 
@@ -81,7 +81,7 @@ function setFallbackImageSourceValidation() {
     .setDataValidation(rule);
 }
 
-function clearAllFallbackImageUrlAndSource() {
+function clearAllFallbackImageUrlAndSource_() {
   const sheet = getSheet(CONFIG.SHEETS.MAIN);
   ensureFallbackImageColumns_(sheet);
 
@@ -108,7 +108,7 @@ function clearAllFallbackImageUrlAndSource() {
 function batchFillFallbackImageUrlsByLimit_(limit, options) {
   const sheet = getSheet(CONFIG.SHEETS.MAIN);
   ensureFallbackImageColumns_(sheet);
-  setFallbackImageSourceValidation();
+  setFallbackImageSourceValidation_();
 
   const last = getLastDataRow(sheet, CONFIG.COL.TITLE);
   if (last < 2) {
@@ -546,7 +546,7 @@ function fetchFallbackImageUrlWithRetry_(url, options, retryCount) {
   throw lastError || new Error('fetchFallbackImageUrlWithRetry_: unknown error');
 }
 
-function debugResolveFallbackImageUrlPreset() {
+function debugResolveFallbackImageUrlPreset_() {
   const isbn = '9784088931722';
   return debugResolveFallbackImageUrlByIsbn_(isbn);
 }

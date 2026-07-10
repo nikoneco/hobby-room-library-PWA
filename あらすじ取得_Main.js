@@ -48,7 +48,7 @@ const SYNOPSIS_FETCH_CONFIG = {
  * Z列が空欄の行だけを対象に、最大50件処理する。
  * @returns {Object} 実行結果
  */
-function batchFetchSynopsisRaw() {
+function batchFetchSynopsisRaw_() {
   return batchFetchSynopsisRawByLimit_(SYNOPSIS_FETCH_CONFIG.BATCH_SIZE);
 }
 
@@ -57,7 +57,7 @@ function batchFetchSynopsisRaw() {
  * まずはこちらで動作確認する。
  * @returns {Object} 実行結果
  */
-function batchFetchSynopsisRawTest10() {
+function batchFetchSynopsisRawTest10_() {
   return batchFetchSynopsisRawByLimit_(SYNOPSIS_FETCH_CONFIG.TEST_BATCH_SIZE);
 }
 
@@ -65,7 +65,7 @@ function batchFetchSynopsisRawTest10() {
  * あらすじSOURCE列の入力規則を設定する。
  * 手動運用のブレ防止用。必要なときだけ実行する。
  */
-function setSynopsisSourceValidation() {
+function setSynopsisSourceValidation_() {
   const sheet = getSheet(CONFIG.SHEETS.MAIN);
   ensureSynopsisColumns_(sheet);
 
@@ -99,7 +99,7 @@ function setSynopsisSourceValidation() {
  * ヘッダ行は保持する。Manualも含めて消えるので、全件取り直し時だけ実行する。
  * @returns {Object}
  */
-function clearAllSynopsisRawAndSource() {
+function clearAllSynopsisRawAndSource_() {
   const sheet = getSheet(CONFIG.SHEETS.MAIN);
   ensureSynopsisColumns_(sheet);
 
@@ -756,7 +756,7 @@ function buildRakutenBooksFetchOptions_() {
  * 秘密情報はマスクしてログ出力する。
  * @returns {Object}
  */
-function testRakutenBooksApiConnection() {
+function testRakutenBooksApiConnection_() {
   const credentials = getRakutenBooksApiCredentials_();
   console.log('=== Rakuten Books API 接続テスト開始 ===');
 
@@ -1336,7 +1336,7 @@ function stripTrailingHanmotoNoiseSections_(text) {
   return s;
 }
 
-function debug_isbn_preset (){
+function debug_isbn_preset_(){
   debugHanmotoCandidates_('9784063546330');
 }
 /**

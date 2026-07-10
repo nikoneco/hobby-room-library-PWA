@@ -5,7 +5,7 @@
 //  - GASでは同一プロジェクト内の .gs ファイルは同じグローバルスコープで動作
 // ＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝＝
 
-function retryNotFoundSynopsisFromRakutenKobo() {
+function retryNotFoundSynopsisFromRakutenKobo_() {
   return retryNotFoundSynopsisFromRakutenKoboByLimit_(SYNOPSIS_FETCH_CONFIG.KOBO_RETRY_BATCH_SIZE);
 }
 
@@ -13,7 +13,7 @@ function retryNotFoundSynopsisFromRakutenKobo() {
  * NOT_FOUND行だけを楽天Koboで救済するテスト10件バッチ。
  * @returns {Object}
  */
-function retryNotFoundSynopsisFromRakutenKoboTest10() {
+function retryNotFoundSynopsisFromRakutenKoboTest10_() {
   return retryNotFoundSynopsisFromRakutenKoboByLimit_(SYNOPSIS_FETCH_CONFIG.KOBO_RETRY_TEST_BATCH_SIZE);
 }
 
@@ -28,7 +28,7 @@ function retryNotFoundSynopsisFromRakutenKoboByLimit_(limit) {
 
   // Kobo救済では RakutenKobo / NOT_FOUND. を書き込むため、
   // 古い入力規則が残っていてもここで自動更新する。
-  setSynopsisSourceValidation();
+  setSynopsisSourceValidation_();
 
   const last = getLastDataRow(sheet, CONFIG.COL.TITLE);
   if (last < 2) {
@@ -1159,7 +1159,7 @@ function debugRakutenKoboCandidatesByRow_(rowNumber) {
  * Kobo救済ロジック調整後に再実行したい場合だけ手動実行する。
  * @returns {{resetRows: number}}
  */
-function resetKoboNotFoundDoneToNotFound() {
+function resetKoboNotFoundDoneToNotFound_() {
   const sheet = getSheet(CONFIG.SHEETS.MAIN);
   ensureSynopsisColumns_(sheet);
 

@@ -49,9 +49,9 @@ const DBG_KOBO_CONFIG = {
  * 行番号デバッグ用プリセット。
  * ここを書き換えて実行する。
  */
-function dbgKoboRowPreset() {
+function dbgKoboRowPreset_() {
   const rowNumber = 1449; // ←ここを書き換える
-  dbgKoboRow(rowNumber);
+  dbgKoboRow_(rowNumber);
 }
 
 
@@ -59,9 +59,9 @@ function dbgKoboRowPreset() {
  * 任意keyword検索用プリセット。
  * ここを書き換えて実行する。
  */
-function dbgKoboKeywordSearchPreset() {
+function dbgKoboKeywordSearchPreset_() {
   const keyword = 'もやしもん'; // ←ここを書き換える
-  dbgKoboKeywordSearch(keyword);
+  dbgKoboKeywordSearch_(keyword);
 }
 
 
@@ -69,7 +69,7 @@ function dbgKoboKeywordSearchPreset() {
  * 複数keywordをまとめて確認するプリセット。
  * 気になる作品名をここに入れて実行。
  */
-function dbgKoboKeywordSearchBatchPreset() {
+function dbgKoboKeywordSearchBatchPreset_() {
   const keywords = [
     'デュラララ!! ×02',
     'デュラララ!! ×01',
@@ -78,7 +78,7 @@ function dbgKoboKeywordSearchBatchPreset() {
 
   keywords.forEach((keyword, i) => {
     if (i > 0) Utilities.sleep(DBG_KOBO_CONFIG.SLEEP_MS);
-    dbgKoboKeywordSearch(keyword);
+    dbgKoboKeywordSearch_(keyword);
   });
 }
 
@@ -88,7 +88,7 @@ function dbgKoboKeywordSearchBatchPreset() {
  *
  * @param {number} rowNumber 目録シート上の行番号
  */
-function dbgKoboRow(rowNumber) {
+function dbgKoboRow_(rowNumber) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(DBG_KOBO_CONFIG.SHEET_NAME);
   if (!sheet) throw new Error('シートが見つかりません: ' + DBG_KOBO_CONFIG.SHEET_NAME);
 
@@ -145,7 +145,7 @@ function dbgKoboRow(rowNumber) {
  *
  * @param {string} keyword
  */
-function dbgKoboKeywordSearch(keyword) {
+function dbgKoboKeywordSearch_(keyword) {
   const response = dbgKoboFetchByKeyword_(keyword);
   const items = response.items || [];
 
@@ -865,7 +865,7 @@ function dbgKoboCleanText_(value) {
 
 
 
-function debugLibraryDatasetSize() {
+function debugLibraryDatasetSize_() {
   const t0 = Date.now();
   const dataset = buildLibraryDataset_();
   const t1 = Date.now();
@@ -922,7 +922,7 @@ const DEBUG_LIBRARY_SIZE_CONFIG = {
  *
  * @returns {Object}
  */
-function debugCompareLibraryDatasetSize() {
+function debugCompareLibraryDatasetSize_() {
   const result = debugCompareLibraryDatasetSize_(DEBUG_LIBRARY_SIZE_CONFIG.SAMPLE_KEYWORD, DEBUG_LIBRARY_SIZE_CONFIG.SAMPLE_LIMIT);
   console.log(JSON.stringify(result, null, 2));
   return result;
@@ -934,7 +934,7 @@ function debugCompareLibraryDatasetSize() {
  *
  * @returns {Object}
  */
-function debugCompareLibraryDatasetSizePreset() {
+function debugCompareLibraryDatasetSizePreset_() {
   const keyword = 'よつばと'; // ←必要に応じて変更
   const limit = 30;           // ←必要に応じて変更
 
@@ -1265,7 +1265,7 @@ function buildSearchResponseSampleForDebug_(dataset, keyword, limit) {
  * 大本命調査メイン。
  * まずこれを実行する。
  */
-function debugFindLibraryLoadBottleneck() {
+function debugFindLibraryLoadBottleneck_() {
   const result = {
     mode: 'FIND_LIBRARY_LOAD_BOTTLENECK',
     generatedAt: new Date().toISOString(),
@@ -1636,7 +1636,7 @@ const DEBUG_LAST_ROW_CELL_CONFIG = {
  *
  * @returns {Object}
  */
-function debugCompareLoadMainBookDataWithLastRowCell() {
+function debugCompareLoadMainBookDataWithLastRowCell_() {
   const result = debugCompareLoadMainBookDataWithLastRowCell_(
     DEBUG_LAST_ROW_CELL_CONFIG.TRIALS
   );
@@ -1650,7 +1650,7 @@ function debugCompareLoadMainBookDataWithLastRowCell() {
  *
  * @returns {Object}
  */
-function debugCompareLoadMainBookDataWithLastRowCellPreset() {
+function debugCompareLoadMainBookDataWithLastRowCellPreset_() {
   const trials = 10;
   const result = debugCompareLoadMainBookDataWithLastRowCell_(trials);
 
@@ -1892,11 +1892,11 @@ function summarizeDebugRuns_(runs) {
   };
 }
 
-function debugClearLibrarySearchCache() {
+function debugClearLibrarySearchCache_() {
   clearLibrarySearchCache_();
 }
 
-function debugGetInitialSearchData() {
+function debugGetInitialSearchData_() {
   const data = getInitialSearchData();
 
   console.log(JSON.stringify({
@@ -1930,7 +1930,7 @@ function debugGetInitialSearchData() {
  * - 本番データは変更しない
  * - 検索キャッシュは比較のために削除する
  */
-function debugCompareInitialSearchApiIntegration() {
+function debugCompareInitialSearchApiIntegration_() {
   const result = {
     mode: 'COMPARE_INITIAL_SEARCH_API_INTEGRATION',
     generatedAt: new Date().toISOString(),

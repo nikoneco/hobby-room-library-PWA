@@ -18,7 +18,6 @@ const WEB_APP_API_REGISTRY_ = Object.freeze({
     { name: 'getBookDetailByRowIndex', calledBy: 'script.js.html: showPopup', role: 'PWA本棚一覧から開いた本の詳細取得' },
     { name: 'getBookDetailsByRowIndexes', calledBy: 'script.js.html: detail prefetch', role: 'PWA本棚詳細の少量先読み' },
     { name: 'getBooksBySeriesKey', calledBy: 'script.js.html: loadSeriesPanel', role: 'シリーズ一覧表示' },
-    { name: 'getWebAppUserPreferences', calledBy: 'script.js.html: fetchInitialSearchData', role: 'Webアプリ表示設定取得' }
   ],
   compatibility: [
     { name: 'searchBooks', role: '旧来互換のタイトル/作者検索' },
@@ -507,14 +506,14 @@ function normalizeWebAppResultViewMode_(mode) {
   return WEBAPP_RESULT_VIEW_MODES.includes(mode) ? mode : 'card';
 }
 
-function getWebAppUserPreferences() {
+function getWebAppUserPreferences_() {
   try {
     const props = PropertiesService.getScriptProperties();
     return {
       resultViewMode: normalizeWebAppResultViewMode_(props.getProperty(WEBAPP_PREF_RESULT_VIEW_MODE_KEY))
     };
   } catch (e) {
-    console.warn('getWebAppUserPreferences error:', e);
+    console.warn('getWebAppUserPreferences_ error:', e);
     return {
       resultViewMode: 'card'
     };
@@ -554,7 +553,7 @@ function getInitialSearchData() {
       suggest: buildSuggestDataPayload_(dataset),
       advancedOptions: buildAdvancedSearchOptionsPayload_(dataset),
       previewIndex: buildPreviewIndexPayload_(dataset),
-      userPreferences: getWebAppUserPreferences()
+      userPreferences: getWebAppUserPreferences_()
     };
   } catch (e) {
     console.error('getInitialSearchData error:', e);
@@ -562,7 +561,7 @@ function getInitialSearchData() {
       suggest: buildEmptySuggestData_(),
       advancedOptions: buildEmptyAdvancedSearchOptions_(),
       previewIndex: [],
-      userPreferences: getWebAppUserPreferences()
+      userPreferences: getWebAppUserPreferences_()
     };
   }
 }
@@ -595,7 +594,7 @@ function getInitialSearchDataForPwa_() {
       advancedOptions: buildAdvancedSearchOptionsPayload_(dataset),
       previewIndex: [],
       quickBrowseCounts: buildQuickBrowseCountsPayload_(dataset),
-      userPreferences: getWebAppUserPreferences()
+      userPreferences: getWebAppUserPreferences_()
     };
   } catch (e) {
     console.error('getInitialSearchDataForPwa_ error:', e);
@@ -604,7 +603,7 @@ function getInitialSearchDataForPwa_() {
       advancedOptions: buildEmptyAdvancedSearchOptions_(),
       previewIndex: [],
       quickBrowseCounts: buildQuickBrowseCountsPayload_(null),
-      userPreferences: getWebAppUserPreferences()
+      userPreferences: getWebAppUserPreferences_()
     };
   }
 }

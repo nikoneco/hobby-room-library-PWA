@@ -6,11 +6,11 @@ const NEW_BOOK_IMPORT_CONFIG = {
   LOCK_WAIT_MS: 10000
 };
 
-function enrichNewBooksAfterImport() {
+function enrichNewBooksAfterImport_() {
   return enrichNewBooksAfterImportByLimit_(NEW_BOOK_IMPORT_CONFIG.DEFAULT_LIMIT);
 }
 
-function enrichNewBooksAfterImportTest5() {
+function enrichNewBooksAfterImportTest5_() {
   return enrichNewBooksAfterImportByLimit_(NEW_BOOK_IMPORT_CONFIG.TEST_LIMIT);
 }
 
