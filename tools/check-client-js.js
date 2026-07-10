@@ -402,6 +402,69 @@ assert(
   'bookshelf view renders book tiles incrementally instead of blocking on every tile'
 );
 assert(
+  clientScriptSources[clientScriptFiles.indexOf('script.state.js.html')].includes('RESULT_RENDER_INITIAL_BOOK_LIMIT') &&
+    clientScriptSources[clientScriptFiles.indexOf('script.state.js.html')].includes('const RESULT_RENDER_INITIAL_BOOK_LIMIT = 12') &&
+    clientScriptSources[clientScriptFiles.indexOf('script.shelf.js.html')].includes('function scheduleIncrementalResultRender_') &&
+    clientScriptSources[clientScriptFiles.indexOf('script.shelf.js.html')].includes('new window.IntersectionObserver') &&
+    clientScriptSources[clientScriptFiles.indexOf('script.shelf.js.html')].includes('resetResultRenderQueue_();') &&
+    clientScriptSources[clientScriptFiles.indexOf('script.shelf.js.html')].includes('deferred: Math.max(0, data.length - nextIndex)') &&
+    !clientScriptSources[clientScriptFiles.indexOf('script.shelf.js.html')].includes('data.forEach((book, idx) => {'),
+  'card and list search results render incrementally without a result-count limit'
+);
+vm.runInContext(`
+  var __previousCreateRenderElement = document.createElement;
+  var __previousRenderRaf = window.requestAnimationFrame;
+  var __previousRenderObserver = window.IntersectionObserver;
+  var __renderRanges = [];
+  var __renderObservers = [];
+  function __createRenderNode() {
+    return {
+      children: [],
+      parentNode: null,
+      className: '',
+      setAttribute() {},
+      appendChild(child) {
+        this.children.push(child);
+        child.parentNode = this;
+        return child;
+      },
+      removeChild(child) {
+        this.children = this.children.filter(item => item !== child);
+        child.parentNode = null;
+      }
+    };
+  }
+  document.createElement = function() { return __createRenderNode(); };
+  window.requestAnimationFrame = function(callback) { callback(); };
+  window.IntersectionObserver = function(callback) {
+    this.callback = callback;
+    __renderObservers.push(this);
+  };
+  window.IntersectionObserver.prototype.observe = function() {};
+  window.IntersectionObserver.prototype.disconnect = function() {};
+
+  var __incrementalResult = __createRenderNode();
+  scheduleIncrementalResultRender_(
+    __incrementalResult,
+    Array.from({ length: 40 }, (_, index) => index),
+    'card',
+    function(start, end) { __renderRanges.push([start, end]); },
+    null
+  );
+  __renderObservers[0].callback([{ isIntersecting: true }]);
+  __renderObservers[1].callback([{ isIntersecting: true }]);
+  __renderObservers[2].callback([{ isIntersecting: true }]);
+
+  document.createElement = __previousCreateRenderElement;
+  window.requestAnimationFrame = __previousRenderRaf;
+  window.IntersectionObserver = __previousRenderObserver;
+`, sandbox);
+assertEqual(
+  vm.runInContext('JSON.stringify(__renderRanges)', sandbox),
+  JSON.stringify([[0, 12], [12, 24], [24, 36], [36, 40]]),
+  'incremental result renderer keeps every result available in bounded chunks'
+);
+assert(
   clientScriptSources[clientScriptFiles.indexOf('script.state.js.html')].includes('BOOK_DETAIL_PREFETCH_WARM_DELAY_MS') &&
     clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('function scheduleBookDetailPrefetchQueue_') &&
     clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('window.requestIdleCallback(run') &&

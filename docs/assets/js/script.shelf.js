@@ -1076,12 +1076,98 @@ function renderShelfView_(data) {
   return container;
 }
 
+function resetResultRenderQueue_() {
+  resultRenderRunId += 1;
+  if (resultRenderObserver && typeof resultRenderObserver.disconnect === 'function') {
+    resultRenderObserver.disconnect();
+  }
+  resultRenderObserver = null;
+}
+
+function scheduleIncrementalResultRender_(result, data, viewMode, appendItems, renderPerfToken) {
+  const runId = ++resultRenderRunId;
+  const initialLimit = RESULT_RENDER_INITIAL_BOOK_LIMIT;
+  const chunkSize = viewMode === 'list'
+    ? RESULT_RENDER_LIST_CHUNK_SIZE
+    : RESULT_RENDER_CARD_CHUNK_SIZE;
+  let nextIndex = Math.min(initialLimit, data.length);
+
+  appendItems(0, nextIndex);
+  pwaPerfEnd_(renderPerfToken, {
+    count: nextIndex,
+    deferred: Math.max(0, data.length - nextIndex)
+  });
+
+  if (nextIndex >= data.length) return;
+
+  const sentinel = document.createElement('div');
+  sentinel.className = 'result-render-sentinel';
+  sentinel.setAttribute('aria-hidden', 'true');
+  result.appendChild(sentinel);
+
+  function appendNextChunk_() {
+    if (runId !== resultRenderRunId) return;
+
+    const start = nextIndex;
+    const end = Math.min(start + chunkSize, data.length);
+    const chunkToken = pwaPerfStart_('render:' + viewMode + ':chunk', {
+      count: end - start
+    });
+    appendItems(start, end);
+    nextIndex = end;
+    pwaPerfEnd_(chunkToken, { count: end - start });
+
+    if (nextIndex >= data.length) {
+      if (resultRenderObserver && typeof resultRenderObserver.disconnect === 'function') {
+        resultRenderObserver.disconnect();
+      }
+      resultRenderObserver = null;
+      if (sentinel.parentNode) sentinel.parentNode.removeChild(sentinel);
+      return;
+    }
+
+    observeNextChunk_();
+  }
+
+  function scheduleAppend_() {
+    if (typeof window.requestAnimationFrame === 'function') {
+      window.requestAnimationFrame(appendNextChunk_);
+    } else {
+      window.setTimeout(appendNextChunk_, 16);
+    }
+  }
+
+  function observeNextChunk_() {
+    if (runId !== resultRenderRunId) return;
+    if (typeof window.IntersectionObserver !== 'function') {
+      window.setTimeout(appendNextChunk_, 16);
+      return;
+    }
+
+    if (resultRenderObserver && typeof resultRenderObserver.disconnect === 'function') {
+      resultRenderObserver.disconnect();
+    }
+    resultRenderObserver = new window.IntersectionObserver(function(entries) {
+      if (runId !== resultRenderRunId || !entries.some(entry => entry.isIntersecting)) return;
+      resultRenderObserver.disconnect();
+      resultRenderObserver = null;
+      scheduleAppend_();
+    }, {
+      rootMargin: '0px 0px 480px 0px'
+    });
+    resultRenderObserver.observe(sentinel);
+  }
+
+  observeNextChunk_();
+}
+
 function showResult(data) {
   hideSpinner();
   if (typeof syncMobileAppDockState_ === 'function') syncMobileAppDockState_();
 
   const result = document.getElementById('result');
   result.innerHTML = '';
+  resetResultRenderQueue_();
 
   if (!data || !Array.isArray(data) || data.length === 0) {
     shelfRenderRunId += 1;
@@ -1122,8 +1208,12 @@ function showResult(data) {
     unmountShelfRoomMapPortal_();
     const container = document.createElement('div');
     container.className = 'card-view';
+    result.appendChild(container);
 
-    data.forEach((book, idx) => {
+    scheduleIncrementalResultRender_(result, data, viewMode, function(start, end) {
+      const fragment = document.createDocumentFragment();
+      for (let idx = start; idx < end; idx += 1) {
+      const book = data[idx];
       const card = document.createElement('div');
       card.className = 'book-card';
       setBookRevealIndex_(card, idx);
@@ -1162,16 +1252,20 @@ function showResult(data) {
       setupBookKeyboardOpenSurface_(info.querySelector('.book-title'), book, idx, data);
 
       card.appendChild(info);
-      container.appendChild(card);
-    });
-
-    result.appendChild(container);
+      fragment.appendChild(card);
+      }
+      container.appendChild(fragment);
+    }, renderPerfToken);
   } else {
     unmountShelfRoomMapPortal_();
     const container = document.createElement('div');
     container.className = 'list-view';
+    result.appendChild(container);
 
-    data.forEach((book, idx) => {
+    scheduleIncrementalResultRender_(result, data, viewMode, function(start, end) {
+      const fragment = document.createDocumentFragment();
+      for (let idx = start; idx < end; idx += 1) {
+      const book = data[idx];
       const card = document.createElement('div');
       card.className = 'book-card list';
       setBookRevealIndex_(card, idx);
@@ -1255,13 +1349,15 @@ function showResult(data) {
         details.style.display = expanded ? 'block' : 'none';
       };
 
-      container.appendChild(card);
-    });
-
-    result.appendChild(container);
+      fragment.appendChild(card);
+      }
+      container.appendChild(fragment);
+    }, renderPerfToken);
   }
 
-  pwaPerfEnd_(renderPerfToken, { count: data.length });
+  if (viewMode === 'shelf') {
+    pwaPerfEnd_(renderPerfToken, { count: data.length });
+  }
   result.classList.remove('show');
   result.classList.add('result-fade');
 
