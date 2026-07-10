@@ -10,7 +10,8 @@ const cssFiles = [
   'style.modern-core.css.html',
   'style.modern-modal.css.html',
   'style.modern-shelf.css.html',
-  'style.responsive.css.html'
+  'style.responsive.css.html',
+  'style.night-library.css.html'
 ];
 
 function assert(condition, message) {
@@ -76,7 +77,9 @@ assertBalancedBraces(combinedCss);
   /body:not\(\.mobile-dock-has-results\)\s+\.mobile-dock-view-switch\s*\{[\s\S]*?display:\s*none/,
   /\.view-toggle\s*\{[\s\S]*?display:\s*none/,
   /body\.shelf-popup-open\s+#result\s*\{[\s\S]*?visibility:\s*hidden/,
-  /body\.shelf-popup-open\s+#image-popup-overlay\s*\{[\s\S]*?backdrop-filter:\s*none/
+  /body\.shelf-popup-open\s+#image-popup-overlay\s*\{[\s\S]*?backdrop-filter:\s*none/,
+  /body\.sandbox-redesign\s+\.preview-brand\b/,
+  /body\.sandbox-redesign\.pwa-librarian-presence\s+\.app-brand-librarian-image\s*\{[\s\S]*?display:\s*block/
 ].forEach(pattern => {
   assert(pattern.test(combinedCss), `required interactive style is present: ${pattern}`);
 });

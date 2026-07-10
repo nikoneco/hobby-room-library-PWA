@@ -18,7 +18,8 @@ const cssFiles = [
   'style.modern-core.css.html',
   'style.modern-modal.css.html',
   'style.modern-shelf.css.html',
-  'style.responsive.css.html'
+  'style.responsive.css.html',
+  'style.night-library.css.html'
 ];
 
 const jsFiles = [
@@ -137,7 +138,7 @@ function buildStaticIndex() {
   );
 
   source = source.replace(
-    /(<body>)/,
+    /(<body[^>]*>)/,
     `$1
   <div id="pwaLaunchSplash" class="pwa-launch-splash" aria-hidden="true">
     <div class="pwa-launch-splash-scene">
@@ -3550,14 +3551,26 @@ function writePwaClient() {
 
   function syncLogoForLibrarianPresence_(enabled) {
     const logo = document.getElementById('logoResetBtn');
-    if (!logo) return;
-
-    const nextSrc = enabled ? LIBRARIAN_LOGO_SRC : DEFAULT_LOGO_SRC;
-    const currentSrc = logo.getAttribute('src') || '';
-    if (currentSrc !== nextSrc) {
-      logo.setAttribute('src', nextSrc);
+    if (logo) {
+      const nextSrc = enabled ? LIBRARIAN_LOGO_SRC : DEFAULT_LOGO_SRC;
+      const currentSrc = logo.getAttribute('src') || '';
+      if (currentSrc !== nextSrc) {
+        logo.setAttribute('src', nextSrc);
+      }
+      logo.setAttribute('alt', enabled ? '司書のいる趣味部屋図書館' : 'ロゴ');
     }
-    logo.setAttribute('alt', enabled ? '司書のいる趣味部屋図書館' : 'ロゴ');
+
+    const brandButton = document.getElementById('appBrandResetBtn');
+    const brandImage = document.getElementById('appBrandLibrarianImage');
+    if (brandButton) {
+      brandButton.setAttribute(
+        'aria-label',
+        enabled ? '司書のいる趣味部屋図書館。検索をリセットして最初に戻る' : '検索をリセットして最初に戻る'
+      );
+    }
+    if (brandImage && enabled && brandImage.getAttribute('src') !== LIBRARIAN_LOGO_SRC) {
+      brandImage.setAttribute('src', LIBRARIAN_LOGO_SRC);
+    }
   }
 
   function applyPlaySettings_() {
@@ -4444,6 +4457,7 @@ function writePwaFiles() {
   './assets/css/style.modern-modal.css',
   './assets/css/style.modern-shelf.css',
   './assets/css/style.responsive.css',
+  './assets/css/style.night-library.css',
   './assets/css/pwa.css',
   './assets/logo.png',
   './assets/librarian-presence.jpg',

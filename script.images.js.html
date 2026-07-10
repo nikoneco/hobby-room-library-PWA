@@ -28,7 +28,7 @@ function buildHanmotoImageUrlFromBook_(book, size) {
   if (!isbn) return '';
 
   const imageSize = Number(size) === 400 ? 400 : 600;
-  return `https://hanmoto.com/bd/img/${isbn}_${imageSize}.jpg`;
+  return 'https://hanmoto.com/bd/img/' + isbn + '_' + imageSize + '.jpg';
 }
 
 function isSensitiveCoverVisible_() {

@@ -1,0 +1,1730 @@
+<style>
+/*
+ * 趣味部屋図書館 UI試作 v1
+ * Design Read: 夜の個人書庫。表紙と文字を主役にした編集的なダークUI。
+ * Dials: variance 7 / motion 3 / density 6
+ */
+
+html.sandbox-redesign-root {
+  background: #0b0f0e;
+  color-scheme: dark;
+}
+
+body.sandbox-redesign {
+  --night-bg: #0b0f0e;
+  --night-bg-raised: #111715;
+  --night-panel: #151c19;
+  --night-panel-strong: #1a211e;
+  --night-panel-soft: #0e1311;
+  --night-text: #f1ede4;
+  --night-muted: #a8aaa2;
+  --night-subtle: #747b74;
+  --night-line: rgba(235, 230, 217, 0.13);
+  --night-line-strong: rgba(235, 230, 217, 0.25);
+  --night-accent: #d6b36e;
+  --night-accent-strong: #edce8b;
+  --night-accent-ink: #241a08;
+  --night-danger: #da8d7f;
+  --night-radius-control: 5px;
+  --night-radius-panel: 8px;
+  --night-shadow: 0 18px 60px rgba(0, 0, 0, 0.28);
+  --night-max: 1320px;
+  --night-ease: 160ms cubic-bezier(0.2, 0, 0, 1);
+
+  --pwa-bg-top: var(--night-bg);
+  --pwa-bg: var(--night-bg);
+  --pwa-bg-bottom: #070a09;
+  --pwa-panel: var(--night-panel);
+  --pwa-panel-strong: var(--night-panel-strong);
+  --pwa-panel-soft: rgba(255, 255, 255, 0.035);
+  --pwa-line: var(--night-line);
+  --pwa-line-strong: var(--night-line-strong);
+  --pwa-accent: var(--night-accent);
+  --pwa-accent-2: var(--night-accent-strong);
+  --pwa-accent-rgb: 214, 179, 110;
+  --pwa-accent-2-rgb: 237, 206, 139;
+  --pwa-accent-text: var(--night-accent-ink);
+  --pwa-accent-readable: var(--night-text);
+  --pwa-warm: var(--night-accent);
+  --pwa-warm-2: var(--night-accent-strong);
+  --pwa-warm-rgb: 214, 179, 110;
+  --pwa-grid-rgb: 214, 179, 110;
+
+  --lib-bg: var(--night-bg);
+  --lib-bg-2: var(--night-bg-raised);
+  --lib-panel: var(--night-panel);
+  --lib-panel-strong: var(--night-panel-strong);
+  --lib-panel-soft: rgba(255, 255, 255, 0.035);
+  --lib-line: var(--night-line);
+  --lib-line-strong: var(--night-line-strong);
+  --lib-text: var(--night-text);
+  --lib-muted: var(--night-muted);
+  --lib-subtle: var(--night-subtle);
+  --lib-accent: var(--night-accent);
+  --lib-accent-2: var(--night-accent-strong);
+  --lib-amber: var(--night-accent);
+  --lib-amber-2: var(--night-accent-strong);
+  --lib-radius-sm: 4px;
+  --lib-radius-md: 6px;
+  --lib-radius-lg: 8px;
+  --lib-shadow-sm: 0 10px 34px rgba(0, 0, 0, 0.22);
+  --lib-shadow-md: var(--night-shadow);
+  --lib-ease: var(--night-ease);
+
+  margin: 0;
+  min-height: 100dvh;
+  overflow-x: hidden;
+  background: var(--night-bg);
+  color: var(--night-text);
+  font-family: "Yu Gothic UI", "BIZ UDPGothic", Aptos, "Noto Sans JP", system-ui, sans-serif;
+  font-feature-settings: "palt" 1;
+  letter-spacing: 0.01em;
+}
+
+body.sandbox-redesign.pwa-theme-kohi {
+  --night-bg: #110d0e;
+  --night-bg-raised: #181213;
+  --night-panel: #1e1718;
+  --night-panel-strong: #241b1c;
+  --night-accent: #d28b7b;
+  --night-accent-strong: #e9ad9e;
+  --night-accent-ink: #2b0d0b;
+  --pwa-accent-rgb: 210, 139, 123;
+  --pwa-accent-2-rgb: 233, 173, 158;
+  --pwa-warm-rgb: 210, 139, 123;
+}
+
+body.sandbox-redesign.pwa-theme-shikon {
+  --night-bg: #0f0e13;
+  --night-bg-raised: #16151c;
+  --night-panel: #1b1922;
+  --night-panel-strong: #211f2a;
+  --night-accent: #b9a6d5;
+  --night-accent-strong: #d0c0e6;
+  --night-accent-ink: #181021;
+  --pwa-accent-rgb: 185, 166, 213;
+  --pwa-accent-2-rgb: 208, 192, 230;
+  --pwa-warm-rgb: 185, 166, 213;
+}
+
+body.sandbox-redesign.pwa-theme-kohaku {
+  --night-bg: #100e0a;
+  --night-bg-raised: #17130d;
+  --night-panel: #1d1810;
+  --night-panel-strong: #241e14;
+  --night-accent: #d6a75f;
+  --night-accent-strong: #edc77f;
+  --night-accent-ink: #261806;
+  --pwa-accent-rgb: 214, 167, 95;
+  --pwa-accent-2-rgb: 237, 199, 127;
+  --pwa-warm-rgb: 214, 167, 95;
+}
+
+body.sandbox-redesign::before,
+body.sandbox-redesign::after,
+body.sandbox-redesign .search-container::before,
+body.sandbox-redesign .search-container::after,
+body.sandbox-redesign .search-form::before,
+body.sandbox-redesign .search-status-area::before,
+body.sandbox-redesign .search-status-area::after,
+body.sandbox-redesign .quick-browse-rail::before,
+body.sandbox-redesign .quick-browse-rail::after,
+body.sandbox-redesign .quick-browse-kicker::before,
+body.sandbox-redesign .quick-browse-kicker::after,
+body.sandbox-redesign .book-card::before,
+body.sandbox-redesign .book-card::after,
+body.sandbox-redesign #image-popup-content::before,
+body.sandbox-redesign #image-popup-content::after,
+body.sandbox-redesign .bookshelf-group::before,
+body.sandbox-redesign .bookshelf-group::after,
+body.sandbox-redesign .shelf-view-overview::before,
+body.sandbox-redesign .shelf-jump-nav::before {
+  content: none !important;
+}
+
+body.sandbox-redesign button,
+body.sandbox-redesign input,
+body.sandbox-redesign select,
+body.sandbox-redesign textarea {
+  font: inherit;
+}
+
+body.sandbox-redesign button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+body.sandbox-redesign button:active {
+  transform: translateY(1px);
+}
+
+body.sandbox-redesign :focus-visible {
+  outline: 2px solid var(--night-accent-strong) !important;
+  outline-offset: 3px;
+}
+
+body.sandbox-redesign .pwa-launch-splash,
+body.sandbox-redesign .logo {
+  display: none !important;
+}
+
+body.sandbox-redesign .ti {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.18em;
+  line-height: 1;
+}
+
+/* Brand and initial search */
+
+body.sandbox-redesign .search-container,
+body.sandbox-redesign .search-container.centered,
+body.sandbox-redesign .search-container.shrink,
+body.sandbox-redesign .search-container.shrink.compact,
+body.sandbox-redesign .search-container.shrink.shelf-view-active {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  border: 0;
+  border-bottom: 1px solid var(--night-line);
+  border-radius: 0;
+  background: var(--night-bg);
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+body.sandbox-redesign .search-container.centered {
+  position: relative;
+  top: 0;
+  display: grid;
+  grid-template-columns: minmax(230px, 0.8fr) minmax(480px, 1.35fr);
+  grid-template-areas:
+    "brand status"
+    "brand form";
+  align-items: center;
+  gap: 1.4rem clamp(3rem, 7vw, 8rem);
+  min-height: min(560px, calc(100dvh - 20px));
+  padding: clamp(4.5rem, 8vw, 7rem) max(2rem, calc((100vw - var(--night-max)) / 2));
+  overflow: visible;
+  text-align: left;
+}
+
+body.sandbox-redesign .preview-brand {
+  grid-area: brand;
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  align-items: center;
+  gap: 1.25rem;
+  width: min(100%, 370px);
+  min-height: 84px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--night-text);
+  text-align: left;
+  cursor: pointer;
+}
+
+body.sandbox-redesign .preview-brand-mark {
+  display: grid;
+  width: 64px;
+  height: 64px;
+  place-items: center;
+  border: 1px solid var(--night-line-strong);
+  border-radius: var(--night-radius-panel);
+  color: var(--night-accent);
+}
+
+body.sandbox-redesign .preview-brand-mark .ti {
+  font-size: 2.05rem;
+  font-weight: 400;
+}
+
+body.sandbox-redesign .preview-brand-mark svg {
+  width: 2.05rem;
+  height: 2.05rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+body.sandbox-redesign .app-brand-default-mark {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+}
+
+body.sandbox-redesign .app-brand-librarian-image {
+  display: none;
+  width: 100%;
+  height: 100%;
+  border-radius: calc(var(--night-radius-panel) - 1px);
+  object-fit: cover;
+  object-position: 22% 42%;
+}
+
+body.sandbox-redesign.pwa-librarian-presence .app-brand-default-mark {
+  display: none;
+}
+
+body.sandbox-redesign.pwa-librarian-presence .app-brand-librarian-image {
+  display: block;
+}
+
+body.sandbox-redesign .preview-brand-copy {
+  display: grid;
+  gap: 0.48rem;
+  min-width: 0;
+}
+
+body.sandbox-redesign .preview-brand-name {
+  font-size: clamp(1.6rem, 3.1vw, 2.65rem);
+  font-weight: 650;
+  line-height: 1.15;
+  letter-spacing: -0.055em;
+}
+
+body.sandbox-redesign .preview-brand-note {
+  color: var(--night-muted);
+  font-size: 0.86rem;
+  line-height: 1.6;
+}
+
+body.sandbox-redesign .search-container.centered .search-status-area {
+  grid-area: status;
+  justify-self: stretch;
+  width: 100%;
+  max-width: 720px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  text-align: left;
+}
+
+body.sandbox-redesign .search-container.centered .search-form {
+  grid-area: form;
+  width: 100%;
+  max-width: 760px;
+  margin: 0;
+  padding: 1.65rem 0 0;
+  border: 0;
+  border-top: 1px solid var(--night-line-strong);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+body.sandbox-redesign.pwa-shell .search-container.centered .search-form {
+  border: 0;
+  border-top: 1px solid var(--night-line-strong);
+  border-radius: 0;
+  background: transparent;
+  background-image: none;
+  box-shadow: none;
+}
+
+body.sandbox-redesign .input-group {
+  gap: 0.55rem;
+}
+
+body.sandbox-redesign .input-group label,
+body.sandbox-redesign .released-range-row > label {
+  color: var(--night-muted);
+  font-size: 0.78rem;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+}
+
+body.sandbox-redesign input[type="text"],
+body.sandbox-redesign select,
+body.sandbox-redesign textarea {
+  min-height: 48px;
+  border: 1px solid var(--night-line);
+  border-radius: var(--night-radius-control);
+  background: var(--night-panel-soft);
+  color: var(--night-text);
+  box-shadow: none;
+  transition: border-color var(--night-ease), background-color var(--night-ease);
+}
+
+body.sandbox-redesign #keyword {
+  min-height: 58px;
+  padding: 0.82rem 1rem;
+  font-size: clamp(1rem, 2vw, 1.18rem);
+}
+
+body.sandbox-redesign input::placeholder,
+body.sandbox-redesign textarea::placeholder {
+  color: #7f847e;
+  opacity: 1;
+}
+
+body.sandbox-redesign input[type="text"]:hover,
+body.sandbox-redesign select:hover,
+body.sandbox-redesign textarea:hover {
+  border-color: var(--night-line-strong);
+}
+
+body.sandbox-redesign input[type="text"]:focus,
+body.sandbox-redesign select:focus,
+body.sandbox-redesign textarea:focus {
+  border-color: var(--night-accent);
+  background: var(--night-panel);
+  outline: 0;
+}
+
+body.sandbox-redesign .button-group,
+body.sandbox-redesign .advanced-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  margin-top: 0.75rem;
+}
+
+body.sandbox-redesign.pwa-shell .search-container.centered .button-group {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  background-image: none;
+  box-shadow: none;
+}
+
+body.sandbox-redesign .button-group button,
+body.sandbox-redesign .advanced-actions button,
+body.sandbox-redesign .quick-browse-refresh {
+  min-height: 46px;
+  padding: 0.72rem 1.1rem;
+  border: 1px solid var(--night-line);
+  border-radius: var(--night-radius-control);
+  background: transparent;
+  color: var(--night-text);
+  box-shadow: none;
+  transition: border-color var(--night-ease), background-color var(--night-ease), color var(--night-ease), transform var(--night-ease);
+}
+
+body.sandbox-redesign .button-group .primary-action,
+body.sandbox-redesign .advanced-actions .primary-action {
+  min-width: 132px;
+  border-color: var(--night-accent);
+  background: var(--night-accent);
+  color: var(--night-accent-ink);
+  font-weight: 750;
+}
+
+body.sandbox-redesign.pwa-shell .button-group .primary-action,
+body.sandbox-redesign.pwa-shell .advanced-actions .primary-action {
+  border-color: var(--night-accent);
+  background: var(--night-accent);
+  background-image: none;
+  color: var(--night-accent-ink);
+  box-shadow: none;
+}
+
+body.sandbox-redesign .button-group button:hover,
+body.sandbox-redesign .advanced-actions button:hover,
+body.sandbox-redesign .quick-browse-refresh:hover {
+  border-color: var(--night-accent);
+  background: rgba(var(--pwa-accent-rgb), 0.08);
+}
+
+body.sandbox-redesign .button-group .primary-action:hover,
+body.sandbox-redesign .advanced-actions .primary-action:hover {
+  background: var(--night-accent-strong);
+  color: var(--night-accent-ink);
+}
+
+body.sandbox-redesign .bookshelf-cta-wrap {
+  margin-top: 1.25rem;
+  padding-top: 1.1rem;
+  border-top: 1px solid var(--night-line);
+}
+
+body.sandbox-redesign .bookshelf-cta-card.top-shelf-btn {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  grid-template-areas:
+    "icon title arrow"
+    "icon subtitle arrow";
+  align-items: center;
+  gap: 0.1rem 0.75rem;
+  width: 100%;
+  min-height: 64px;
+  padding: 0.72rem 0.2rem;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--night-text);
+  box-shadow: none;
+  text-align: left;
+}
+
+body.sandbox-redesign .preview-cta-arrow {
+  grid-area: arrow;
+  color: var(--night-accent);
+  font-size: 1.15rem;
+}
+
+body.sandbox-redesign .bookshelf-cta-icon {
+  grid-area: icon;
+  width: 32px;
+  height: 32px;
+  color: var(--night-accent);
+}
+
+body.sandbox-redesign .bookshelf-cta-title {
+  grid-area: title;
+  color: var(--night-text);
+  font-size: 0.96rem;
+  font-weight: 700;
+}
+
+body.sandbox-redesign .bookshelf-cta-subtitle {
+  grid-area: subtitle;
+  color: var(--night-muted);
+  font-size: 0.76rem;
+}
+
+/* Suggestions, status, quick browse and advanced search */
+
+body.sandbox-redesign .suggest-box {
+  z-index: 50;
+  margin-top: 4px;
+  border: 1px solid var(--night-line-strong);
+  border-radius: var(--night-radius-control);
+  background: var(--night-panel-strong);
+  box-shadow: var(--night-shadow);
+}
+
+body.sandbox-redesign .suggest-item,
+body.sandbox-redesign .suggest-box > div {
+  border-radius: 0;
+  color: var(--night-text);
+}
+
+body.sandbox-redesign .suggest-item:hover,
+body.sandbox-redesign .suggest-item.active,
+body.sandbox-redesign .suggest-box > div:hover {
+  background: rgba(var(--pwa-accent-rgb), 0.1);
+}
+
+body.sandbox-redesign .search-status-count {
+  color: var(--night-text);
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+body.sandbox-redesign .search-status-chips,
+body.sandbox-redesign .quick-browse-chips,
+body.sandbox-redesign .genre-chip-wrap {
+  gap: 0.35rem;
+}
+
+body.sandbox-redesign .search-status-chip,
+body.sandbox-redesign .quick-browse-chip,
+body.sandbox-redesign .genre-chip,
+body.sandbox-redesign .summary-chip-toggle,
+body.sandbox-redesign .book-meta-pill {
+  border: 1px solid var(--night-line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--night-muted);
+  box-shadow: none;
+}
+
+body.sandbox-redesign button.search-status-chip:hover,
+body.sandbox-redesign button.quick-browse-chip:hover,
+body.sandbox-redesign button.genre-chip:hover,
+body.sandbox-redesign .summary-chip-toggle:hover {
+  border-color: var(--night-accent);
+  background: rgba(var(--pwa-accent-rgb), 0.08);
+  color: var(--night-text);
+}
+
+body.sandbox-redesign .search-status-librarian-note,
+body.sandbox-redesign .quick-browse-kicker {
+  color: var(--night-muted);
+}
+
+body.sandbox-redesign .quick-browse-rail {
+  margin-top: 1.25rem;
+  padding: 1rem 0 0;
+  border: 0;
+  border-top: 1px solid var(--night-line);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+body.sandbox-redesign.pwa-shell .search-container.centered .quick-browse-rail {
+  border: 0;
+  border-top: 1px solid var(--night-line);
+  border-radius: 0;
+  background: transparent;
+  background-image: none;
+  box-shadow: none;
+}
+
+body.sandbox-redesign .advanced-search-area {
+  margin-top: 1.15rem;
+  padding: 1.25rem 0 0;
+  border: 0;
+  border-top: 1px solid var(--night-line);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+body.sandbox-redesign .advanced-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem 1.25rem;
+}
+
+/* Compact search after results */
+
+body.sandbox-redesign .search-container.shrink,
+body.sandbox-redesign .search-container.shrink.compact,
+body.sandbox-redesign .search-container.shrink.shelf-view-active {
+  position: sticky;
+  top: 0;
+  z-index: 35;
+  display: grid;
+  grid-template-columns: minmax(190px, 0.45fr) minmax(420px, 1.35fr);
+  grid-template-areas:
+    "brand status"
+    "brand form";
+  align-items: center;
+  gap: 0.45rem clamp(1.5rem, 4vw, 4rem);
+  min-height: 0;
+  padding: 0.9rem max(1.25rem, calc((100vw - var(--night-max)) / 2));
+  background: rgba(11, 15, 14, 0.96);
+  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.2);
+}
+
+body.sandbox-redesign .search-container.shrink .preview-brand,
+body.sandbox-redesign .search-container.shrink.compact .preview-brand,
+body.sandbox-redesign .search-container.shrink.shelf-view-active .preview-brand {
+  grid-template-columns: 40px minmax(0, 1fr);
+  gap: 0.72rem;
+  min-height: 44px;
+}
+
+body.sandbox-redesign .search-container.shrink .preview-brand-mark,
+body.sandbox-redesign .search-container.shrink.compact .preview-brand-mark,
+body.sandbox-redesign .search-container.shrink.shelf-view-active .preview-brand-mark {
+  width: 40px;
+  height: 40px;
+}
+
+body.sandbox-redesign .search-container.shrink .preview-brand-mark .ti,
+body.sandbox-redesign .search-container.shrink.compact .preview-brand-mark .ti,
+body.sandbox-redesign .search-container.shrink.shelf-view-active .preview-brand-mark .ti {
+  font-size: 1.35rem;
+}
+
+body.sandbox-redesign .search-container.shrink .preview-brand-name,
+body.sandbox-redesign .search-container.shrink.compact .preview-brand-name,
+body.sandbox-redesign .search-container.shrink.shelf-view-active .preview-brand-name {
+  font-size: 1rem;
+  letter-spacing: -0.03em;
+}
+
+body.sandbox-redesign .search-container.shrink .preview-brand-note,
+body.sandbox-redesign .search-container.shrink.compact .preview-brand-note,
+body.sandbox-redesign .search-container.shrink.shelf-view-active .preview-brand-note {
+  display: none;
+}
+
+body.sandbox-redesign .search-container.shrink .search-status-area,
+body.sandbox-redesign .search-container.shrink.compact .search-status-area,
+body.sandbox-redesign .search-container.shrink.shelf-view-active .search-status-area {
+  position: static;
+  grid-area: status;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+body.sandbox-redesign .search-container.shrink .search-form,
+body.sandbox-redesign .search-container.shrink.compact .search-form,
+body.sandbox-redesign .search-container.shrink.shelf-view-active .search-form {
+  grid-area: form;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+body.sandbox-redesign .search-container.shrink #keyword,
+body.sandbox-redesign .search-container.shrink.compact #keyword,
+body.sandbox-redesign .search-container.shrink.shelf-view-active #keyword {
+  min-height: 44px;
+  font-size: 0.92rem;
+}
+
+body.sandbox-redesign .search-container.shrink .bookshelf-cta-wrap,
+body.sandbox-redesign .search-container.shrink.compact .bookshelf-cta-wrap,
+body.sandbox-redesign .search-container.shrink.shelf-view-active .bookshelf-cta-wrap {
+  margin-top: 0.65rem;
+  padding-top: 0.55rem;
+}
+
+body.sandbox-redesign .search-container.shrink .bookshelf-cta-card.top-shelf-btn,
+body.sandbox-redesign .search-container.shrink.compact .bookshelf-cta-card.top-shelf-btn,
+body.sandbox-redesign .search-container.shrink.shelf-view-active .bookshelf-cta-card.top-shelf-btn {
+  min-height: 36px;
+  padding: 0.2rem 0;
+}
+
+body.sandbox-redesign .search-container.shrink .bookshelf-cta-subtitle,
+body.sandbox-redesign .search-container.shrink.compact .bookshelf-cta-subtitle,
+body.sandbox-redesign .search-container.shrink.shelf-view-active .bookshelf-cta-subtitle {
+  display: none;
+}
+
+/* Settings and system banners */
+
+body.sandbox-redesign .pwa-settings-button {
+  top: max(16px, env(safe-area-inset-top));
+  right: max(18px, env(safe-area-inset-right));
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--night-line-strong);
+  border-radius: var(--night-radius-control);
+  background: var(--night-bg-raised);
+  color: var(--night-muted);
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+body.sandbox-redesign .pwa-settings-button:hover,
+body.sandbox-redesign .pwa-settings-button:focus-visible,
+body.sandbox-redesign .pwa-settings-button[aria-expanded="true"] {
+  border-color: var(--night-accent);
+  background: var(--night-panel);
+  color: var(--night-accent);
+}
+
+body.sandbox-redesign .pwa-settings-backdrop {
+  background: rgba(4, 6, 5, 0.72);
+  backdrop-filter: none;
+}
+
+body.sandbox-redesign .pwa-settings-panel {
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(420px, calc(100vw - 28px));
+  max-height: none;
+  padding: 1.35rem;
+  border: 0;
+  border-left: 1px solid var(--night-line-strong);
+  border-radius: 0;
+  background: var(--night-bg-raised);
+  box-shadow: -20px 0 60px rgba(0, 0, 0, 0.32);
+}
+
+body.sandbox-redesign .pwa-settings-header {
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--night-line-strong);
+}
+
+body.sandbox-redesign .pwa-settings-header h2 {
+  color: var(--night-text);
+  font-size: 1.25rem;
+  letter-spacing: -0.03em;
+}
+
+body.sandbox-redesign .pwa-settings-close {
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--night-line);
+  border-radius: var(--night-radius-control);
+  background: transparent;
+  color: var(--night-muted);
+}
+
+body.sandbox-redesign .pwa-settings-section {
+  margin: 0;
+  padding: 1.15rem 0;
+  border: 0;
+  border-bottom: 1px solid var(--night-line);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+body.sandbox-redesign .pwa-settings-row,
+body.sandbox-redesign .pwa-theme-settings label {
+  border: 1px solid var(--night-line);
+  border-radius: var(--night-radius-control);
+  background: transparent;
+  box-shadow: none;
+}
+
+body.sandbox-redesign .pwa-settings-row:hover,
+body.sandbox-redesign .pwa-theme-settings label:hover {
+  border-color: var(--night-line-strong);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+body.sandbox-redesign .pwa-theme-settings label:has(input:checked) {
+  border-color: var(--night-accent);
+  background: rgba(var(--pwa-accent-rgb), 0.08);
+}
+
+body.sandbox-redesign .preview-mode-note {
+  margin: 1.1rem 0 0;
+  padding: 0.8rem 0;
+  color: var(--night-subtle);
+  font-size: 0.74rem;
+  line-height: 1.65;
+}
+
+body.sandbox-redesign .pwa-network-banner {
+  border: 1px solid var(--night-line-strong);
+  border-radius: var(--night-radius-control);
+  background: var(--night-panel-strong);
+  color: var(--night-text);
+  box-shadow: var(--night-shadow);
+}
+
+body.sandbox-redesign .pwa-network-banner-action {
+  border-color: var(--night-accent);
+  border-radius: var(--night-radius-control);
+  background: var(--night-accent);
+  color: var(--night-accent-ink);
+}
+
+/* View switch */
+
+body.sandbox-redesign .view-toggle {
+  top: max(14px, env(safe-area-inset-top));
+  right: 78px;
+  gap: 0;
+  padding: 0;
+  border: 1px solid var(--night-line-strong);
+  border-radius: var(--night-radius-control);
+  background: var(--night-bg-raised);
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+body.sandbox-redesign .view-toggle-kicker {
+  padding: 0 0.65rem;
+  color: var(--night-subtle);
+  font-size: 0.64rem;
+}
+
+body.sandbox-redesign .toggle-btn {
+  min-width: 68px;
+  min-height: 44px;
+  border: 0;
+  border-left: 1px solid var(--night-line);
+  border-radius: 0;
+  background: transparent;
+  color: var(--night-muted);
+  box-shadow: none;
+}
+
+body.sandbox-redesign .toggle-btn:hover,
+body.sandbox-redesign .toggle-btn.active,
+body.sandbox-redesign .toggle-btn[aria-pressed="true"] {
+  background: rgba(var(--pwa-accent-rgb), 0.09);
+  color: var(--night-accent-strong);
+}
+
+/* Loading, empty and error states */
+
+body.sandbox-redesign #spinner-overlay {
+  background: rgba(7, 10, 9, 0.82);
+  backdrop-filter: none;
+}
+
+body.sandbox-redesign .spinner-panel,
+body.sandbox-redesign .empty-state,
+body.sandbox-redesign .error-state {
+  border: 1px solid var(--night-line-strong);
+  border-radius: var(--night-radius-panel);
+  background: var(--night-bg-raised);
+  box-shadow: var(--night-shadow);
+}
+
+body.sandbox-redesign .spinner {
+  border-color: var(--night-line-strong);
+  border-top-color: var(--night-accent);
+  box-shadow: none;
+}
+
+body.sandbox-redesign .spinner-shelf span {
+  background: var(--night-accent);
+  box-shadow: none;
+}
+
+/* Results */
+
+body.sandbox-redesign #result {
+  width: 100%;
+  max-width: none;
+  margin: 0 auto;
+  padding: 2.4rem max(1.25rem, calc((100vw - var(--night-max)) / 2)) 7rem;
+}
+
+body.sandbox-redesign .card-view {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0 1px;
+  width: 100%;
+  max-width: var(--night-max);
+  margin: 0 auto;
+  padding: 0;
+  border-top: 1px solid var(--night-line-strong);
+  background: transparent;
+}
+
+body.sandbox-redesign .book-card,
+body.sandbox-redesign .card-view .book-card {
+  min-width: 0;
+  padding: 1.4rem;
+  border: 0;
+  border-right: 1px solid var(--night-line);
+  border-bottom: 1px solid var(--night-line);
+  border-radius: 0;
+  background: var(--night-bg);
+  box-shadow: none;
+  transition: background-color var(--night-ease), transform var(--night-ease);
+}
+
+body.sandbox-redesign .book-card:hover,
+body.sandbox-redesign .book-card:focus-within {
+  border-color: transparent;
+  background: var(--night-bg-raised);
+  box-shadow: none;
+  transform: translateY(-2px);
+}
+
+body.sandbox-redesign .card-view .book-cover {
+  width: auto;
+  max-width: 100%;
+  height: clamp(190px, 22vw, 285px);
+  max-height: none;
+  margin: 0 auto;
+  border: 0;
+  border-radius: 2px;
+  background: var(--night-panel-soft);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.24);
+  object-fit: contain;
+  transition: transform var(--night-ease);
+}
+
+body.sandbox-redesign .book-card:hover .book-cover {
+  transform: translateY(-2px);
+}
+
+body.sandbox-redesign .card-info {
+  padding-top: 1rem;
+}
+
+body.sandbox-redesign .book-title,
+body.sandbox-redesign .card-view .book-title {
+  min-height: 2.8em;
+  margin: 0;
+  color: var(--night-text);
+  font-size: 0.94rem;
+  font-weight: 700;
+  line-height: 1.4;
+  letter-spacing: -0.015em;
+}
+
+body.sandbox-redesign .book-author-line,
+body.sandbox-redesign .card-view .book-author-line {
+  margin-top: 0.55rem;
+  color: var(--night-muted);
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
+body.sandbox-redesign .book-publisher-name {
+  color: var(--night-subtle);
+}
+
+body.sandbox-redesign .genre-chip-wrap {
+  margin: 0.72rem 0 0;
+}
+
+body.sandbox-redesign .genre-chip,
+body.sandbox-redesign .summary-chip-toggle {
+  padding: 0.2rem 0.46rem;
+  font-size: 0.66rem;
+  font-weight: 600;
+}
+
+body.sandbox-redesign .book-meta-pills,
+body.sandbox-redesign .card-view .book-meta-pills.card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem 0.72rem;
+  margin-top: 0.75rem;
+}
+
+body.sandbox-redesign .book-meta-pill,
+body.sandbox-redesign .card-view .book-meta-pill {
+  display: inline-flex;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--night-subtle);
+  font-size: 0.65rem;
+}
+
+body.sandbox-redesign .book-meta-pill-label {
+  color: var(--night-accent);
+  font-size: inherit;
+  font-weight: 650;
+}
+
+body.sandbox-redesign .book-meta-pill-value {
+  color: var(--night-muted);
+}
+
+body.sandbox-redesign .book-open-cue {
+  border: 0;
+  background: transparent;
+  color: var(--night-subtle);
+  box-shadow: none;
+}
+
+body.sandbox-redesign .summary-text {
+  margin-top: 0.75rem;
+  padding: 0.85rem 0;
+  border: 0;
+  border-top: 1px solid var(--night-line);
+  border-radius: 0;
+  background: transparent;
+  color: var(--night-muted);
+  line-height: 1.8;
+}
+
+/* List view */
+
+body.sandbox-redesign .list-view {
+  display: grid;
+  gap: 0;
+  width: 100%;
+  max-width: var(--night-max);
+  margin: 0 auto;
+  padding: 0;
+  border-top: 1px solid var(--night-line-strong);
+  background: transparent;
+}
+
+body.sandbox-redesign .book-card.list,
+body.sandbox-redesign .list-view .book-card.list {
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid var(--night-line);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+body.sandbox-redesign .book-card.list:hover,
+body.sandbox-redesign .book-card.list.open {
+  background: var(--night-bg-raised);
+  transform: none;
+}
+
+body.sandbox-redesign .list-row {
+  min-height: 94px;
+  padding: 0.75rem 0.65rem;
+}
+
+body.sandbox-redesign .list-thumb {
+  width: 52px;
+  height: 74px;
+  border: 0;
+  border-radius: 2px;
+  background: var(--night-panel-soft);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.22);
+  object-fit: contain;
+}
+
+body.sandbox-redesign .list-view .book-title {
+  min-height: 0;
+  font-size: 0.95rem;
+}
+
+body.sandbox-redesign .book-card.list .book-details {
+  margin: 0 0.65rem 0.75rem 4.75rem;
+  padding: 0.9rem 0;
+  border: 0;
+  border-top: 1px solid var(--night-line);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+/* Shelf view */
+
+body.sandbox-redesign .shelf-view {
+  max-width: var(--night-max);
+  margin: 0 auto;
+  padding: 0;
+}
+
+body.sandbox-redesign .shelf-jump-nav,
+body.sandbox-redesign .shelf-jump-nav.immersive {
+  position: sticky;
+  top: 112px;
+  z-index: 24;
+  margin: 0 0 1rem;
+  padding: 0.75rem;
+  border: 1px solid var(--night-line-strong);
+  border-radius: var(--night-radius-panel);
+  background: rgba(17, 23, 21, 0.97);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.2);
+  backdrop-filter: none;
+}
+
+body.sandbox-redesign .shelf-jump-nav-header {
+  margin-bottom: 0.55rem;
+  padding-bottom: 0.55rem;
+  border-bottom: 1px solid var(--night-line);
+}
+
+body.sandbox-redesign .shelf-jump-chip-row {
+  gap: 0.35rem;
+}
+
+body.sandbox-redesign .shelf-jump-chip,
+body.sandbox-redesign .shelf-jump-top-btn {
+  min-height: 38px;
+  border: 1px solid var(--night-line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--night-muted);
+  box-shadow: none;
+}
+
+body.sandbox-redesign .shelf-jump-chip:hover,
+body.sandbox-redesign .shelf-jump-chip:focus-visible,
+body.sandbox-redesign .shelf-jump-chip.is-active,
+body.sandbox-redesign .shelf-jump-top-btn:hover {
+  border-color: var(--night-accent);
+  background: rgba(var(--pwa-accent-rgb), 0.08);
+  color: var(--night-text);
+}
+
+body.sandbox-redesign .shelf-view-overview {
+  display: grid;
+  grid-template-columns: minmax(230px, 1.1fr) minmax(460px, 1.4fr);
+  gap: 1.25rem;
+  margin: 0 0 1rem;
+  padding: 1.15rem;
+  border: 1px solid var(--night-line-strong);
+  border-radius: var(--night-radius-panel);
+  background: var(--night-bg-raised);
+  box-shadow: none;
+}
+
+body.sandbox-redesign .shelf-view-mode-badge,
+body.sandbox-redesign .shelf-view-stat {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+body.sandbox-redesign .shelf-view-stat-grid {
+  gap: 0;
+  border-left: 1px solid var(--night-line);
+}
+
+body.sandbox-redesign .shelf-view-stat {
+  padding: 0.2rem 0.9rem;
+  border-right: 1px solid var(--night-line);
+}
+
+body.sandbox-redesign .shelf-view-stat-value {
+  color: var(--night-accent-strong);
+}
+
+body.sandbox-redesign .shelf-view-heading,
+body.sandbox-redesign .shelf-view-mode,
+body.sandbox-redesign .shelf-view-stat-label,
+body.sandbox-redesign .shelf-view-stat-value {
+  opacity: 1;
+}
+
+body.sandbox-redesign .shelf-view-mode {
+  color: var(--night-text);
+}
+
+body.sandbox-redesign .shelf-view-stat-label {
+  color: var(--night-muted) !important;
+}
+
+body.sandbox-redesign .shelf-view-stat-value {
+  color: var(--night-accent-strong) !important;
+}
+
+body.sandbox-redesign .bookshelf-group {
+  margin: 0 0 1.2rem;
+  padding: 1rem;
+  border: 1px solid var(--night-line-strong);
+  border-radius: var(--night-radius-panel);
+  background: var(--night-bg-raised);
+  box-shadow: none;
+}
+
+body.sandbox-redesign .bookshelf-group.is-active {
+  border-color: rgba(var(--pwa-accent-rgb), 0.42);
+  box-shadow: none;
+}
+
+body.sandbox-redesign .bookshelf-group-title {
+  padding: 0 0 0.9rem;
+  border-bottom: 1px solid var(--night-line-strong);
+  color: var(--night-text);
+}
+
+body.sandbox-redesign .bookshelf-level {
+  margin-top: 1rem;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+body.sandbox-redesign .bookshelf-level-title {
+  margin-bottom: 0.65rem;
+  color: var(--night-muted);
+}
+
+body.sandbox-redesign .bookshelf-strip {
+  gap: 0.55rem;
+  padding: 0.65rem 0 0.85rem;
+  border: 0;
+  border-bottom: 3px solid color-mix(in srgb, var(--night-accent) 42%, #29231a);
+  border-radius: 0;
+  background: var(--night-panel-soft);
+  box-shadow: inset 0 -9px 14px rgba(0, 0, 0, 0.2);
+  scrollbar-color: var(--night-accent) var(--night-panel);
+}
+
+body.sandbox-redesign .shelf-book {
+  border: 0;
+  border-radius: 2px;
+  background: transparent;
+  box-shadow: none;
+}
+
+body.sandbox-redesign .shelf-book:hover,
+body.sandbox-redesign .shelf-book:focus-visible {
+  border-color: transparent;
+  background: rgba(255, 255, 255, 0.035);
+  box-shadow: none;
+  transform: translateY(-3px);
+}
+
+body.sandbox-redesign .shelf-book-cover-wrap {
+  border: 0;
+  border-radius: 2px;
+  background: var(--night-panel);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.24);
+}
+
+body.sandbox-redesign .shelf-book-cover {
+  color: transparent;
+  font-size: 0;
+}
+
+body.sandbox-redesign .shelf-book-title {
+  border: 0;
+  background: transparent;
+  color: var(--night-muted);
+  box-shadow: none;
+}
+
+body.sandbox-redesign.shelf-immersive-active,
+body.sandbox-redesign.shelf-immersive-active .shelf-view,
+body.sandbox-redesign.shelf-immersive-active .bookshelf-group,
+body.sandbox-redesign.shelf-immersive-active .bookshelf-level {
+  background: var(--night-bg) !important;
+  background-image: none !important;
+}
+
+body.sandbox-redesign .shelf-room-map,
+body.sandbox-redesign .shelf-room-map-modal-panel {
+  border: 1px solid var(--night-line-strong);
+  border-radius: var(--night-radius-panel);
+  background: var(--night-bg-raised);
+  box-shadow: var(--night-shadow);
+}
+
+body.sandbox-redesign .shelf-room-map-summary {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+body.sandbox-redesign .shelf-room-map-fab {
+  border: 1px solid var(--night-accent);
+  border-radius: var(--night-radius-control);
+  background: var(--night-panel-strong);
+  color: var(--night-accent-strong);
+  box-shadow: var(--night-shadow);
+}
+
+body.sandbox-redesign .shelf-room-map-overlay {
+  background: rgba(4, 6, 5, 0.84);
+  backdrop-filter: none;
+}
+
+/* Book detail and image viewer */
+
+body.sandbox-redesign #image-popup-overlay,
+body.sandbox-redesign #cover-fullscreen-overlay {
+  background: rgba(4, 6, 5, 0.9);
+  backdrop-filter: none;
+}
+
+body.sandbox-redesign #image-popup-content {
+  width: min(1120px, calc(100vw - 48px));
+  max-height: min(860px, calc(100dvh - 48px));
+  padding: 1.25rem;
+  border: 1px solid var(--night-line-strong);
+  border-radius: var(--night-radius-panel);
+  background: var(--night-bg-raised);
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.48);
+}
+
+body.sandbox-redesign #image-popup-content:not(.series-mode) {
+  grid-template-columns: minmax(260px, 0.82fr) minmax(420px, 1.35fr);
+  gap: clamp(1.5rem, 4vw, 3.5rem);
+}
+
+body.sandbox-redesign #image-popup-content::before,
+body.sandbox-redesign #image-popup-content::after,
+body.sandbox-redesign #image-popup-info::before {
+  display: none !important;
+}
+
+body.sandbox-redesign #image-popup-img {
+  border: 0;
+  border-radius: 2px;
+  background: var(--night-panel-soft);
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.32);
+}
+
+body.sandbox-redesign #image-popup-info {
+  padding: 1rem 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+body.sandbox-redesign #image-popup-close,
+body.sandbox-redesign .popup-arrow,
+body.sandbox-redesign #cover-fullscreen-close {
+  border: 1px solid var(--night-line-strong);
+  border-radius: var(--night-radius-control);
+  background: var(--night-panel-strong);
+  color: var(--night-muted);
+  box-shadow: none;
+}
+
+body.sandbox-redesign #image-popup-close:hover,
+body.sandbox-redesign .popup-arrow:hover,
+body.sandbox-redesign #cover-fullscreen-close:hover {
+  border-color: var(--night-accent);
+  color: var(--night-accent);
+}
+
+body.sandbox-redesign .popup-book-title {
+  color: var(--night-text);
+  font-size: clamp(1.45rem, 3vw, 2.45rem);
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.045em;
+}
+
+body.sandbox-redesign .popup-book-lead,
+body.sandbox-redesign .popup-book-kicker,
+body.sandbox-redesign #image-popup-info .book-note {
+  color: var(--night-muted);
+}
+
+body.sandbox-redesign .popup-action-btn,
+body.sandbox-redesign .popup-link-btn,
+body.sandbox-redesign #image-popup-info .summary-chip-toggle {
+  border: 1px solid var(--night-line-strong);
+  border-radius: var(--night-radius-control);
+  background: transparent;
+  color: var(--night-text);
+  box-shadow: none;
+}
+
+body.sandbox-redesign .popup-action-btn:hover,
+body.sandbox-redesign .popup-link-btn:hover,
+body.sandbox-redesign #image-popup-info .summary-chip-toggle:hover {
+  border-color: var(--night-accent);
+  background: rgba(var(--pwa-accent-rgb), 0.08);
+}
+
+/* Mobile dock */
+
+body.sandbox-redesign .mobile-app-dock {
+  border: 1px solid var(--night-line-strong);
+  border-radius: var(--night-radius-panel);
+  background: rgba(17, 23, 21, 0.97);
+  box-shadow: 0 18px 54px rgba(0, 0, 0, 0.32);
+  backdrop-filter: none;
+}
+
+body.sandbox-redesign .mobile-app-dock-btn,
+body.sandbox-redesign .mobile-dock-view-btn {
+  border: 0;
+  border-radius: var(--night-radius-control);
+  background: transparent;
+  color: var(--night-muted);
+  box-shadow: none;
+}
+
+body.sandbox-redesign .mobile-app-dock-btn + .mobile-app-dock-btn,
+body.sandbox-redesign .mobile-dock-view-btn + .mobile-dock-view-btn {
+  border-left: 1px solid var(--night-line);
+}
+
+body.sandbox-redesign .mobile-app-dock-btn.active,
+body.sandbox-redesign .mobile-app-dock-btn.primary.active,
+body.sandbox-redesign .mobile-dock-view-btn[aria-pressed="true"] {
+  border-color: transparent;
+  background: rgba(var(--pwa-accent-rgb), 0.1);
+  color: var(--night-accent-strong);
+}
+
+/* Responsive layout */
+
+@media (max-width: 1024px) {
+  body.sandbox-redesign .search-container.centered {
+    grid-template-columns: minmax(200px, 0.62fr) minmax(440px, 1.38fr);
+    gap: 1.25rem 3rem;
+    padding-right: 2.5rem;
+    padding-left: 2.5rem;
+  }
+
+  body.sandbox-redesign .card-view {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  body.sandbox-redesign .search-container.shrink,
+  body.sandbox-redesign .search-container.shrink.compact,
+  body.sandbox-redesign .search-container.shrink.shelf-view-active {
+    grid-template-columns: 180px minmax(0, 1fr);
+    padding-right: 1.25rem;
+    padding-left: 1.25rem;
+  }
+
+  body.sandbox-redesign .shelf-jump-nav {
+    top: 108px;
+  }
+}
+
+@media (max-width: 760px) {
+  body.sandbox-redesign {
+    padding-bottom: calc(86px + env(safe-area-inset-bottom));
+  }
+
+  body.sandbox-redesign .pwa-settings-button {
+    top: max(12px, env(safe-area-inset-top));
+    right: max(12px, env(safe-area-inset-right));
+  }
+
+  body.sandbox-redesign .search-container.centered {
+    display: flex;
+    min-height: auto;
+    padding: calc(4.8rem + env(safe-area-inset-top)) 1rem 2rem;
+    text-align: left;
+  }
+
+  body.sandbox-redesign .preview-brand {
+    order: 0;
+    grid-template-columns: 48px minmax(0, 1fr);
+    width: 100%;
+    min-height: 56px;
+    margin-bottom: 1.65rem;
+  }
+
+  body.sandbox-redesign .preview-brand-mark {
+    width: 48px;
+    height: 48px;
+  }
+
+  body.sandbox-redesign .preview-brand-mark .ti {
+    font-size: 1.55rem;
+  }
+
+  body.sandbox-redesign .preview-brand-name {
+    font-size: 1.4rem;
+  }
+
+  body.sandbox-redesign .preview-brand-note {
+    font-size: 0.73rem;
+  }
+
+  body.sandbox-redesign .search-container.centered .search-status-area {
+    order: 1;
+    width: 100%;
+    margin: 0 0 0.8rem;
+    text-align: left;
+  }
+
+  body.sandbox-redesign .search-container.centered .search-form {
+    order: 2;
+    width: 100%;
+    max-width: none;
+    padding-top: 1.25rem;
+  }
+
+  body.sandbox-redesign #keyword {
+    min-height: 54px;
+    font-size: 1rem;
+  }
+
+  body.sandbox-redesign .button-group {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  body.sandbox-redesign .button-group .primary-action {
+    grid-column: 1 / -1;
+  }
+
+  body.sandbox-redesign.pwa-shell #advancedToggleBtn,
+  body.sandbox-redesign.pwa-shell .search-container.centered .button-group #advancedToggleBtn {
+    grid-column: auto !important;
+  }
+
+  body.sandbox-redesign .button-group button {
+    min-width: 0;
+    padding-right: 0.65rem;
+    padding-left: 0.65rem;
+  }
+
+  body.sandbox-redesign .advanced-grid {
+    grid-template-columns: 1fr;
+  }
+
+  body.sandbox-redesign .search-container.shrink,
+  body.sandbox-redesign .search-container.shrink.compact,
+  body.sandbox-redesign .search-container.shrink.shelf-view-active {
+    position: relative;
+    top: 0;
+    display: flex;
+    gap: 0;
+    padding: calc(4rem + env(safe-area-inset-top)) 0.8rem 1rem;
+    box-shadow: none;
+  }
+
+  body.sandbox-redesign .search-container.shrink .preview-brand,
+  body.sandbox-redesign .search-container.shrink.compact .preview-brand,
+  body.sandbox-redesign .search-container.shrink.shelf-view-active .preview-brand {
+    width: 100%;
+    margin-bottom: 0.85rem;
+  }
+
+  body.sandbox-redesign .search-container.shrink .search-status-area,
+  body.sandbox-redesign .search-container.shrink.compact .search-status-area,
+  body.sandbox-redesign .search-container.shrink.shelf-view-active .search-status-area {
+    width: 100%;
+    margin-bottom: 0.7rem;
+  }
+
+  body.sandbox-redesign .view-toggle {
+    display: none;
+  }
+
+  body.sandbox-redesign #result {
+    padding: 1.25rem 0.75rem calc(7rem + env(safe-area-inset-bottom));
+  }
+
+  body.sandbox-redesign .card-view {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0 1px;
+    padding: 0;
+  }
+
+  body.sandbox-redesign .book-card,
+  body.sandbox-redesign .card-view .book-card {
+    padding: 0.8rem 0.65rem 1rem;
+    border-radius: 0;
+  }
+
+  body.sandbox-redesign .card-view .book-cover {
+    width: auto;
+    max-width: 100%;
+    height: min(47vw, 210px);
+    max-height: none;
+  }
+
+  body.sandbox-redesign .book-title,
+  body.sandbox-redesign .card-view .book-title {
+    min-height: 2.7em;
+    font-size: 0.78rem;
+  }
+
+  body.sandbox-redesign .card-view .book-author-line {
+    font-size: 0.66rem;
+  }
+
+  body.sandbox-redesign .genre-chip,
+  body.sandbox-redesign .summary-chip-toggle {
+    max-width: 100%;
+    overflow: hidden;
+    font-size: 0.59rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  body.sandbox-redesign .book-meta-pill,
+  body.sandbox-redesign .card-view .book-meta-pill {
+    font-size: 0.57rem;
+  }
+
+  body.sandbox-redesign .list-row {
+    min-height: 78px;
+    padding: 0.6rem 0.25rem;
+  }
+
+  body.sandbox-redesign .list-thumb {
+    width: 42px;
+    height: 60px;
+  }
+
+  body.sandbox-redesign .book-card.list .book-details {
+    margin-left: 3.6rem;
+  }
+
+  body.sandbox-redesign .shelf-jump-nav,
+  body.sandbox-redesign .shelf-jump-nav.immersive {
+    position: relative;
+    top: 0;
+    margin-bottom: 0.75rem;
+    padding: 0.65rem;
+  }
+
+  body.sandbox-redesign .shelf-view-overview {
+    grid-template-columns: 1fr;
+    padding: 0.9rem;
+  }
+
+  body.sandbox-redesign .shelf-view-stat-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    border-top: 1px solid var(--night-line);
+    border-left: 0;
+  }
+
+  body.sandbox-redesign .shelf-view-stat {
+    padding: 0.65rem 0.5rem;
+    border-right: 0;
+  }
+
+  body.sandbox-redesign .bookshelf-group {
+    padding: 0.75rem;
+  }
+
+  body.sandbox-redesign #image-popup-content,
+  body.sandbox-redesign #image-popup-content:not(.series-mode) {
+    display: flex;
+    width: calc(100vw - 20px);
+    max-height: calc(100dvh - 20px);
+    flex-direction: column;
+    gap: 1rem;
+    padding: 0.9rem;
+  }
+
+  body.sandbox-redesign #image-popup-img {
+    width: auto;
+    max-width: min(72vw, 280px);
+    max-height: 38dvh;
+    margin: 0 auto;
+  }
+
+  body.sandbox-redesign #image-popup-info {
+    width: 100%;
+    padding: 0.45rem 0;
+  }
+
+  body.sandbox-redesign .popup-book-title {
+    font-size: 1.35rem;
+  }
+
+  body.sandbox-redesign .popup-link-row .popup-link-btn:first-child {
+    grid-column: 1 / -1;
+  }
+
+  body.sandbox-redesign .pwa-settings-panel {
+    width: min(390px, 100vw);
+  }
+}
+
+body.sandbox-redesign.modal-open .pwa-settings-button,
+body.sandbox-redesign.cover-fullscreen-open .pwa-settings-button,
+body.sandbox-redesign.shelf-room-map-modal-open .pwa-settings-button {
+  display: none !important;
+}
+
+@media (max-width: 390px) {
+  body.sandbox-redesign .bookshelf-cta-card.top-shelf-btn {
+    grid-template-columns: 28px minmax(0, 1fr) auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body.sandbox-redesign *,
+  body.sandbox-redesign *::before,
+  body.sandbox-redesign *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  body.sandbox-redesign .book-card:hover,
+  body.sandbox-redesign .shelf-book:hover,
+  body.sandbox-redesign .book-cover,
+  body.sandbox-redesign button:active {
+    transform: none !important;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  body.sandbox-redesign .search-container.shrink,
+  body.sandbox-redesign .shelf-jump-nav,
+  body.sandbox-redesign .mobile-app-dock {
+    background: var(--night-bg-raised);
+  }
+}
+</style>

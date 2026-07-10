@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="dark">
+  <title>趣味部屋図書館 UIプレビュー</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: "Yu Gothic UI", "BIZ UDPGothic", Aptos, system-ui, sans-serif;
+      background: #0b0f0e;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #0b0f0e;
+    }
+
+    .preview-frame {
+      display: block;
+      width: 100%;
+      height: 100%;
+      border: 0;
+      background: #0b0f0e;
+    }
+
+    .preview-loading,
+    .preview-error {
+      position: fixed;
+      inset: 0;
+      z-index: 2;
+      display: grid;
+      place-items: center;
+      padding: 2rem;
+      background: #0b0f0e;
+      color: #eee9df;
+      text-align: center;
+    }
+
+    .preview-loading[hidden],
+    .preview-error[hidden] {
+      display: none;
+    }
+
+    .preview-loading p,
+    .preview-error p {
+      max-width: 42rem;
+      margin: 0;
+      line-height: 1.8;
+    }
+
+    .preview-error code {
+      color: #d6b36e;
+    }
+  </style>
+</head>
+<body>
+  <div id="previewLoading" class="preview-loading" role="status">
+    <p>夜の個人書庫を開いています</p>
+  </div>
+  <div id="previewError" class="preview-error" role="alert" hidden>
+    <p>
+      プレビューを読み込めませんでした。リポジトリ直下をローカルサーバーで公開し、
+      <code>ui-redesign-v1/</code> を開いてください。
+    </p>
+  </div>
+  <iframe
+    id="appPreview"
+    class="preview-frame"
+    title="趣味部屋図書館 夜の個人書庫 UIプレビュー"
+    src="../../../docs/index.html?ui-preview=night-library"
+  ></iframe>
+  <script src="./preview.js"></script>
+</body>
+</html>

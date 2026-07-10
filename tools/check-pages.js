@@ -80,6 +80,9 @@ assert(index.includes('src="./assets/logo.png"'), 'static index uses local logo 
 assert(index.includes('id="pwaSettingsButton"'), 'static index includes PWA settings button');
 assert(index.includes('id="pwaSettingsPanel"'), 'static index includes PWA settings panel');
 assert(index.includes('id="pwaLibrarianPresence"'), 'static index includes librarian presence setting');
+assert(index.includes('class="sandbox-redesign"'), 'static index enables the night library redesign');
+assert(index.includes('id="appBrandResetBtn"'), 'static index includes the redesigned brand reset button');
+assert(index.includes('id="appBrandLibrarianImage"'), 'static index includes the librarian brand image');
 assert(index.includes('id="pwaQuietMotion"'), 'static index includes quiet motion setting');
 assert(index.includes('id="pwaPerfHudEnabled"'), 'static index includes performance HUD setting');
 ['shinhaku', 'kohi', 'shikon', 'kohaku'].forEach(value => {
@@ -108,7 +111,8 @@ assert(pagesWorkflow.includes('actions/deploy-pages@v5'), 'Pages workflow deploy
   'style.modern-core.css',
   'style.modern-modal.css',
   'style.modern-shelf.css',
-  'style.responsive.css'
+  'style.responsive.css',
+  'style.night-library.css'
 ].forEach(fileName => {
   assert(index.includes(`./assets/css/${fileName}`), `static index references ${fileName}`);
   const source = read(path.join(docs, 'assets', 'css', fileName));
@@ -156,6 +160,7 @@ assert(sw.includes('./assets/librarian-presence.jpg'), 'service worker caches li
 assert(sw.includes('./assets/splash-lantern.jpg'), 'service worker caches optimized lantern splash image');
 assert(/\.\/assets\/js\/script\.state\.[a-f0-9]{10}\.js/.test(sw), 'service worker caches hashed state script');
 assert(sw.includes('./assets/css/style.responsive.css'), 'service worker caches responsive CSS');
+assert(sw.includes('./assets/css/style.night-library.css'), 'service worker caches night library CSS');
 assert(sw.includes('./assets/icons/icon-lantern-192.png'), 'service worker caches renamed 192px lantern icon');
 assert(sw.includes('./assets/icons/icon-lantern-512.png'), 'service worker caches renamed 512px lantern icon');
 assert(sw.includes('./assets/icons/apple-touch-icon-lantern-180.png'), 'service worker caches renamed apple touch lantern icon');
@@ -279,6 +284,8 @@ assert(pwaClient.includes('recordPerf_'), 'PWA client records performance entrie
 assert(pwaClient.includes('observeLongTasks_'), 'PWA client observes long tasks for performance HUD');
 assert(pwaClient.includes('copyPerfLog_'), 'PWA client can copy performance logs');
 assert(pwaClient.includes('LIBRARIAN_LOGO_SRC'), 'PWA client can switch to librarian logo');
+assert(pwaClient.includes("document.getElementById('appBrandLibrarianImage')"), 'PWA client updates the redesigned librarian brand image');
+assert(pwaClient.includes("document.getElementById('appBrandResetBtn')"), 'PWA client updates the redesigned brand label');
 assert(pwaClient.includes('getLibrarianText'), 'PWA client exposes librarian text hook');
 assert(pwaClient.includes('THEME_COLORS'), 'PWA client maps themes to shell colors');
 assert(pwaClient.includes("THEME_OPTIONS = ['shinhaku', 'kohi', 'shikon', 'kohaku']"), 'PWA client exposes the four named themes');

@@ -23,9 +23,10 @@
   <link rel="stylesheet" href="./assets/css/style.modern-modal.css">
   <link rel="stylesheet" href="./assets/css/style.modern-shelf.css">
   <link rel="stylesheet" href="./assets/css/style.responsive.css">
+  <link rel="stylesheet" href="./assets/css/style.night-library.css">
   <link rel="stylesheet" href="./assets/css/pwa.css">
 </head>
-<body>
+<body class="sandbox-redesign">
   <div id="pwaLaunchSplash" class="pwa-launch-splash" aria-hidden="true">
     <div class="pwa-launch-splash-scene">
       <img src="./assets/splash-lantern.jpg" alt="">
@@ -97,6 +98,19 @@
     </div>
   </section>
   <div id="searchContainer" class="search-container centered">
+    <button type="button" id="appBrandResetBtn" class="preview-brand" data-action="reset-search" aria-label="検索をリセットして最初に戻る">
+      <span class="preview-brand-mark" aria-hidden="true">
+        <span class="app-brand-default-mark">
+          <svg viewBox="0 0 24 24"><path d="M13 12v.01"></path><path d="M3 21h18"></path><path d="M5 21v-16a2 2 0 0 1 2-2h6m4 10.5v7.5"></path><path d="M21 7h-7m3-3l-3 3 3 3"></path></svg>
+        </span>
+        <img id="appBrandLibrarianImage" class="app-brand-librarian-image" alt="">
+      </span>
+      <span class="preview-brand-copy">
+        <span class="preview-brand-name">趣味部屋図書館</span>
+        <span class="preview-brand-note">個人の蔵書を探す、眺める。</span>
+      </span>
+    </button>
+
     <label class="sensitive-toggle" for="sensitiveToggle">
       <span class="sensitive-toggle-label">センシティブ</span>
       <input type="checkbox" id="sensitiveToggle" class="sensitive-toggle-input">
@@ -260,6 +274,9 @@
           </span>
           <span class="bookshelf-cta-title">本棚を見る</span>
           <span class="bookshelf-cta-subtitle">棚マップから所蔵本を眺める</span>
+          <span class="preview-cta-arrow ui-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"></path></svg>
+          </span>
         </button>
       </div>
     </div>
@@ -378,7 +395,7 @@
   <script src="./assets/js/gas-run-shim.js"></script>
   <script src="./assets/js/pwa-client.js"></script>
   <script src="./assets/js/script.state.c2a5308ae9.js"></script>
-  <script src="./assets/js/script.images.5abf8ac1da.js"></script>
+  <script src="./assets/js/script.images.296dbf1d8a.js"></script>
   <script src="./assets/js/script.search.2d9f21660b.js"></script>
   <script src="./assets/js/script.render.921eff7a34.js"></script>
   <script src="./assets/js/script.shelf.598dbdb6f7.js"></script>

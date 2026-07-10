@@ -24,6 +24,13 @@ const clientScriptSources = clientScriptFiles
     .replace(/\s*<\/script>\s*$/, ''));
 const searchScriptSource = clientScriptSources[clientScriptFiles.indexOf('script.search.js.html')];
 
+clientScriptFiles.forEach((fileName, index) => {
+  assert(
+    !/`https?:\/\//.test(clientScriptSources[index]),
+    `${fileName} avoids URL literals inside template strings because GAS HtmlService truncates them`
+  );
+});
+
 function createStorage() {
   const values = new Map();
   return {
