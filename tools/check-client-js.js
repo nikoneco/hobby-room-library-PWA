@@ -124,7 +124,7 @@ assert(!/\son(?:click|change|input|submit|keydown)=/i.test(indexSource), 'index.
 });
 assert(
   indexSource.includes('data-action="top"') &&
-    indexSource.includes('>トップページへ<') &&
+    indexSource.includes('>ホーム<') &&
     clientScriptSources[clientScriptFiles.indexOf('script.boot.js.html')].includes('function returnToTopPage_()') &&
     clientScriptSources[clientScriptFiles.indexOf('script.boot.js.html')].includes('resetSearch();') &&
     !indexSource.includes('data-action="bookshelf" aria-label="本棚を開く"'),
