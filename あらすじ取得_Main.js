@@ -206,6 +206,9 @@ function batchFetchSynopsisRawByLimit_(limit) {
   SpreadsheetApp.flush();
 
   const result = buildSynopsisBatchResult_(processed, success, notFound, skipped, error, manualProtected);
+  if (result.processed > 0) {
+    clearLibrarySearchCache_();
+  }
 
   SpreadsheetApp.getActive().toast(
     `あらすじ取得: 処理${result.processed} / 成功${result.success} / 未発見${result.notFound}`

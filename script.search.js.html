@@ -306,6 +306,7 @@ function applyInitialSearchData_(data) {
     ? payload.quickBrowseCounts
     : null;
   PREVIEW_INDEX_READY = true;
+  syncBookDetailCacheRevision_(payload.datasetRevision);
 
   if (!resultViewModeChangedLocally && payload.userPreferences) {
     const initialViewMode = getPreferredResultViewMode_(payload.userPreferences);

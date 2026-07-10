@@ -135,6 +135,20 @@ assertEqual(
 assertEqual(sandbox.normalizeKana('ＡＢＣ カタカナ'), 'abcかたかな', 'normalizeKana normalizes width and kana');
 
 {
+  const revisionBook = { rowIndex: 12, isbn: '9780000000000', title: 'キャッシュ確認本' };
+  const revisionDetail = { isbn: '9780000000000', title: 'キャッシュ確認本', summary: '新版' };
+  sandbox.syncBookDetailCacheRevision_('revision-a');
+  const revisionKey = sandbox.getBookDetailCacheKey_(revisionBook);
+  assert(revisionKey.includes('revision:revision-a'), 'detail cache key includes the dataset revision');
+  assert(revisionKey.includes('isbn:9780000000000'), 'detail cache key includes the ISBN');
+  assert(revisionKey.includes(encodeURIComponent('キャッシュ確認本')), 'detail cache key includes the title');
+  sandbox.rememberBookDetail_(revisionBook, revisionDetail);
+  assert(sandbox.getCachedBookDetail_(revisionBook), 'detail cache returns an entry for the current dataset revision');
+  sandbox.syncBookDetailCacheRevision_('revision-b');
+  assertEqual(sandbox.getCachedBookDetail_(revisionBook), null, 'dataset revision change clears stale detail cache entries');
+}
+
+{
   const originalPopulateAdvancedOptions = sandbox.populateAdvancedOptions;
   const originalRenderQuickBrowseRail = sandbox.renderQuickBrowseRail_;
   const originalSyncSearchStatus = sandbox.syncSearchStatusPreviewFromForm_;

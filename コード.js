@@ -518,7 +518,7 @@ function fillSeriesKeyAutoAll_() {
   const seriesKeyCol = CONFIG.COL.SERIES_KEY_AUTO;
 
   const values = sheet
-    .getRange(2, 1, lastRow - 1, Math.max(titleCol, genreCol))
+    .getRange(2, 1, lastRow - 1, Math.max(titleCol, genreCol, seriesKeyCol))
     .getValues();
 
   const output = values.map(row => {
@@ -532,7 +532,14 @@ function fillSeriesKeyAutoAll_() {
     return [key];
   });
 
+  const currentOutput = values.map(row => [row[seriesKeyCol - 1] || '']);
+  const changed = output.some((row, index) => row[0] !== currentOutput[index][0]);
+  if (!changed) return { updatedRows: 0 };
+
   sheet
     .getRange(2, seriesKeyCol, output.length, 1)
     .setValues(output);
+  SpreadsheetApp.flush();
+  clearLibrarySearchCache_();
+  return { updatedRows: output.length };
 }

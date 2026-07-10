@@ -172,6 +172,86 @@ function getCacheMetaKey_(key) {
   return `${key}:meta`;
 }
 
+function getUtf8ByteLength_(value) {
+  return Utilities.newBlob(String(value == null ? '' : value)).getBytes().length;
+}
+
+function normalizeUtf16Boundary_(text, start, end) {
+  let boundary = Math.max(start, Math.min(String(text || '').length, end));
+  if (
+    boundary > start &&
+    boundary < text.length &&
+    /[\uD800-\uDBFF]/.test(text.charAt(boundary - 1)) &&
+    /[\uDC00-\uDFFF]/.test(text.charAt(boundary))
+  ) {
+    boundary--;
+  }
+  return boundary;
+}
+
+function splitUtf8ByByteLimit_(value, byteLimit) {
+  const text = String(value == null ? '' : value);
+  const limit = Math.max(1, Number(byteLimit || CACHE_CONFIG.CHUNK_BYTE_LIMIT));
+  if (!text) return [''];
+
+  const chunks = [];
+  let start = 0;
+
+  while (start < text.length) {
+    let low = start + 1;
+    let high = normalizeUtf16Boundary_(text, start, Math.min(text.length, start + limit));
+    let bestEnd = start;
+
+    while (low <= high) {
+      const rawMid = Math.floor((low + high) / 2);
+      const mid = normalizeUtf16Boundary_(text, start, rawMid);
+      if (mid <= start) {
+        low = rawMid + 1;
+        continue;
+      }
+
+      if (getUtf8ByteLength_(text.slice(start, mid)) <= limit) {
+        bestEnd = mid;
+        low = mid + 1;
+      } else {
+        high = mid - 1;
+      }
+    }
+
+    if (bestEnd <= start) {
+      throw new Error(`Cannot split cache payload within ${limit} UTF-8 bytes`);
+    }
+
+    chunks.push(text.slice(start, bestEnd));
+    start = bestEnd;
+  }
+
+  return chunks;
+}
+
+function getLibraryDatasetRevision_() {
+  try {
+    const props = PropertiesService.getScriptProperties();
+    const revision = String(props.getProperty(CACHE_CONFIG.DATASET_REVISION_PROPERTY) || '').trim();
+    return revision || '0';
+  } catch (e) {
+    console.error('getLibraryDatasetRevision_ error:', e);
+    return 'unavailable';
+  }
+}
+
+function bumpLibraryDatasetRevision_() {
+  try {
+    const nextRevision = String(Date.now());
+    PropertiesService.getScriptProperties()
+      .setProperty(CACHE_CONFIG.DATASET_REVISION_PROPERTY, nextRevision);
+    return nextRevision;
+  } catch (e) {
+    console.error('bumpLibraryDatasetRevision_ error:', e);
+    return getLibraryDatasetRevision_();
+  }
+}
+
 /**
  * JSONデータを分割キャッシュから取得
  * @param {string} key
@@ -198,6 +278,11 @@ function getCachedJson_(key) {
       json += chunk;
     }
 
+    if (meta.byteLength && getUtf8ByteLength_(json) !== Number(meta.byteLength)) {
+      console.error(`getCachedJson_ byte length mismatch: key=${key}`);
+      return null;
+    }
+
     return JSON.parse(json);
   } catch (e) {
     console.error('getCachedJson_ error:', e);
@@ -217,20 +302,31 @@ function putCachedJson_(key, value, ttlSeconds) {
     const cache = getLibraryCache_();
     const ttl = ttlSeconds || CACHE_CONFIG.TTL_SECONDS;
     const json = JSON.stringify(value);
-    const chunkSize = CACHE_CONFIG.CHUNK_SIZE;
-
-    const chunkCount = Math.max(1, Math.ceil(json.length / chunkSize));
+    const chunks = splitUtf8ByByteLimit_(json, CACHE_CONFIG.CHUNK_BYTE_LIMIT);
+    const chunkCount = chunks.length;
+    const totalByteLength = getUtf8ByteLength_(json);
     const payload = {};
-    payload[getCacheMetaKey_(key)] = JSON.stringify({ chunkCount });
+    payload[getCacheMetaKey_(key)] = JSON.stringify({ chunkCount, byteLength: totalByteLength });
 
     for (let i = 0; i < chunkCount; i++) {
-      payload[`${key}:chunk:${i}`] = json.slice(i * chunkSize, (i + 1) * chunkSize);
+      const chunk = chunks[i];
+      if (getUtf8ByteLength_(chunk) > CACHE_CONFIG.CHUNK_BYTE_LIMIT) {
+        throw new Error(`Cache chunk exceeds byte limit: key=${key} chunk=${i}`);
+      }
+      payload[`${key}:chunk:${i}`] = chunk;
     }
 
+    clearCachedJson_(key);
     cache.putAll(payload, ttl);
+
+    const restored = getCachedJson_(key);
+    if (JSON.stringify(restored) !== json) {
+      clearCachedJson_(key);
+      throw new Error(`Cache round-trip verification failed: key=${key}`);
+    }
     return true;
   } catch (e) {
-    console.error('putCachedJson_ error:', e);
+    console.error(`putCachedJson_ error: key=${key}`, e);
     return false;
   }
 }
@@ -269,6 +365,34 @@ function clearCachedJson_(key) {
 function clearLibrarySearchCache_() {
   clearCachedJson_(CACHE_CONFIG.LIBRARY_DATASET_KEY);
   clearCachedJson_(CACHE_CONFIG.SHELF_DATASET_KEY);
+  bumpLibraryDatasetRevision_();
+}
+
+function getOrBuildCachedDataset_(cacheKey, isValid, buildDataset) {
+  const cached = getCachedJson_(cacheKey);
+  if (isValid(cached)) return cached;
+
+  const lock = LockService.getScriptLock();
+  let locked = false;
+
+  try {
+    locked = lock.tryLock(CACHE_CONFIG.BUILD_LOCK_WAIT_MS);
+    if (!locked) {
+      console.warn(`Dataset cache build lock timed out: key=${cacheKey}; returning an uncached fallback`);
+      return buildDataset();
+    }
+
+    const cachedAfterLock = getCachedJson_(cacheKey);
+    if (isValid(cachedAfterLock)) return cachedAfterLock;
+
+    const dataset = buildDataset();
+    if (isValid(dataset)) {
+      putCachedJson_(cacheKey, dataset, CACHE_CONFIG.TTL_SECONDS);
+    }
+    return dataset;
+  } finally {
+    if (locked) lock.releaseLock();
+  }
 }
 
 /**
@@ -542,6 +666,7 @@ function getWebAppUserPreferences_() {
  *     releaseYears: string[]
  *   },
  *   previewIndex: Object[],
+ *   datasetRevision: string,
  *   userPreferences: {resultViewMode: string}
  * }}
  */
@@ -553,6 +678,7 @@ function getInitialSearchData() {
       suggest: buildSuggestDataPayload_(dataset),
       advancedOptions: buildAdvancedSearchOptionsPayload_(dataset),
       previewIndex: buildPreviewIndexPayload_(dataset),
+      datasetRevision: getLibraryDatasetRevision_(),
       userPreferences: getWebAppUserPreferences_()
     };
   } catch (e) {
@@ -561,6 +687,7 @@ function getInitialSearchData() {
       suggest: buildEmptySuggestData_(),
       advancedOptions: buildEmptyAdvancedSearchOptions_(),
       previewIndex: [],
+      datasetRevision: getLibraryDatasetRevision_(),
       userPreferences: getWebAppUserPreferences_()
     };
   }
@@ -594,6 +721,7 @@ function getInitialSearchDataForPwa_() {
       advancedOptions: buildAdvancedSearchOptionsPayload_(dataset),
       previewIndex: [],
       quickBrowseCounts: buildQuickBrowseCountsPayload_(dataset),
+      datasetRevision: getLibraryDatasetRevision_(),
       userPreferences: getWebAppUserPreferences_()
     };
   } catch (e) {
@@ -603,6 +731,7 @@ function getInitialSearchDataForPwa_() {
       advancedOptions: buildEmptyAdvancedSearchOptions_(),
       previewIndex: [],
       quickBrowseCounts: buildQuickBrowseCountsPayload_(null),
+      datasetRevision: getLibraryDatasetRevision_(),
       userPreferences: getWebAppUserPreferences_()
     };
   }
@@ -874,27 +1003,26 @@ function buildBookshelfLiteDataset_() {
 
 function getBookshelfLiteDataset_() {
   const cacheKey = CACHE_CONFIG.SHELF_DATASET_KEY;
-  const cached = getCachedJson_(cacheKey);
-  if (
-    cached &&
-    Array.isArray(cached.books) &&
-    Number(cached.total || 0) === cached.books.length &&
-    cached.books.every(book =>
+  return getOrBuildCachedDataset_(
+    cacheKey,
+    isBookshelfLiteDatasetValid_,
+    buildBookshelfLiteDataset_
+  );
+}
+
+function isBookshelfLiteDatasetValid_(dataset) {
+  return Boolean(
+    dataset &&
+    Array.isArray(dataset.books) &&
+    Number(dataset.total || 0) === dataset.books.length &&
+    dataset.books.every(book =>
       book &&
       typeof book.title === 'string' &&
       typeof book.shelf === 'string' &&
       typeof book.location === 'string' &&
       Object.prototype.hasOwnProperty.call(book, 'rowIndex')
     )
-  ) {
-    return cached;
-  }
-
-  const dataset = buildBookshelfLiteDataset_();
-  if (dataset && Array.isArray(dataset.books) && dataset.books.length) {
-    putCachedJson_(cacheKey, dataset, CACHE_CONFIG.TTL_SECONDS);
-  }
-  return dataset;
+  );
 }
 
 /**
@@ -1465,17 +1593,23 @@ function buildSeriesSearchLinks_(title) {
  */
 function getLibraryDataset_() {
   const cacheKey = CACHE_CONFIG.LIBRARY_DATASET_KEY;
+  return getOrBuildCachedDataset_(
+    cacheKey,
+    isLibraryDatasetValid_,
+    buildLibraryDataset_
+  );
+}
 
-  const cached = getCachedJson_(cacheKey);
-  if (
-    cached &&
-    Array.isArray(cached.rows) &&
-    Array.isArray(cached.index) &&
-    cached.suggest &&
-    cached.advancedOptions &&
-    cached.rows.length > 0 &&
-    cached.index.length === cached.rows.length &&
-    cached.index.every(idx =>
+function isLibraryDatasetValid_(dataset) {
+  return Boolean(
+    dataset &&
+    Array.isArray(dataset.rows) &&
+    Array.isArray(dataset.index) &&
+    dataset.suggest &&
+    dataset.advancedOptions &&
+    dataset.rows.length > 0 &&
+    dataset.index.length === dataset.rows.length &&
+    dataset.index.every(idx =>
       idx &&
       typeof idx.searchKey === 'string' &&
       typeof idx.seriesDisplayTitle === 'string' &&
@@ -1483,23 +1617,7 @@ function getLibraryDataset_() {
       typeof idx.seriesCount === 'number' &&
       typeof idx.links === 'object'
     )
-  ) {
-    return cached;
-  }
-
-  const dataset = buildLibraryDataset_();
-
-  if (
-    dataset &&
-    Array.isArray(dataset.rows) &&
-    Array.isArray(dataset.index) &&
-    dataset.rows.length > 0 &&
-    dataset.index.length === dataset.rows.length
-  ) {
-    putCachedJson_(cacheKey, dataset, CACHE_CONFIG.TTL_SECONDS);
-  }
-
-  return dataset;
+  );
 }
 
 /**

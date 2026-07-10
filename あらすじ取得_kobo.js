@@ -92,6 +92,9 @@ function retryNotFoundSynopsisFromRakutenKoboByLimit_(limit) {
   SpreadsheetApp.flush();
 
   const result = buildKoboRetryBatchResult_(processed, success, notFoundDone, skipped, error);
+  if (result.processed > 0) {
+    clearLibrarySearchCache_();
+  }
   SpreadsheetApp.getActive().toast(
     `Kobo救済: 処理${result.processed} / 成功${result.success} / 未発見確定${result.notFoundDone}`
   );

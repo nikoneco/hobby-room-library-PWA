@@ -3,6 +3,10 @@ const path = require('path');
 
 const root = path.resolve(__dirname, '..');
 const source = fs.readFileSync(path.join(root, 'Webアプリ.js'), 'utf8');
+const configSource = fs.readFileSync(path.join(root, 'config.js'), 'utf8');
+const mainSynopsisSource = fs.readFileSync(path.join(root, 'あらすじ取得_Main.js'), 'utf8');
+const koboSynopsisSource = fs.readFileSync(path.join(root, 'あらすじ取得_kobo.js'), 'utf8');
+const sheetCodeSource = fs.readFileSync(path.join(root, 'コード.js'), 'utf8');
 const claspignore = fs.readFileSync(path.join(root, '.claspignore'), 'utf8');
 
 function assert(condition, message) {
@@ -29,6 +33,17 @@ assert(source.includes('normalizeWebAppApiInteger_'), 'server centralizes public
 assert(source.includes('SHELF_CHUNK_MAX_LIMIT'), 'server caps bookshelf chunk size');
 assert(source.includes('RANDOM_MAX_COUNT'), 'server caps random result count');
 assert(source.includes('BOOK_DETAIL_BATCH_MAX'), 'server caps detail batch size');
+assert(configSource.includes('CHUNK_BYTE_LIMIT: 80 * 1024'), 'cache chunks use an 80KB byte limit');
+assert(source.includes('function splitUtf8ByByteLimit_'), 'server splits cache payloads by UTF-8 byte length');
+assert(source.includes('Utilities.newBlob'), 'server measures cache chunks as UTF-8 bytes');
+assert(source.includes('Cache round-trip verification failed'), 'server verifies cache writes by reading them back');
+assert(source.includes('LockService.getScriptLock'), 'server coordinates dataset rebuilds with ScriptLock');
+assert(source.includes('getOrBuildCachedDataset_'), 'library and shelf datasets use the shared cache rebuild contract');
+assert(source.includes('datasetRevision: getLibraryDatasetRevision_()'), 'initial API responses include the dataset revision');
+assert(source.includes('bumpLibraryDatasetRevision_'), 'cache invalidation advances the dataset revision');
+assert(mainSynopsisSource.includes('if (result.processed > 0)') && mainSynopsisSource.includes('clearLibrarySearchCache_();'), 'synopsis batches invalidate cache once after updates');
+assert(koboSynopsisSource.includes('if (result.processed > 0)') && koboSynopsisSource.includes('clearLibrarySearchCache_();'), 'Kobo retry batches invalidate cache once after updates');
+assert(sheetCodeSource.includes('const changed = output.some') && sheetCodeSource.includes('clearLibrarySearchCache_();'), 'series-key batch invalidates cache only after actual changes');
 
 [
   'initial',

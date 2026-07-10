@@ -73,10 +73,12 @@ const NO_IMAGE_URL = "https://i.imgur.com/Q80wBRc.jpeg";
 
 /* ====== Webアプリ検索キャッシュ設定 ====== */
 const CACHE_CONFIG = {
-  LIBRARY_DATASET_KEY: 'library_dataset_v21',
-  SHELF_DATASET_KEY: 'library_shelf_dataset_v1',
+  LIBRARY_DATASET_KEY: 'library_dataset_v22',
+  SHELF_DATASET_KEY: 'library_shelf_dataset_v2',
+  DATASET_REVISION_PROPERTY: 'library_dataset_revision_v1',
   TTL_SECONDS: 60 * 60,     // 1時間
-  CHUNK_SIZE: 90000         // CacheService 100KB制限対策
+  CHUNK_BYTE_LIMIT: 80 * 1024,
+  BUILD_LOCK_WAIT_MS: 10000
 };
 
 /* ====== 操作モードドロップダウン値 ====== */

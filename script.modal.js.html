@@ -303,7 +303,15 @@ function schedulePopupCurrentDetailRender_(book, index, dataArr, seriesContext, 
 
 function getBookDetailCacheKey_(book) {
   if (!book || book.rowIndex === undefined || book.rowIndex === null) return '';
-  return `row:${book.rowIndex}`;
+  const revision = String(currentDatasetRevision || '').trim();
+  const isbn = String(book.isbn || '').trim();
+  const title = String(book.title || '').trim();
+  return [
+    `revision:${encodeURIComponent(revision)}`,
+    `isbn:${encodeURIComponent(isbn)}`,
+    `title:${encodeURIComponent(title)}`,
+    `row:${book.rowIndex}`
+  ].join('|');
 }
 
 function rememberBookDetail_(book, detail) {
@@ -397,12 +405,12 @@ function readPersistentBookDetailCache_() {
     }
     const raw = window.localStorage.getItem(BOOK_DETAIL_PERSISTENT_CACHE_KEY);
     if (!raw) {
-      bookDetailPersistentCachePayload = { version: 1, items: {} };
+      bookDetailPersistentCachePayload = { version: 2, datasetRevision: '', items: {} };
       return bookDetailPersistentCachePayload;
     }
     const parsed = JSON.parse(raw);
     if (!parsed || typeof parsed !== 'object' || !parsed.items || typeof parsed.items !== 'object') {
-      bookDetailPersistentCachePayload = { version: 1, items: {} };
+      bookDetailPersistentCachePayload = { version: 2, datasetRevision: '', items: {} };
       return bookDetailPersistentCachePayload;
     }
     bookDetailPersistentCachePayload = parsed;
@@ -423,12 +431,31 @@ function writePersistentBookDetailCache_(payload) {
   }
 }
 
+function syncBookDetailCacheRevision_(datasetRevision) {
+  const revision = String(datasetRevision || '').trim();
+  if (!revision || revision === currentDatasetRevision) return;
+
+  currentDatasetRevision = revision;
+  bookDetailCache.clear();
+  bookDetailInFlightCallbacks.clear();
+
+  const payload = readPersistentBookDetailCache_();
+  if (!payload || payload.version !== 2 || payload.datasetRevision !== revision) {
+    writePersistentBookDetailCache_({
+      version: 2,
+      datasetRevision: revision,
+      items: {}
+    });
+  }
+}
+
 function rememberPersistentBookDetail_(key, detail) {
   const payload = readPersistentBookDetailCache_();
   if (!payload || !key || !detail || typeof detail !== 'object') return;
 
   const now = Date.now();
-  payload.version = 1;
+  payload.version = 2;
+  payload.datasetRevision = currentDatasetRevision;
   payload.items[key] = {
     savedAt: now,
     detail: detail
@@ -464,6 +491,9 @@ function isPersistentBookDetailMatch_(book, detail) {
 function getPersistentBookDetail_(book, key) {
   const payload = readPersistentBookDetailCache_();
   if (!payload || !key || !payload.items) return null;
+  if (!currentDatasetRevision || payload.version !== 2 || payload.datasetRevision !== currentDatasetRevision) {
+    return null;
+  }
 
   const entry = payload.items[key];
   if (!entry || !entry.detail || typeof entry.detail !== 'object') return null;
