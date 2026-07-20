@@ -536,6 +536,24 @@
     return Math.round(value) + 'ms';
   }
 
+  function formatClockTime_(value) {
+    const date = value instanceof Date ? value : new Date(value);
+    if (!Number.isFinite(date.getTime())) return '-';
+    return date.toLocaleTimeString('ja-JP', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      fractionalSecondDigits: 3,
+      hour12: false
+    });
+  }
+
+  function formatSignedDuration_(durationMs) {
+    const value = Number(durationMs);
+    if (!Number.isFinite(value)) return '-';
+    return (value < 0 ? '-' : '') + formatDuration_(Math.abs(value));
+  }
+
   function summarizePerfMeta_(entry) {
     const meta = entry && entry.meta && typeof entry.meta === 'object' ? entry.meta : {};
     const server = meta.server && typeof meta.server === 'object' ? meta.server : null;
@@ -609,7 +627,7 @@
     const note = document.createElement('p');
     note.id = 'pwaPerfHudNote';
     note.className = 'pwa-perf-hud-note';
-    note.textContent = '直近20件を保存します';
+    note.textContent = '直近20件を保存します。概算値は端末とGoogleの時計差を含みます';
     hud.appendChild(note);
 
     copyButton.addEventListener('click', copyPerfLog_);
@@ -651,10 +669,20 @@
       const latestServer = latestApi && latestApi.meta && latestApi.meta.server && typeof latestApi.meta.server === 'object'
         ? latestApi.meta.server
         : null;
+      const latestTransport = latestApi && latestApi.meta && latestApi.meta.transport && typeof latestApi.meta.transport === 'object'
+        ? latestApi.meta.transport
+        : null;
       const stats = [
         { label: 'API', value: latestApi ? formatDuration_(latestApi.durationMs) : '-' },
         { label: 'GAS内部', value: latestServer ? formatDuration_(latestServer.serverMs) : '-' },
         { label: '通信・起動等', value: latestServer && latestServer.outsideServerMs !== undefined ? formatDuration_(latestServer.outsideServerMs) : '-' },
+        { label: 'リクエスト送信', value: latestTransport ? formatClockTime_(latestTransport.requestSentAtEpochMs) : '-' },
+        { label: 'GAS処理開始', value: latestServer ? formatClockTime_(latestServer.serverStartedAtEpochMs) : '-' },
+        { label: 'GAS応答準備', value: latestServer ? formatClockTime_(latestServer.serverResponseReadyAtEpochMs) : '-' },
+        { label: 'コールバック受信', value: latestTransport ? formatClockTime_(latestTransport.callbackReceivedAtEpochMs) : '-' },
+        { label: 'GAS開始前（概算）', value: latestTransport ? formatSignedDuration_(latestTransport.beforeServerApproxMs) : '-' },
+        { label: '応答準備後（概算）', value: latestTransport ? formatSignedDuration_(latestTransport.afterServerApproxMs) : '-' },
+        { label: 'JSONP文字数', value: latestTransport && latestTransport.jsonpResponseChars !== undefined ? Number(latestTransport.jsonpResponseChars).toLocaleString('ja-JP') : '-' },
         { label: 'キャッシュ', value: latestServer && latestServer.cacheStatus ? formatCacheStatus_(latestServer.cacheStatus) : '-' },
         { label: '描画', value: latestRender ? formatDuration_(latestRender.durationMs) : '-' },
         { label: 'Long task', value: String(longTasks) }

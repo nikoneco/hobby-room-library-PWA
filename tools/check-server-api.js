@@ -52,6 +52,9 @@ assert(source.includes("addWebAppPerfDuration_(perf, 'filterMs'"), 'server perfo
 assert(source.includes("addWebAppPerfDuration_(perf, 'pickMs'"), 'server performance trace measures random selection');
 assert(source.includes("String(decodedParams.perf || '') === '1'"), 'JSONP performance trace is opt-in');
 assert(source.includes('envelope.perf = perf'), 'JSONP returns performance trace metadata');
+assert(source.includes('serverStartedAtEpochMs'), 'JSONP performance trace includes GAS handler start time');
+assert(source.includes('serverResponseReadyAtEpochMs'), 'JSONP performance trace includes GAS response-ready time');
+assert(source.includes('perf.jsonpResponseChars'), 'JSONP performance trace includes the final script character count');
 assert(source.includes('datasetRevision: getLibraryDatasetRevision_()'), 'initial API responses include the dataset revision');
 assert(source.includes('bumpLibraryDatasetRevision_'), 'cache invalidation advances the dataset revision');
 assert(mainSynopsisSource.includes('if (result.processed > 0)') && mainSynopsisSource.includes('clearLibrarySearchCache_();'), 'synopsis batches invalidate cache once after updates');

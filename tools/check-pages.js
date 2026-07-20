@@ -301,10 +301,21 @@ assert(pwaClient.includes('perfEnd: endPerf_'), 'PWA client exposes performance 
 assert(gasRunShim.includes("startPerf_('api:' + config.api"), 'GAS JSONP shim measures API calls');
 assert(gasRunShim.includes("endPerf_(perfToken"), 'GAS JSONP shim completes API performance measures');
 assert(gasRunShim.includes("params.set('perf', '1')"), 'GAS JSONP shim requests server timings only while performance HUD is active');
-assert(gasRunShim.includes("server: envelope.perf"), 'GAS JSONP shim attaches server timings to performance entries');
+assert(gasRunShim.includes('server: serverPerf'), 'GAS JSONP shim attaches server timings to performance entries');
 assert(pwaClient.includes('outsideServerMs'), 'PWA client estimates network and GAS startup overhead');
+assert(gasRunShim.includes('requestSentAtEpochMs'), 'JSONP shim records the client request-sent time');
+assert(gasRunShim.includes('callbackReceivedAtEpochMs'), 'JSONP shim records the client callback-received time');
+assert(gasRunShim.includes('beforeServerApproxMs'), 'JSONP shim estimates time before the GAS handler starts');
+assert(gasRunShim.includes('afterServerApproxMs'), 'JSONP shim estimates time after the GAS response is ready');
+assert(gasRunShim.includes('jsonpResponseChars'), 'JSONP shim carries the response character count');
 assert(pwaClient.includes("label: 'GAS内部'"), 'performance HUD summarizes server execution time');
 assert(pwaClient.includes("label: '通信・起動等'"), 'performance HUD summarizes time outside measured server execution');
+assert(pwaClient.includes("label: 'リクエスト送信'"), 'performance HUD shows request-sent time');
+assert(pwaClient.includes("label: 'GAS処理開始'"), 'performance HUD shows GAS handler start time');
+assert(pwaClient.includes("label: 'GAS応答準備'"), 'performance HUD shows GAS response-ready time');
+assert(pwaClient.includes("label: 'コールバック受信'"), 'performance HUD shows callback-received time');
+assert(pwaClient.includes("label: 'JSONP文字数'"), 'performance HUD shows JSONP response character count');
+assert(pwaClient.includes('概算値は端末とGoogleの時計差を含みます'), 'performance HUD explains cross-clock approximate timings');
 assert(pwaClient.includes("label: 'キャッシュ'"), 'performance HUD summarizes cache status');
 assert(pwaClient.includes('function isIosLike_'), 'PWA client detects iOS-like browsers');
 assert(pwaClient.includes('showIosInstallHint_'), 'PWA client can show iOS install hint');
@@ -401,11 +412,24 @@ sandboxWindow[callbackName]({
   ok: true,
   data: [{ title: '葬送のフリーレン' }],
   error: null,
-  perf: { version: 1, serverMs: 240, cacheStatus: 'hit', cacheReadMs: 210, filterMs: 4, mapMs: 2 }
+  perf: {
+    version: 2,
+    serverMs: 240,
+    serverStartedAtEpochMs: Date.now() - 250,
+    serverResponseReadyAtEpochMs: Date.now() - 10,
+    jsonpResponseChars: 1234,
+    cacheStatus: 'hit',
+    cacheReadMs: 210,
+    filterMs: 4,
+    mapMs: 2
+  }
 });
 assert(Array.isArray(successPayload) && successPayload[0].title === '葬送のフリーレン', 'JSONP shim delivers success payload');
 assert(sandboxWindow.ShumiLibraryPwa.perfEntries.length === 1, 'JSONP shim completes the API performance entry');
 assert(sandboxWindow.ShumiLibraryPwa.perfEntries[0].meta.server.cacheStatus === 'hit', 'JSONP shim carries server timing details into the performance entry');
+assert(sandboxWindow.ShumiLibraryPwa.perfEntries[0].meta.transport.requestSentAtEpochMs > 0, 'JSONP shim records request-sent epoch time');
+assert(sandboxWindow.ShumiLibraryPwa.perfEntries[0].meta.transport.callbackReceivedAtEpochMs > 0, 'JSONP shim records callback-received epoch time');
+assert(sandboxWindow.ShumiLibraryPwa.perfEntries[0].meta.transport.jsonpResponseChars === 1234, 'JSONP shim records JSONP response character count');
 assert(failureCode === '', 'JSONP shim does not call failure on success');
 assert(sandboxWindow.ShumiLibraryPwa.cleared === 1, 'JSONP shim clears network warning on success');
 

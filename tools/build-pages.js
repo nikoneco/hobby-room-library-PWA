@@ -2931,12 +2931,13 @@ function writeGasRunShim() {
     const callbackName = '__shumiLibraryJsonp_' + Date.now() + '_' + (++requestSeq);
     const params = new URLSearchParams();
     const script = document.createElement('script');
+    const requestSentAtEpochMs = Date.now();
     let finished = false;
     let timeoutId = 0;
 
     params.set('api', config.api);
     params.set('callback', callbackName);
-    params.set('rq', String(Date.now()));
+    params.set('rq', String(requestSentAtEpochMs));
     if (perfToken) params.set('perf', '1');
     appendArgs_(params, config.argNames, args);
 
@@ -2954,12 +2955,43 @@ function writeGasRunShim() {
 
     window[callbackName] = function(envelope) {
       if (finished) return;
+      const callbackReceivedAtEpochMs = Date.now();
       finished = true;
       cleanup_();
 
+      const serverPerf = envelope && envelope.perf && typeof envelope.perf === 'object'
+        ? envelope.perf
+        : undefined;
+      const transportPerf = perfToken ? {
+        requestSentAtEpochMs: requestSentAtEpochMs,
+        requestSentAt: new Date(requestSentAtEpochMs).toISOString(),
+        callbackReceivedAtEpochMs: callbackReceivedAtEpochMs,
+        callbackReceivedAt: new Date(callbackReceivedAtEpochMs).toISOString(),
+        callbackWaitMs: Math.max(0, callbackReceivedAtEpochMs - requestSentAtEpochMs),
+        jsonpResponseChars: serverPerf && serverPerf.jsonpResponseChars !== undefined
+          ? Number(serverPerf.jsonpResponseChars)
+          : undefined
+      } : undefined;
+
+      if (transportPerf && serverPerf) {
+        const serverStartedAtEpochMs = Number(serverPerf.serverStartedAtEpochMs);
+        const serverResponseReadyAtEpochMs = Number(serverPerf.serverResponseReadyAtEpochMs);
+        if (Number.isFinite(serverStartedAtEpochMs)) {
+          transportPerf.beforeServerApproxMs = serverStartedAtEpochMs - requestSentAtEpochMs;
+        }
+        if (Number.isFinite(serverResponseReadyAtEpochMs)) {
+          transportPerf.afterServerApproxMs = callbackReceivedAtEpochMs - serverResponseReadyAtEpochMs;
+        }
+      }
+
       if (!envelope || envelope.ok === false) {
         const errorInfo = envelope && envelope.error ? envelope.error : {};
-        endPerf_(perfToken, { ok: false, code: errorInfo.code || 'API_ERROR' });
+        endPerf_(perfToken, {
+          ok: false,
+          code: errorInfo.code || 'API_ERROR',
+          server: serverPerf,
+          transport: transportPerf
+        });
         invokeFailure_(
           failureHandler,
           createError_(errorInfo.message || 'APIからエラーが返りました。', 'API_ERROR', errorInfo)
@@ -2970,7 +3002,8 @@ function writeGasRunShim() {
       endPerf_(perfToken, {
         ok: true,
         count: Array.isArray(envelope.data) ? envelope.data.length : undefined,
-        server: envelope.perf && typeof envelope.perf === 'object' ? envelope.perf : undefined
+        server: serverPerf,
+        transport: transportPerf
       });
       notifySuccess_();
       if (typeof successHandler === 'function') {
@@ -3581,6 +3614,24 @@ function writePwaClient() {
     return Math.round(value) + 'ms';
   }
 
+  function formatClockTime_(value) {
+    const date = value instanceof Date ? value : new Date(value);
+    if (!Number.isFinite(date.getTime())) return '-';
+    return date.toLocaleTimeString('ja-JP', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      fractionalSecondDigits: 3,
+      hour12: false
+    });
+  }
+
+  function formatSignedDuration_(durationMs) {
+    const value = Number(durationMs);
+    if (!Number.isFinite(value)) return '-';
+    return (value < 0 ? '-' : '') + formatDuration_(Math.abs(value));
+  }
+
   function summarizePerfMeta_(entry) {
     const meta = entry && entry.meta && typeof entry.meta === 'object' ? entry.meta : {};
     const server = meta.server && typeof meta.server === 'object' ? meta.server : null;
@@ -3654,7 +3705,7 @@ function writePwaClient() {
     const note = document.createElement('p');
     note.id = 'pwaPerfHudNote';
     note.className = 'pwa-perf-hud-note';
-    note.textContent = '直近20件を保存します';
+    note.textContent = '直近20件を保存します。概算値は端末とGoogleの時計差を含みます';
     hud.appendChild(note);
 
     copyButton.addEventListener('click', copyPerfLog_);
@@ -3696,10 +3747,20 @@ function writePwaClient() {
       const latestServer = latestApi && latestApi.meta && latestApi.meta.server && typeof latestApi.meta.server === 'object'
         ? latestApi.meta.server
         : null;
+      const latestTransport = latestApi && latestApi.meta && latestApi.meta.transport && typeof latestApi.meta.transport === 'object'
+        ? latestApi.meta.transport
+        : null;
       const stats = [
         { label: 'API', value: latestApi ? formatDuration_(latestApi.durationMs) : '-' },
         { label: 'GAS内部', value: latestServer ? formatDuration_(latestServer.serverMs) : '-' },
         { label: '通信・起動等', value: latestServer && latestServer.outsideServerMs !== undefined ? formatDuration_(latestServer.outsideServerMs) : '-' },
+        { label: 'リクエスト送信', value: latestTransport ? formatClockTime_(latestTransport.requestSentAtEpochMs) : '-' },
+        { label: 'GAS処理開始', value: latestServer ? formatClockTime_(latestServer.serverStartedAtEpochMs) : '-' },
+        { label: 'GAS応答準備', value: latestServer ? formatClockTime_(latestServer.serverResponseReadyAtEpochMs) : '-' },
+        { label: 'コールバック受信', value: latestTransport ? formatClockTime_(latestTransport.callbackReceivedAtEpochMs) : '-' },
+        { label: 'GAS開始前（概算）', value: latestTransport ? formatSignedDuration_(latestTransport.beforeServerApproxMs) : '-' },
+        { label: '応答準備後（概算）', value: latestTransport ? formatSignedDuration_(latestTransport.afterServerApproxMs) : '-' },
+        { label: 'JSONP文字数', value: latestTransport && latestTransport.jsonpResponseChars !== undefined ? Number(latestTransport.jsonpResponseChars).toLocaleString('ja-JP') : '-' },
         { label: 'キャッシュ', value: latestServer && latestServer.cacheStatus ? formatCacheStatus_(latestServer.cacheStatus) : '-' },
         { label: '描画', value: latestRender ? formatDuration_(latestRender.durationMs) : '-' },
         { label: 'Long task', value: String(longTasks) }

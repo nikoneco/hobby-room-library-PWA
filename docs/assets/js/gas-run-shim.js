@@ -155,12 +155,13 @@
     const callbackName = '__shumiLibraryJsonp_' + Date.now() + '_' + (++requestSeq);
     const params = new URLSearchParams();
     const script = document.createElement('script');
+    const requestSentAtEpochMs = Date.now();
     let finished = false;
     let timeoutId = 0;
 
     params.set('api', config.api);
     params.set('callback', callbackName);
-    params.set('rq', String(Date.now()));
+    params.set('rq', String(requestSentAtEpochMs));
     if (perfToken) params.set('perf', '1');
     appendArgs_(params, config.argNames, args);
 
@@ -178,12 +179,43 @@
 
     window[callbackName] = function(envelope) {
       if (finished) return;
+      const callbackReceivedAtEpochMs = Date.now();
       finished = true;
       cleanup_();
 
+      const serverPerf = envelope && envelope.perf && typeof envelope.perf === 'object'
+        ? envelope.perf
+        : undefined;
+      const transportPerf = perfToken ? {
+        requestSentAtEpochMs: requestSentAtEpochMs,
+        requestSentAt: new Date(requestSentAtEpochMs).toISOString(),
+        callbackReceivedAtEpochMs: callbackReceivedAtEpochMs,
+        callbackReceivedAt: new Date(callbackReceivedAtEpochMs).toISOString(),
+        callbackWaitMs: Math.max(0, callbackReceivedAtEpochMs - requestSentAtEpochMs),
+        jsonpResponseChars: serverPerf && serverPerf.jsonpResponseChars !== undefined
+          ? Number(serverPerf.jsonpResponseChars)
+          : undefined
+      } : undefined;
+
+      if (transportPerf && serverPerf) {
+        const serverStartedAtEpochMs = Number(serverPerf.serverStartedAtEpochMs);
+        const serverResponseReadyAtEpochMs = Number(serverPerf.serverResponseReadyAtEpochMs);
+        if (Number.isFinite(serverStartedAtEpochMs)) {
+          transportPerf.beforeServerApproxMs = serverStartedAtEpochMs - requestSentAtEpochMs;
+        }
+        if (Number.isFinite(serverResponseReadyAtEpochMs)) {
+          transportPerf.afterServerApproxMs = callbackReceivedAtEpochMs - serverResponseReadyAtEpochMs;
+        }
+      }
+
       if (!envelope || envelope.ok === false) {
         const errorInfo = envelope && envelope.error ? envelope.error : {};
-        endPerf_(perfToken, { ok: false, code: errorInfo.code || 'API_ERROR' });
+        endPerf_(perfToken, {
+          ok: false,
+          code: errorInfo.code || 'API_ERROR',
+          server: serverPerf,
+          transport: transportPerf
+        });
         invokeFailure_(
           failureHandler,
           createError_(errorInfo.message || 'APIからエラーが返りました。', 'API_ERROR', errorInfo)
@@ -194,7 +226,8 @@
       endPerf_(perfToken, {
         ok: true,
         count: Array.isArray(envelope.data) ? envelope.data.length : undefined,
-        server: envelope.perf && typeof envelope.perf === 'object' ? envelope.perf : undefined
+        server: serverPerf,
+        transport: transportPerf
       });
       notifySuccess_();
       if (typeof successHandler === 'function') {

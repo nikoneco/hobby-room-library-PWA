@@ -2126,14 +2126,30 @@ function handleWebAppJsonpRequest_(apiName, params) {
   const callback = normalizeWebAppJsonpCallback_(params.callback);
   const decodedParams = decodeWebAppJsonpParams_(params || {});
   const perf = String(decodedParams.perf || '') === '1'
-    ? { version: 1 }
+    ? {
+        version: 2,
+        serverStartedAtEpochMs: serverStartedAt,
+        serverStartedAt: new Date(serverStartedAt).toISOString()
+      }
     : null;
   const envelope = buildWebAppJsonpEnvelope_(apiName, decodedParams, perf);
   if (perf) {
-    perf.serverMs = Math.max(0, Date.now() - serverStartedAt);
+    const serverResponseReadyAt = Date.now();
+    perf.serverResponseReadyAtEpochMs = serverResponseReadyAt;
+    perf.serverResponseReadyAt = new Date(serverResponseReadyAt).toISOString();
+    perf.serverMs = Math.max(0, serverResponseReadyAt - serverStartedAt);
     envelope.perf = perf;
   }
-  const body = `${callback}(${stringifyForJsonp_(envelope)});`;
+  let body = `${callback}(${stringifyForJsonp_(envelope)});`;
+  if (perf) {
+    // 文字数自体をレスポンスへ含めるため、桁数が安定するまで再生成する。
+    for (let i = 0; i < 4; i += 1) {
+      const responseChars = body.length;
+      if (perf.jsonpResponseChars === responseChars) break;
+      perf.jsonpResponseChars = responseChars;
+      body = `${callback}(${stringifyForJsonp_(envelope)});`;
+    }
+  }
 
   return ContentService
     .createTextOutput(body)
