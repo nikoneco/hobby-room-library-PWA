@@ -39,6 +39,12 @@ assert(source.includes('Utilities.newBlob'), 'server measures cache chunks as UT
 assert(source.includes('Cache round-trip verification failed'), 'server verifies cache writes by reading them back');
 assert(source.includes('LockService.getScriptLock'), 'server coordinates dataset rebuilds with ScriptLock');
 assert(source.includes('getOrBuildCachedDataset_'), 'library and shelf datasets use the shared cache rebuild contract');
+assert(source.includes("addWebAppPerfDuration_(perf, 'cacheReadMs'"), 'server performance trace measures cache reads');
+assert(source.includes("addWebAppPerfDuration_(perf, 'datasetMs'"), 'server performance trace measures dataset retrieval');
+assert(source.includes("addWebAppPerfDuration_(perf, 'filterMs'"), 'server performance trace measures simple-search filtering');
+assert(source.includes("addWebAppPerfDuration_(perf, 'pickMs'"), 'server performance trace measures random selection');
+assert(source.includes("String(decodedParams.perf || '') === '1'"), 'JSONP performance trace is opt-in');
+assert(source.includes('envelope.perf = perf'), 'JSONP returns performance trace metadata');
 assert(source.includes('datasetRevision: getLibraryDatasetRevision_()'), 'initial API responses include the dataset revision');
 assert(source.includes('bumpLibraryDatasetRevision_'), 'cache invalidation advances the dataset revision');
 assert(mainSynopsisSource.includes('if (result.processed > 0)') && mainSynopsisSource.includes('clearLibrarySearchCache_();'), 'synopsis batches invalidate cache once after updates');

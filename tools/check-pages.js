@@ -300,6 +300,12 @@ assert(pwaClient.includes('perfStart: startPerf_'), 'PWA client exposes performa
 assert(pwaClient.includes('perfEnd: endPerf_'), 'PWA client exposes performance end hook');
 assert(gasRunShim.includes("startPerf_('api:' + config.api"), 'GAS JSONP shim measures API calls');
 assert(gasRunShim.includes("endPerf_(perfToken"), 'GAS JSONP shim completes API performance measures');
+assert(gasRunShim.includes("params.set('perf', '1')"), 'GAS JSONP shim requests server timings only while performance HUD is active');
+assert(gasRunShim.includes("server: envelope.perf"), 'GAS JSONP shim attaches server timings to performance entries');
+assert(pwaClient.includes('outsideServerMs'), 'PWA client estimates network and GAS startup overhead');
+assert(pwaClient.includes("label: 'GAS内部'"), 'performance HUD summarizes server execution time');
+assert(pwaClient.includes("label: '通信・起動等'"), 'performance HUD summarizes time outside measured server execution');
+assert(pwaClient.includes("label: 'キャッシュ'"), 'performance HUD summarizes cache status');
 assert(pwaClient.includes('function isIosLike_'), 'PWA client detects iOS-like browsers');
 assert(pwaClient.includes('showIosInstallHint_'), 'PWA client can show iOS install hint');
 assert(pwaClient.includes('INSTALL_HINT_AUTO_HIDE_MS'), 'PWA client auto-hides install hints');
@@ -324,6 +330,13 @@ const sandboxWindow = {
   ShumiLibraryPwa: {
     failures: [],
     cleared: 0,
+    perfEntries: [],
+    perfStart(name, meta) {
+      return { name, meta };
+    },
+    perfEnd(token, meta) {
+      this.perfEntries.push({ token, meta });
+    },
     handleApiFailure(error) {
       this.failures.push(error && error.code);
     },
@@ -379,12 +392,20 @@ sandboxWindow.google.script.run
 assert(appendedScripts.length === 1, 'JSONP shim appends one script for search');
 const searchUrl = new URL(appendedScripts[0].src);
 assert(searchUrl.searchParams.get('api') === 'searchSimple', 'JSONP shim maps searchBooksSimple');
+assert(searchUrl.searchParams.get('perf') === '1', 'JSONP shim opts into server timings while the performance HUD records');
 assert(!searchUrl.searchParams.has('keyword'), 'JSONP shim avoids direct keyword transfer');
 assert(searchUrl.searchParams.get('keywordB64') === '6JGs6YCB', 'JSONP shim serializes keyword as Base64URL');
 const callbackName = searchUrl.searchParams.get('callback');
 assert(callbackName && typeof sandboxWindow[callbackName] === 'function', 'JSONP callback is registered');
-sandboxWindow[callbackName]({ ok: true, data: [{ title: '葬送のフリーレン' }], error: null });
+sandboxWindow[callbackName]({
+  ok: true,
+  data: [{ title: '葬送のフリーレン' }],
+  error: null,
+  perf: { version: 1, serverMs: 240, cacheStatus: 'hit', cacheReadMs: 210, filterMs: 4, mapMs: 2 }
+});
 assert(Array.isArray(successPayload) && successPayload[0].title === '葬送のフリーレン', 'JSONP shim delivers success payload');
+assert(sandboxWindow.ShumiLibraryPwa.perfEntries.length === 1, 'JSONP shim completes the API performance entry');
+assert(sandboxWindow.ShumiLibraryPwa.perfEntries[0].meta.server.cacheStatus === 'hit', 'JSONP shim carries server timing details into the performance entry');
 assert(failureCode === '', 'JSONP shim does not call failure on success');
 assert(sandboxWindow.ShumiLibraryPwa.cleared === 1, 'JSONP shim clears network warning on success');
 

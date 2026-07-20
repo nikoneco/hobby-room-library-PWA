@@ -368,30 +368,64 @@ function clearLibrarySearchCache_() {
   bumpLibraryDatasetRevision_();
 }
 
-function getOrBuildCachedDataset_(cacheKey, isValid, buildDataset) {
-  const cached = getCachedJson_(cacheKey);
-  if (isValid(cached)) return cached;
+function addWebAppPerfDuration_(perf, key, startedAt) {
+  if (!perf || !key) return;
+  const duration = Math.max(0, Date.now() - Number(startedAt || Date.now()));
+  perf[key] = Math.max(0, Number(perf[key] || 0)) + duration;
+}
 
-  const lock = LockService.getScriptLock();
-  let locked = false;
+function getOrBuildCachedDataset_(cacheKey, isValid, buildDataset, perf) {
+  const datasetStartedAt = Date.now();
 
   try {
-    locked = lock.tryLock(CACHE_CONFIG.BUILD_LOCK_WAIT_MS);
-    if (!locked) {
-      console.warn(`Dataset cache build lock timed out: key=${cacheKey}; returning an uncached fallback`);
-      return buildDataset();
+    let stepStartedAt = Date.now();
+    const cached = getCachedJson_(cacheKey);
+    addWebAppPerfDuration_(perf, 'cacheReadMs', stepStartedAt);
+    if (isValid(cached)) {
+      if (perf) perf.cacheStatus = 'hit';
+      return cached;
     }
 
-    const cachedAfterLock = getCachedJson_(cacheKey);
-    if (isValid(cachedAfterLock)) return cachedAfterLock;
+    if (perf) perf.cacheStatus = 'miss';
+    const lock = LockService.getScriptLock();
+    let locked = false;
 
-    const dataset = buildDataset();
-    if (isValid(dataset)) {
-      putCachedJson_(cacheKey, dataset, CACHE_CONFIG.TTL_SECONDS);
+    try {
+      stepStartedAt = Date.now();
+      locked = lock.tryLock(CACHE_CONFIG.BUILD_LOCK_WAIT_MS);
+      addWebAppPerfDuration_(perf, 'lockWaitMs', stepStartedAt);
+      if (!locked) {
+        console.warn(`Dataset cache build lock timed out: key=${cacheKey}; returning an uncached fallback`);
+        if (perf) perf.cacheStatus = 'miss-lock-timeout';
+        stepStartedAt = Date.now();
+        const fallbackDataset = buildDataset();
+        addWebAppPerfDuration_(perf, 'buildMs', stepStartedAt);
+        return fallbackDataset;
+      }
+
+      stepStartedAt = Date.now();
+      const cachedAfterLock = getCachedJson_(cacheKey);
+      addWebAppPerfDuration_(perf, 'cacheReadMs', stepStartedAt);
+      if (isValid(cachedAfterLock)) {
+        if (perf) perf.cacheStatus = 'hit-after-lock';
+        return cachedAfterLock;
+      }
+
+      stepStartedAt = Date.now();
+      const dataset = buildDataset();
+      addWebAppPerfDuration_(perf, 'buildMs', stepStartedAt);
+      if (isValid(dataset)) {
+        stepStartedAt = Date.now();
+        putCachedJson_(cacheKey, dataset, CACHE_CONFIG.TTL_SECONDS);
+        addWebAppPerfDuration_(perf, 'cacheWriteMs', stepStartedAt);
+      }
+      if (perf) perf.cacheStatus = 'miss-built';
+      return dataset;
+    } finally {
+      if (locked) lock.releaseLock();
     }
-    return dataset;
   } finally {
-    if (locked) lock.releaseLock();
+    addWebAppPerfDuration_(perf, 'datasetMs', datasetStartedAt);
   }
 }
 
@@ -1591,12 +1625,13 @@ function buildSeriesSearchLinks_(title) {
  *   advancedOptions: Object
  * }}
  */
-function getLibraryDataset_() {
+function getLibraryDataset_(perf) {
   const cacheKey = CACHE_CONFIG.LIBRARY_DATASET_KEY;
   return getOrBuildCachedDataset_(
     cacheKey,
     isLibraryDatasetValid_,
-    buildLibraryDataset_
+    buildLibraryDataset_,
+    perf
   );
 }
 
@@ -1679,18 +1714,29 @@ function searchBooks(title, author) {
  * @param {string} keyword
  * @returns {Object[]}
  */
-function searchBooksSimple(keyword) {
+function searchBooksSimple(keyword, perf) {
   try {
-    const dataset = getLibraryDataset_();
+    const dataset = getLibraryDataset_(perf);
     const rows = dataset.rows || [];
     const index = dataset.index || [];
 
-    if (!rows.length) return [];
+    if (perf) perf.sourceCount = rows.length;
 
+    if (!rows.length) {
+      if (perf) perf.resultCount = 0;
+      return [];
+    }
+
+    const filterStartedAt = Date.now();
     const nKeyword = normalizeKana(keyword || '');
 
     if (!nKeyword) {
-      return mapRowsToBooks_(rows, index, { compact: true });
+      addWebAppPerfDuration_(perf, 'filterMs', filterStartedAt);
+      const mapStartedAt = Date.now();
+      const allBooks = mapRowsToBooks_(rows, index, { compact: true });
+      addWebAppPerfDuration_(perf, 'mapMs', mapStartedAt);
+      if (perf) perf.resultCount = allBooks.length;
+      return allBooks;
     }
 
     const matchedRows = [];
@@ -1705,9 +1751,14 @@ function searchBooksSimple(keyword) {
       }
     }
 
-    return mapRowsToBooks_(matchedRows, matchedIndex, {
+    addWebAppPerfDuration_(perf, 'filterMs', filterStartedAt);
+    const mapStartedAt = Date.now();
+    const books = mapRowsToBooks_(matchedRows, matchedIndex, {
       compact: matchedRows.length > 80
     });
+    addWebAppPerfDuration_(perf, 'mapMs', mapStartedAt);
+    if (perf) perf.resultCount = books.length;
+    return books;
   } catch (e) {
     console.error('searchBooksSimple error:', e);
     return [];
@@ -1720,13 +1771,18 @@ function searchBooksSimple(keyword) {
  * @param {number} count
  * @returns {Object[]}
  */
-function getRandomBooks(count) {
+function getRandomBooks(count, perf) {
   try {
-    const dataset = getLibraryDataset_();
+    const dataset = getLibraryDataset_(perf);
     const rows = dataset.rows || [];
     const index = dataset.index || [];
 
-    if (!rows.length) return [];
+    if (perf) perf.sourceCount = rows.length;
+
+    if (!rows.length) {
+      if (perf) perf.resultCount = 0;
+      return [];
+    }
 
     const n = normalizeWebAppApiInteger_(count, {
       fallback: 10,
@@ -1734,8 +1790,12 @@ function getRandomBooks(count) {
       max: Math.min(WEBAPP_API_LIMITS_.RANDOM_MAX_COUNT, rows.length)
     });
 
-    if (n <= 0) return [];
+    if (n <= 0) {
+      if (perf) perf.resultCount = 0;
+      return [];
+    }
 
+    const pickStartedAt = Date.now();
     const used = new Set();
     const pickedRows = [];
     const pickedIndex = [];
@@ -1749,7 +1809,12 @@ function getRandomBooks(count) {
       pickedIndex.push(index[i] || {});
     }
 
-    return mapRowsToBooks_(pickedRows, pickedIndex);
+    addWebAppPerfDuration_(perf, 'pickMs', pickStartedAt);
+    const mapStartedAt = Date.now();
+    const books = mapRowsToBooks_(pickedRows, pickedIndex);
+    addWebAppPerfDuration_(perf, 'mapMs', mapStartedAt);
+    if (perf) perf.resultCount = books.length;
+    return books;
   } catch (e) {
     console.error('getRandomBooks error:', e);
     return [];
@@ -1991,7 +2056,7 @@ const PUBLIC_WEBAPP_JSONP_API_HANDLERS_ = Object.freeze({
     params.detailReleasedToYear,
     params.detailReleasedToMonth
   ),
-  searchSimple: params => searchBooksSimple(params.keyword || ''),
+  searchSimple: (params, perf) => searchBooksSimple(params.keyword || '', perf),
   searchAdvanced: params => searchBooksAdvanced(
     params.keyword,
     params.detailTitle,
@@ -2007,7 +2072,7 @@ const PUBLIC_WEBAPP_JSONP_API_HANDLERS_ = Object.freeze({
     params.detailReleasedToYear,
     params.detailReleasedToMonth
   ),
-  random: params => getRandomBooks(params.count || 10),
+  random: (params, perf) => getRandomBooks(params.count || 10, perf),
   shelf: () => getBookshelfBooks(),
   shelfChunk: params => getBookshelfBooksChunk(params.offset, params.limit),
   bookDetail: params => getBookDetailByRowIndex(params.rowIndex),
@@ -2039,9 +2104,17 @@ function doGet(e) {
  * @returns {GoogleAppsScript.Content.TextOutput}
  */
 function handleWebAppJsonpRequest_(apiName, params) {
+  const serverStartedAt = Date.now();
   const callback = normalizeWebAppJsonpCallback_(params.callback);
   const decodedParams = decodeWebAppJsonpParams_(params || {});
-  const envelope = buildWebAppJsonpEnvelope_(apiName, decodedParams);
+  const perf = String(decodedParams.perf || '') === '1'
+    ? { version: 1 }
+    : null;
+  const envelope = buildWebAppJsonpEnvelope_(apiName, decodedParams, perf);
+  if (perf) {
+    perf.serverMs = Math.max(0, Date.now() - serverStartedAt);
+    envelope.perf = perf;
+  }
   const body = `${callback}(${stringifyForJsonp_(envelope)});`;
 
   return ContentService
@@ -2118,11 +2191,11 @@ function normalizeWebAppJsonpCallback_(callback) {
  * @param {Object<string, string>} params
  * @returns {{ok:boolean,data:*,error:Object|null}}
  */
-function buildWebAppJsonpEnvelope_(apiName, params) {
+function buildWebAppJsonpEnvelope_(apiName, params, perf) {
   try {
     return {
       ok: true,
-      data: dispatchWebAppJsonpApi_(apiName, params),
+      data: dispatchWebAppJsonpApi_(apiName, params, perf),
       error: null
     };
   } catch (e) {
@@ -2143,13 +2216,13 @@ function buildWebAppJsonpEnvelope_(apiName, params) {
  * @param {Object<string, string>} params
  * @returns {*}
  */
-function dispatchWebAppJsonpApi_(apiName, params) {
+function dispatchWebAppJsonpApi_(apiName, params, perf) {
   const normalizedApiName = String(apiName || '').trim();
   const handler = PUBLIC_WEBAPP_JSONP_API_HANDLERS_[normalizedApiName];
   if (typeof handler !== 'function') {
     throw new Error(`Unknown API: ${apiName}`);
   }
-  return handler(params || {});
+  return handler(params || {}, perf || null);
 }
 
 

@@ -161,6 +161,7 @@
     params.set('api', config.api);
     params.set('callback', callbackName);
     params.set('rq', String(Date.now()));
+    if (perfToken) params.set('perf', '1');
     appendArgs_(params, config.argNames, args);
 
     function cleanup_() {
@@ -192,7 +193,8 @@
 
       endPerf_(perfToken, {
         ok: true,
-        count: Array.isArray(envelope.data) ? envelope.data.length : undefined
+        count: Array.isArray(envelope.data) ? envelope.data.length : undefined,
+        server: envelope.perf && typeof envelope.perf === 'object' ? envelope.perf : undefined
       });
       notifySuccess_();
       if (typeof successHandler === 'function') {

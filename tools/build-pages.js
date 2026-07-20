@@ -2937,6 +2937,7 @@ function writeGasRunShim() {
     params.set('api', config.api);
     params.set('callback', callbackName);
     params.set('rq', String(Date.now()));
+    if (perfToken) params.set('perf', '1');
     appendArgs_(params, config.argNames, args);
 
     function cleanup_() {
@@ -2968,7 +2969,8 @@ function writeGasRunShim() {
 
       endPerf_(perfToken, {
         ok: true,
-        count: Array.isArray(envelope.data) ? envelope.data.length : undefined
+        count: Array.isArray(envelope.data) ? envelope.data.length : undefined,
+        server: envelope.perf && typeof envelope.perf === 'object' ? envelope.perf : undefined
       });
       notifySuccess_();
       if (typeof successHandler === 'function') {
@@ -3581,13 +3583,27 @@ function writePwaClient() {
 
   function summarizePerfMeta_(entry) {
     const meta = entry && entry.meta && typeof entry.meta === 'object' ? entry.meta : {};
+    const server = meta.server && typeof meta.server === 'object' ? meta.server : null;
     const parts = [];
     if (meta.api) parts.push('api=' + meta.api);
     if (meta.method) parts.push('method=' + meta.method);
     if (meta.count !== undefined) parts.push('count=' + meta.count);
+    if (server && server.serverMs !== undefined) parts.push('GAS=' + formatDuration_(server.serverMs));
+    if (server && server.cacheStatus) parts.push('cache=' + formatCacheStatus_(server.cacheStatus));
     if (meta.ok === false) parts.push('fail');
     if (meta.code) parts.push('code=' + meta.code);
     return parts.join(' / ');
+  }
+
+  function formatCacheStatus_(status) {
+    const labels = {
+      hit: 'HIT',
+      'hit-after-lock': 'HIT(待機後)',
+      miss: 'MISS',
+      'miss-built': 'MISS→再構築',
+      'miss-lock-timeout': 'MISS(待機切れ)'
+    };
+    return labels[String(status || '')] || String(status || '-');
   }
 
   function ensurePerfHud_() {
@@ -3676,12 +3692,16 @@ function writePwaClient() {
     if (summaryEl) {
       const latestApi = entries.slice().reverse().find(entry => String(entry.name || '').indexOf('api:') === 0);
       const latestRender = entries.slice().reverse().find(entry => String(entry.name || '').indexOf('render:') === 0 || String(entry.name || '').indexOf('shelf:') === 0);
-      const latestPopup = entries.slice().reverse().find(entry => String(entry.name || '').indexOf('popup:') === 0);
       const longTasks = entries.filter(entry => String(entry.name || '') === 'longtask').length;
+      const latestServer = latestApi && latestApi.meta && latestApi.meta.server && typeof latestApi.meta.server === 'object'
+        ? latestApi.meta.server
+        : null;
       const stats = [
         { label: 'API', value: latestApi ? formatDuration_(latestApi.durationMs) : '-' },
+        { label: 'GAS内部', value: latestServer ? formatDuration_(latestServer.serverMs) : '-' },
+        { label: '通信・起動等', value: latestServer && latestServer.outsideServerMs !== undefined ? formatDuration_(latestServer.outsideServerMs) : '-' },
+        { label: 'キャッシュ', value: latestServer && latestServer.cacheStatus ? formatCacheStatus_(latestServer.cacheStatus) : '-' },
         { label: '描画', value: latestRender ? formatDuration_(latestRender.durationMs) : '-' },
-        { label: 'モーダル', value: latestPopup ? formatDuration_(latestPopup.durationMs) : '-' },
         { label: 'Long task', value: String(longTasks) }
       ];
       summaryEl.innerHTML = '';
@@ -3785,7 +3805,13 @@ function writePwaClient() {
   function endPerf_(token, meta) {
     if (!token) return null;
     const mergedMeta = Object.assign({}, token.meta || {}, meta || {});
-    return recordPerf_(token.name, now_() - Number(token.startedAt || now_()), mergedMeta);
+    const durationMs = now_() - Number(token.startedAt || now_());
+    if (mergedMeta.server && typeof mergedMeta.server === 'object') {
+      mergedMeta.server = Object.assign({}, mergedMeta.server, {
+        outsideServerMs: Math.max(0, Math.round(durationMs - Number(mergedMeta.server.serverMs || 0)))
+      });
+    }
+    return recordPerf_(token.name, durationMs, mergedMeta);
   }
 
   function observeLongTasks_() {
