@@ -1192,11 +1192,14 @@ button.popup-arrow:active {
   }
 
   #image-popup-content:not(.series-mode) #image-popup-info {
+    flex: 0 0 auto;
+    overflow: visible;
     padding: 0.74rem 0.76rem 0.8rem;
     border-radius: calc(var(--lib-radius-md) + 1px);
   }
 
   #image-popup-img {
+    flex: 0 0 auto;
     justify-self: center;
     max-width: min(68vw, 260px);
     max-height: 36vh;
