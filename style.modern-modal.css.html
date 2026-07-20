@@ -697,8 +697,7 @@ button.popup-arrow:active {
   padding-left: 0.1rem;
 }
 
-.popup-detail-skeleton-line,
-.popup-detail-skeleton-chip-row span {
+.popup-detail-skeleton-line {
   position: relative;
   overflow: hidden;
   border-radius: 999px;
@@ -718,20 +717,7 @@ button.popup-arrow:active {
   width: 92%;
 }
 
-.popup-detail-skeleton-chip-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.36rem;
-}
-
-.popup-detail-skeleton-chip-row span {
-  width: 4.8rem;
-  height: 1.52rem;
-  border: 1px solid rgba(246, 241, 229, 0.078);
-}
-
-.popup-detail-skeleton-line::after,
-.popup-detail-skeleton-chip-row span::after {
+.popup-detail-skeleton-line::after {
   content: "";
   position: absolute;
   inset: 0;

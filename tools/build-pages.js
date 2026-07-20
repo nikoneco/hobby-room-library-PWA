@@ -3058,6 +3058,7 @@ function writeGasRunShim() {
 
   let localIndexPayload = null;
   let localIndexRecords = [];
+  let localIndexByRowIndex = new Map();
   let localIndexLoadPromise = null;
   let localIndexRefreshPromise = null;
   let localIndexLastCheckedAt = 0;
@@ -3397,6 +3398,10 @@ function writeGasRunShim() {
     const converted = convertLocalIndexPayload_(payload);
     localIndexPayload = payload;
     localIndexRecords = converted;
+    localIndexByRowIndex = new Map();
+    converted.forEach(function(record) {
+      localIndexByRowIndex.set(Number(record.book.rowIndex), record);
+    });
     dispatchLocalIndexReady_(updated);
   }
 
@@ -3479,6 +3484,10 @@ function writeGasRunShim() {
     getRevision: function() { return localIndexPayload ? String(localIndexPayload.revision || '') : ''; },
     getRecordCount: function() { return localIndexRecords.length; },
     getPreviewIndex: function() { return localIndexRecords.map(function(record) { return record.index; }); },
+    getBookByRowIndex: function(rowIndex) {
+      const record = localIndexByRowIndex.get(Number(rowIndex));
+      return record ? cloneLocalBook_(record) : null;
+    },
     getMetadata: function() {
       return localIndexPayload && localIndexPayload.metadata && typeof localIndexPayload.metadata === 'object'
         ? localIndexPayload.metadata
@@ -3613,7 +3622,7 @@ function writePwaClient() {
     'shelfOverview.heading.immersive': '蔵書全体の棚を開いています',
     'shelfOverview.heading.result': '見つかった本を棚順に並べています',
     'shelfOverview.note.result': '検索結果だけを棚順に並べています。全体を眺めるときはトップの「本棚を見る」からどうぞ。',
-    'popup.detailLoading': '詳細の頁を開いています',
+    'popup.detailLoading': 'あらすじなどを読み込んでいます',
     'series.loading': 'シリーズ棚を確かめています...'
   };
 

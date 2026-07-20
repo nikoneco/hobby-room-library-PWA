@@ -171,6 +171,9 @@ function invoke(runner, method, args) {
   assert(metadata.suggest.titles.includes('【推しの子】'), 'stored index exposes search suggestions');
   assert(metadata.advancedOptions.publishers.includes('小学館'), 'stored index exposes advanced search options');
   assert(metadata.quickBrowseCounts.status['連載中'] === 3, 'stored index exposes quick-browse counts');
+  const indexedBook = sandboxWindow.ShumiLibraryLocalIndex.getBookByRowIndex(1);
+  assert(indexedBook && indexedBook.title === '【推しの子】 2', 'stored index exposes a book by row index');
+  assert(indexedBook.genreMeta.some(item => item.name === '芸能'), 'row lookup preserves locally stored genres');
   assert(documentEvents.some(event => event.type === 'shumi-library-local-index-ready'), 'stored index emits a ready event');
 
   const runner = sandboxWindow.google.script.run;

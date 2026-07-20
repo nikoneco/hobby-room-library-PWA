@@ -67,7 +67,7 @@
     'shelfOverview.heading.immersive': '蔵書全体の棚を開いています',
     'shelfOverview.heading.result': '見つかった本を棚順に並べています',
     'shelfOverview.note.result': '検索結果だけを棚順に並べています。全体を眺めるときはトップの「本棚を見る」からどうぞ。',
-    'popup.detailLoading': '詳細の頁を開いています',
+    'popup.detailLoading': 'あらすじなどを読み込んでいます',
     'series.loading': 'シリーズ棚を確かめています...'
   };
 

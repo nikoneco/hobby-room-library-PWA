@@ -282,6 +282,7 @@
 
   let localIndexPayload = null;
   let localIndexRecords = [];
+  let localIndexByRowIndex = new Map();
   let localIndexLoadPromise = null;
   let localIndexRefreshPromise = null;
   let localIndexLastCheckedAt = 0;
@@ -621,6 +622,10 @@
     const converted = convertLocalIndexPayload_(payload);
     localIndexPayload = payload;
     localIndexRecords = converted;
+    localIndexByRowIndex = new Map();
+    converted.forEach(function(record) {
+      localIndexByRowIndex.set(Number(record.book.rowIndex), record);
+    });
     dispatchLocalIndexReady_(updated);
   }
 
@@ -703,6 +708,10 @@
     getRevision: function() { return localIndexPayload ? String(localIndexPayload.revision || '') : ''; },
     getRecordCount: function() { return localIndexRecords.length; },
     getPreviewIndex: function() { return localIndexRecords.map(function(record) { return record.index; }); },
+    getBookByRowIndex: function(rowIndex) {
+      const record = localIndexByRowIndex.get(Number(rowIndex));
+      return record ? cloneLocalBook_(record) : null;
+    },
     getMetadata: function() {
       return localIndexPayload && localIndexPayload.metadata && typeof localIndexPayload.metadata === 'object'
         ? localIndexPayload.metadata

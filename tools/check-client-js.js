@@ -164,6 +164,50 @@ assertEqual(sandbox.normalizeKana('ＡＢＣ カタカナ'), 'abcかたかな', 
 }
 
 {
+  const originalLocalIndexManager = sandbox.window.ShumiLibraryLocalIndex;
+  sandbox.window.ShumiLibraryLocalIndex = {
+    getBookByRowIndex(rowIndex) {
+      assertEqual(rowIndex, 4, 'popup local-index hydration uses the current row index');
+      return {
+        rowIndex: 4,
+        title: '【推しの子】 04',
+        author: '赤坂アカ×横槍メンゴ',
+        publisher: '集英社',
+        genre: 'ミステリー／サスペンス,芸能界,完結(全巻保有)',
+        genreMeta: [
+          { category: 'story', name: 'ミステリー／サスペンス' },
+          { category: 'theme', name: '芸能界' },
+          { category: 'status', name: '完結(全巻保有)' }
+        ]
+      };
+    }
+  };
+
+  const lightweightBook = {
+    rowIndex: 4,
+    detailLoaded: false,
+    title: '【推しの子】 04',
+    isbn: '9784088918723',
+    shelf: '④',
+    location: '下-2'
+  };
+  const hydratedBook = sandbox.hydratePopupBookFromLocalIndex_(lightweightBook);
+  assert(hydratedBook === lightweightBook, 'popup hydration enriches the existing lightweight book reference');
+  assertEqual(hydratedBook.author, '赤坂アカ×横槍メンゴ', 'popup immediately restores local author metadata');
+  assertEqual(hydratedBook.genreMeta.length, 3, 'popup immediately restores local genre metadata');
+
+  const deferredRenderBook = sandbox.createPopupDeferredRenderBook_(hydratedBook);
+  assertEqual(deferredRenderBook.genreMeta.length, 3, 'deferred popup rendering preserves immediate genres');
+  assertEqual(deferredRenderBook.detailLoaded, false, 'deferred popup still waits for synopsis details');
+
+  if (originalLocalIndexManager === undefined) {
+    delete sandbox.window.ShumiLibraryLocalIndex;
+  } else {
+    sandbox.window.ShumiLibraryLocalIndex = originalLocalIndexManager;
+  }
+}
+
+{
   const originalPopulateAdvancedOptions = sandbox.populateAdvancedOptions;
   const originalRenderQuickBrowseRail = sandbox.renderQuickBrowseRail_;
   const originalSyncSearchStatus = sandbox.syncSearchStatusPreviewFromForm_;
@@ -555,6 +599,24 @@ assert(
     searchScriptSource.includes("lastResultKind = 'shelf';"),
   'result kind keeps search grouping out of random and bookshelf views'
 );
+{
+  const modalSource = clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')];
+  const popupStart = modalSource.indexOf('function showPopup(');
+  const popupEnd = modalSource.indexOf('appendPopupSummaryAccordion_', popupStart);
+  const popupMarkupSource = popupStart >= 0 && popupEnd > popupStart
+    ? modalSource.slice(popupStart, popupEnd)
+    : '';
+  assert(
+    popupMarkupSource.indexOf('genre-chip-wrap popup') < popupMarkupSource.indexOf('buildPopupDetailLoadingHtml_'),
+    'popup renders local genres before the deferred-detail loading state'
+  );
+  assert(
+    modalSource.includes('if (targetBook.detailLoaded !== false) return;'),
+    'popup does not recursively reapply cached details to an already-loaded book'
+  );
+  assert(!modalSource.includes('popup-detail-skeleton-chip-row'), 'popup loading skeleton no longer impersonates unavailable genres');
+  assert(modalSource.includes('あらすじなどを読み込んでいます'), 'popup loading copy describes only deferred detail data');
+}
 assert(
   clientScriptSources[clientScriptFiles.indexOf('script.state.js.html')].includes('BOOK_DETAIL_PREFETCH_WARM_DELAY_MS') &&
     clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('function scheduleBookDetailPrefetchQueue_') &&

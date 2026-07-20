@@ -270,6 +270,35 @@ function shouldFetchDeferredBookDetails_(book, options) {
   );
 }
 
+function hydratePopupBookFromLocalIndex_(book) {
+  if (!book || typeof book !== 'object') return book;
+
+  const manager = window.ShumiLibraryLocalIndex;
+  if (!manager || typeof manager.getBookByRowIndex !== 'function') return book;
+
+  const localBook = manager.getBookByRowIndex(book.rowIndex);
+  if (!localBook || typeof localBook !== 'object') return book;
+
+  [
+    'author', 'publisher', 'released', 'brand', 'genre', 'yomi',
+    'seriesKeyAuto', 'seriesCount', 'seriesSearchTitle', 'volume', 'ownedMaxVolume'
+  ].forEach(key => {
+    if (!hasDisplayValue_(book[key]) && hasDisplayValue_(localBook[key])) {
+      book[key] = localBook[key];
+    }
+  });
+
+  if ((!Array.isArray(book.genreMeta) || !book.genreMeta.length) && Array.isArray(localBook.genreMeta)) {
+    book.genreMeta = localBook.genreMeta.map(item => Object.assign({}, item));
+  }
+
+  if (book.isExtraSeries === undefined && localBook.isExtraSeries !== undefined) {
+    book.isExtraSeries = Boolean(localBook.isExtraSeries);
+  }
+
+  return book;
+}
+
 function createPopupDeferredRenderBook_(book) {
   if (!book || typeof book !== 'object') return book;
 
@@ -283,6 +312,10 @@ function createPopupDeferredRenderBook_(book) {
     img400: book.img400 || '',
     fallbackImg: book.fallbackImg || '',
     fallbackImageSource: book.fallbackImageSource || '',
+    genre: book.genre || '',
+    genreMeta: Array.isArray(book.genreMeta)
+      ? book.genreMeta.map(item => Object.assign({}, item))
+      : [],
     isSensitive: book.isSensitive,
     detailLoaded: false,
     detailLoading: true,
@@ -706,6 +739,9 @@ function fetchPopupContextBookDetails_(book, index, dataArr, seriesContext, opti
 
   targets.forEach(target => {
     const targetBook = target.book;
+    // A cached detail may still exist after the full book has already been
+    // merged. Reapplying it would reopen the popup recursively.
+    if (targetBook.detailLoaded !== false) return;
     const cached = getCachedBookDetail_(targetBook);
     if (cached) {
       handlePopupContextBookDetailResult_(target, dataArr, seriesContext, cached, null);
@@ -1079,15 +1115,10 @@ function buildPopupDetailLoadingHtml_(book) {
   }
   return `
     <div class="popup-detail-loading" aria-live="polite">
-      <div class="popup-detail-state loading">${escapeHtml(getPwaLibrarianText_('popup.detailLoading', '詳細を準備中'))}</div>
+      <div class="popup-detail-state loading">${escapeHtml(getPwaLibrarianText_('popup.detailLoading', 'あらすじなどを読み込んでいます'))}</div>
       <div class="popup-detail-skeleton" aria-hidden="true">
         <span class="popup-detail-skeleton-line wide"></span>
         <span class="popup-detail-skeleton-line"></span>
-        <span class="popup-detail-skeleton-chip-row">
-          <span></span>
-          <span></span>
-          <span></span>
-        </span>
       </div>
     </div>
   `;
@@ -1550,6 +1581,7 @@ function showPopup(book, index, dataArr, seriesContext, options) {
     shelf: isShelfPopupContext_(dataArr)
   });
   const popupOptions = options || {};
+  book = hydratePopupBookFromLocalIndex_(book);
   const sourceBook = book;
   const deferCurrentDetailRender = Boolean(
     popupOptions.deferCurrentDetailRender &&
@@ -1625,12 +1657,12 @@ function showPopup(book, index, dataArr, seriesContext, options) {
   const actionsHtml = buildPopupActionsHtml(renderBook, popupSeriesContext);
   info.innerHTML = `
     <div class="popup-book-detail">
-      <div class="popup-book-head">
-        <div class="popup-book-title">${escapeHtml(renderBook.title || '(タイトルなし)')}</div>
-        ${buildPopupBookLeadHtml_(renderBook)}
-        ${buildPopupDetailLoadingHtml_(renderBook)}
-      </div>
+        <div class="popup-book-head">
+          <div class="popup-book-title">${escapeHtml(renderBook.title || '(タイトルなし)')}</div>
+          ${buildPopupBookLeadHtml_(renderBook)}
+        </div>
       <div class="genre-chip-wrap popup">${buildGenreChips(renderBook)}</div>
+      ${buildPopupDetailLoadingHtml_(renderBook)}
       <div class="popup-book-primary-meta">
         ${buildBookMetaPillsHtml_(renderBook, { includeIsbn: true })}
         ${buildBookMemoHtml_(renderBook)}
