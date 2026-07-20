@@ -24,6 +24,7 @@
   <link rel="stylesheet" href="./assets/css/style.modern-shelf.css">
   <link rel="stylesheet" href="./assets/css/style.responsive.css">
   <link rel="stylesheet" href="./assets/css/style.night-library.css">
+  <link rel="stylesheet" href="./assets/css/tokens.css">
   <link rel="stylesheet" href="./assets/css/pwa.css">
 </head>
 <body class="sandbox-redesign">
@@ -280,28 +281,28 @@
         </button>
       </div>
     </div>
-  </div>
 
-  <div id="viewToggle" class="view-toggle" role="group" aria-label="表示モード">
-    <span class="view-toggle-kicker" aria-hidden="true">表示</span>
-    <button id="tileViewBtn" class="toggle-btn active" aria-label="タイル表示" aria-pressed="true">
-      <span class="toggle-icon ui-icon" aria-hidden="true">
-        <svg viewBox="0 0 24 24"><path d="M5 5h5v5H5z"></path><path d="M14 5h5v5h-5z"></path><path d="M5 14h5v5H5z"></path><path d="M14 14h5v5h-5z"></path></svg>
-      </span>
-      <span class="toggle-label">タイル</span>
-    </button>
-    <button id="listViewBtn" class="toggle-btn" aria-label="リスト表示" aria-pressed="false">
-      <span class="toggle-icon ui-icon" aria-hidden="true">
-        <svg viewBox="0 0 24 24"><path d="M8 6h12"></path><path d="M8 12h12"></path><path d="M8 18h12"></path><path d="M4 6h.01"></path><path d="M4 12h.01"></path><path d="M4 18h.01"></path></svg>
-      </span>
-      <span class="toggle-label">リスト</span>
-    </button>
-    <button id="shelfViewBtn" class="toggle-btn" aria-label="本棚表示" aria-pressed="false">
-      <span class="toggle-icon ui-icon" aria-hidden="true">
-        <svg viewBox="0 0 24 24"><path d="M4 20h16"></path><path d="M5 4h3v13H5z"></path><path d="M10 4h3v13h-3z"></path><path d="M15 5l3-.8 3.4 12.8-3 .8z"></path></svg>
-      </span>
-      <span class="toggle-label">本棚</span>
-    </button>
+    <div id="viewToggle" class="view-toggle" role="group" aria-label="表示モード">
+      <span class="view-toggle-kicker" aria-hidden="true">表示</span>
+      <button id="tileViewBtn" class="toggle-btn active" aria-label="タイル表示" aria-pressed="true">
+        <span class="toggle-icon ui-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M5 5h5v5H5z"></path><path d="M14 5h5v5h-5z"></path><path d="M5 14h5v5H5z"></path><path d="M14 14h5v5h-5z"></path></svg>
+        </span>
+        <span class="toggle-label">タイル</span>
+      </button>
+      <button id="listViewBtn" class="toggle-btn" aria-label="リスト表示" aria-pressed="false">
+        <span class="toggle-icon ui-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M8 6h12"></path><path d="M8 12h12"></path><path d="M8 18h12"></path><path d="M4 6h.01"></path><path d="M4 12h.01"></path><path d="M4 18h.01"></path></svg>
+        </span>
+        <span class="toggle-label">リスト</span>
+      </button>
+      <button id="shelfViewBtn" class="toggle-btn" aria-label="本棚表示" aria-pressed="false">
+        <span class="toggle-icon ui-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M4 20h16"></path><path d="M5 4h3v13H5z"></path><path d="M10 4h3v13h-3z"></path><path d="M15 5l3-.8 3.4 12.8-3 .8z"></path></svg>
+        </span>
+        <span class="toggle-label">本棚</span>
+      </button>
+    </div>
   </div>
 
   <div id="spinner-overlay" role="status" aria-live="polite" aria-busy="true" style="display: none;">

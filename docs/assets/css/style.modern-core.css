@@ -1,5 +1,10 @@
+/* Hallmark · pre-emit critique: P5 H4 E4 S5 R4 V5 */
+/* Hallmark · genre: atmospheric · tone: quiet midnight library · palette: deep teal + lantern amber · macrostructure: Workbench · design-system: design.md · designed-as-app · visual-QA: pending */
 /* ===== Modern Dark Library Refresh 2026-05-20 ===== */
 :root {
+  --font-display: "Yu Mincho", "Hiragino Mincho ProN", "BIZ UDPMincho", "Noto Serif JP", serif;
+  --font-body: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans JP", "Yu Gothic", "Hiragino Sans", sans-serif;
+  --color-focus: var(--lib-accent-2);
   --lib-bg: #10141b;
   --lib-bg-2: #151a23;
   --lib-panel: rgba(29, 36, 48, 0.86);
@@ -28,14 +33,43 @@
   box-sizing: border-box;
 }
 
+html,
 body {
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans JP", "Yu Gothic", "Hiragino Sans", sans-serif;
+  overflow-x: clip;
+}
+
+body {
+  font-family: var(--font-body);
   background:
     linear-gradient(135deg, rgba(255, 255, 255, 0.035) 0 1px, transparent 1px 18px),
     linear-gradient(180deg, #171c25 0%, var(--lib-bg) 42%, #0c1016 100%);
   color: var(--lib-text);
   letter-spacing: 0;
   min-height: 100vh;
+}
+
+.preview-brand-name,
+.bookshelf-cta-title,
+.shelf-view-mode,
+.bookshelf-group-title,
+.bookshelf-level-title,
+.shelf-room-map-modal-title,
+.book-title,
+.popup-book-title,
+.search-result-series-book-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.shelf-view-stat-value,
+.shelf-jump-chip-count,
+.bookshelf-group-count,
+.bookshelf-level-count,
+.book-price,
+.popup-position-indicator {
+  font-variant-numeric: tabular-nums;
 }
 
 body::before {
@@ -348,12 +382,10 @@ body::before {
   border: 1px solid rgba(214, 164, 95, 0.20);
   border-radius: calc(var(--lib-radius-lg) + 2px);
   background:
-    linear-gradient(90deg, rgba(214, 164, 95, 0.090) 0 6px, transparent 6px),
     linear-gradient(180deg, rgba(255, 255, 255, 0.064), rgba(255, 255, 255, 0.026)),
     rgba(10, 15, 21, 0.70);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.060),
-    inset 7px 0 0 rgba(214, 164, 95, 0.12),
     0 22px 62px rgba(0, 0, 0, 0.32);
 }
 
@@ -732,6 +764,8 @@ button.quick-browse-chip:active {
   color: var(--lib-text);
   color-scheme: dark;
   font-size: 0.98rem;
+  outline: 2px solid transparent;
+  outline-offset: 1px;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.038);
   transition: border-color var(--lib-ease), background var(--lib-ease), box-shadow var(--lib-ease);
 }
@@ -765,6 +799,7 @@ button.quick-browse-chip:active {
 .input-group input:focus,
 .input-group select:focus,
 .released-range-controls select:focus {
+  outline-color: var(--color-focus);
   border-color: rgba(104, 191, 215, 0.78);
   background: rgba(255, 255, 255, 0.07);
   box-shadow: 0 0 0 3px rgba(104, 191, 215, 0.13);
@@ -787,15 +822,11 @@ button.quick-browse-chip:active {
   display: grid;
   grid-template-columns: minmax(0, 1.08fr) minmax(0, 0.92fr) auto;
   align-items: stretch;
-  padding: 0.34rem;
-  border: 1px solid rgba(148, 163, 184, 0.13);
-  border-radius: calc(var(--lib-radius-sm) + 5px);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.046), rgba(255, 255, 255, 0.018)),
-    rgba(3, 8, 13, 0.24);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.050),
-    0 12px 28px rgba(0, 0, 0, 0.14);
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 button,
@@ -808,6 +839,7 @@ button,
   align-items: center;
   justify-content: center;
   gap: 0.42em;
+  white-space: nowrap;
   min-height: 40px;
   padding: 0.62rem 1rem;
   border: 1px solid var(--lib-line);
@@ -984,12 +1016,7 @@ button.quiet-action:hover,
 }
 
 .search-container.centered .quick-browse-rail::before {
-  content: "";
-  position: absolute;
-  inset: 0 auto 0 0;
-  z-index: -1;
-  width: 5px;
-  background: linear-gradient(180deg, rgba(240, 195, 122, 0.44), rgba(104, 191, 215, 0.26));
+  content: none;
 }
 
 .search-container.centered .quick-browse-chips {
@@ -1162,7 +1189,6 @@ button.quick-browse-chip:hover,
 button.quick-browse-chip:focus-visible {
   border-color: var(--quick-chip-accent);
   background:
-    linear-gradient(90deg, var(--quick-chip-accent-soft) 0 4px, transparent 4px),
     linear-gradient(180deg, rgba(255, 255, 255, 0.070), rgba(255, 255, 255, 0.024)),
     rgba(255, 255, 255, 0.026);
   color: #ffffff;
@@ -1301,7 +1327,6 @@ button.quick-browse-chip:focus-visible {
   border: 1px solid rgba(148, 163, 184, 0.16);
   border-radius: calc(var(--lib-radius-lg) + 4px);
   background:
-    linear-gradient(90deg, rgba(240, 195, 122, 0.085) 0 5px, transparent 5px),
     linear-gradient(145deg, rgba(104, 191, 215, 0.095), rgba(214, 164, 95, 0.046) 44%, rgba(255, 255, 255, 0.030)),
     rgba(13, 18, 26, 0.82);
   box-shadow:
@@ -1343,14 +1368,7 @@ button.quick-browse-chip:focus-visible {
 
 .advanced-grid .input-group::before,
 .released-range-row::before {
-  content: "";
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: 3px;
-  background: linear-gradient(180deg, rgba(240, 195, 122, 0.58), rgba(104, 191, 215, 0.36));
-  opacity: 0.28;
-  pointer-events: none;
-  transition: opacity var(--lib-ease);
+  content: none;
 }
 
 .advanced-grid .input-group:focus-within,
@@ -1366,7 +1384,7 @@ button.quick-browse-chip:focus-visible {
 
 .advanced-grid .input-group:focus-within::before,
 .released-range-row:focus-within::before {
-  opacity: 0.78;
+  content: none;
 }
 
 .advanced-grid .input-group label {
@@ -2219,7 +2237,7 @@ button.genre-chip.status:focus-visible {
   position: relative;
   scroll-margin-block: 1rem;
   padding: 0.74rem 0.86rem 0.78rem 0.92rem;
-  border-left: 3px solid rgba(105, 198, 163, 0.30);
+  border-left: 1px solid rgba(255, 255, 255, 0.085);
   color: #dce7ec;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.052), rgba(255, 255, 255, 0.022)),
@@ -2440,7 +2458,6 @@ button.genre-chip.status:focus-visible {
   border: 1px solid rgba(148, 163, 184, 0.18);
   border-radius: 18px;
   background:
-    linear-gradient(90deg, rgba(240, 195, 122, 0.11) 0 5px, transparent 5px),
     radial-gradient(circle at 12% 0%, rgba(240, 195, 122, 0.13), transparent 34%),
     linear-gradient(145deg, rgba(104, 191, 215, 0.12), rgba(214, 164, 95, 0.056) 46%, rgba(255, 255, 255, 0.030)),
     rgba(15, 19, 27, 0.84);

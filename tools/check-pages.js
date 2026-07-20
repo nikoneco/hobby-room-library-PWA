@@ -235,6 +235,7 @@ assert(buildScript.includes("const CACHE_PREFIX = 'shumi-library-pwa-'"), 'build
 assert(buildScript.includes('fetchAndRefreshCache_'), 'build script emits waitUntil-backed cache refreshes');
 
 const pwaCss = read(path.join(docs, 'assets', 'css', 'pwa.css'));
+const nightCss = read(path.join(docs, 'assets', 'css', 'style.night-library.css'));
 const pwaClient = read(path.join(docs, 'assets', 'js', 'pwa-client.js'));
 const gasRunShim = read(path.join(docs, 'assets', 'js', 'gas-run-shim.js'));
 const bootClient = read(path.join(docs, 'assets', 'js', 'script.boot.js'));
@@ -246,8 +247,10 @@ assert(pwaCss.includes('.pwa-settings-button'), 'PWA CSS styles settings button'
 assert(pwaCss.includes('.pwa-settings-panel'), 'PWA CSS styles settings panel');
 assert(pwaCss.includes('.pwa-perf-hud'), 'PWA CSS styles performance HUD');
 assert(pwaCss.includes('.pwa-perf-hud-row.is-slow'), 'PWA CSS highlights slow performance rows');
-assert(pwaCss.includes('.pwa-settings-button ~ .view-toggle'), 'PWA CSS keeps mobile view toggle away from settings button');
-assert(pwaCss.includes('left: max(8px, env(safe-area-inset-left))'), 'PWA CSS moves mobile view toggle to the left edge');
+assert(nightCss.includes('grid-template-columns: minmax(190px, 0.45fr) minmax(360px, 1.1fr) auto'), 'desktop search header reserves a column for the view switch');
+assert(nightCss.includes('"brand status view"') && nightCss.includes('"brand form view"'), 'desktop search header assigns the view switch to both header rows');
+assert(/body\.sandbox-redesign\s+\.view-toggle\s*\{[\s\S]*?position:\s*static;[\s\S]*?grid-area:\s*view;/.test(nightCss), 'desktop view switch participates in search header layout');
+assert(nightCss.includes('padding-right: max(5.5rem, calc((100vw - var(--night-max)) / 2))'), 'desktop search header reserves a settings-button gutter');
 assert(pwaCss.includes('body.pwa-theme-shinhaku'), 'PWA CSS includes shinhaku theme');
 assert(pwaCss.includes('body.pwa-theme-kohi'), 'PWA CSS includes kohi theme');
 assert(pwaCss.includes('body.pwa-theme-shikon'), 'PWA CSS includes shikon theme');

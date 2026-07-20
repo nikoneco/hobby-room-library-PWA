@@ -596,14 +596,15 @@ body.sandbox-redesign .search-container.shrink.shelf-view-active {
   top: 0;
   z-index: 35;
   display: grid;
-  grid-template-columns: minmax(190px, 0.45fr) minmax(420px, 1.35fr);
+  grid-template-columns: minmax(190px, 0.45fr) minmax(360px, 1.1fr) auto;
   grid-template-areas:
-    "brand status"
-    "brand form";
+    "brand status view"
+    "brand form view";
   align-items: center;
   gap: 0.45rem clamp(1.5rem, 4vw, 4rem);
   min-height: 0;
   padding: 0.9rem max(1.25rem, calc((100vw - var(--night-max)) / 2));
+  padding-right: max(5.5rem, calc((100vw - var(--night-max)) / 2));
   background: rgba(11, 15, 14, 0.96);
   box-shadow: 0 16px 44px rgba(0, 0, 0, 0.2);
 }
@@ -820,8 +821,12 @@ body.sandbox-redesign .pwa-network-banner-action {
 /* View switch */
 
 body.sandbox-redesign .view-toggle {
-  top: max(14px, env(safe-area-inset-top));
-  right: 78px;
+  position: static;
+  top: auto;
+  right: auto;
+  grid-area: view;
+  align-self: center;
+  justify-self: end;
   gap: 0;
   padding: 0;
   border: 1px solid var(--night-line-strong);
@@ -1446,9 +1451,17 @@ body.sandbox-redesign .mobile-dock-view-btn[aria-pressed="true"] {
   body.sandbox-redesign .search-container.shrink,
   body.sandbox-redesign .search-container.shrink.compact,
   body.sandbox-redesign .search-container.shrink.shelf-view-active {
-    grid-template-columns: 180px minmax(0, 1fr);
-    padding-right: 1.25rem;
+    grid-template-columns: 180px minmax(0, 1fr) auto;
+    padding-right: 5.5rem;
     padding-left: 1.25rem;
+  }
+
+  body.sandbox-redesign .view-toggle-kicker {
+    display: none;
+  }
+
+  body.sandbox-redesign .toggle-btn {
+    min-width: 56px;
   }
 
   body.sandbox-redesign .shelf-jump-nav {

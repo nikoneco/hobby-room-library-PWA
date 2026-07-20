@@ -1,0 +1,12 @@
+[
+  {
+    "date": "2026-07-20",
+    "scope": "app",
+    "macrostructure": "Workbench",
+    "theme": "custom",
+    "theme_axes": "dark paper / local Mincho display / active theme accent",
+    "enrichment": "none",
+    "vibe": "quiet midnight personal library",
+    "brief": "Remove card nesting and decorative stripes while preserving the library PWA flows."
+  }
+]

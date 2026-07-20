@@ -1,0 +1,38 @@
+/* Hallmark · pre-emit critique: P5 H5 E5 S5 R5 V4 */
+/* Hallmark · macrostructure: Workbench · genre: atmospheric · tone: quiet midnight personal library · anchor hue: active theme accent + amber */
+:root {
+  --font-display: "Yu Mincho", "Hiragino Mincho ProN", "BIZ UDPMincho", "Noto Serif JP", serif;
+  --font-body: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans JP", "Yu Gothic", "Hiragino Sans", sans-serif;
+  --font-mono: ui-monospace, "Cascadia Mono", "SFMono-Regular", monospace;
+
+  --color-paper: var(--lib-bg, oklch(0.16 0.018 224));
+  --color-paper-raised: var(--lib-panel, oklch(0.20 0.022 224 / 0.88));
+  --color-paper-strong: var(--lib-panel-strong, oklch(0.23 0.024 224 / 0.96));
+  --color-ink: var(--lib-text, oklch(0.94 0.014 215));
+  --color-ink-muted: var(--lib-muted, oklch(0.76 0.025 220));
+  --color-ink-subtle: var(--lib-subtle, oklch(0.61 0.026 220));
+  --color-rule: var(--lib-line, oklch(0.77 0.045 220 / 0.16));
+  --color-rule-strong: var(--lib-line-strong, oklch(0.81 0.065 220 / 0.30));
+  --color-accent: var(--lib-accent, oklch(0.72 0.09 215));
+  --color-accent-strong: var(--lib-accent-2, oklch(0.79 0.10 205));
+  --color-focus: var(--lib-accent-2, oklch(0.79 0.10 205));
+  --color-lantern: var(--lib-amber, oklch(0.74 0.10 72));
+  --color-lantern-bright: var(--lib-amber-2, oklch(0.82 0.11 78));
+
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 3rem;
+
+  --radius-control: 0.5rem;
+  --radius-surface: 0.875rem;
+  --radius-dialog: 1.125rem;
+  --shadow-whisper: 0 0.5rem 1.5rem oklch(0.05 0.01 230 / 0.20);
+  --shadow-surface: 0 1.125rem 2.875rem oklch(0.05 0.01 230 / 0.26);
+  --duration-quick: 160ms;
+  --duration-calm: 260ms;
+  --ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
