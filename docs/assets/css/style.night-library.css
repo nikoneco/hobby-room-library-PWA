@@ -294,6 +294,14 @@ body.sandbox-redesign .preview-brand-note {
   line-height: 1.6;
 }
 
+body.sandbox-redesign .search-container.centered .search-status-area,
+body.sandbox-redesign .search-container.shrink .search-status-area,
+body.sandbox-redesign .search-container.shrink.compact .search-status-area,
+body.sandbox-redesign .search-container.shrink.shelf-view-active .search-status-area {
+  min-width: 0;
+  overflow: visible;
+}
+
 body.sandbox-redesign .search-container.centered .search-status-area {
   grid-area: status;
   justify-self: stretch;
@@ -305,7 +313,6 @@ body.sandbox-redesign .search-container.centered .search-status-area {
   background: transparent;
   box-shadow: none;
   text-align: left;
-  overflow: visible;
 }
 
 body.sandbox-redesign .search-container.centered .search-form {
@@ -546,6 +553,13 @@ body.sandbox-redesign .summary-chip-toggle:hover {
   border-color: var(--night-accent);
   background: rgba(var(--pwa-accent-rgb), 0.08);
   color: var(--night-text);
+}
+
+body.sandbox-redesign .search-status-librarian-note {
+  min-width: 0;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 body.sandbox-redesign .search-status-librarian-note,
