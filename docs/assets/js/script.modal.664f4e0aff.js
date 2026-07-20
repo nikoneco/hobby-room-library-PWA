@@ -15,6 +15,13 @@ function getPopupDragAxis_(diffX, diffY, canScroll) {
   return '';
 }
 
+function getPopupManualScrollTop_(startTop, diffY, maxScrollTop) {
+  const start = Math.max(0, Number(startTop) || 0);
+  const diff = Number(diffY) || 0;
+  const max = Math.max(0, Number(maxScrollTop) || 0);
+  return Math.max(0, Math.min(max, start - diff));
+}
+
 let popupPageScrollLockY_ = null;
 
 function setPopupModalOpen_(enabled) {
@@ -1788,7 +1795,9 @@ function showPopup(book, index, dataArr, seriesContext, options) {
   let popupDragging = false;
   let popupDragSource = '';
   let popupDragScrollTarget = false;
+  let popupDragNativeScrollTarget = false;
   let popupDragCanScroll = false;
+  let popupDragStartScrollTop = 0;
   let popupDragAxis = '';
 
   function startPopupDrag_(source, x, y, target) {
@@ -1798,20 +1807,22 @@ function showPopup(book, index, dataArr, seriesContext, options) {
     popupDragStartY = y;
     popupDragging = true;
     popupDragSource = source;
-    popupDragScrollTarget = isPopupSummaryScrollTarget_(target);
-    popupDragCanScroll = popupDragScrollTarget || Boolean(
+    popupDragNativeScrollTarget = isPopupSummaryScrollTarget_(target);
+    popupDragScrollTarget = popupDragNativeScrollTarget;
+    popupDragCanScroll = popupDragNativeScrollTarget || Boolean(
       target &&
       typeof target.closest === 'function' &&
       target.closest('#image-popup-content') &&
       popupContent.scrollHeight > popupContent.clientHeight + 1
     );
-    popupDragAxis = popupDragScrollTarget ? 'y' : '';
+    popupDragStartScrollTop = Math.max(0, Number(popupContent.scrollTop) || 0);
+    popupDragAxis = popupDragNativeScrollTarget ? 'y' : '';
     popupContent.classList.add('is-dragging');
     return true;
   }
 
   function updatePopupDrag_(x, y) {
-    if (popupDragScrollTarget) return false;
+    if (popupDragNativeScrollTarget) return false;
 
     const diffX = x - popupDragStartX;
     const diffYRaw = y - popupDragStartY;
@@ -1820,14 +1831,23 @@ function showPopup(book, index, dataArr, seriesContext, options) {
 
     if (!popupDragAxis) {
       popupDragAxis = getPopupDragAxis_(diffX, diffYRaw, popupDragCanScroll);
-      if (popupDragAxis === 'y') {
-        popupDragScrollTarget = true;
-        popupContent.classList.remove('is-dragging');
-        return false;
-      }
     }
 
-    if (popupDragAxis === 'y') return false;
+    if (popupDragAxis === 'y') {
+      const isDownwardCloseFromTop = popupDragStartScrollTop <= 0 && diffYRaw > 0;
+      if (!isDownwardCloseFromTop) {
+        const maxScrollTop = Math.max(0, popupContent.scrollHeight - popupContent.clientHeight);
+        popupContent.scrollTop = getPopupManualScrollTop_(
+          popupDragStartScrollTop,
+          diffYRaw,
+          maxScrollTop
+        );
+        popupDragScrollTarget = true;
+        popupContent.classList.remove('is-dragging');
+        return true;
+      }
+      popupDragScrollTarget = false;
+    }
 
     if (absX > 8 && absX > absY * 0.82) {
       const maxDragX = Math.min(178, Math.max(96, window.innerWidth * 0.42));
@@ -1854,7 +1874,9 @@ function showPopup(book, index, dataArr, seriesContext, options) {
     popupDragging = false;
     popupDragSource = '';
     popupDragScrollTarget = false;
+    popupDragNativeScrollTarget = false;
     popupDragCanScroll = false;
+    popupDragStartScrollTop = 0;
     popupDragAxis = '';
     clearPopupMotionState_(popupContent);
   }
@@ -1883,6 +1905,7 @@ function showPopup(book, index, dataArr, seriesContext, options) {
       popupDragging = false;
       popupDragSource = '';
       popupDragScrollTarget = false;
+      popupDragNativeScrollTarget = false;
       popupDragSuppressNextClick = true;
       popupContent.classList.remove('is-dragging');
       popupMove(moveDiff, { useTransitionClone: true });
@@ -1901,7 +1924,7 @@ function showPopup(book, index, dataArr, seriesContext, options) {
   };
   overlay.ontouchmove = function(e) {
     if (!popupDragging || popupDragSource !== 'touch' || !e.touches || e.touches.length !== 1) return;
-    if (popupDragScrollTarget) return;
+    if (popupDragNativeScrollTarget) return;
     if (updatePopupDrag_(e.touches[0].clientX, e.touches[0].clientY)) e.preventDefault();
   };
   overlay.ontouchend = function(e) {

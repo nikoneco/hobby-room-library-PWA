@@ -708,13 +708,18 @@ assert(
 assert(
   clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('popupDragCanScroll') &&
     clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('getPopupDragAxis_(diffX, diffYRaw, popupDragCanScroll)') &&
+    clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('popupContent.scrollTop = getPopupManualScrollTop_(') &&
     clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes("if (updatePopupDrag_(e.touches[0].clientX, e.touches[0].clientY)) e.preventDefault();"),
-  'book popup preserves native vertical scrolling while keeping horizontal book swipes'
+  'book popup manually scrolls the detail card while keeping horizontal book swipes'
 );
 assertEqual(sandbox.getPopupDragAxis_(4, 7, true), '', 'popup drag waits for a clear gesture direction');
 assertEqual(sandbox.getPopupDragAxis_(12, 44, true), 'y', 'popup drag keeps vertical movement for card scrolling');
 assertEqual(sandbox.getPopupDragAxis_(48, 9, true), 'x', 'popup drag keeps horizontal movement for book navigation');
 assertEqual(sandbox.getPopupDragAxis_(9, 48, false), '', 'non-scrollable popup keeps downward close gesture available');
+assertEqual(sandbox.getPopupManualScrollTop_(120, -45, 400), 165, 'upward touch movement scrolls the detail card down');
+assertEqual(sandbox.getPopupManualScrollTop_(120, 50, 400), 70, 'downward touch movement scrolls the detail card up');
+assertEqual(sandbox.getPopupManualScrollTop_(10, 80, 400), 0, 'manual detail scrolling clamps at the top');
+assertEqual(sandbox.getPopupManualScrollTop_(390, -80, 400), 400, 'manual detail scrolling clamps at the bottom');
 {
   sandbox.window.scrollY = 384;
   sandbox.window.lastScrollTo = null;
