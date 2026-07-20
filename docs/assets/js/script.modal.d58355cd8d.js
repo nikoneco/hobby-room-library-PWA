@@ -6,6 +6,15 @@ function shouldIgnoreBookOpenSurfaceClick_(target) {
   );
 }
 
+function getPopupDragAxis_(diffX, diffY, canScroll) {
+  const absX = Math.abs(Number(diffX) || 0);
+  const absY = Math.abs(Number(diffY) || 0);
+  if (Math.max(absX, absY) <= 8) return '';
+  if (canScroll && absY > absX * 0.82) return 'y';
+  if (absX > absY * 0.82) return 'x';
+  return '';
+}
+
 function setupBookOpenSurface_(element, book, idx, data) {
   if (!element) return;
   element.classList.add('book-open-surface');
@@ -1748,6 +1757,8 @@ function showPopup(book, index, dataArr, seriesContext, options) {
   let popupDragging = false;
   let popupDragSource = '';
   let popupDragScrollTarget = false;
+  let popupDragCanScroll = false;
+  let popupDragAxis = '';
 
   function startPopupDrag_(source, x, y, target) {
     if (popupDragging && popupDragSource !== source) return false;
@@ -1757,6 +1768,13 @@ function showPopup(book, index, dataArr, seriesContext, options) {
     popupDragging = true;
     popupDragSource = source;
     popupDragScrollTarget = isPopupSummaryScrollTarget_(target);
+    popupDragCanScroll = popupDragScrollTarget || Boolean(
+      target &&
+      typeof target.closest === 'function' &&
+      target.closest('#image-popup-content') &&
+      popupContent.scrollHeight > popupContent.clientHeight + 1
+    );
+    popupDragAxis = popupDragScrollTarget ? 'y' : '';
     popupContent.classList.add('is-dragging');
     return true;
   }
@@ -1768,6 +1786,17 @@ function showPopup(book, index, dataArr, seriesContext, options) {
     const diffYRaw = y - popupDragStartY;
     const absX = Math.abs(diffX);
     const absY = Math.abs(diffYRaw);
+
+    if (!popupDragAxis) {
+      popupDragAxis = getPopupDragAxis_(diffX, diffYRaw, popupDragCanScroll);
+      if (popupDragAxis === 'y') {
+        popupDragScrollTarget = true;
+        popupContent.classList.remove('is-dragging');
+        return false;
+      }
+    }
+
+    if (popupDragAxis === 'y') return false;
 
     if (absX > 8 && absX > absY * 0.82) {
       const maxDragX = Math.min(178, Math.max(96, window.innerWidth * 0.42));
@@ -1794,6 +1823,8 @@ function showPopup(book, index, dataArr, seriesContext, options) {
     popupDragging = false;
     popupDragSource = '';
     popupDragScrollTarget = false;
+    popupDragCanScroll = false;
+    popupDragAxis = '';
     clearPopupMotionState_(popupContent);
   }
 
@@ -1840,8 +1871,7 @@ function showPopup(book, index, dataArr, seriesContext, options) {
   overlay.ontouchmove = function(e) {
     if (!popupDragging || popupDragSource !== 'touch' || !e.touches || e.touches.length !== 1) return;
     if (popupDragScrollTarget) return;
-    e.preventDefault();
-    updatePopupDrag_(e.touches[0].clientX, e.touches[0].clientY);
+    if (updatePopupDrag_(e.touches[0].clientX, e.touches[0].clientY)) e.preventDefault();
   };
   overlay.ontouchend = function(e) {
     if (!popupDragging || popupDragSource !== 'touch') return;

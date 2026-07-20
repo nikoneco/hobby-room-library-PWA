@@ -665,6 +665,16 @@ assert(
   'book popup provides horizontal drag feedback while swiping'
 );
 assert(
+  clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('popupDragCanScroll') &&
+    clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('getPopupDragAxis_(diffX, diffYRaw, popupDragCanScroll)') &&
+    clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes("if (updatePopupDrag_(e.touches[0].clientX, e.touches[0].clientY)) e.preventDefault();"),
+  'book popup preserves native vertical scrolling while keeping horizontal book swipes'
+);
+assertEqual(sandbox.getPopupDragAxis_(4, 7, true), '', 'popup drag waits for a clear gesture direction');
+assertEqual(sandbox.getPopupDragAxis_(12, 44, true), 'y', 'popup drag keeps vertical movement for card scrolling');
+assertEqual(sandbox.getPopupDragAxis_(48, 9, true), 'x', 'popup drag keeps horizontal movement for book navigation');
+assertEqual(sandbox.getPopupDragAxis_(9, 48, false), '', 'non-scrollable popup keeps downward close gesture available');
+assert(
   clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes("'popup-commit-next'") &&
     clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes("'popup-no-rise'") &&
     clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('renderNextPopup_();') &&

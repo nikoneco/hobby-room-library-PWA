@@ -86,6 +86,7 @@ assertBalancedBraces(combinedCss);
   /body\.sandbox-redesign\s+\.view-toggle\s*\{[\s\S]*?position:\s*static[\s\S]*?grid-area:\s*view/,
   /body\.sandbox-redesign\s+\.search-container\.centered\s+\.search-status-area[\s\S]*?body\.sandbox-redesign\s+\.search-container\.shrink\.shelf-view-active\s+\.search-status-area\s*\{[^}]*min-width:\s*0[^}]*overflow:\s*visible/,
   /body\.sandbox-redesign\s+\.search-status-librarian-note\s*\{[^}]*min-width:\s*0[^}]*max-width:\s*100%[^}]*white-space:\s*normal[^}]*overflow-wrap:\s*anywhere/,
+  /@media\s*\(max-width:\s*700px\)[\s\S]*?#image-popup-content\s*\{[^}]*overflow-y:\s*auto\s*!important[^}]*-webkit-overflow-scrolling:\s*touch[^}]*overscroll-behavior-y:\s*contain/,
   /\.search-series-card\s*\{/,
   /\.search-result-series-list\s*\{[\s\S]*?scroll-snap-type:\s*x\s+mandatory/,
   /\.search-result-series-book-cover\s*\{[\s\S]*?aspect-ratio:\s*2\s*\/\s*3/,
