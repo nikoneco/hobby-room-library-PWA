@@ -15,6 +15,37 @@ function getPopupDragAxis_(diffX, diffY, canScroll) {
   return '';
 }
 
+let popupPageScrollLockY_ = null;
+
+function setPopupModalOpen_(enabled) {
+  const body = document.body;
+  const root = document.documentElement;
+  if (!body || !body.classList) return;
+
+  if (enabled) {
+    if (!body.classList.contains('modal-open')) {
+      popupPageScrollLockY_ = Math.max(0, Number(window.scrollY) || 0);
+      if (body.style && typeof body.style.setProperty === 'function') {
+        body.style.setProperty('--modal-scroll-lock-y', `-${popupPageScrollLockY_}px`);
+      }
+    }
+    body.classList.add('modal-open');
+    if (root && root.classList) root.classList.add('modal-open');
+    return;
+  }
+
+  const restoreY = popupPageScrollLockY_;
+  body.classList.remove('modal-open');
+  if (root && root.classList) root.classList.remove('modal-open');
+  if (body.style && typeof body.style.removeProperty === 'function') {
+    body.style.removeProperty('--modal-scroll-lock-y');
+  }
+  popupPageScrollLockY_ = null;
+  if (restoreY !== null && Number.isFinite(restoreY) && typeof window.scrollTo === 'function') {
+    window.scrollTo({ top: restoreY, behavior: 'auto' });
+  }
+}
+
 function setupBookOpenSurface_(element, book, idx, data) {
   if (!element) return;
   element.classList.add('book-open-surface');
@@ -1314,7 +1345,7 @@ function openSeriesPanel(sourceBook) {
   };
 
   overlay.style.display = 'flex';
-  document.body.classList.add('modal-open');
+  setPopupModalOpen_(true);
   if (popupContent) {
     popupContent.classList.add('series-mode');
     popupContent.classList.remove('search-result-series-mode');
@@ -1370,7 +1401,7 @@ function showSearchResultSeriesPanel_(group) {
     popupReturnScrollY = window.scrollY || 0;
   }
   overlay.style.display = 'flex';
-  document.body.classList.add('modal-open');
+  setPopupModalOpen_(true);
   if (popupContent) popupContent.classList.add('series-mode', 'search-result-series-mode');
   img.style.display = 'none';
   prevBtn.style.display = 'none';
@@ -1426,7 +1457,7 @@ function showSearchResultSeriesPanel_(group) {
 
   function closeSearchResultSeriesPanel_() {
     overlay.style.display = 'none';
-    document.body.classList.remove('modal-open');
+    setPopupModalOpen_(false);
     if (popupContent) popupContent.classList.remove('series-mode', 'search-result-series-mode');
     setShelfPopupPerformanceMode_(false);
     document.onkeydown = null;
@@ -1515,7 +1546,7 @@ function showSeriesPanel(sourceBook, seriesBooks, returnContext) {
   overlay.onclick = function(e) {
     if (e.target === overlay) {
       overlay.style.display = 'none';
-      document.body.classList.remove('modal-open');
+      setPopupModalOpen_(false);
       setShelfPopupPerformanceMode_(false);
       document.onkeydown = null;
     }
@@ -1523,7 +1554,7 @@ function showSeriesPanel(sourceBook, seriesBooks, returnContext) {
 
   closeBtn.onclick = function() {
     overlay.style.display = 'none';
-    document.body.classList.remove('modal-open');
+    setPopupModalOpen_(false);
     setShelfPopupPerformanceMode_(false);
     document.onkeydown = null;
   };
@@ -1531,7 +1562,7 @@ function showSeriesPanel(sourceBook, seriesBooks, returnContext) {
   document.onkeydown = function(e) {
     if (e.key === 'Escape') {
       overlay.style.display = 'none';
-      document.body.classList.remove('modal-open');
+      setPopupModalOpen_(false);
       setShelfPopupPerformanceMode_(false);
       document.onkeydown = null;
     }
@@ -1710,7 +1741,7 @@ function showPopup(book, index, dataArr, seriesContext, options) {
   );
 
   overlay.style.display = 'flex';
-  document.body.classList.add('modal-open');
+  setPopupModalOpen_(true);
 
   clearPopupMotionState_(popupContent);
 
@@ -1720,7 +1751,7 @@ function showPopup(book, index, dataArr, seriesContext, options) {
     clearPopupNeighborDetailTimer_();
     clearPopupImagePrefetchTimer_();
     overlay.style.display = 'none';
-    document.body.classList.remove('modal-open');
+    setPopupModalOpen_(false);
     setShelfPopupPerformanceMode_(false);
     document.onkeydown = null;
     window.requestAnimationFrame(function() {

@@ -9,6 +9,7 @@
   align-items: center;
   justify-content: center;
   transition: opacity 0.25s;
+  overscroll-behavior: none;
 }
 #image-popup-content {
   background: #181d2b;
@@ -259,9 +260,21 @@
   }
 }
 /* スクロール禁止（ポップアップ時） */
+html.modal-open {
+  overflow: hidden !important;
+  overscroll-behavior: none;
+}
+
 body.modal-open {
+  position: fixed;
+  top: var(--modal-scroll-lock-y, 0px);
+  left: 0;
+  right: 0;
+  width: 100%;
   overflow: hidden !important;
   height: 100vh;
+  height: 100dvh;
+  overscroll-behavior: none;
 }
 
 /* シリーズ一覧パネル */

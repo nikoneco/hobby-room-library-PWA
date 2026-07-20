@@ -967,7 +967,11 @@ function closeActiveBookPopup_() {
   closeCoverFullscreen_();
   clearPopupTouchHandlers_();
   overlay.style.display = 'none';
-  document.body.classList.remove('modal-open');
+  if (typeof setPopupModalOpen_ === 'function') {
+    setPopupModalOpen_(false);
+  } else {
+    document.body.classList.remove('modal-open');
+  }
   if (typeof setShelfPopupPerformanceMode_ === 'function') setShelfPopupPerformanceMode_(false);
   document.onkeydown = null;
 }

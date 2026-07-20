@@ -46,6 +46,47 @@ function createStorage() {
   };
 }
 
+function createMutableClassList() {
+  const values = new Set();
+  return {
+    add(...names) {
+      names.forEach(name => values.add(name));
+    },
+    remove(...names) {
+      names.forEach(name => values.delete(name));
+    },
+    toggle(name, force) {
+      if (force === true) values.add(name);
+      else if (force === false) values.delete(name);
+      else if (values.has(name)) values.delete(name);
+      else values.add(name);
+      return values.has(name);
+    },
+    contains(name) {
+      return values.has(name);
+    }
+  };
+}
+
+function createStyle() {
+  const values = new Map();
+  return {
+    setProperty(name, value) {
+      values.set(name, String(value));
+    },
+    removeProperty(name) {
+      values.delete(name);
+    },
+    getPropertyValue(name) {
+      return values.get(name) || '';
+    }
+  };
+}
+
+const sandboxBodyClassList = createMutableClassList();
+const sandboxRootClassList = createMutableClassList();
+const sandboxBodyStyle = createStyle();
+
 const sandbox = {
   console,
   Math,
@@ -63,15 +104,12 @@ const sandbox = {
   localStorage: createStorage(),
   document: {
     body: {
-      classList: {
-        add() {},
-        remove() {},
-        toggle() {},
-        contains() {
-          return false;
-        }
-      },
+      classList: sandboxBodyClassList,
+      style: sandboxBodyStyle,
       appendChild() {}
+    },
+    documentElement: {
+      classList: sandboxRootClassList
     },
     getElementById() {
       return null;
@@ -90,7 +128,10 @@ const sandbox = {
     localStorage: null,
     addEventListener() {},
     setTimeout,
-    clearTimeout
+    clearTimeout,
+    scrollTo(options) {
+      this.lastScrollTo = options;
+    }
   },
   google: {
     script: {
@@ -674,6 +715,18 @@ assertEqual(sandbox.getPopupDragAxis_(4, 7, true), '', 'popup drag waits for a c
 assertEqual(sandbox.getPopupDragAxis_(12, 44, true), 'y', 'popup drag keeps vertical movement for card scrolling');
 assertEqual(sandbox.getPopupDragAxis_(48, 9, true), 'x', 'popup drag keeps horizontal movement for book navigation');
 assertEqual(sandbox.getPopupDragAxis_(9, 48, false), '', 'non-scrollable popup keeps downward close gesture available');
+{
+  sandbox.window.scrollY = 384;
+  sandbox.window.lastScrollTo = null;
+  sandbox.setPopupModalOpen_(true);
+  assert(sandboxBodyClassList.contains('modal-open'), 'popup scroll lock fixes the page body while details are open');
+  assert(sandboxRootClassList.contains('modal-open'), 'popup scroll lock also blocks root-page overscroll');
+  assertEqual(sandboxBodyStyle.getPropertyValue('--modal-scroll-lock-y'), '-384px', 'popup scroll lock preserves the page offset');
+  sandbox.setPopupModalOpen_(false);
+  assert(!sandboxBodyClassList.contains('modal-open'), 'popup scroll lock releases the page body when details close');
+  assert(!sandboxRootClassList.contains('modal-open'), 'popup scroll lock releases the root page when details close');
+  assertEqual(sandbox.window.lastScrollTo.top, 384, 'popup scroll lock restores the original page offset');
+}
 assert(
   clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes("'popup-commit-next'") &&
     clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes("'popup-no-rise'") &&
