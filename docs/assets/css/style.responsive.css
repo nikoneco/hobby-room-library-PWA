@@ -98,16 +98,8 @@
   }
 
   .series-list-item {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 0.36rem;
+    display: flex;
     padding: 0.62rem;
-  }
-
-  .series-list-meta {
-    width: fit-content;
-    max-width: 100%;
-    margin-top: 0.42rem;
   }
 
   #cover-fullscreen-img {

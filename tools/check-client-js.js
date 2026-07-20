@@ -625,6 +625,11 @@ assert(
   'bookshelf detail prefetch is delayed and scheduled through idle-friendly background work'
 );
 assert(
+  !clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('buildSeriesListMetaHtml_') &&
+    !clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('series-list-meta'),
+  'series panel rows show only the volume number and title'
+);
+assert(
   clientScriptSources[clientScriptFiles.indexOf('script.state.js.html')].includes('bookshelfPendingRestoreScroll') &&
     clientScriptSources[clientScriptFiles.indexOf('script.shelf.js.html')].includes('restoreBookshelfScrollAfterRender_') &&
     clientScriptSources[clientScriptFiles.indexOf('script.search.js.html')].includes('bookshelfPendingRestoreScroll = Boolean(opt.restoreScroll)'),
