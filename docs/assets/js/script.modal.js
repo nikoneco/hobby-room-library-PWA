@@ -1020,6 +1020,11 @@ function clearBookDetailPrefetchSchedule_() {
   }
 }
 
+function resumeBookDetailPrefetchQueue_() {
+  if (!bookDetailPrefetchQueue.length || !canPrefetchBookDetails_()) return;
+  scheduleBookDetailPrefetchQueue_(false);
+}
+
 function scheduleBookDetailPrefetchQueue_(priority) {
   clearBookDetailPrefetchSchedule_();
   const delay = priority ? BOOK_DETAIL_PREFETCH_PRIORITY_DELAY_MS : BOOK_DETAIL_PREFETCH_IDLE_DELAY_MS;
@@ -1055,14 +1060,103 @@ function queueBookDetailPrefetch_(book, priority) {
     bookDetailPrefetchQueue.unshift(book);
   }
 
-  if (bookDetailPrefetchQueue.length > BOOK_DETAIL_PREFETCH_QUEUE_LIMIT) {
-    const overflow = bookDetailPrefetchQueue.splice(BOOK_DETAIL_PREFETCH_QUEUE_LIMIT);
+  const queueLimit = Array.isArray(searchResultDetailPrefetchSource)
+    ? Math.max(BOOK_DETAIL_PREFETCH_QUEUE_LIMIT, searchResultDetailPrefetchSource.length)
+    : BOOK_DETAIL_PREFETCH_QUEUE_LIMIT;
+  if (bookDetailPrefetchQueue.length > queueLimit) {
+    const overflow = bookDetailPrefetchQueue.splice(queueLimit);
     overflow.forEach(item => {
       if (item) item.detailQueued = false;
     });
   }
 
   scheduleBookDetailPrefetchQueue_(Boolean(priority));
+}
+
+function clearSearchResultBookDetailPrefetch_() {
+  searchResultDetailPrefetchGeneration += 1;
+  searchResultDetailPrefetchSource = null;
+  searchResultDetailPrefetchKind = 'none';
+
+  if (searchResultDetailPrefetchTimer) {
+    window.clearTimeout(searchResultDetailPrefetchTimer);
+    searchResultDetailPrefetchTimer = 0;
+  }
+  if (
+    searchResultDetailPrefetchIdleTimer &&
+    typeof window.cancelIdleCallback === 'function'
+  ) {
+    window.cancelIdleCallback(searchResultDetailPrefetchIdleTimer);
+    searchResultDetailPrefetchIdleTimer = 0;
+  }
+
+  bookDetailPrefetchQueue.forEach(book => {
+    if (book) book.detailQueued = false;
+  });
+  bookDetailPrefetchQueue = [];
+  clearBookDetailPrefetchSchedule_();
+}
+
+function syncSearchResultBookDetailPrefetch_(books, resultKind) {
+  const kind = String(resultKind || 'none');
+  const isSearchResult = kind === 'search' || kind === 'random';
+  if (!isSearchResult || !Array.isArray(books) || !books.length) {
+    if (searchResultDetailPrefetchSource || searchResultDetailPrefetchKind !== 'none') {
+      clearSearchResultBookDetailPrefetch_();
+    }
+    return;
+  }
+
+  if (
+    searchResultDetailPrefetchSource === books &&
+    searchResultDetailPrefetchKind === kind
+  ) {
+    return;
+  }
+
+  clearSearchResultBookDetailPrefetch_();
+  searchResultDetailPrefetchSource = books;
+  searchResultDetailPrefetchKind = kind;
+  const generation = searchResultDetailPrefetchGeneration;
+
+  if (!canPrefetchBookDetails_()) return;
+
+  const run = function() {
+    searchResultDetailPrefetchIdleTimer = 0;
+    if (
+      generation !== searchResultDetailPrefetchGeneration ||
+      searchResultDetailPrefetchSource !== books ||
+      searchResultDetailPrefetchKind !== kind ||
+      lastResult !== books ||
+      lastResultKind !== kind
+    ) {
+      return;
+    }
+
+    const seen = new Set();
+    books.forEach(book => {
+      if (!shouldFetchDeferredBookDetails_(book) || getCachedBookDetail_(book)) return;
+      const key = getBookDetailCacheKey_(book);
+      const id = key || `row:${book.rowIndex}`;
+      if (seen.has(id)) return;
+      seen.add(id);
+      book.detailQueued = true;
+      bookDetailPrefetchQueue.push(book);
+    });
+
+    resumeBookDetailPrefetchQueue_();
+  };
+
+  searchResultDetailPrefetchTimer = window.setTimeout(function() {
+    searchResultDetailPrefetchTimer = 0;
+    if (typeof window.requestIdleCallback === 'function') {
+      searchResultDetailPrefetchIdleTimer = window.requestIdleCallback(run, {
+        timeout: SEARCH_RESULT_DETAIL_PREFETCH_TIMEOUT_MS
+      });
+    } else {
+      run();
+    }
+  }, SEARCH_RESULT_DETAIL_PREFETCH_DELAY_MS);
 }
 
 function warmBookDetailPrefetch_(books, options) {
@@ -1468,6 +1562,7 @@ function showSearchResultSeriesPanel_(group) {
     if (popupContent) popupContent.classList.remove('series-mode', 'search-result-series-mode');
     setShelfPopupPerformanceMode_(false);
     document.onkeydown = null;
+    resumeBookDetailPrefetchQueue_();
     window.requestAnimationFrame(function() {
       window.scrollTo({ top: popupReturnScrollY || 0, behavior: 'auto' });
     });
@@ -1556,6 +1651,7 @@ function showSeriesPanel(sourceBook, seriesBooks, returnContext) {
       setPopupModalOpen_(false);
       setShelfPopupPerformanceMode_(false);
       document.onkeydown = null;
+      resumeBookDetailPrefetchQueue_();
     }
   };
 
@@ -1564,6 +1660,7 @@ function showSeriesPanel(sourceBook, seriesBooks, returnContext) {
     setPopupModalOpen_(false);
     setShelfPopupPerformanceMode_(false);
     document.onkeydown = null;
+    resumeBookDetailPrefetchQueue_();
   };
 
   document.onkeydown = function(e) {
@@ -1572,6 +1669,7 @@ function showSeriesPanel(sourceBook, seriesBooks, returnContext) {
       setPopupModalOpen_(false);
       setShelfPopupPerformanceMode_(false);
       document.onkeydown = null;
+      resumeBookDetailPrefetchQueue_();
     }
   };
 }
@@ -1761,6 +1859,7 @@ function showPopup(book, index, dataArr, seriesContext, options) {
     setPopupModalOpen_(false);
     setShelfPopupPerformanceMode_(false);
     document.onkeydown = null;
+    resumeBookDetailPrefetchQueue_();
     window.requestAnimationFrame(function() {
       window.scrollTo({ top: popupReturnScrollY || 0, behavior: 'auto' });
     });

@@ -1323,6 +1323,7 @@ function showResult(data) {
   const result = document.getElementById('result');
   result.innerHTML = '';
   resetResultRenderQueue_();
+  syncSearchResultBookDetailPrefetch_(data, lastResultKind);
 
   if (lastResultKind !== 'search') {
     currentSearchResultPresentationStats = null;

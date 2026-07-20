@@ -435,6 +435,48 @@ assert(
     clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes("mode: 'neighborsOnly'"),
   'book popup fetches current details immediately, can defer heavy detail rendering, and delays nearby detail prefetch'
 );
+const popupPriorityBooks = Array.from({ length: 9 }, (_, index) => ({
+  title: `優先順位 ${index}`,
+  rowIndex: index + 1,
+  detailLoaded: false
+}));
+assertEqual(
+  sandbox.collectPopupContextDetailTargets_(popupPriorityBooks[4], 4, popupPriorityBooks, { mode: 'all' })
+    .map(target => target.index)
+    .join(','),
+  '4,5,3,6,2',
+  'popup detail priority is current, then one book on each side, then two books on each side'
+);
+vm.runInContext(`
+  var __previousPrefetchSetTimeout = window.setTimeout;
+  var __prefetchTimerCallbacks = [];
+  window.setTimeout = function(callback) {
+    __prefetchTimerCallbacks.push(callback);
+    return __prefetchTimerCallbacks.length;
+  };
+  var __allSearchBooks = Array.from({ length: 55 }, function(_, index) {
+    return { title: '検索本 ' + index, rowIndex: index + 100, detailLoaded: false };
+  });
+  lastResult = __allSearchBooks;
+  lastResultKind = 'search';
+  syncSearchResultBookDetailPrefetch_(__allSearchBooks, lastResultKind);
+  __prefetchTimerCallbacks.shift()();
+  var __allSearchQueuedCount = bookDetailPrefetchQueue.length;
+  var __allSearchQueuedFirst = bookDetailPrefetchQueue[0].title;
+  var __allSearchQueuedLast = bookDetailPrefetchQueue[bookDetailPrefetchQueue.length - 1].title;
+  clearSearchResultBookDetailPrefetch_();
+  window.setTimeout = __previousPrefetchSetTimeout;
+`, sandbox);
+assertEqual(
+  vm.runInContext('__allSearchQueuedCount', sandbox),
+  55,
+  'search synopsis prefetch keeps every raw result beyond the generic 40-book queue limit'
+);
+assertEqual(
+  vm.runInContext('__allSearchQueuedFirst + "," + __allSearchQueuedLast', sandbox),
+  '検索本 0,検索本 54',
+  'search synopsis prefetch preserves the full raw result order'
+);
 assert(
     clientScriptSources[clientScriptFiles.indexOf('script.images.js.html')].includes('function prefetchPopupNeighborCoverImages_') &&
       clientScriptSources[clientScriptFiles.indexOf('script.images.js.html')].includes('function prefetchBookCoverImage_') &&
@@ -664,6 +706,23 @@ assert(
     clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('window.requestIdleCallback(run') &&
     clientScriptSources[clientScriptFiles.indexOf('script.shelf.js.html')].includes('priorityCount: 0'),
   'bookshelf detail prefetch is delayed and scheduled through idle-friendly background work'
+);
+assert(
+  clientScriptSources[clientScriptFiles.indexOf('script.state.js.html')].includes('const BOOK_DETAIL_PREFETCH_BATCH_SIZE = 12') &&
+    clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('function syncSearchResultBookDetailPrefetch_') &&
+    clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes("kind === 'search' || kind === 'random'") &&
+    clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('Math.max(BOOK_DETAIL_PREFETCH_QUEUE_LIMIT, searchResultDetailPrefetchSource.length)') &&
+    clientScriptSources[clientScriptFiles.indexOf('script.shelf.js.html')].includes('syncSearchResultBookDetailPrefetch_(data, lastResultKind);'),
+  'normal and random searches queue every raw result for batched synopsis prefetch'
+);
+assert(
+  clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('if (!canRunBackgroundBookDetailPrefetch_()) return;') &&
+    clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('removeBookDetailPrefetchItems_(requestTargets.map(target => target.book));') &&
+    clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes("mode: 'currentOnly'") &&
+    clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes("mode: 'neighborsOnly'") &&
+    clientScriptSources[clientScriptFiles.indexOf('script.state.js.html')].includes('const POPUP_DETAIL_PREFETCH_RADIUS = 2') &&
+    clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('resumeBookDetailPrefetchQueue_();'),
+  'open popup prioritizes the current book and two neighbors on each side before resuming the background queue'
 );
 assert(
   !clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('buildSeriesListMetaHtml_') &&
