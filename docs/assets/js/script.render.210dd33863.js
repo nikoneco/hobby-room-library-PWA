@@ -191,6 +191,10 @@ function buildGenreChips(book, options) {
     const label = getGenreCategoryLabel_(item.category);
     if (!field || !hasDisplayValue_(item.name)) return '';
 
+    if (opt.interactive === false) {
+      return `<span class="${cls}" aria-label="${escapeHtml(label + ': ' + item.name)}">${escapeHtml(item.name)}</span>`;
+    }
+
     return `
       <button
         type="button"

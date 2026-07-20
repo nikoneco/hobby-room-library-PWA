@@ -297,21 +297,38 @@ function getEmptyAdvancedOptions_() {
   };
 }
 
-function syncPreviewIndexFromLocal_() {
+function syncSearchDataFromLocalIndex_() {
   const manager = window.ShumiLibraryLocalIndex;
   if (!manager || typeof manager.isReady !== 'function' || !manager.isReady()) return false;
+
+  const metadata = typeof manager.getMetadata === 'function'
+    ? manager.getMetadata()
+    : null;
+  if (!metadata || typeof metadata !== 'object') return false;
 
   const localPreview = typeof manager.getPreviewIndex === 'function'
     ? manager.getPreviewIndex()
     : [];
+  SUGGEST_DATA = metadata.suggest || getEmptySuggestData_();
+  ADVANCED_OPTIONS = metadata.advancedOptions || getEmptyAdvancedOptions_();
+  QUICK_BROWSE_COUNTS = metadata.quickBrowseCounts && typeof metadata.quickBrowseCounts === 'object'
+    ? metadata.quickBrowseCounts
+    : null;
   PREVIEW_INDEX = Array.isArray(localPreview) ? localPreview : [];
   PREVIEW_INDEX_READY = true;
   if (typeof manager.getRevision === 'function') {
     syncBookDetailCacheRevision_(manager.getRevision());
   }
+  populateAdvancedOptions();
   renderQuickBrowseRail_();
-  syncSearchStatusPreviewFromForm_();
+  if (!lastResult) {
+    syncSearchStatusPreviewFromForm_();
+  }
   return true;
+}
+
+function syncPreviewIndexFromLocal_() {
+  return syncSearchDataFromLocalIndex_();
 }
 
 function applyInitialSearchData_(data) {
@@ -347,10 +364,10 @@ function applyInitialSearchData_(data) {
 }
 
 document.addEventListener('shumi-library-local-index-ready', function() {
-  syncPreviewIndexFromLocal_();
+  syncSearchDataFromLocalIndex_();
 });
 
-function fetchInitialSearchData() {
+function fetchInitialSearchDataRemote_() {
   google.script.run
     .withSuccessHandler(function(data) {
       applyInitialSearchData_(data);
@@ -365,6 +382,29 @@ function fetchInitialSearchData() {
       fetchPreviewIndex();
     })
     .getInitialSearchData();
+}
+
+function fetchInitialSearchData() {
+  const manager = window.ShumiLibraryLocalIndex;
+  if (
+    manager &&
+    typeof manager.isSupported === 'function' &&
+    manager.isSupported() &&
+    typeof manager.whenLoaded === 'function'
+  ) {
+    manager.whenLoaded()
+      .then(function() {
+        if (!syncSearchDataFromLocalIndex_()) {
+          fetchInitialSearchDataRemote_();
+        }
+      })
+      .catch(function() {
+        fetchInitialSearchDataRemote_();
+      });
+    return;
+  }
+
+  fetchInitialSearchDataRemote_();
 }
 
 function fetchSuggestData() {

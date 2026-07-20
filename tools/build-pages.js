@@ -2782,7 +2782,7 @@ function writeGasRunShim() {
   const LOCAL_INDEX_DB_NAME = 'shumiLibrary.localIndex.v1';
   const LOCAL_INDEX_STORE_NAME = 'snapshots';
   const LOCAL_INDEX_ACTIVE_KEY = 'active';
-  const LOCAL_INDEX_SCHEMA_VERSION = 1;
+  const LOCAL_INDEX_SCHEMA_VERSION = 2;
   const LOCAL_INDEX_CHECK_INTERVAL_MS = 15 * 60 * 1000;
   const LOCAL_INDEX_CHECK_THROTTLE_MS = 5 * 60 * 1000;
 
@@ -3198,6 +3198,9 @@ function writeGasRunShim() {
     if (!Array.isArray(payload.records) || typeof payload.revision !== 'string') {
       throw createError_('ローカル索引が壊れています。', 'LOCAL_INDEX_INVALID');
     }
+    if (!payload.metadata || typeof payload.metadata !== 'object') {
+      throw createError_('ローカル索引の検索候補が壊れています。', 'LOCAL_INDEX_METADATA_INVALID');
+    }
 
     return payload.records.map(function(record) {
       if (!Array.isArray(record) || record.length < 30) {
@@ -3470,10 +3473,17 @@ function writeGasRunShim() {
   }
 
   window.ShumiLibraryLocalIndex = {
+    isSupported: function() { return Boolean(window.indexedDB); },
     isReady: function() { return Boolean(localIndexPayload); },
+    whenLoaded: function() { return ensureLocalIndexLoaded_(); },
     getRevision: function() { return localIndexPayload ? String(localIndexPayload.revision || '') : ''; },
     getRecordCount: function() { return localIndexRecords.length; },
     getPreviewIndex: function() { return localIndexRecords.map(function(record) { return record.index; }); },
+    getMetadata: function() {
+      return localIndexPayload && localIndexPayload.metadata && typeof localIndexPayload.metadata === 'object'
+        ? localIndexPayload.metadata
+        : null;
+    },
     noteServerRevision: function(revision) { return refreshLocalIndex_(true, revision); },
     checkForUpdates: function() { return refreshLocalIndex_(true, ''); }
   };

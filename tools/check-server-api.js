@@ -57,6 +57,9 @@ assert(source.includes('serverResponseReadyAtEpochMs'), 'JSONP performance trace
 assert(source.includes('perf.jsonpResponseChars'), 'JSONP performance trace includes the final script character count');
 assert(source.includes('datasetRevision: getLibraryDatasetRevision_()'), 'initial API responses include the dataset revision');
 assert(source.includes('function buildLocalLibraryIndexPayload_'), 'server builds a lightweight local-search index');
+assert(source.includes('const LOCAL_LIBRARY_INDEX_VERSION_ = 2'), 'server publishes the metadata-aware local-index schema');
+assert(source.includes('function buildLocalSearchMetadataPayload_'), 'server bundles search UI metadata into the local index');
+assert(source.includes('metadata: buildLocalSearchMetadataPayload_(dataset)'), 'local index contains suggestions, filters, and quick-browse counts');
 assert(source.includes('function getLibraryDatasetRevisionForPwa_'), 'server exposes a lightweight revision check');
 assert(source.includes('function getLocalLibraryIndexForPwa_'), 'server exposes the local-search index payload');
 assert(source.includes("'rowIndex', 'title', 'author', 'publisher'"), 'local index uses a compact columnar record layout');

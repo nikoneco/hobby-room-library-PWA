@@ -1686,6 +1686,16 @@ button.quick-browse-chip:focus-visible {
   margin-top: 0.16rem;
 }
 
+.search-series-genres {
+  gap: 0.28rem;
+  margin: 0.24rem 0 0.06rem;
+  pointer-events: none;
+}
+
+.search-series-genres:empty {
+  display: none;
+}
+
 .search-series-list-row {
   width: 100%;
 }

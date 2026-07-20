@@ -11,8 +11,30 @@ function assert(condition, message) {
 
 function createPayload() {
   return {
-    version: 1,
+    version: 2,
     revision: 'fixture-revision',
+    metadata: {
+      suggest: {
+        titles: ['【推しの子】', '葬送のフリーレン'],
+        yomis: ['おしのこ', 'そうそうのふりーれん'],
+        authors: ['赤坂アカ×横槍メンゴ', '山田鐘人'],
+        genres: ['芸能', 'ファンタジー', '連載中']
+      },
+      advancedOptions: {
+        publishers: ['集英社', '小学館'],
+        storyGenres: ['ファンタジー'],
+        themeGenres: ['芸能'],
+        moodGenres: [],
+        statusGenres: ['連載中'],
+        releaseYears: ['2020']
+      },
+      quickBrowseCounts: {
+        story: { 'ファンタジー': 1 },
+        theme: { '芸能': 2 },
+        mood: {},
+        status: { '連載中': 3 }
+      }
+    },
     columns: [],
     records: [
       [
@@ -87,7 +109,7 @@ function invoke(runner, method, args) {
   const payload = createPayload();
   const stored = {
     key: 'active',
-    schemaVersion: 1,
+    schemaVersion: 2,
     revision: payload.revision,
     payload
   };
@@ -141,8 +163,14 @@ function invoke(runner, method, args) {
   });
 
   await new Promise(resolve => setImmediate(resolve));
+  assert(sandboxWindow.ShumiLibraryLocalIndex.isSupported(), 'IndexedDB support is exposed');
+  assert(await sandboxWindow.ShumiLibraryLocalIndex.whenLoaded(), 'stored index load can be awaited');
   assert(sandboxWindow.ShumiLibraryLocalIndex.isReady(), 'stored index becomes ready');
   assert(sandboxWindow.ShumiLibraryLocalIndex.getRecordCount() === 3, 'stored index exposes its record count');
+  const metadata = sandboxWindow.ShumiLibraryLocalIndex.getMetadata();
+  assert(metadata.suggest.titles.includes('【推しの子】'), 'stored index exposes search suggestions');
+  assert(metadata.advancedOptions.publishers.includes('小学館'), 'stored index exposes advanced search options');
+  assert(metadata.quickBrowseCounts.status['連載中'] === 3, 'stored index exposes quick-browse counts');
   assert(documentEvents.some(event => event.type === 'shumi-library-local-index-ready'), 'stored index emits a ready event');
 
   const runner = sandboxWindow.google.script.run;

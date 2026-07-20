@@ -474,9 +474,19 @@ assertEqual(
 );
 
 const groupedSearchPresentation = sandbox.buildSearchResultPresentation_([
-  { title: 'フラジャイル 1', seriesKeyAuto: 'fragile', seriesSearchTitle: 'フラジャイル' },
+  {
+    title: 'フラジャイル 1',
+    seriesKeyAuto: 'fragile',
+    seriesSearchTitle: 'フラジャイル',
+    genreMeta: [{ category: 'story', name: '医療' }, { category: 'status', name: '連載中' }]
+  },
   { title: '単巻作品', seriesKeyAuto: '' },
-  { title: 'フラジャイル 10', seriesKeyAuto: 'fragile', seriesSearchTitle: 'フラジャイル' },
+  {
+    title: 'フラジャイル 10',
+    seriesKeyAuto: 'fragile',
+    seriesSearchTitle: 'フラジャイル',
+    genreMeta: [{ category: 'story', name: '医療' }, { category: 'theme', name: '仕事' }]
+  },
   { title: '暫定本 A', seriesKeyAuto: '__extra__temporary', isExtraSeries: true },
   { title: 'フラジャイル 11', seriesKeyAuto: 'fragile', seriesSearchTitle: 'フラジャイル' },
   { title: '一冊だけ一致', seriesKeyAuto: 'single-match', seriesSearchTitle: '別シリーズ' },
@@ -488,6 +498,17 @@ assertEqual(groupedSearchPresentation.displayItemCount, 5, 'search presentation 
 assertEqual(groupedSearchPresentation.entries[0].kind, 'series', 'first repeated series becomes one series result');
 assertEqual(groupedSearchPresentation.entries[0].title, 'フラジャイル', 'series result uses canonical series title');
 assertEqual(groupedSearchPresentation.entries[0].representativeBook.title, 'フラジャイル 1', 'series result uses first matching cover representative');
+assertEqual(
+  groupedSearchPresentation.entries[0].genreMeta.map(item => `${item.category}:${item.name}`).join(','),
+  'story:医療,status:連載中,theme:仕事',
+  'series result merges unique genres from matching volumes'
+);
+const staticSeriesChips = sandbox.buildGenreChips(
+  { genreMeta: groupedSearchPresentation.entries[0].genreMeta },
+  { limit: 3, interactive: false }
+);
+assert(staticSeriesChips.includes('<span class="genre-chip"'), 'series genres render as non-interactive chips inside the series button');
+assert(!staticSeriesChips.includes('<button'), 'series genres avoid nested buttons');
 assertEqual(
   groupedSearchPresentation.entries[0].books.map(book => book.title).join(','),
   'フラジャイル 1,フラジャイル 10,フラジャイル 11',

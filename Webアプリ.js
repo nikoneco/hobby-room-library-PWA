@@ -642,13 +642,27 @@ function buildPreviewIndexPayload_(dataset) {
   }));
 }
 
-const LOCAL_LIBRARY_INDEX_VERSION_ = 1;
+const LOCAL_LIBRARY_INDEX_VERSION_ = 2;
+
+/**
+ * PWAのローカル索引と一緒に保存する検索UI用メタデータを返す。
+ * 端末に索引がある場合、初期表示の候補取得をGASへ依存させない。
+ * @param {Object} dataset
+ * @returns {{suggest:Object,advancedOptions:Object,quickBrowseCounts:Object}}
+ */
+function buildLocalSearchMetadataPayload_(dataset) {
+  return {
+    suggest: buildSuggestDataPayload_(dataset),
+    advancedOptions: buildAdvancedSearchOptionsPayload_(dataset),
+    quickBrowseCounts: buildQuickBrowseCountsPayload_(dataset)
+  };
+}
 
 /**
  * PWAの端末内検索へ保存する軽量索引を列指向の配列で返す。
  * 詳細本文・外部リンク・生成画像URLは含めず、モーダル表示時に既存APIから取得する。
  * @param {Object} dataset
- * @returns {{version:number,revision:string,columns:string[],records:Array<Array<*>>}}
+ * @returns {{version:number,revision:string,metadata:Object,columns:string[],records:Array<Array<*>>}}
  */
 function buildLocalLibraryIndexPayload_(dataset) {
   const rows = dataset && Array.isArray(dataset.rows) ? dataset.rows : [];
@@ -696,6 +710,7 @@ function buildLocalLibraryIndexPayload_(dataset) {
   return {
     version: LOCAL_LIBRARY_INDEX_VERSION_,
     revision: getLibraryDatasetRevision_(),
+    metadata: buildLocalSearchMetadataPayload_(dataset),
     columns: [
       'rowIndex', 'title', 'author', 'publisher', 'shelf', 'location', 'released', 'brand',
       'isbn', 'yomi', 'genre', 'seriesKeyAuto', 'seriesCount', 'seriesSearchTitle',
@@ -845,12 +860,13 @@ function getInitialSearchData() {
 function getInitialSearchDataForPwa_() {
   try {
     const dataset = getLibraryDataset_();
+    const metadata = buildLocalSearchMetadataPayload_(dataset);
 
     return {
-      suggest: buildSuggestDataPayload_(dataset),
-      advancedOptions: buildAdvancedSearchOptionsPayload_(dataset),
+      suggest: metadata.suggest,
+      advancedOptions: metadata.advancedOptions,
       previewIndex: [],
-      quickBrowseCounts: buildQuickBrowseCountsPayload_(dataset),
+      quickBrowseCounts: metadata.quickBrowseCounts,
       datasetRevision: getLibraryDatasetRevision_(),
       userPreferences: getWebAppUserPreferences_()
     };

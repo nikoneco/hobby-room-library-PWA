@@ -1176,6 +1176,26 @@ function getSearchResultSeriesTitle_(group) {
   return String(representativeBook.seriesSearchTitle || representativeBook.title || 'シリーズ').trim();
 }
 
+function getSearchResultSeriesGenreMeta_(group) {
+  const books = group && Array.isArray(group.books) ? group.books : [];
+  const seen = new Set();
+  const genreMeta = [];
+
+  books.forEach(book => {
+    const items = book && Array.isArray(book.genreMeta) ? book.genreMeta : [];
+    items.forEach(item => {
+      const category = String(item && item.category || '').trim();
+      const name = String(item && item.name || '').trim();
+      const key = `${category}\u0000${name}`;
+      if (!category || !name || seen.has(key)) return;
+      seen.add(key);
+      genreMeta.push({ category, name });
+    });
+  });
+
+  return genreMeta;
+}
+
 function buildSearchResultPresentation_(books) {
   const sourceBooks = Array.isArray(books) ? books : [];
   const entries = [];
@@ -1225,6 +1245,7 @@ function buildSearchResultPresentation_(books) {
     entry.kind = 'series';
     entry.title = getSearchResultSeriesTitle_(entry);
     entry.matchCount = entry.books.length;
+    entry.genreMeta = getSearchResultSeriesGenreMeta_(entry);
     return entry;
   });
 
@@ -1240,6 +1261,9 @@ function createSearchResultSeriesCard_(group, viewMode, displayIndex) {
   const representativeBook = group && group.representativeBook ? group.representativeBook : {};
   const title = getSearchResultSeriesTitle_(group);
   const matchCount = Array.isArray(group && group.books) ? group.books.length : 0;
+  const genreMeta = Array.isArray(group && group.genreMeta)
+    ? group.genreMeta
+    : getSearchResultSeriesGenreMeta_(group);
   const card = document.createElement('button');
   card.type = 'button';
   card.className = viewMode === 'list'
@@ -1266,6 +1290,7 @@ function createSearchResultSeriesCard_(group, viewMode, displayIndex) {
   content.innerHTML = `
     <div class="search-series-kicker">${uiIcon_('collection', 'ui-icon-inline')}<span>シリーズ</span></div>
     <div class="book-title">${escapeHtml(title)}</div>
+    <div class="genre-chip-wrap search-series-genres">${buildGenreChips({ genreMeta }, { limit: 3, interactive: false })}</div>
     <div class="search-series-match-count">検索一致 ${matchCount}冊</div>
     <div class="book-open-cue${viewMode === 'list' ? ' list-open-cue' : ''}" aria-hidden="true"><span>一致した巻を見る</span>${uiIcon_('chevronDown', 'book-open-cue-icon')}</div>
   `;

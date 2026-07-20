@@ -309,7 +309,11 @@ assert(gasRunShim.includes("window.addEventListener('focus'"), 'Pages client che
 assert(gasRunShim.includes("document.addEventListener('visibilitychange'"), 'Pages client checks the local index when visible again');
 assert(gasRunShim.includes("window.addEventListener('online'"), 'Pages client checks the local index when connectivity returns');
 assert(gasRunShim.includes('LOCAL_INDEX_CHECK_INTERVAL_MS'), 'Pages client periodically checks the local index while active');
-assert(searchClient.includes('syncPreviewIndexFromLocal_'), 'search preview adopts the active local index');
+assert(gasRunShim.includes('const LOCAL_INDEX_SCHEMA_VERSION = 2'), 'Pages client invalidates the previous local-index schema');
+assert(gasRunShim.includes('getMetadata: function()'), 'Pages client exposes locally stored search metadata');
+assert(gasRunShim.includes('whenLoaded: function()'), 'Pages client allows initial UI data to await IndexedDB');
+assert(searchClient.includes('syncSearchDataFromLocalIndex_'), 'search UI adopts metadata and preview data from the active local index');
+assert(searchClient.includes('if (!syncSearchDataFromLocalIndex_())'), 'initial data falls back to GAS only when local metadata is unavailable');
 assert(searchClient.includes('noteServerRevision(payload.datasetRevision)'), 'initial data revision triggers local index synchronization');
 assert(gasRunShim.includes("endPerf_(perfToken"), 'GAS JSONP shim completes API performance measures');
 assert(gasRunShim.includes("params.set('perf', '1')"), 'GAS JSONP shim requests server timings only while performance HUD is active');
