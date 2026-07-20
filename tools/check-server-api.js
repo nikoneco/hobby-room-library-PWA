@@ -56,6 +56,11 @@ assert(source.includes('serverStartedAtEpochMs'), 'JSONP performance trace inclu
 assert(source.includes('serverResponseReadyAtEpochMs'), 'JSONP performance trace includes GAS response-ready time');
 assert(source.includes('perf.jsonpResponseChars'), 'JSONP performance trace includes the final script character count');
 assert(source.includes('datasetRevision: getLibraryDatasetRevision_()'), 'initial API responses include the dataset revision');
+assert(source.includes('function buildLocalLibraryIndexPayload_'), 'server builds a lightweight local-search index');
+assert(source.includes('function getLibraryDatasetRevisionForPwa_'), 'server exposes a lightweight revision check');
+assert(source.includes('function getLocalLibraryIndexForPwa_'), 'server exposes the local-search index payload');
+assert(source.includes("'rowIndex', 'title', 'author', 'publisher'"), 'local index uses a compact columnar record layout');
+assert(source.includes('getBookDetailByRowIndex'), 'book detail remains available separately');
 assert(source.includes('bumpLibraryDatasetRevision_'), 'cache invalidation advances the dataset revision');
 assert(mainSynopsisSource.includes('if (result.processed > 0)') && mainSynopsisSource.includes('clearLibrarySearchCache_();'), 'synopsis batches invalidate cache once after updates');
 assert(koboSynopsisSource.includes('if (result.processed > 0)') && koboSynopsisSource.includes('clearLibrarySearchCache_();'), 'Kobo retry batches invalidate cache once after updates');
@@ -63,6 +68,8 @@ assert(sheetCodeSource.includes('const changed = output.some') && sheetCodeSourc
 
 [
   'initial',
+  'libraryRevision',
+  'localIndex',
   'suggest',
   'advancedOptions',
   'previewIndex',
@@ -96,6 +103,8 @@ assert(sheetCodeSource.includes('const changed = output.some') && sheetCodeSourc
 
 [
   'getInitialSearchDataForPwa_()',
+  'getLibraryDatasetRevisionForPwa_()',
+  'getLocalLibraryIndexForPwa_()',
   'getSuggestData()',
   'getAdvancedSearchOptions()',
   'countPreviewMatchesAuthoritative(',

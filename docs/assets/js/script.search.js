@@ -296,6 +296,23 @@ function getEmptyAdvancedOptions_() {
   };
 }
 
+function syncPreviewIndexFromLocal_() {
+  const manager = window.ShumiLibraryLocalIndex;
+  if (!manager || typeof manager.isReady !== 'function' || !manager.isReady()) return false;
+
+  const localPreview = typeof manager.getPreviewIndex === 'function'
+    ? manager.getPreviewIndex()
+    : [];
+  PREVIEW_INDEX = Array.isArray(localPreview) ? localPreview : [];
+  PREVIEW_INDEX_READY = true;
+  if (typeof manager.getRevision === 'function') {
+    syncBookDetailCacheRevision_(manager.getRevision());
+  }
+  renderQuickBrowseRail_();
+  syncSearchStatusPreviewFromForm_();
+  return true;
+}
+
 function applyInitialSearchData_(data) {
   const payload = data || {};
 
@@ -307,6 +324,11 @@ function applyInitialSearchData_(data) {
     : null;
   PREVIEW_INDEX_READY = true;
   syncBookDetailCacheRevision_(payload.datasetRevision);
+
+  const localIndexManager = window.ShumiLibraryLocalIndex;
+  if (localIndexManager && typeof localIndexManager.noteServerRevision === 'function') {
+    localIndexManager.noteServerRevision(payload.datasetRevision);
+  }
 
   if (!resultViewModeChangedLocally && payload.userPreferences) {
     const initialViewMode = getPreferredResultViewMode_(payload.userPreferences);
@@ -320,7 +342,12 @@ function applyInitialSearchData_(data) {
   if (!lastResult) {
     syncSearchStatusPreviewFromForm_();
   }
+  syncPreviewIndexFromLocal_();
 }
+
+document.addEventListener('shumi-library-local-index-ready', function() {
+  syncPreviewIndexFromLocal_();
+});
 
 function fetchInitialSearchData() {
   google.script.run

@@ -239,6 +239,7 @@ const nightCss = read(path.join(docs, 'assets', 'css', 'style.night-library.css'
 const pwaClient = read(path.join(docs, 'assets', 'js', 'pwa-client.js'));
 const gasRunShim = read(path.join(docs, 'assets', 'js', 'gas-run-shim.js'));
 const bootClient = read(path.join(docs, 'assets', 'js', 'script.boot.js'));
+const searchClient = read(path.join(docs, 'assets', 'js', 'script.search.js'));
 assert(pwaCss.includes('body.pwa-standalone .mobile-app-dock'), 'PWA CSS styles standalone dock');
 assert(pwaCss.includes('.pwa-launch-splash'), 'PWA CSS styles launch splash overlay');
 assert(pwaCss.includes('body.pwa-launch-splash-visible .pwa-launch-splash'), 'PWA CSS only reveals launch splash while body state is active');
@@ -299,6 +300,17 @@ assert(pwaClient.includes('bindSettingsPanel_'), 'PWA client binds settings pane
 assert(pwaClient.includes('perfStart: startPerf_'), 'PWA client exposes performance start hook');
 assert(pwaClient.includes('perfEnd: endPerf_'), 'PWA client exposes performance end hook');
 assert(gasRunShim.includes("startPerf_('api:' + config.api"), 'GAS JSONP shim measures API calls');
+assert(gasRunShim.includes('LOCAL_INDEX_DB_NAME'), 'Pages client defines an IndexedDB-backed local index');
+assert(gasRunShim.includes('function searchLocalSimple_'), 'Pages client can run simple searches locally');
+assert(gasRunShim.includes('function searchLocalAdvanced_'), 'Pages client can run advanced searches locally');
+assert(gasRunShim.includes('function pickLocalRandom_'), 'Pages client can pick random books locally');
+assert(gasRunShim.includes('local index refresh failed; previous index remains active'), 'Pages client keeps the previous index when refresh fails');
+assert(gasRunShim.includes("window.addEventListener('focus'"), 'Pages client checks the local index when focus returns');
+assert(gasRunShim.includes("document.addEventListener('visibilitychange'"), 'Pages client checks the local index when visible again');
+assert(gasRunShim.includes("window.addEventListener('online'"), 'Pages client checks the local index when connectivity returns');
+assert(gasRunShim.includes('LOCAL_INDEX_CHECK_INTERVAL_MS'), 'Pages client periodically checks the local index while active');
+assert(searchClient.includes('syncPreviewIndexFromLocal_'), 'search preview adopts the active local index');
+assert(searchClient.includes('noteServerRevision(payload.datasetRevision)'), 'initial data revision triggers local index synchronization');
 assert(gasRunShim.includes("endPerf_(perfToken"), 'GAS JSONP shim completes API performance measures');
 assert(gasRunShim.includes("params.set('perf', '1')"), 'GAS JSONP shim requests server timings only while performance HUD is active');
 assert(gasRunShim.includes('server: serverPerf'), 'GAS JSONP shim attaches server timings to performance entries');

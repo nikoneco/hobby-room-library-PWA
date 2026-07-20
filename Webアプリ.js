@@ -13,6 +13,8 @@ const WEB_APP_API_REGISTRY_ = Object.freeze({
     { name: 'searchBooksAdvanced', calledBy: 'script.js.html: search/rerunSearchWithParams_', role: '詳細検索' },
     { name: 'countPreviewMatchesAuthoritative', calledBy: 'script.js.html: syncSearchStatusPreviewFromForm_', role: '詳細検索プレビュー件数のサーバー補正' },
     { name: 'getRandomBooks', calledBy: 'script.js.html: showRandomBooks', role: 'ランダム表示' },
+    { name: 'getLibraryDatasetRevisionForPwa_', calledBy: 'JSONP API: libraryRevision', role: 'PWAローカル索引の更新判定' },
+    { name: 'getLocalLibraryIndexForPwa_', calledBy: 'JSONP API: localIndex', role: 'PWAローカル検索用の軽量索引取得' },
     { name: 'getBookshelfBooks', calledBy: 'script.js.html: showAllBookshelf', role: 'PWA本棚一覧用の軽量全件取得' },
     { name: 'getBookshelfBooksChunk', calledBy: 'JSONP API: shelfChunk', role: 'PWA本棚一覧用の軽量分割取得' },
     { name: 'getBookDetailByRowIndex', calledBy: 'script.js.html: showPopup', role: 'PWA本棚一覧から開いた本の詳細取得' },
@@ -638,6 +640,82 @@ function buildPreviewIndexPayload_(dataset) {
       status: Array.isArray(item && item.genres && item.genres.status) ? item.genres.status : []
     }
   }));
+}
+
+const LOCAL_LIBRARY_INDEX_VERSION_ = 1;
+
+/**
+ * PWAの端末内検索へ保存する軽量索引を列指向の配列で返す。
+ * 詳細本文・外部リンク・生成画像URLは含めず、モーダル表示時に既存APIから取得する。
+ * @param {Object} dataset
+ * @returns {{version:number,revision:string,columns:string[],records:Array<Array<*>>}}
+ */
+function buildLocalLibraryIndexPayload_(dataset) {
+  const rows = dataset && Array.isArray(dataset.rows) ? dataset.rows : [];
+  const index = dataset && Array.isArray(dataset.index) ? dataset.index : [];
+
+  const records = rows.map((row, rowIndex) => {
+    const item = index[rowIndex] || {};
+    const genres = item.genres || {};
+    const isSensitive = isSensitiveIndexItem_(item) || isSensitiveGenreText_(row[CONFIG.IDX.GENRE]);
+
+    return [
+      rowIndex,
+      row[CONFIG.IDX.TITLE] || '',
+      row[CONFIG.IDX.AUTHOR] || '',
+      row[CONFIG.IDX.PUBLISHER] || '',
+      row[CONFIG.IDX.SHELF] || '',
+      row[CONFIG.IDX.LOCATION] || '',
+      row[CONFIG.IDX.RELEASED] || '',
+      row[CONFIG.IDX.BRAND] || '',
+      normalizeIsbn_(row[CONFIG.IDX.ISBN]),
+      row[CONFIG.IDX.YOMIGANA] || '',
+      row[CONFIG.IDX.GENRE] || '',
+      item.seriesKeyAuto || '',
+      Number(item.seriesCount || 0),
+      item.seriesSearchTitle || '',
+      Boolean(item.isExtraSeries),
+      item.volume || 0,
+      item.ownedMaxVolume || 0,
+      normalizeBookFallbackImageUrl_(row[CONFIG.IDX.FALLBACK_IMAGE_URL]),
+      row[CONFIG.IDX.FALLBACK_IMAGE_SOURCE] || '',
+      Boolean(isSensitive),
+      String(item.title || ''),
+      String(item.yomi || ''),
+      String(item.author || ''),
+      String(item.searchKey || ''),
+      String(item.publisher || ''),
+      Number(item.releasedYm || 0),
+      Array.isArray(genres.story) ? genres.story : [],
+      Array.isArray(genres.theme) ? genres.theme : [],
+      Array.isArray(genres.mood) ? genres.mood : [],
+      Array.isArray(genres.status) ? genres.status : []
+    ];
+  });
+
+  return {
+    version: LOCAL_LIBRARY_INDEX_VERSION_,
+    revision: getLibraryDatasetRevision_(),
+    columns: [
+      'rowIndex', 'title', 'author', 'publisher', 'shelf', 'location', 'released', 'brand',
+      'isbn', 'yomi', 'genre', 'seriesKeyAuto', 'seriesCount', 'seriesSearchTitle',
+      'isExtraSeries', 'volume', 'ownedMaxVolume', 'fallbackImg', 'fallbackImageSource',
+      'isSensitive', 'indexTitle', 'indexYomi', 'indexAuthor', 'searchKey', 'indexPublisher',
+      'releasedYm', 'story', 'theme', 'mood', 'status'
+    ],
+    records
+  };
+}
+
+function getLibraryDatasetRevisionForPwa_() {
+  return {
+    version: LOCAL_LIBRARY_INDEX_VERSION_,
+    revision: getLibraryDatasetRevision_()
+  };
+}
+
+function getLocalLibraryIndexForPwa_() {
+  return buildLocalLibraryIndexPayload_(getLibraryDataset_());
 }
 
 /**
@@ -2056,6 +2134,8 @@ const WEBAPP_JSONP_CALLBACK_PATTERN_ = /^[A-Za-z_$][0-9A-Za-z_$]*(?:\.[A-Za-z_$]
 const WEBAPP_JSONP_DEFAULT_CALLBACK_ = '__shumiLibraryJsonpCallback';
 const PUBLIC_WEBAPP_JSONP_API_HANDLERS_ = Object.freeze({
   initial: () => getInitialSearchDataForPwa_(),
+  libraryRevision: () => getLibraryDatasetRevisionForPwa_(),
+  localIndex: () => getLocalLibraryIndexForPwa_(),
   suggest: () => getSuggestData(),
   advancedOptions: () => getAdvancedSearchOptions(),
   previewIndex: () => [],
