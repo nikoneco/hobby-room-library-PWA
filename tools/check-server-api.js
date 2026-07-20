@@ -40,6 +40,13 @@ assert(source.includes('Cache round-trip verification failed'), 'server verifies
 assert(source.includes('LockService.getScriptLock'), 'server coordinates dataset rebuilds with ScriptLock');
 assert(source.includes('getOrBuildCachedDataset_'), 'library and shelf datasets use the shared cache rebuild contract');
 assert(source.includes("addWebAppPerfDuration_(perf, 'cacheReadMs'"), 'server performance trace measures cache reads');
+assert(source.includes("addWebAppPerfDuration_(perf, 'cacheMetaMs'"), 'server performance trace measures cache metadata fetches');
+assert(source.includes("addWebAppPerfDuration_(perf, 'cacheChunksMs'"), 'server performance trace measures cache chunk fetches');
+assert(source.includes("addWebAppPerfDuration_(perf, 'cacheAssembleMs'"), 'server performance trace measures cache assembly');
+assert(source.includes("addWebAppPerfDuration_(perf, 'cacheIntegrityMs'"), 'server performance trace measures lightweight cache integrity validation');
+assert(source.includes("addWebAppPerfDuration_(perf, 'cacheParseMs'"), 'server performance trace measures cache JSON parsing');
+assert(source.includes('charLength: json.length'), 'cache metadata stores a cheap character-length integrity value');
+assert(!source.includes("getUtf8ByteLength_(json) !== Number(meta.byteLength)"), 'cache hits avoid recalculating full UTF-8 byte length');
 assert(source.includes("addWebAppPerfDuration_(perf, 'datasetMs'"), 'server performance trace measures dataset retrieval');
 assert(source.includes("addWebAppPerfDuration_(perf, 'filterMs'"), 'server performance trace measures simple-search filtering');
 assert(source.includes("addWebAppPerfDuration_(perf, 'pickMs'"), 'server performance trace measures random selection');

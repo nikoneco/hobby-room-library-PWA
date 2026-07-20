@@ -257,33 +257,47 @@ function bumpLibraryDatasetRevision_() {
  * @param {string} key
  * @returns {*|null}
  */
-function getCachedJson_(key) {
+function getCachedJson_(key, perf) {
   try {
+    let stepStartedAt = Date.now();
     const cache = getLibraryCache_();
     const metaText = cache.get(getCacheMetaKey_(key));
+    addWebAppPerfDuration_(perf, 'cacheMetaMs', stepStartedAt);
     if (!metaText) return null;
 
+    stepStartedAt = Date.now();
     const meta = JSON.parse(metaText);
+    addWebAppPerfDuration_(perf, 'cacheMetaParseMs', stepStartedAt);
     const chunkCount = Number(meta.chunkCount || 0);
     if (!chunkCount) return null;
+    if (perf) perf.cacheChunkCount = chunkCount;
 
     const keys = Array.from({ length: chunkCount }, (_, i) => `${key}:chunk:${i}`);
+    stepStartedAt = Date.now();
     const chunkMap = cache.getAll(keys);
+    addWebAppPerfDuration_(perf, 'cacheChunksMs', stepStartedAt);
     if (Object.keys(chunkMap).length !== chunkCount) return null;
 
+    stepStartedAt = Date.now();
     let json = '';
     for (let i = 0; i < chunkCount; i++) {
       const chunk = chunkMap[`${key}:chunk:${i}`];
       if (typeof chunk !== 'string') return null;
       json += chunk;
     }
+    addWebAppPerfDuration_(perf, 'cacheAssembleMs', stepStartedAt);
 
-    if (meta.byteLength && getUtf8ByteLength_(json) !== Number(meta.byteLength)) {
-      console.error(`getCachedJson_ byte length mismatch: key=${key}`);
+    stepStartedAt = Date.now();
+    if (meta.charLength && json.length !== Number(meta.charLength)) {
+      console.error(`getCachedJson_ character length mismatch: key=${key}`);
       return null;
     }
+    addWebAppPerfDuration_(perf, 'cacheIntegrityMs', stepStartedAt);
 
-    return JSON.parse(json);
+    stepStartedAt = Date.now();
+    const parsed = JSON.parse(json);
+    addWebAppPerfDuration_(perf, 'cacheParseMs', stepStartedAt);
+    return parsed;
   } catch (e) {
     console.error('getCachedJson_ error:', e);
     return null;
@@ -306,7 +320,11 @@ function putCachedJson_(key, value, ttlSeconds) {
     const chunkCount = chunks.length;
     const totalByteLength = getUtf8ByteLength_(json);
     const payload = {};
-    payload[getCacheMetaKey_(key)] = JSON.stringify({ chunkCount, byteLength: totalByteLength });
+    payload[getCacheMetaKey_(key)] = JSON.stringify({
+      chunkCount,
+      byteLength: totalByteLength,
+      charLength: json.length
+    });
 
     for (let i = 0; i < chunkCount; i++) {
       const chunk = chunks[i];
@@ -379,7 +397,7 @@ function getOrBuildCachedDataset_(cacheKey, isValid, buildDataset, perf) {
 
   try {
     let stepStartedAt = Date.now();
-    const cached = getCachedJson_(cacheKey);
+    const cached = getCachedJson_(cacheKey, perf);
     addWebAppPerfDuration_(perf, 'cacheReadMs', stepStartedAt);
     if (isValid(cached)) {
       if (perf) perf.cacheStatus = 'hit';
@@ -404,7 +422,7 @@ function getOrBuildCachedDataset_(cacheKey, isValid, buildDataset, perf) {
       }
 
       stepStartedAt = Date.now();
-      const cachedAfterLock = getCachedJson_(cacheKey);
+      const cachedAfterLock = getCachedJson_(cacheKey, perf);
       addWebAppPerfDuration_(perf, 'cacheReadMs', stepStartedAt);
       if (isValid(cachedAfterLock)) {
         if (perf) perf.cacheStatus = 'hit-after-lock';
