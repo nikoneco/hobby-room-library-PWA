@@ -1115,7 +1115,7 @@ function buildPopupDetailLoadingHtml_(book) {
   }
   return `
     <div class="popup-detail-loading" aria-live="polite">
-      <div class="popup-detail-state loading">${escapeHtml(getPwaLibrarianText_('popup.detailLoading', 'あらすじなどを読み込んでいます'))}</div>
+      <div class="popup-detail-state loading">${escapeHtml(getPwaLibrarianText_('popup.detailLoading', 'あらすじを読み込んでいます'))}</div>
       <div class="popup-detail-skeleton" aria-hidden="true">
         <span class="popup-detail-skeleton-line wide"></span>
         <span class="popup-detail-skeleton-line"></span>
@@ -1444,7 +1444,7 @@ function showSeriesPanel(sourceBook, seriesBooks, returnContext) {
   const prevBtn = document.getElementById('popup-prev');
   const nextBtn = document.getElementById('popup-next');
 
-  const items = Array.isArray(seriesBooks) ? seriesBooks : [];
+  const items = sortSeriesBooksForDisplay_(Array.isArray(seriesBooks) ? seriesBooks : []);
   const sourceTitle = sourceBook && (sourceBook.seriesSearchTitle || sourceBook.title) || 'シリーズ';
   const linksHtml = buildExternalLinksHtml(sourceBook);
 
@@ -1460,9 +1460,10 @@ function showSeriesPanel(sourceBook, seriesBooks, returnContext) {
   const listHtml = items.length
     ? items.map((item, idx) => {
       const isCurrent = isCurrentSeriesBook_(sourceBook, item);
+      const badgeLabel = getSeriesListBadgeLabel_(item, idx);
       return `
         <button type="button" class="series-list-item${isCurrent ? ' is-current' : ''}" data-series-index="${idx}" aria-label="${escapeHtml(item.title || 'シリーズ内の本')} の詳細を開く">
-          <span class="series-list-title">${escapeHtml(item.title || '(タイトルなし)')}</span>
+          <span class="series-list-title" data-series-label="${escapeHtml(badgeLabel)}">${escapeHtml(item.title || '(タイトルなし)')}</span>
         </button>
       `;
     }).join('')
@@ -1542,6 +1543,37 @@ function isCurrentSeriesBook_(sourceBook, item) {
     String(sourceBook.title).trim() === String(item.title).trim() &&
     String(sourceBook.released || '').trim() === String(item.released || '').trim()
   );
+}
+
+function getSeriesPartLabel_(item) {
+  const title = String(item && item.title || '').trim();
+  const match = title.match(/(?:^|[\s._・:：\-－—])((?:上|中|下)(?:巻)?|(?:前|後)編)\s*$/);
+  return match ? match[1].replace(/[巻編]$/, '') : '';
+}
+
+function getSeriesListBadgeLabel_(item, index) {
+  const partLabel = getSeriesPartLabel_(item);
+  if (partLabel) return partLabel;
+
+  const volume = Number(item && item.volume);
+  if (Number.isFinite(volume) && volume > 0) {
+    return String(Math.floor(volume)).padStart(2, '0');
+  }
+
+  return String(Math.max(0, Number(index) || 0) + 1).padStart(2, '0');
+}
+
+function sortSeriesBooksForDisplay_(books) {
+  const rank = { '前': 1, '上': 2, '中': 3, '下': 4, '後': 5 };
+  return books
+    .map((book, index) => ({ book, index, part: getSeriesPartLabel_(book) }))
+    .sort((a, b) => {
+      if (a.part && b.part && rank[a.part] !== rank[b.part]) {
+        return rank[a.part] - rank[b.part];
+      }
+      return a.index - b.index;
+    })
+    .map(entry => entry.book);
 }
 
 function showPopup(book, index, dataArr, seriesContext, options) {

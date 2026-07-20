@@ -313,7 +313,7 @@ assert(gasRunShim.includes('const LOCAL_INDEX_SCHEMA_VERSION = 2'), 'Pages clien
 assert(gasRunShim.includes('getMetadata: function()'), 'Pages client exposes locally stored search metadata');
 assert(gasRunShim.includes('getBookByRowIndex: function(rowIndex)'), 'Pages client exposes local book metadata for immediate popup rendering');
 assert(gasRunShim.includes('whenLoaded: function()'), 'Pages client allows initial UI data to await IndexedDB');
-assert(pwaClient.includes("'popup.detailLoading': 'あらすじなどを読み込んでいます'"), 'popup loading text distinguishes deferred details from local genres');
+assert(pwaClient.includes("'popup.detailLoading': 'あらすじを読み込んでいます'"), 'popup loading text identifies the deferred synopsis precisely');
 assert(searchClient.includes('syncSearchDataFromLocalIndex_'), 'search UI adopts metadata and preview data from the active local index');
 assert(searchClient.includes('if (!syncSearchDataFromLocalIndex_())'), 'initial data falls back to GAS only when local metadata is unavailable');
 assert(searchClient.includes('noteServerRevision(payload.datasetRevision)'), 'initial data revision triggers local index synchronization');

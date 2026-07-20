@@ -615,7 +615,7 @@ assert(
     'popup does not recursively reapply cached details to an already-loaded book'
   );
   assert(!modalSource.includes('popup-detail-skeleton-chip-row'), 'popup loading skeleton no longer impersonates unavailable genres');
-  assert(modalSource.includes('あらすじなどを読み込んでいます'), 'popup loading copy describes only deferred detail data');
+  assert(modalSource.includes('あらすじを読み込んでいます'), 'popup loading copy describes the deferred synopsis precisely');
 }
 assert(
   clientScriptSources[clientScriptFiles.indexOf('script.state.js.html')].includes('BOOK_DETAIL_PREFETCH_WARM_DELAY_MS') &&
@@ -628,6 +628,30 @@ assert(
   !clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('buildSeriesListMetaHtml_') &&
     !clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('series-list-meta'),
   'series panel rows show only the volume number and title'
+);
+assertEqual(
+  sandbox.getSeriesListBadgeLabel_({ title: "アメデオ旅行記 = Amedeo's Travels. 下", volume: 0 }, 0),
+  '下',
+  'series panel uses the actual lower-volume label instead of its list position'
+);
+assertEqual(
+  sandbox.getSeriesListBadgeLabel_({ title: '通常シリーズ 3', volume: 3 }, 2),
+  '03',
+  'series panel keeps zero-padded numeric volume labels'
+);
+assertEqual(
+  sandbox.sortSeriesBooksForDisplay_([
+    { title: "アメデオ旅行記 = Amedeo's Travels. 下" },
+    { title: "アメデオ旅行記 = Amedeo's Travels. 上" }
+  ]).map(book => sandbox.getSeriesPartLabel_(book)).join(','),
+  '上,下',
+  'series panel orders upper and lower volumes naturally'
+);
+assert(
+  clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('data-series-label=') &&
+    modernModalStyleSource.includes('content: attr(data-series-label)') &&
+    !modernModalStyleSource.includes('counter(series-item'),
+  'series panel renders data-derived badge labels instead of ordinal counters'
 );
 assert(
   clientScriptSources[clientScriptFiles.indexOf('script.state.js.html')].includes('bookshelfPendingRestoreScroll') &&

@@ -878,7 +878,6 @@ button.popup-arrow:active {
 
 .series-list {
   flex: 1 1 auto;
-  counter-reset: series-item;
   display: grid;
   gap: 0.38rem;
   min-height: 0;
@@ -898,7 +897,6 @@ button.popup-arrow:active {
 
 .series-list-item {
   position: relative;
-  counter-increment: series-item;
   display: flex;
   align-items: center;
   min-height: 3.05rem;
@@ -954,7 +952,7 @@ button.popup-arrow:active {
 }
 
 .series-list-title::before {
-  content: counter(series-item, decimal-leading-zero);
+  content: attr(data-series-label);
   flex: 0 0 auto;
   min-width: 2.25em;
   padding: 0.12rem 0.34rem;
