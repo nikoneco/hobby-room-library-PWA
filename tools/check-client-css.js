@@ -84,6 +84,7 @@ assertBalancedBraces(combinedCss);
   /body\.sandbox-redesign\s+\.search-container\.shrink[\s\S]*?grid-template-areas:[\s\S]*?"brand status view"[\s\S]*?"brand form view"/,
   /body\.sandbox-redesign\s+\.search-container\.shrink[\s\S]*?padding-right:\s*max\(5\.5rem,\s*calc\(\(100vw\s*-\s*var\(--night-max\)\)\s*\/\s*2\)\)/,
   /body\.sandbox-redesign\s+\.view-toggle\s*\{[\s\S]*?position:\s*static[\s\S]*?grid-area:\s*view/,
+  /body\.sandbox-redesign\s+\.search-container\.centered\s+\.search-status-area\s*\{[^}]*overflow:\s*visible/,
   /\.search-series-card\s*\{/,
   /\.search-result-series-list\s*\{[\s\S]*?scroll-snap-type:\s*x\s+mandatory/,
   /\.search-result-series-book-cover\s*\{[\s\S]*?aspect-ratio:\s*2\s*\/\s*3/,
