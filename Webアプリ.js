@@ -1104,7 +1104,7 @@ function isSensitiveGenreText_(genreText) {
 /**
  * PWA本棚表示専用の軽量データへ変換する。
  * 詳細情報はモーダルを開いた時に1冊ずつ取得する。
- * 画像URLはクライアント側でISBNから組み立て、初回JSONPは文字データ優先にする。
+ * ISBN由来の画像が取得できない場合に備え、スプレッドシートのフォールバック画像も含める。
  *
  * @param {string[][]} rows
  * @param {Object[]=} indexData
@@ -1126,13 +1126,10 @@ function mapRowsToShelfBooks_(rows, indexData, rowOffset) {
       isbn,
       shelf: row[CONFIG.IDX.SHELF] || '',
       location: row[CONFIG.IDX.LOCATION] || '',
-      isSensitive
+      isSensitive,
+      fallbackImg: normalizeBookFallbackImageUrl_(row[CONFIG.IDX.FALLBACK_IMAGE_URL]),
+      fallbackImageSource: row[CONFIG.IDX.FALLBACK_IMAGE_SOURCE] || ''
     };
-
-    if (isSensitive) {
-      book.fallbackImg = normalizeBookFallbackImageUrl_(row[CONFIG.IDX.FALLBACK_IMAGE_URL]);
-      book.fallbackImageSource = row[CONFIG.IDX.FALLBACK_IMAGE_SOURCE] || '';
-    }
 
     return book;
   });
@@ -1166,6 +1163,8 @@ function isBookshelfLiteDatasetValid_(dataset) {
       typeof book.title === 'string' &&
       typeof book.shelf === 'string' &&
       typeof book.location === 'string' &&
+      typeof book.fallbackImg === 'string' &&
+      typeof book.fallbackImageSource === 'string' &&
       Object.prototype.hasOwnProperty.call(book, 'rowIndex')
     )
   );

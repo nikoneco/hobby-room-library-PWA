@@ -26,8 +26,12 @@ assert(source.includes('Utilities.base64DecodeWebSafe'), 'JSONP uses web-safe Ba
 assert(source.includes('PUBLIC_WEBAPP_JSONP_API_HANDLERS_'), 'JSONP uses an explicit public API whitelist');
 assert(source.includes('buildQuickBrowseCountsPayload_'), 'PWA initial data includes quick browse counts');
 assert(source.includes('SHELF_DATASET_KEY'), 'server defines a separate bookshelf dataset cache key');
+assert(configSource.includes("SHELF_DATASET_KEY: 'library_shelf_dataset_v3'"), 'bookshelf cache key invalidates datasets without fallback cover fields');
 assert(source.includes('getBookshelfLiteDataset_'), 'server has a lightweight bookshelf dataset path');
 assert(source.includes('buildBookshelfLiteDataset_'), 'server can build bookshelf data without full search index');
+assert(source.includes('fallbackImg: normalizeBookFallbackImageUrl_(row[CONFIG.IDX.FALLBACK_IMAGE_URL])'), 'lightweight bookshelf records preserve the fallback cover URL');
+assert(source.includes("fallbackImageSource: row[CONFIG.IDX.FALLBACK_IMAGE_SOURCE] || ''"), 'lightweight bookshelf records preserve the fallback cover source');
+assert(source.includes("typeof book.fallbackImg === 'string'"), 'bookshelf cache validation rejects records without fallback cover URLs');
 assert(source.includes('WEBAPP_API_LIMITS_'), 'server centralizes public API limits');
 assert(source.includes('normalizeWebAppApiInteger_'), 'server centralizes public API integer normalization');
 assert(source.includes('SHELF_CHUNK_MAX_LIMIT'), 'server caps bookshelf chunk size');
