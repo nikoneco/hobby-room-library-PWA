@@ -1555,3 +1555,175 @@ function showResult(data) {
     result.classList.add('show');
   }, 40);
 }
+
+function formatSeriesStatusVolumeList_(volumes) {
+  return (Array.isArray(volumes) ? volumes : [])
+    .map(volume => `${Number(volume)}巻`)
+    .join('・');
+}
+
+function formatSeriesStatusDuplicateList_(duplicates) {
+  return (Array.isArray(duplicates) ? duplicates : [])
+    .map(item => `${Number(item.volume)}巻（${Number(item.count || 0)}冊）`)
+    .join('・');
+}
+
+function createSeriesStatusIssueCard_(issue) {
+  const missingVolumes = Array.isArray(issue && issue.missingVolumes) ? issue.missingVolumes : [];
+  const duplicateVolumes = Array.isArray(issue && issue.duplicateVolumes) ? issue.duplicateVolumes : [];
+  const card = document.createElement('button');
+  card.type = 'button';
+  card.className = 'series-status-card';
+  card.setAttribute('aria-label', `${issue.title || 'シリーズ'}の所蔵巻を確認`);
+  card.onclick = function() {
+    if (issue && issue.sourceBook) openSeriesPanel(issue.sourceBook);
+  };
+
+  const flags = [];
+  if (missingVolumes.length) {
+    flags.push(`
+      <div class="series-status-issue-row is-missing">
+        <span class="series-status-issue-label">途中で抜けている巻</span>
+        <strong>${escapeHtml(formatSeriesStatusVolumeList_(missingVolumes))}</strong>
+      </div>
+    `);
+  }
+  if (duplicateVolumes.length) {
+    flags.push(`
+      <div class="series-status-issue-row is-duplicate">
+        <span class="series-status-issue-label">重複の可能性</span>
+        <strong>${escapeHtml(formatSeriesStatusDuplicateList_(duplicateVolumes))}</strong>
+      </div>
+    `);
+  }
+
+  card.innerHTML = `
+    <span class="series-status-card-main">
+      <span class="series-status-card-title">${escapeHtml(issue.title || 'シリーズ')}</span>
+      <span class="series-status-card-meta">所蔵 ${Number(issue.ownedBookCount || 0)}冊・最大 ${Number(issue.ownedMaxVolume || 0)}巻</span>
+      <span class="series-status-card-issues">${flags.join('')}</span>
+    </span>
+    <span class="series-status-card-action">
+      <span>シリーズを見る</span>
+      ${uiIcon_('chevronDown', 'series-status-card-chevron')}
+    </span>
+  `;
+  return card;
+}
+
+function renderSeriesInventoryStatus_(payload) {
+  hideSpinner();
+  const data = payload && typeof payload === 'object' ? payload : {};
+  const issues = Array.isArray(data.issues) ? data.issues : [];
+  const result = document.getElementById('result');
+  if (!result) return;
+
+  resetResultRenderQueue_();
+  resetBookDetailPrefetchObserver_();
+  syncSearchResultBookDetailPrefetch_([], 'none');
+  syncShelfViewUiState_('card');
+  unmountShelfRoomMapPortal_();
+  hideSearchStatus_();
+
+  result.innerHTML = '';
+  result.classList.remove('show');
+  result.classList.add('result-fade');
+
+  const section = document.createElement('section');
+  section.className = 'series-status-view';
+  section.setAttribute('aria-labelledby', 'seriesStatusTitle');
+  section.innerHTML = `
+    <header class="series-status-header">
+      <div>
+        <p class="series-status-kicker">シリーズ確認</p>
+        <h2 id="seriesStatusTitle">シリーズ所蔵状況</h2>
+        <p class="series-status-lead">所蔵巻の抜けや重複の可能性を確認します</p>
+      </div>
+      <button type="button" class="series-status-back-btn" data-action="top">
+        ${uiIcon_('back', 'series-status-back-icon')}
+        <span>トップに戻る</span>
+      </button>
+    </header>
+    <div class="series-status-summary" aria-label="確認結果">
+      <div class="series-status-stat">
+        <span>確認したシリーズ</span>
+        <strong>${Number(data.checkedSeriesCount || 0)}</strong>
+      </div>
+      <div class="series-status-stat is-missing">
+        <span>途中で抜け</span>
+        <strong>${Number(data.missingSeriesCount || 0)}</strong>
+      </div>
+      <div class="series-status-stat is-duplicate">
+        <span>重複候補</span>
+        <strong>${Number(data.duplicateSeriesCount || 0)}</strong>
+      </div>
+    </div>
+    <p class="series-status-rule-note">
+      1巻から所蔵最大巻までの途中だけを確認しています。未購入の続刊や未発売巻は判定しません。
+    </p>
+  `;
+  const backButton = section.querySelector('.series-status-back-btn');
+  if (backButton) {
+    backButton.onclick = function() {
+      returnToTopPage_();
+    };
+  }
+
+  const list = document.createElement('div');
+  list.className = 'series-status-list';
+  list.setAttribute('aria-label', '確認が必要なシリーズ');
+
+  if (!issues.length) {
+    const empty = document.createElement('div');
+    empty.className = 'series-status-empty';
+    empty.innerHTML = `
+      ${uiIcon_('collection', 'series-status-empty-icon')}
+      <strong>途中の抜けや重複候補は見つかりませんでした</strong>
+      <span>現在の所蔵データでは、確認が必要なシリーズはありません。</span>
+    `;
+    list.appendChild(empty);
+  } else {
+    issues.forEach(issue => {
+      list.appendChild(createSeriesStatusIssueCard_(issue));
+    });
+  }
+
+  section.appendChild(list);
+  result.appendChild(section);
+  window.requestAnimationFrame(function() {
+    result.classList.add('show');
+    window.scrollTo({ top: 0, behavior: 'auto' });
+  });
+}
+
+function showSeriesInventoryStatus() {
+  hideAllSuggest();
+  clearSearchFormValuesForBrowse_();
+  closeAdvancedSearchPanel_();
+
+  const container = document.getElementById('searchContainer');
+  if (container) {
+    container.classList.remove('centered');
+    container.classList.add('shrink');
+  }
+
+  const viewToggle = document.getElementById('viewToggle');
+  if (viewToggle) viewToggle.style.display = 'none';
+
+  isShelfImmersiveMode = false;
+  lastResult = null;
+  lastResultKind = 'series-status';
+  currentSearchResultPresentationStats = null;
+  syncShelfViewUiState_('card');
+  if (typeof syncMobileAppDockState_ === 'function') syncMobileAppDockState_();
+
+  showSpinner('シリーズの巻数を確かめています', { kind: 'refine' });
+  google.script.run
+    .withSuccessHandler(renderSeriesInventoryStatus_)
+    .withFailureHandler(function(err) {
+      console.error('getSeriesInventoryStatus failed:', err);
+      hideSpinner();
+      alert('シリーズ所蔵状況を確認できませんでした。時間をおいて再度お試しください。');
+    })
+    .getSeriesInventoryStatus();
+}

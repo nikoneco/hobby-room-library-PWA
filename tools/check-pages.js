@@ -309,7 +309,8 @@ assert(gasRunShim.includes("window.addEventListener('focus'"), 'Pages client che
 assert(gasRunShim.includes("document.addEventListener('visibilitychange'"), 'Pages client checks the local index when visible again');
 assert(gasRunShim.includes("window.addEventListener('online'"), 'Pages client checks the local index when connectivity returns');
 assert(gasRunShim.includes('LOCAL_INDEX_CHECK_INTERVAL_MS'), 'Pages client periodically checks the local index while active');
-assert(gasRunShim.includes('const LOCAL_INDEX_SCHEMA_VERSION = 2'), 'Pages client invalidates the previous local-index schema');
+assert(gasRunShim.includes('const LOCAL_INDEX_SCHEMA_VERSION = 3'), 'Pages client invalidates the previous local-index schema');
+assert(gasRunShim.includes("getSeriesInventoryStatus: { api: 'seriesStatus', argNames: [] }"), 'Pages client maps the series status read API');
 assert(gasRunShim.includes('getMetadata: function()'), 'Pages client exposes locally stored search metadata');
 assert(gasRunShim.includes('getBookByRowIndex: function(rowIndex)'), 'Pages client exposes local book metadata for immediate popup rendering');
 assert(gasRunShim.includes('whenLoaded: function()'), 'Pages client allows initial UI data to await IndexedDB');

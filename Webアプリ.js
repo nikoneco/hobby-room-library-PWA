@@ -19,6 +19,7 @@ const WEB_APP_API_REGISTRY_ = Object.freeze({
     { name: 'getBookshelfBooksChunk', calledBy: 'JSONP API: shelfChunk', role: 'PWA本棚一覧用の軽量分割取得' },
     { name: 'getBookDetailByRowIndex', calledBy: 'script.js.html: showPopup', role: 'PWA本棚一覧から開いた本の詳細取得' },
     { name: 'getBookDetailsByRowIndexes', calledBy: 'script.js.html: detail prefetch', role: 'PWA本棚詳細の少量先読み' },
+    { name: 'getSeriesInventoryStatus', calledBy: 'script.shelf.js.html: showSeriesInventoryStatus', role: 'シリーズ所蔵巻の途中抜け・重複候補確認' },
     { name: 'getBooksBySeriesKey', calledBy: 'script.js.html: loadSeriesPanel', role: 'シリーズ一覧表示' },
   ],
   compatibility: [
@@ -642,7 +643,7 @@ function buildPreviewIndexPayload_(dataset) {
   }));
 }
 
-const LOCAL_LIBRARY_INDEX_VERSION_ = 2;
+const LOCAL_LIBRARY_INDEX_VERSION_ = 3;
 
 /**
  * PWAのローカル索引と一緒に保存する検索UI用メタデータを返す。
@@ -1538,19 +1539,197 @@ function buildLibraryDataset_() {
 
 function extractVolumeNumber(title) {
   if (!title) return 0;
-  const t = String(title).normalize('NFKC');
+  const t = String(title)
+    .normalize('NFKC')
+    .replace(/\u00A0/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
   let m;
+
+  // 「1～10巻BOX」のような複数巻セットは、単一巻として扱わない。
+  if (/\d+\s*(?:[-~〜～–—]|から)\s*\d+\s*巻/i.test(t)) return 0;
 
   m = t.match(/第\s*(\d+)\s*巻/i);
   if (m) return Number(m[1]);
   m = t.match(/(\d+)\s*巻/i);
   if (m) return Number(m[1]);
+  m = t.match(/(?:^|\s)vol(?:ume)?\.?\s*0*(\d{1,3})(?![\d.])/i);
+  if (m) return Number(m[1]);
+  m = t.match(/(?:^|\s)その\s*0*(\d{1,3})(?![\d.])/i);
+  if (m) return Number(m[1]);
+  m = t.match(/(?:^|\s)[×#]\s*0*(\d{1,3})(?![\d.])/i);
+  if (m) return Number(m[1]);
   m = t.match(/[\(\（]\s*(\d+)\s*[\)\）]/);
   if (m) return Number(m[1]);
-  m = t.match(/\s(\d+)\s*$/);
+  m = t.match(/[〈<]\s*0*(\d{1,3})\s*[〉>]/);
+  if (m) return Number(m[1]);
+
+  // 副題、版種、上下分冊が後ろに続く巻も、先頭の独立した数字を巻数として扱う。
+  // 小数（08.5など）はガイドブック等の可能性が高いため除外する。
+  m = t.match(/(?:^|\s)0*(\d{1,3})(?![\d.])(?=\s|[-‐‑‒–—―ー:：・/(\（]|$)/);
   if (m) return Number(m[1]);
 
   return 0;
+}
+
+function buildSeriesInventoryStatus_(dataset) {
+  const rows = dataset && Array.isArray(dataset.rows) ? dataset.rows : [];
+  const index = dataset && Array.isArray(dataset.index) ? dataset.index : [];
+  const groups = new Map();
+
+  index.forEach((item, rowIndex) => {
+    const key = String(item && item.seriesKeyAuto || '').trim();
+    if (!key || /^__extra__/i.test(key)) return;
+
+    const volume = Number(item && item.volume || 0);
+    if (!Number.isInteger(volume) || volume <= 0) return;
+
+    const row = rows[rowIndex] || [];
+    const title = String(row[CONFIG.IDX.TITLE] || '').trim();
+    if (!groups.has(key)) {
+      groups.set(key, {
+        key,
+        books: [],
+        seriesCount: Number(item.seriesCount || 0),
+        seriesSearchTitle: String(item.seriesSearchTitle || item.seriesDisplayTitle || title).trim()
+      });
+    }
+
+    groups.get(key).books.push({
+      rowIndex,
+      title,
+      isbn: normalizeIsbn_(row[CONFIG.IDX.ISBN]),
+      fallbackImg: normalizeBookFallbackImageUrl_(row[CONFIG.IDX.FALLBACK_IMAGE_URL]),
+      isSensitive: isSensitiveIndexItem_(item),
+      volume
+    });
+  });
+
+  const issues = [];
+  let checkedSeriesCount = 0;
+  let missingVolumeCount = 0;
+  let duplicateVolumeCount = 0;
+
+  groups.forEach(group => {
+    if (!group || !Array.isArray(group.books) || group.books.length < 2) return;
+
+    const byVolume = new Map();
+    group.books.forEach(book => {
+      if (!byVolume.has(book.volume)) byVolume.set(book.volume, []);
+      byVolume.get(book.volume).push(book);
+    });
+
+    const ownedVolumes = [...byVolume.keys()].sort((a, b) => a - b);
+    if (ownedVolumes.length < 2 || ownedVolumes[0] !== 1) return;
+    checkedSeriesCount += 1;
+
+    const ownedMaxVolume = ownedVolumes[ownedVolumes.length - 1];
+    const missingVolumes = [];
+    for (let volume = 1; volume < ownedMaxVolume; volume++) {
+      if (!byVolume.has(volume)) missingVolumes.push(volume);
+    }
+
+    const duplicateVolumes = [];
+    byVolume.forEach((books, volume) => {
+      if (!Array.isArray(books) || books.length < 2) return;
+
+      const titleCounts = new Map();
+      books.forEach(book => {
+        const normalizedTitle = String(book.title || '')
+          .normalize('NFKC')
+          .replace(/\u00A0/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim()
+          .toLowerCase();
+        if (normalizedTitle) {
+          titleCounts.set(normalizedTitle, (titleCounts.get(normalizedTitle) || 0) + 1);
+        }
+        book.duplicateTitleKey = normalizedTitle;
+      });
+
+      // 同じ巻数でも、上下分冊・特装版・派生シリーズは別物になり得る。
+      // 完全同名のものだけを、重複候補として控えめに拾う。
+      // ISBNだけの一致は、本と同梱特典が別行になっている場合があるため使わない。
+      const duplicateBooks = books.filter(book => {
+        const titleKey = String(book.duplicateTitleKey || '');
+        return titleKey && titleCounts.get(titleKey) > 1;
+      });
+      books.forEach(book => {
+        delete book.duplicateTitleKey;
+      });
+      if (duplicateBooks.length < 2) return;
+
+      duplicateVolumes.push({
+        volume,
+        count: duplicateBooks.length,
+        titles: duplicateBooks.map(book => book.title)
+      });
+    });
+
+    if (!missingVolumes.length && !duplicateVolumes.length) return;
+
+    const sourceBook = group.books.find(book => book.volume === 1) || group.books[0];
+    missingVolumeCount += missingVolumes.length;
+    duplicateVolumeCount += duplicateVolumes.length;
+
+    issues.push({
+      seriesKeyAuto: group.key,
+      title: group.seriesSearchTitle || sourceBook.title || 'シリーズ',
+      seriesCount: Number(group.seriesCount || group.books.length),
+      ownedBookCount: group.books.length,
+      ownedMaxVolume,
+      ownedVolumes,
+      missingVolumes,
+      duplicateVolumes,
+      sourceBook: {
+        rowIndex: sourceBook.rowIndex,
+        title: sourceBook.title,
+        isbn: sourceBook.isbn,
+        fallbackImg: sourceBook.fallbackImg,
+        isSensitive: Boolean(sourceBook.isSensitive),
+        seriesKeyAuto: group.key,
+        seriesCount: Number(group.seriesCount || group.books.length),
+        seriesSearchTitle: group.seriesSearchTitle || sourceBook.title || '',
+        isExtraSeries: false,
+        volume: sourceBook.volume,
+        detailLoaded: false
+      }
+    });
+  });
+
+  issues.sort((a, b) => {
+    const aMissing = a.missingVolumes.length ? 0 : 1;
+    const bMissing = b.missingVolumes.length ? 0 : 1;
+    if (aMissing !== bMissing) return aMissing - bMissing;
+    return String(a.title || '').localeCompare(String(b.title || ''), 'ja');
+  });
+
+  return {
+    checkedSeriesCount,
+    issueSeriesCount: issues.length,
+    missingSeriesCount: issues.filter(issue => issue.missingVolumes.length > 0).length,
+    missingVolumeCount,
+    duplicateSeriesCount: issues.filter(issue => issue.duplicateVolumes.length > 0).length,
+    duplicateVolumeCount,
+    issues
+  };
+}
+
+function getSeriesInventoryStatus() {
+  try {
+    return buildSeriesInventoryStatus_(getLibraryDataset_());
+  } catch (e) {
+    console.error('getSeriesInventoryStatus error:', e);
+    return {
+      checkedSeriesCount: 0,
+      issueSeriesCount: 0,
+      missingSeriesCount: 0,
+      missingVolumeCount: 0,
+      duplicateSeriesCount: 0,
+      duplicateVolumeCount: 0,
+      issues: []
+    };
+  }
 }
 
 function buildSeriesDisplayTitle_(title) {
@@ -2190,6 +2369,7 @@ const PUBLIC_WEBAPP_JSONP_API_HANDLERS_ = Object.freeze({
   shelfChunk: params => getBookshelfBooksChunk(params.offset, params.limit),
   bookDetail: params => getBookDetailByRowIndex(params.rowIndex),
   bookDetails: params => getBookDetailsByRowIndexes(params.rowIndexes || params.rowIndexesCsv || ''),
+  seriesStatus: () => getSeriesInventoryStatus(),
   series: params => getBooksBySeriesKey(params.seriesKeyAuto || params.seriesKey || '')
 });
 

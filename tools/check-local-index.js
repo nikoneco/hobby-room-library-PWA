@@ -11,7 +11,7 @@ function assert(condition, message) {
 
 function createPayload() {
   return {
-    version: 2,
+    version: 3,
     revision: 'fixture-revision',
     metadata: {
       suggest: {
@@ -109,7 +109,7 @@ function invoke(runner, method, args) {
   const payload = createPayload();
   const stored = {
     key: 'active',
-    schemaVersion: 2,
+    schemaVersion: 3,
     revision: payload.revision,
     payload
   };

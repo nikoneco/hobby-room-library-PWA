@@ -17,6 +17,7 @@ const serverPath = path.join(root, 'Webアプリ.js');
 const indexSource = fs.readFileSync(indexPath, 'utf8');
 const serverSource = fs.readFileSync(serverPath, 'utf8');
 const modernModalStyleSource = fs.readFileSync(path.join(root, 'style.modern-modal.css.html'), 'utf8');
+const modernShelfStyleSource = fs.readFileSync(path.join(root, 'style.modern-shelf.css.html'), 'utf8');
 const clientScriptSources = clientScriptFiles
   .map(fileName => fs
     .readFileSync(path.join(root, fileName), 'utf8')
@@ -184,8 +185,21 @@ assert(serverSource.includes('compatibility'), 'Webアプリ.js registry classif
 const actionKeys = vm.runInContext('Object.keys(STATIC_ACTION_HANDLERS).sort().join(",")', sandbox);
 assertEqual(
   actionKeys,
-  'bookshelf,clear-conditions,focus-search,random,reset-search,search,toggle-advanced,top',
+  'bookshelf,clear-conditions,focus-search,random,reset-search,search,series-status,toggle-advanced,top',
   'STATIC_ACTION_HANDLERS maps static data-actions'
+);
+assert(
+  indexSource.includes('data-action="series-status"') &&
+    indexSource.includes('>シリーズ確認<') &&
+    clientScriptSources[clientScriptFiles.indexOf('script.shelf.js.html')].includes('function showSeriesInventoryStatus()') &&
+    clientScriptSources[clientScriptFiles.indexOf('script.shelf.js.html')].includes('シリーズ所蔵状況') &&
+    modernShelfStyleSource.includes('.series-status-view'),
+  'series status entry opens the dedicated inventory screen'
+);
+assertEqual(
+  sandbox.formatSeriesStatusVolumeList_([3, 5]),
+  '3巻・5巻',
+  'series status formats missing volumes compactly'
 );
 
 assertEqual(sandbox.normalizeKana('ＡＢＣ カタカナ'), 'abcかたかな', 'normalizeKana normalizes width and kana');

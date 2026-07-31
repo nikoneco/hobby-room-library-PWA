@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const vm = require('vm');
 
 const root = path.resolve(__dirname, '..');
 const source = fs.readFileSync(path.join(root, 'Webアプリ.js'), 'utf8');
@@ -25,6 +26,7 @@ assert(source.includes('decodeWebAppJsonpParams_'), 'JSONP decodes Base64URL par
 assert(source.includes('Utilities.base64DecodeWebSafe'), 'JSONP uses web-safe Base64 decoding');
 assert(source.includes('PUBLIC_WEBAPP_JSONP_API_HANDLERS_'), 'JSONP uses an explicit public API whitelist');
 assert(source.includes('buildQuickBrowseCountsPayload_'), 'PWA initial data includes quick browse counts');
+assert(configSource.includes("LIBRARY_DATASET_KEY: 'library_dataset_v23'"), 'library cache key invalidates datasets with the previous volume parser');
 assert(source.includes('SHELF_DATASET_KEY'), 'server defines a separate bookshelf dataset cache key');
 assert(configSource.includes("SHELF_DATASET_KEY: 'library_shelf_dataset_v3'"), 'bookshelf cache key invalidates datasets without fallback cover fields');
 assert(source.includes('getBookshelfLiteDataset_'), 'server has a lightweight bookshelf dataset path');
@@ -61,7 +63,7 @@ assert(source.includes('serverResponseReadyAtEpochMs'), 'JSONP performance trace
 assert(source.includes('perf.jsonpResponseChars'), 'JSONP performance trace includes the final script character count');
 assert(source.includes('datasetRevision: getLibraryDatasetRevision_()'), 'initial API responses include the dataset revision');
 assert(source.includes('function buildLocalLibraryIndexPayload_'), 'server builds a lightweight local-search index');
-assert(source.includes('const LOCAL_LIBRARY_INDEX_VERSION_ = 2'), 'server publishes the metadata-aware local-index schema');
+assert(source.includes('const LOCAL_LIBRARY_INDEX_VERSION_ = 3'), 'server publishes the volume-aware local-index schema');
 assert(source.includes('function buildLocalSearchMetadataPayload_'), 'server bundles search UI metadata into the local index');
 assert(source.includes('metadata: buildLocalSearchMetadataPayload_(dataset)'), 'local index contains suggestions, filters, and quick-browse counts');
 assert(source.includes('function getLibraryDatasetRevisionForPwa_'), 'server exposes a lightweight revision check');
@@ -88,6 +90,7 @@ assert(sheetCodeSource.includes('const changed = output.some') && sheetCodeSourc
   'shelfChunk',
   'bookDetail',
   'bookDetails',
+  'seriesStatus',
   'series'
 ].forEach(apiName => {
   assert(new RegExp(`\\b${apiName}\\s*:`).test(source), `JSONP API whitelist includes ${apiName}`);
@@ -122,6 +125,7 @@ assert(sheetCodeSource.includes('const changed = output.some') && sheetCodeSourc
   'getBookshelfBooksChunk(',
   'getBookDetailByRowIndex(',
   'getBookDetailsByRowIndexes(',
+  'getSeriesInventoryStatus()',
   'getBooksBySeriesKey('
 ].forEach(call => {
   assert(source.includes(call), `JSONP dispatch calls ${call}`);
@@ -136,5 +140,95 @@ assert(source.includes('WEBAPP_API_LIMITS_.BOOK_DETAIL_BATCH_MAX'), 'detail batc
 assert(!/params\.c\b/.test(source), 'JSONP route does not use reserved c parameter');
 assert(!/params\.sid\b/.test(source), 'JSONP route does not use reserved sid parameter');
 assert(/^docs\/\*\*/m.test(claspignore), 'docs are excluded from clasp push');
+
+const serverSandbox = vm.createContext({ console, URL, encodeURIComponent, decodeURIComponent });
+vm.runInContext(`${configSource}\n${source}`, serverSandbox, { filename: 'Webアプリ.js' });
+
+[
+  ['Sket dance 03 (友達がいっぱい)', 3],
+  ['都会のトム＆ソーヤ 05-下', 5],
+  ['聖☆おにいさん 22 限定版', 22],
+  ['デュラララ!! ×03', 3],
+  ['月曜日のたわわ その4', 4],
+  ['オーバーロード = OVERLOAD. 2(漆黒の戦士)', 2],
+  ['Pandora hearts 08.5 official guide', 0],
+  ['BEASTARS 1～10巻BOXセット', 0]
+].forEach(([title, expected]) => {
+  serverSandbox.__volumeTitle = title;
+  assert(
+    vm.runInContext('extractVolumeNumber(__volumeTitle)', serverSandbox) === expected,
+    `volume parser handles ${title}`
+  );
+});
+
+function makeSeriesFixtureRow(title, isbn) {
+  const row = Array(20).fill('');
+  row[0] = title;
+  row[10] = isbn || '';
+  return row;
+}
+
+const fixtureRows = [
+  makeSeriesFixtureRow('抜けテスト 1'),
+  makeSeriesFixtureRow('抜けテスト 2'),
+  makeSeriesFixtureRow('抜けテスト 4'),
+  makeSeriesFixtureRow('重複テスト 1'),
+  makeSeriesFixtureRow('重複テスト 2'),
+  makeSeriesFixtureRow('重複テスト 2'),
+  makeSeriesFixtureRow('分冊テスト 1'),
+  makeSeriesFixtureRow('分冊テスト 2-上'),
+  makeSeriesFixtureRow('分冊テスト 2-下'),
+  makeSeriesFixtureRow('分冊テスト 3'),
+  makeSeriesFixtureRow('派生テスト 1'),
+  makeSeriesFixtureRow('派生テスト 2', '9780000000001'),
+  makeSeriesFixtureRow('派生テスト ×02', '9780000000001'),
+  makeSeriesFixtureRow('派生テスト 3')
+];
+const fixtureIndex = [
+  ['missing', 1, 3, '抜けテスト'],
+  ['missing', 2, 3, '抜けテスト'],
+  ['missing', 4, 3, '抜けテスト'],
+  ['duplicate', 1, 3, '重複テスト'],
+  ['duplicate', 2, 3, '重複テスト'],
+  ['duplicate', 2, 3, '重複テスト'],
+  ['split', 1, 4, '分冊テスト'],
+  ['split', 2, 4, '分冊テスト'],
+  ['split', 2, 4, '分冊テスト'],
+  ['split', 3, 4, '分冊テスト'],
+  ['derivative', 1, 4, '派生テスト'],
+  ['derivative', 2, 4, '派生テスト'],
+  ['derivative', 2, 4, '派生テスト'],
+  ['derivative', 3, 4, '派生テスト']
+].map(([seriesKeyAuto, volume, seriesCount, seriesSearchTitle]) => ({
+  seriesKeyAuto,
+  volume,
+  seriesCount,
+  seriesSearchTitle,
+  genreMeta: []
+}));
+
+serverSandbox.__seriesFixture = { rows: fixtureRows, index: fixtureIndex };
+const fixtureStatus = vm.runInContext('buildSeriesInventoryStatus_(__seriesFixture)', serverSandbox);
+assert(fixtureStatus.issueSeriesCount === 2, 'series status reports only actionable missing and duplicate groups');
+assert(
+  fixtureStatus.issues.some(issue => issue.seriesKeyAuto === 'missing' && issue.missingVolumes.join(',') === '3'),
+  'series status reports an internal missing volume'
+);
+assert(
+  fixtureStatus.issues.some(issue =>
+    issue.seriesKeyAuto === 'duplicate' &&
+    issue.duplicateVolumes.length === 1 &&
+    issue.duplicateVolumes[0].volume === 2
+  ),
+  'series status reports a same-volume duplicate candidate'
+);
+assert(
+  !fixtureStatus.issues.some(issue => issue.seriesKeyAuto === 'split'),
+  'series status does not treat upper and lower split volumes as duplicates'
+);
+assert(
+  !fixtureStatus.issues.some(issue => issue.seriesKeyAuto === 'derivative'),
+  'series status does not treat a differently titled same-number derivative as a duplicate'
+);
 
 console.log('server api checks ok');

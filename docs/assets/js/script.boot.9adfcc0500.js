@@ -3,6 +3,7 @@ const STATIC_ACTION_HANDLERS = {
   'focus-search': focusSearchEntry_,
   'random': showRandomBooks,
   'bookshelf': showAllBookshelf,
+  'series-status': showSeriesInventoryStatus,
   'top': returnToTopPage_,
   'toggle-advanced': toggleAdvancedSearch,
   'clear-conditions': clearSearchConditions,

@@ -6,7 +6,7 @@
   const LOCAL_INDEX_DB_NAME = 'shumiLibrary.localIndex.v1';
   const LOCAL_INDEX_STORE_NAME = 'snapshots';
   const LOCAL_INDEX_ACTIVE_KEY = 'active';
-  const LOCAL_INDEX_SCHEMA_VERSION = 2;
+  const LOCAL_INDEX_SCHEMA_VERSION = 3;
   const LOCAL_INDEX_CHECK_INTERVAL_MS = 15 * 60 * 1000;
   const LOCAL_INDEX_CHECK_THROTTLE_MS = 5 * 60 * 1000;
 
@@ -60,6 +60,7 @@
     getBookshelfBooksChunk: { api: 'shelfChunk', argNames: ['offset', 'limit'] },
     getBookDetailByRowIndex: { api: 'bookDetail', argNames: ['rowIndex'] },
     getBookDetailsByRowIndexes: { api: 'bookDetails', argNames: ['rowIndexes'] },
+    getSeriesInventoryStatus: { api: 'seriesStatus', argNames: [] },
     getBooksBySeriesKey: { api: 'series', argNames: ['seriesKeyAuto'] }
   };
 
