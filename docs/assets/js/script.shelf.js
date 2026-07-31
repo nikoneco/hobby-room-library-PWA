@@ -1568,6 +1568,24 @@ function formatSeriesStatusDuplicateList_(duplicates) {
     .join('・');
 }
 
+function getNextSeriesStatusFilter_(currentFilter, selectedFilter) {
+  const current = String(currentFilter || '');
+  const selected = String(selectedFilter || '');
+  if (selected !== 'missing' && selected !== 'duplicate') return '';
+  return current === selected ? '' : selected;
+}
+
+function filterSeriesStatusIssues_(issues, filter) {
+  const source = Array.isArray(issues) ? issues : [];
+  if (filter === 'missing') {
+    return source.filter(issue => Array.isArray(issue && issue.missingVolumes) && issue.missingVolumes.length > 0);
+  }
+  if (filter === 'duplicate') {
+    return source.filter(issue => Array.isArray(issue && issue.duplicateVolumes) && issue.duplicateVolumes.length > 0);
+  }
+  return source.slice();
+}
+
 function createSeriesStatusIssueCard_(issue) {
   const missingVolumes = Array.isArray(issue && issue.missingVolumes) ? issue.missingVolumes : [];
   const duplicateVolumes = Array.isArray(issue && issue.duplicateVolumes) ? issue.duplicateVolumes : [];
@@ -1611,6 +1629,44 @@ function createSeriesStatusIssueCard_(issue) {
   return card;
 }
 
+function renderSeriesStatusIssueList_(list, issues, filter) {
+  if (!list) return 0;
+
+  const filteredIssues = filterSeriesStatusIssues_(issues, filter);
+  list.innerHTML = '';
+  list.setAttribute(
+    'aria-label',
+    filter === 'missing'
+      ? '途中で抜けのあるシリーズ'
+      : filter === 'duplicate'
+        ? '重複候補のあるシリーズ'
+        : '確認が必要なシリーズ'
+  );
+
+  if (!filteredIssues.length) {
+    const empty = document.createElement('div');
+    empty.className = 'series-status-empty';
+    empty.innerHTML = filter
+      ? `
+        ${uiIcon_('collection', 'series-status-empty-icon')}
+        <strong>この条件に当てはまるシリーズはありません</strong>
+        <span>もう一度同じ項目を押すと、すべての確認候補に戻ります。</span>
+      `
+      : `
+        ${uiIcon_('collection', 'series-status-empty-icon')}
+        <strong>途中の抜けや重複候補は見つかりませんでした</strong>
+        <span>現在の所蔵データでは、確認が必要なシリーズはありません。</span>
+      `;
+    list.appendChild(empty);
+    return 0;
+  }
+
+  filteredIssues.forEach(issue => {
+    list.appendChild(createSeriesStatusIssueCard_(issue));
+  });
+  return filteredIssues.length;
+}
+
 function renderSeriesInventoryStatus_(payload) {
   hideSpinner();
   const data = payload && typeof payload === 'object' ? payload : {};
@@ -1649,15 +1705,16 @@ function renderSeriesInventoryStatus_(payload) {
         <span>確認したシリーズ</span>
         <strong>${Number(data.checkedSeriesCount || 0)}</strong>
       </div>
-      <div class="series-status-stat is-missing">
-        <span>途中で抜け</span>
+      <button type="button" class="series-status-stat series-status-filter is-missing" data-series-filter="missing" aria-pressed="false">
+        <span>途中で抜け <small class="series-status-filter-hint">絞り込み</small></span>
         <strong>${Number(data.missingSeriesCount || 0)}</strong>
-      </div>
-      <div class="series-status-stat is-duplicate">
-        <span>重複候補</span>
+      </button>
+      <button type="button" class="series-status-stat series-status-filter is-duplicate" data-series-filter="duplicate" aria-pressed="false">
+        <span>重複候補 <small class="series-status-filter-hint">絞り込み</small></span>
         <strong>${Number(data.duplicateSeriesCount || 0)}</strong>
-      </div>
+      </button>
     </div>
+    <p class="series-status-filter-state" aria-live="polite">すべての確認候補 ${issues.length}シリーズを表示中</p>
     <p class="series-status-rule-note">
       1巻から所蔵最大巻までの途中だけを確認しています。未購入の続刊や未発売巻は判定しません。
     </p>
@@ -1671,24 +1728,37 @@ function renderSeriesInventoryStatus_(payload) {
 
   const list = document.createElement('div');
   list.className = 'series-status-list';
-  list.setAttribute('aria-label', '確認が必要なシリーズ');
-
-  if (!issues.length) {
-    const empty = document.createElement('div');
-    empty.className = 'series-status-empty';
-    empty.innerHTML = `
-      ${uiIcon_('collection', 'series-status-empty-icon')}
-      <strong>途中の抜けや重複候補は見つかりませんでした</strong>
-      <span>現在の所蔵データでは、確認が必要なシリーズはありません。</span>
-    `;
-    list.appendChild(empty);
-  } else {
-    issues.forEach(issue => {
-      list.appendChild(createSeriesStatusIssueCard_(issue));
-    });
-  }
-
+  renderSeriesStatusIssueList_(list, issues, '');
   section.appendChild(list);
+
+  let activeFilter = '';
+  const filterState = section.querySelector('.series-status-filter-state');
+  const filterButtons = Array.from(section.querySelectorAll('[data-series-filter]'));
+  filterButtons.forEach(button => {
+    button.onclick = function() {
+      const selectedFilter = String(button.getAttribute('data-series-filter') || '');
+      activeFilter = getNextSeriesStatusFilter_(activeFilter, selectedFilter);
+      const visibleCount = renderSeriesStatusIssueList_(list, issues, activeFilter);
+
+      filterButtons.forEach(item => {
+        const isActive = String(item.getAttribute('data-series-filter') || '') === activeFilter;
+        item.classList.toggle('is-active', isActive);
+        item.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+        const hint = item.querySelector('.series-status-filter-hint');
+        if (hint) hint.textContent = isActive ? '表示中' : '絞り込み';
+      });
+
+      if (filterState) {
+        const label = activeFilter === 'missing'
+          ? '途中で抜け'
+          : activeFilter === 'duplicate'
+            ? '重複候補'
+            : 'すべての確認候補';
+        filterState.textContent = `${label} ${visibleCount}シリーズを表示中`;
+      }
+    };
+  });
+
   result.appendChild(section);
   window.requestAnimationFrame(function() {
     result.classList.add('show');

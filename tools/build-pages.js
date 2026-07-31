@@ -86,6 +86,11 @@ function prepareStaticAssetNames() {
 function buildStaticIndex() {
   let source = readUtf8('index.html');
 
+  source = source.replace(
+    /\s*<!-- PWA_REMOVE_START:series-status-home -->[\s\S]*?<!-- PWA_REMOVE_END:series-status-home -->/,
+    ''
+  );
+
   source = source.replace('<html>', '<html lang="ja">');
 
   source = source.replace(
@@ -146,7 +151,7 @@ function buildStaticIndex() {
     </div>
   </div>
   <div id="pwaNetworkBanner" class="pwa-network-banner" role="status" aria-live="polite" hidden></div>
-  <button id="pwaSettingsButton" class="pwa-settings-button" type="button" aria-label="設定を開く" aria-controls="pwaSettingsPanel" aria-expanded="false">
+  <button id="pwaSettingsButton" class="pwa-settings-button" type="button" aria-label="メニューを開く" aria-controls="pwaSettingsPanel" aria-expanded="false">
     <span aria-hidden="true"></span>
     <span aria-hidden="true"></span>
     <span aria-hidden="true"></span>
@@ -154,9 +159,19 @@ function buildStaticIndex() {
   <div id="pwaSettingsBackdrop" class="pwa-settings-backdrop" hidden></div>
   <section id="pwaSettingsPanel" class="pwa-settings-panel" role="dialog" aria-modal="true" aria-labelledby="pwaSettingsTitle" tabindex="-1" hidden>
     <div class="pwa-settings-header">
-      <h2 id="pwaSettingsTitle">設定</h2>
-      <button id="pwaSettingsClose" class="pwa-settings-close" type="button" aria-label="設定を閉じる">
+      <h2 id="pwaSettingsTitle">メニュー</h2>
+      <button id="pwaSettingsClose" class="pwa-settings-close" type="button" aria-label="メニューを閉じる">
         <span aria-hidden="true">×</span>
+      </button>
+    </div>
+    <div class="pwa-settings-section pwa-library-menu" aria-label="蔵書">
+      <p class="pwa-settings-section-title">蔵書</p>
+      <button id="pwaSeriesStatusEntry" type="button" class="pwa-settings-row pwa-settings-action-row" data-action="series-status">
+        <span>
+          <span class="pwa-settings-row-title">シリーズ確認</span>
+          <span class="pwa-settings-row-note">所蔵巻の抜けや重複を確認します</span>
+        </span>
+        <span class="pwa-settings-action-arrow" aria-hidden="true">›</span>
       </button>
     </div>
     <div id="pwaSensitiveSetting" class="pwa-settings-section"></div>
@@ -806,6 +821,35 @@ body.pwa-settings-open {
   min-height: 48px;
   cursor: pointer;
   transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
+}
+
+.pwa-settings-action-row {
+  width: 100%;
+  min-height: 54px;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
+}
+
+.pwa-settings-action-row:hover,
+.pwa-settings-action-row:focus-visible {
+  border-color: color-mix(in srgb, var(--pwa-warm-2) 28%, var(--pwa-line));
+  background:
+    linear-gradient(180deg, rgba(var(--pwa-warm-rgb), 0.086), rgba(255, 255, 255, 0.016)),
+    rgba(var(--pwa-warm-rgb), 0.040);
+}
+
+.pwa-settings-action-row:active {
+  transform: translateY(1px);
+}
+
+.pwa-settings-action-arrow {
+  flex: 0 0 auto;
+  color: rgba(226, 235, 240, 0.62);
+  font-size: 1.5rem;
+  line-height: 1;
 }
 
 .pwa-settings-toggle-row + .pwa-settings-toggle-row {
@@ -4449,6 +4493,12 @@ function writePwaClient() {
     backdrop.addEventListener('click', function() {
       setSettingsOpen_(false);
     });
+    const seriesStatusEntry = document.getElementById('pwaSeriesStatusEntry');
+    if (seriesStatusEntry) {
+      seriesStatusEntry.addEventListener('click', function() {
+        setSettingsOpen_(false);
+      });
+    }
     panel.querySelectorAll('input[name="pwaTheme"]').forEach(input => {
       input.addEventListener('change', function() {
         if (input.checked) setTheme_(input.value);

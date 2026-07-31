@@ -18,6 +18,7 @@ const indexSource = fs.readFileSync(indexPath, 'utf8');
 const serverSource = fs.readFileSync(serverPath, 'utf8');
 const modernModalStyleSource = fs.readFileSync(path.join(root, 'style.modern-modal.css.html'), 'utf8');
 const modernShelfStyleSource = fs.readFileSync(path.join(root, 'style.modern-shelf.css.html'), 'utf8');
+const buildPagesSource = fs.readFileSync(path.join(root, 'tools', 'build-pages.js'), 'utf8');
 const clientScriptSources = clientScriptFiles
   .map(fileName => fs
     .readFileSync(path.join(root, fileName), 'utf8')
@@ -189,18 +190,59 @@ assertEqual(
   'STATIC_ACTION_HANDLERS maps static data-actions'
 );
 assert(
-  indexSource.includes('data-action="series-status"') &&
-    indexSource.includes('>シリーズ確認<') &&
+  indexSource.includes('PWA_REMOVE_START:series-status-home') &&
+    indexSource.includes('data-action="series-status"') &&
+    buildPagesSource.includes('PWA_REMOVE_START:series-status-home') &&
+    buildPagesSource.includes('id="pwaSeriesStatusEntry"') &&
+    buildPagesSource.includes('data-action="series-status"') &&
+    buildPagesSource.includes("setSettingsOpen_(false);") &&
     clientScriptSources[clientScriptFiles.indexOf('script.shelf.js.html')].includes('function showSeriesInventoryStatus()') &&
     clientScriptSources[clientScriptFiles.indexOf('script.shelf.js.html')].includes('シリーズ所蔵状況') &&
     modernShelfStyleSource.includes('.series-status-view'),
-  'series status entry opens the dedicated inventory screen'
+  'series status entry moves from the home CTA to the PWA menu'
 );
 assertEqual(
   sandbox.formatSeriesStatusVolumeList_([3, 5]),
   '3巻・5巻',
   'series status formats missing volumes compactly'
 );
+assertEqual(
+  sandbox.getNextSeriesStatusFilter_('', 'missing'),
+  'missing',
+  'series status activates the selected missing filter'
+);
+assertEqual(
+  sandbox.getNextSeriesStatusFilter_('missing', 'missing'),
+  '',
+  'series status clears a filter when the active summary is pressed again'
+);
+assertEqual(
+  sandbox.getNextSeriesStatusFilter_('missing', 'duplicate'),
+  'duplicate',
+  'series status switches directly between summary filters'
+);
+{
+  const issues = [
+    { missingVolumes: [3], duplicateVolumes: [] },
+    { missingVolumes: [], duplicateVolumes: [{ volume: 2, count: 2 }] },
+    { missingVolumes: [4], duplicateVolumes: [{ volume: 1, count: 2 }] }
+  ];
+  assertEqual(
+    sandbox.filterSeriesStatusIssues_(issues, 'missing').length,
+    2,
+    'series status missing filter keeps only series with internal gaps'
+  );
+  assertEqual(
+    sandbox.filterSeriesStatusIssues_(issues, 'duplicate').length,
+    2,
+    'series status duplicate filter keeps only duplicate candidates'
+  );
+  assertEqual(
+    sandbox.filterSeriesStatusIssues_(issues, '').length,
+    3,
+    'series status empty filter restores every issue'
+  );
+}
 
 assertEqual(sandbox.normalizeKana('ＡＢＣ カタカナ'), 'abcかたかな', 'normalizeKana normalizes width and kana');
 

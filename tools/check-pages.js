@@ -20,6 +20,9 @@ const manifest = JSON.parse(read(path.join(docs, 'manifest.webmanifest')));
 const sw = read(path.join(docs, 'sw.js'));
 const pagesWorkflowPath = path.join(root, '.github', 'workflows', 'deploy-pages.yml');
 const pagesWorkflow = read(pagesWorkflowPath);
+const pwaCssForMenu = read(path.join(docs, 'assets', 'css', 'pwa.css'));
+const pwaClientForMenu = read(path.join(docs, 'assets', 'js', 'pwa-client.js'));
+const shelfClientForMenu = read(path.join(docs, 'assets', 'js', 'script.shelf.js'));
 
 [
   'manifest.webmanifest',
@@ -79,6 +82,14 @@ assert(index.includes('./assets/css/pwa.css'), 'static index loads PWA CSS');
 assert(index.includes('src="./assets/logo.png"'), 'static index uses local logo asset');
 assert(index.includes('id="pwaSettingsButton"'), 'static index includes PWA settings button');
 assert(index.includes('id="pwaSettingsPanel"'), 'static index includes PWA settings panel');
+assert(index.includes('aria-label="メニューを開く"'), 'static index labels the top-right control as a menu');
+assert(index.includes('id="pwaSeriesStatusEntry"'), 'static menu includes the series status entry');
+assert(index.includes('data-action="series-status"'), 'static menu routes to the series status screen');
+assert(!index.includes('series-status-cta-card'), 'static home no longer promotes the occasional series status action');
+assert(pwaCssForMenu.includes('.pwa-settings-action-row'), 'static PWA styles the series status menu action');
+assert(pwaClientForMenu.includes("document.getElementById('pwaSeriesStatusEntry')"), 'static PWA closes the menu after selecting series status');
+assert(shelfClientForMenu.includes('getNextSeriesStatusFilter_'), 'static series status screen includes summary filter toggling');
+assert(shelfClientForMenu.includes('aria-pressed="false"'), 'static series status filters expose pressed state');
 assert(index.includes('id="pwaLibrarianPresence"'), 'static index includes librarian presence setting');
 assert(index.includes('class="sandbox-redesign"'), 'static index enables the night library redesign');
 assert(index.includes('id="appBrandResetBtn"'), 'static index includes the redesigned brand reset button');

@@ -893,6 +893,12 @@
     backdrop.addEventListener('click', function() {
       setSettingsOpen_(false);
     });
+    const seriesStatusEntry = document.getElementById('pwaSeriesStatusEntry');
+    if (seriesStatusEntry) {
+      seriesStatusEntry.addEventListener('click', function() {
+        setSettingsOpen_(false);
+      });
+    }
     panel.querySelectorAll('input[name="pwaTheme"]').forEach(input => {
       input.addEventListener('change', function() {
         if (input.checked) setTheme_(input.value);

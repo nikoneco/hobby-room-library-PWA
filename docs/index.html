@@ -34,7 +34,7 @@
     </div>
   </div>
   <div id="pwaNetworkBanner" class="pwa-network-banner" role="status" aria-live="polite" hidden></div>
-  <button id="pwaSettingsButton" class="pwa-settings-button" type="button" aria-label="設定を開く" aria-controls="pwaSettingsPanel" aria-expanded="false">
+  <button id="pwaSettingsButton" class="pwa-settings-button" type="button" aria-label="メニューを開く" aria-controls="pwaSettingsPanel" aria-expanded="false">
     <span aria-hidden="true"></span>
     <span aria-hidden="true"></span>
     <span aria-hidden="true"></span>
@@ -42,9 +42,19 @@
   <div id="pwaSettingsBackdrop" class="pwa-settings-backdrop" hidden></div>
   <section id="pwaSettingsPanel" class="pwa-settings-panel" role="dialog" aria-modal="true" aria-labelledby="pwaSettingsTitle" tabindex="-1" hidden>
     <div class="pwa-settings-header">
-      <h2 id="pwaSettingsTitle">設定</h2>
-      <button id="pwaSettingsClose" class="pwa-settings-close" type="button" aria-label="設定を閉じる">
+      <h2 id="pwaSettingsTitle">メニュー</h2>
+      <button id="pwaSettingsClose" class="pwa-settings-close" type="button" aria-label="メニューを閉じる">
         <span aria-hidden="true">×</span>
+      </button>
+    </div>
+    <div class="pwa-settings-section pwa-library-menu" aria-label="蔵書">
+      <p class="pwa-settings-section-title">蔵書</p>
+      <button id="pwaSeriesStatusEntry" type="button" class="pwa-settings-row pwa-settings-action-row" data-action="series-status">
+        <span>
+          <span class="pwa-settings-row-title">シリーズ確認</span>
+          <span class="pwa-settings-row-note">所蔵巻の抜けや重複を確認します</span>
+        </span>
+        <span class="pwa-settings-action-arrow" aria-hidden="true">›</span>
       </button>
     </div>
     <div id="pwaSensitiveSetting" class="pwa-settings-section"></div>
@@ -279,18 +289,6 @@
             <svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"></path></svg>
           </span>
         </button>
-        <button type="button" class="series-status-cta-card" data-action="series-status" aria-label="シリーズ確認。所蔵巻の抜けや重複の可能性を確認する">
-          <span class="series-status-cta-icon ui-icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24"><path d="M5 5h10a4 4 0 0 1 4 4v10H9a4 4 0 0 1-4-4z"></path><path d="M9 9h6"></path><path d="M9 13h5"></path></svg>
-          </span>
-          <span class="series-status-cta-copy">
-            <span class="series-status-cta-title">シリーズ確認</span>
-            <span class="series-status-cta-subtitle">所蔵巻の抜けや重複を確認</span>
-          </span>
-          <span class="preview-cta-arrow ui-icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"></path></svg>
-          </span>
-        </button>
       </div>
     </div>
 
@@ -411,7 +409,7 @@
   <script src="./assets/js/script.images.296dbf1d8a.js"></script>
   <script src="./assets/js/script.search.5712fa251f.js"></script>
   <script src="./assets/js/script.render.210dd33863.js"></script>
-  <script src="./assets/js/script.shelf.5125111893.js"></script>
+  <script src="./assets/js/script.shelf.f8b72e0c77.js"></script>
   <script src="./assets/js/script.modal.7a4fc32e25.js"></script>
   <script src="./assets/js/script.boot.9adfcc0500.js"></script>
 </body>
