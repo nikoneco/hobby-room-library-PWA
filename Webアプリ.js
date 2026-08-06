@@ -634,6 +634,7 @@ function buildPreviewIndexPayload_(dataset) {
     searchKey: String(item && item.searchKey || ''),
     publisher: String(item && item.publisher || ''),
     releasedYm: Number(item && item.releasedYm || 0),
+    isSensitive: isSensitiveIndexItem_(item),
     genres: {
       story: Array.isArray(item && item.genres && item.genres.story) ? item.genres.story : [],
       theme: Array.isArray(item && item.genres && item.genres.theme) ? item.genres.theme : [],
@@ -1046,6 +1047,7 @@ function mapRowsToBooks_(rows, indexData, options) {
     const isbn = normalizeIsbn_(row[CONFIG.IDX.ISBN]);
     const idx = Array.isArray(indexData) ? indexData[i] : null;
     const summary = row[CONFIG.IDX.SUMMARY] || '';
+    const isSensitive = isSensitiveIndexItem_(idx) || isSensitiveGenreText_(row[CONFIG.IDX.GENRE]);
 
     const book = {
       title    : row[CONFIG.IDX.TITLE]     || '',
@@ -1061,6 +1063,7 @@ function mapRowsToBooks_(rows, indexData, options) {
       yomi     : row[CONFIG.IDX.YOMIGANA]  || '',
       genre         : row[CONFIG.IDX.GENRE]     || '',
       genreMeta     : idx ? (idx.genreMeta || []) : [],
+      isSensitive,
       seriesKeyAuto   : idx ? (idx.seriesKeyAuto || '') : '',
       seriesCount     : idx ? Number(idx.seriesCount || 0) : 0,
       seriesSearchTitle: idx ? (idx.seriesSearchTitle || '') : '',
@@ -1091,6 +1094,9 @@ function mapRowsToBooks_(rows, indexData, options) {
 }
 
 function isSensitiveIndexItem_(idx) {
+  if (idx && idx.isSensitive === true) return true;
+  if (idx && isSensitiveGenreText_(idx.genresRaw)) return true;
+
   const meta = Array.isArray(idx && idx.genreMeta) ? idx.genreMeta : [];
   return meta.some(item => item && item.category === 'theme' && item.name === '18禁');
 }
@@ -1100,6 +1106,28 @@ function isSensitiveGenreText_(genreText) {
     .split(',')
     .map(value => value.trim())
     .some(value => value === '18禁');
+}
+
+function hasGenreSearchCriteria_(criteria) {
+  const c = criteria || {};
+  return Boolean(
+    String(c.selectedStory || '').trim() ||
+    String(c.selectedTheme || '').trim() ||
+    String(c.selectedMood || '').trim() ||
+    String(c.selectedStatus || '').trim()
+  );
+}
+
+function hasExplicitSensitiveGenreSearch_(criteria) {
+  const c = criteria || {};
+  return [c.selectedStory, c.selectedTheme, c.selectedMood, c.selectedStatus]
+    .some(value => String(value || '').trim() === '18禁');
+}
+
+function matchesSensitiveGenrePolicy_(idx, criteria) {
+  if (!isSensitiveIndexItem_(idx)) return true;
+  if (!hasGenreSearchCriteria_(criteria)) return true;
+  return hasExplicitSensitiveGenreSearch_(criteria);
 }
 
 /**
@@ -1117,9 +1145,7 @@ function mapRowsToShelfBooks_(rows, indexData, rowOffset) {
   return rows.map((row, i) => {
     const isbn = normalizeIsbn_(row[CONFIG.IDX.ISBN]);
     const idx = Array.isArray(indexData) ? indexData[i] : null;
-    const isSensitive = idx
-      ? isSensitiveIndexItem_(idx)
-      : isSensitiveGenreText_(row[CONFIG.IDX.GENRE]);
+    const isSensitive = isSensitiveIndexItem_(idx) || isSensitiveGenreText_(row[CONFIG.IDX.GENRE]);
     const book = {
       rowIndex: offset + i,
       detailLoaded: false,
@@ -1322,6 +1348,7 @@ function matchesSearchCriteria_(idx, criteria) {
   const themeMatch = !c.selectedTheme || (item.genres.theme || []).includes(c.selectedTheme);
   const moodMatch = !c.selectedMood || (item.genres.mood || []).includes(c.selectedMood);
   const statusMatch = !c.selectedStatus || (item.genres.status || []).includes(c.selectedStatus);
+  const sensitiveGenreMatch = matchesSensitiveGenrePolicy_(item, c);
 
   const releasedYm = Number(item.releasedYm || 0);
   const releasedFromMatch = !c.fromYm || (releasedYm && releasedYm >= c.fromYm);
@@ -1337,6 +1364,7 @@ function matchesSearchCriteria_(idx, criteria) {
     themeMatch &&
     moodMatch &&
     statusMatch &&
+    sensitiveGenreMatch &&
     releasedFromMatch &&
     releasedToMatch
   );
@@ -1446,6 +1474,7 @@ function buildLibraryDataset_() {
       seriesDisplayTitle: buildSeriesDisplayTitle_(title),
       volume,
       isMainVolume: Number(volume) > 0,
+      isSensitive: isSensitiveGenreText_(genreText),
       ownedMaxVolume: 0,
       releasedYm: releasedYm
     });

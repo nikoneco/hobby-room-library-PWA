@@ -26,6 +26,7 @@ const ALLOWED_PUBLIC_GAS_FUNCTIONS = new Set([
   'getBookshelfBooksChunk',
   'getBookDetailByRowIndex',
   'getBookDetailsByRowIndexes',
+  'getSeriesInventoryStatus',
   'getBooksBySeriesKey',
 
   // Shared pure/read helpers. They cannot modify Sheets or call external APIs.

@@ -244,6 +244,38 @@ function getDefaultPreviewIndexItem_() {
   };
 }
 
+function hasGenreSearchCriteria_(criteria) {
+  const c = criteria || {};
+  return Boolean(
+    String(c.selectedStory || '').trim() ||
+    String(c.selectedTheme || '').trim() ||
+    String(c.selectedMood || '').trim() ||
+    String(c.selectedStatus || '').trim()
+  );
+}
+
+function hasExplicitSensitiveGenreSearch_(criteria) {
+  const c = criteria || {};
+  return [c.selectedStory, c.selectedTheme, c.selectedMood, c.selectedStatus]
+    .some(value => String(value || '').trim() === SENSITIVE_THEME_NAME);
+}
+
+function isSensitiveSearchIndexItem_(idx) {
+  if (idx && idx.isSensitive === true) return true;
+
+  const genres = idx && idx.genres ? idx.genres : {};
+  return ['story', 'theme', 'mood', 'status'].some(category => {
+    const values = Array.isArray(genres[category]) ? genres[category] : [];
+    return values.some(value => String(value || '').trim() === SENSITIVE_THEME_NAME);
+  });
+}
+
+function matchesSensitiveGenrePolicy_(idx, criteria) {
+  if (!isSensitiveSearchIndexItem_(idx)) return true;
+  if (!hasGenreSearchCriteria_(criteria)) return true;
+  return hasExplicitSensitiveGenreSearch_(criteria);
+}
+
 function matchesSearchCriteria_(idx, criteria) {
   const item = idx || getDefaultPreviewIndexItem_();
   const c = criteria || buildClientSearchCriteria_({});
@@ -257,6 +289,7 @@ function matchesSearchCriteria_(idx, criteria) {
   const themeMatch = !c.selectedTheme || (item.genres.theme || []).includes(c.selectedTheme);
   const moodMatch = !c.selectedMood || (item.genres.mood || []).includes(c.selectedMood);
   const statusMatch = !c.selectedStatus || (item.genres.status || []).includes(c.selectedStatus);
+  const sensitiveGenreMatch = matchesSensitiveGenrePolicy_(item, c);
 
   const releasedYm = Number(item.releasedYm || 0);
   const releasedFromMatch = !c.fromYm || (releasedYm && releasedYm >= c.fromYm);
@@ -272,6 +305,7 @@ function matchesSearchCriteria_(idx, criteria) {
     themeMatch &&
     moodMatch &&
     statusMatch &&
+    sensitiveGenreMatch &&
     releasedFromMatch &&
     releasedToMatch
   );

@@ -3204,6 +3204,36 @@ function writeGasRunShim() {
     };
   }
 
+  function hasGenreSearchCriteriaLocal_(criteria) {
+    return Boolean(
+      String(criteria.story || '').trim() ||
+      String(criteria.theme || '').trim() ||
+      String(criteria.mood || '').trim() ||
+      String(criteria.status || '').trim()
+    );
+  }
+
+  function hasExplicitSensitiveGenreSearchLocal_(criteria) {
+    return [criteria.story, criteria.theme, criteria.mood, criteria.status]
+      .some(function(value) { return String(value || '').trim() === '18禁'; });
+  }
+
+  function isSensitiveSearchIndexItemLocal_(item) {
+    if (item && item.isSensitive === true) return true;
+
+    const genres = item && item.genres ? item.genres : {};
+    return ['story', 'theme', 'mood', 'status'].some(function(category) {
+      const values = Array.isArray(genres[category]) ? genres[category] : [];
+      return values.some(function(value) { return String(value || '').trim() === '18禁'; });
+    });
+  }
+
+  function matchesSensitiveGenrePolicyLocal_(item, criteria) {
+    if (!isSensitiveSearchIndexItemLocal_(item)) return true;
+    if (!hasGenreSearchCriteriaLocal_(criteria)) return true;
+    return hasExplicitSensitiveGenreSearchLocal_(criteria);
+  }
+
   function matchesAdvancedCriteriaLocal_(item, criteria) {
     const genres = item.genres || { story: [], theme: [], mood: [], status: [] };
     const releasedYm = Number(item.releasedYm || 0);
@@ -3217,6 +3247,7 @@ function writeGasRunShim() {
       (!criteria.theme || genres.theme.includes(criteria.theme)) &&
       (!criteria.mood || genres.mood.includes(criteria.mood)) &&
       (!criteria.status || genres.status.includes(criteria.status)) &&
+      matchesSensitiveGenrePolicyLocal_(item, criteria) &&
       (!criteria.fromYm || (releasedYm && releasedYm >= criteria.fromYm)) &&
       (!criteria.toYm || (releasedYm && releasedYm <= criteria.toYm))
     );
@@ -3288,6 +3319,7 @@ function writeGasRunShim() {
           searchKey: String(record[23] || ''),
           publisher: String(record[24] || ''),
           releasedYm: Number(record[25] || 0),
+          isSensitive: Boolean(record[19]),
           genres: { story: story, theme: theme, mood: mood, status: status }
         }
       };

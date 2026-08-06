@@ -404,6 +404,50 @@ const missCriteria = sandbox.buildClientSearchCriteria_({
 });
 assert(!sandbox.matchesSearchCriteria_(mixedIndex, missCriteria), 'matchesSearchCriteria_ rejects nonmatching publisher');
 
+const sensitiveIndex = {
+  title: sandbox.normalizeKana('センシティブ本'),
+  yomi: sandbox.normalizeKana('せんしてぃぶほん'),
+  author: sandbox.normalizeKana('テスト作者'),
+  searchKey: sandbox.normalizeKana('センシティブ本 せんしてぃぶほん テスト作者'),
+  publisher: 'テスト出版社',
+  releasedYm: 202401,
+  isSensitive: true,
+  genres: {
+    story: [],
+    theme: ['18禁', '恋愛'],
+    mood: [],
+    status: ['単巻']
+  }
+};
+assert(
+  !sandbox.matchesSearchCriteria_(
+    sensitiveIndex,
+    sandbox.buildClientSearchCriteria_({ detailTheme: '恋愛' })
+  ),
+  'client genre search excludes 18禁 books when 18禁 is not explicitly selected'
+);
+assert(
+  !sandbox.matchesSearchCriteria_(
+    sensitiveIndex,
+    sandbox.buildClientSearchCriteria_({ detailStatus: '単巻' })
+  ),
+  'client status genre search excludes 18禁 books when 18禁 is not explicitly selected'
+);
+assert(
+  sandbox.matchesSearchCriteria_(
+    sensitiveIndex,
+    sandbox.buildClientSearchCriteria_({ detailTheme: '18禁' })
+  ),
+  'client genre search includes 18禁 books when 18禁 is explicitly selected'
+);
+assert(
+  sandbox.matchesSearchCriteria_(
+    sensitiveIndex,
+    sandbox.buildClientSearchCriteria_({ keyword: 'センシティブ本' })
+  ),
+  'client keyword search keeps 18禁 books eligible because genres are not keyword-search fields'
+);
+
 vm.runInContext(`
 PREVIEW_INDEX = [
   ${JSON.stringify(mixedIndex)},

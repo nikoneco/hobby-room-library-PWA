@@ -231,4 +231,53 @@ assert(
   'series status does not treat a differently titled same-number derivative as a duplicate'
 );
 
+const sensitiveSearchIndex = {
+  title: 'センシティブ本',
+  yomi: 'せんしてぃぶほん',
+  author: 'テスト作者',
+  searchKey: 'せんしてぃぶほん せんしてぃぶほん てすとさくしゃ',
+  publisher: 'テスト出版社',
+  releasedYm: 202401,
+  genresRaw: ['18禁', '恋愛'],
+  genres: { story: [], theme: ['18禁', '恋愛'], mood: [], status: ['単巻'] },
+  genreMeta: [
+    { name: '18禁', category: 'theme' },
+    { name: '恋愛', category: 'theme' }
+  ]
+};
+serverSandbox.__sensitiveSearchIndex = sensitiveSearchIndex;
+assert(
+  !vm.runInContext(
+    "matchesSearchCriteria_(__sensitiveSearchIndex, buildServerSearchCriteria_('', '', '', '', '', '', '恋愛', '', '', '', '', '', ''))",
+    serverSandbox
+  ),
+  'genre search excludes 18禁 books when 18禁 is not explicitly selected'
+);
+assert(
+  !vm.runInContext(
+    "matchesSearchCriteria_(__sensitiveSearchIndex, buildServerSearchCriteria_('', '', '', '', '', '', '', '', '単巻', '', '', '', ''))",
+    serverSandbox
+  ),
+  'status genre search excludes 18禁 books when 18禁 is not explicitly selected'
+);
+assert(
+  vm.runInContext(
+    "matchesSearchCriteria_(__sensitiveSearchIndex, buildServerSearchCriteria_('', '', '', '', '', '', '18禁', '', '', '', '', '', ''))",
+    serverSandbox
+  ),
+  'genre search includes 18禁 books when 18禁 is explicitly selected'
+);
+assert(
+  vm.runInContext(
+    "matchesSearchCriteria_(__sensitiveSearchIndex, buildServerSearchCriteria_('センシティブ', '', '', '', '', '', '', '', '', '', '', '', ''))",
+    serverSandbox
+  ),
+  'keyword search keeps 18禁 books eligible because genres are not keyword-search fields'
+);
+const sensitivePreview = vm.runInContext(
+  'buildPreviewIndexPayload_({ index: [__sensitiveSearchIndex] })',
+  serverSandbox
+);
+assert(sensitivePreview[0].isSensitive === true, 'preview index carries the sensitive flag');
+
 console.log('server api checks ok');

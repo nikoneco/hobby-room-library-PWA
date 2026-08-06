@@ -23,7 +23,7 @@ function createPayload() {
       advancedOptions: {
         publishers: ['集英社', '小学館'],
         storyGenres: ['ファンタジー'],
-        themeGenres: ['芸能'],
+        themeGenres: ['芸能', '18禁'],
         moodGenres: [],
         statusGenres: ['連載中'],
         releaseYears: ['2020']
@@ -57,6 +57,13 @@ function createPayload() {
         '', '', false,
         '葬送のふりーれん1', 'そうそうのふりーれん', '山田鐘人', '葬送のふりーれん1 そうそうのふりーれん 山田鐘人', '小学館', 202008,
         ['ファンタジー'], [], [], ['連載中']
+      ],
+      [
+        3, 'センシティブ本 1', 'テスト作者', '同人出版社', 'C', '3-1', '2024/01', '自主制作',
+        '', 'せんしてぃぶほん', '18禁,恋愛', 'センシティブ本', 1, 'センシティブ本', false, 1, 1,
+        '', '', true,
+        'せんしてぃぶ本1', 'せんしてぃぶほん', 'てすとさくしゃ', 'せんしてぃぶ本1 せんしてぃぶほん てすとさくしゃ', '同人出版社', 202401,
+        [], ['18禁', '恋愛'], [], ['単巻']
       ]
     ]
   };
@@ -166,7 +173,7 @@ function invoke(runner, method, args) {
   assert(sandboxWindow.ShumiLibraryLocalIndex.isSupported(), 'IndexedDB support is exposed');
   assert(await sandboxWindow.ShumiLibraryLocalIndex.whenLoaded(), 'stored index load can be awaited');
   assert(sandboxWindow.ShumiLibraryLocalIndex.isReady(), 'stored index becomes ready');
-  assert(sandboxWindow.ShumiLibraryLocalIndex.getRecordCount() === 3, 'stored index exposes its record count');
+  assert(sandboxWindow.ShumiLibraryLocalIndex.getRecordCount() === 4, 'stored index exposes its record count');
   const metadata = sandboxWindow.ShumiLibraryLocalIndex.getMetadata();
   assert(metadata.suggest.titles.includes('【推しの子】'), 'stored index exposes search suggestions');
   assert(metadata.advancedOptions.publishers.includes('小学館'), 'stored index exposes advanced search options');
@@ -185,11 +192,32 @@ function invoke(runner, method, args) {
   const advanced = await invoke(runner, 'searchBooksAdvanced', advancedArgs);
   assert(advanced.length === 1 && advanced[0].title.includes('フリーレン'), 'advanced search runs against the local index');
 
+  const otherGenreArgs = ['', '', '', '', '', '', '恋愛', '', '', '', '', '', ''];
+  const otherGenre = await invoke(runner, 'searchBooksAdvanced', otherGenreArgs);
+  assert(otherGenre.length === 0, 'local genre search excludes 18禁 books from other genre searches');
+
+  const otherStatusArgs = ['', '', '', '', '', '', '', '', '単巻', '', '', '', ''];
+  const otherStatus = await invoke(runner, 'searchBooksAdvanced', otherStatusArgs);
+  assert(otherStatus.length === 0, 'local status genre search excludes 18禁 books from other genre searches');
+
+  const sensitiveGenreArgs = ['', '', '', '', '', '', '18禁', '', '', '', '', '', ''];
+  const sensitiveGenre = await invoke(runner, 'searchBooksAdvanced', sensitiveGenreArgs);
+  assert(
+    sensitiveGenre.length === 1 && sensitiveGenre[0].title.includes('センシティブ本'),
+    'local genre search includes 18禁 books when 18禁 is explicitly selected'
+  );
+
+  const keywordSensitive = await invoke(runner, 'searchBooksSimple', ['センシティブ本']);
+  assert(
+    keywordSensitive.length === 1 && keywordSensitive[0].title.includes('センシティブ本'),
+    'local keyword search keeps 18禁 books eligible because genres are not keyword-search fields'
+  );
+
   const random = await invoke(runner, 'getRandomBooks', [2]);
   assert(random.length === 2, 'random search returns the requested local count');
   assert(new Set(random.map(book => book.rowIndex)).size === 2, 'random search does not duplicate books');
   assert(appendedScripts.length === 0, 'local queries do not inject JSONP scripts even while offline');
-  assert(perfEntries.filter(entry => entry.meta && entry.meta.local).length === 3, 'local queries record local performance entries');
+  assert(perfEntries.filter(entry => entry.meta && entry.meta.local).length === 7, 'local queries record local performance entries');
 
   console.log('local index checks ok');
 })().catch(error => {
