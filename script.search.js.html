@@ -256,8 +256,7 @@ function hasGenreSearchCriteria_(criteria) {
 
 function hasExplicitSensitiveGenreSearch_(criteria) {
   const c = criteria || {};
-  return [c.selectedStory, c.selectedTheme, c.selectedMood, c.selectedStatus]
-    .some(value => String(value || '').trim() === SENSITIVE_THEME_NAME);
+  return String(c.selectedTheme || '').trim() === SENSITIVE_THEME_NAME;
 }
 
 function isSensitiveSearchIndexItem_(idx) {

@@ -431,7 +431,14 @@ assert(
     sensitiveIndex,
     sandbox.buildClientSearchCriteria_({ detailStatus: '単巻' })
   ),
-  'client status genre search excludes 18禁 books when 18禁 is not explicitly selected'
+  'client genre search with another category excludes 18禁 books when 題材=18禁 is not selected'
+);
+assert(
+  !sandbox.matchesSearchCriteria_(
+    sensitiveIndex,
+    sandbox.buildClientSearchCriteria_({ detailStory: '18禁' })
+  ),
+  'client story field cannot opt into 18禁 books because 18禁 belongs to the theme field'
 );
 assert(
   sandbox.matchesSearchCriteria_(

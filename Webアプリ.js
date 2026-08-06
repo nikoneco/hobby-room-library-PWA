@@ -1120,8 +1120,7 @@ function hasGenreSearchCriteria_(criteria) {
 
 function hasExplicitSensitiveGenreSearch_(criteria) {
   const c = criteria || {};
-  return [c.selectedStory, c.selectedTheme, c.selectedMood, c.selectedStatus]
-    .some(value => String(value || '').trim() === '18禁');
+  return String(c.selectedTheme || '').trim() === '18禁';
 }
 
 function matchesSensitiveGenrePolicy_(idx, criteria) {

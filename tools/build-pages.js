@@ -3214,8 +3214,7 @@ function writeGasRunShim() {
   }
 
   function hasExplicitSensitiveGenreSearchLocal_(criteria) {
-    return [criteria.story, criteria.theme, criteria.mood, criteria.status]
-      .some(function(value) { return String(value || '').trim() === '18禁'; });
+    return String(criteria.theme || '').trim() === '18禁';
   }
 
   function isSensitiveSearchIndexItemLocal_(item) {

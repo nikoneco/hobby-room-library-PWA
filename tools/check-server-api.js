@@ -258,7 +258,14 @@ assert(
     "matchesSearchCriteria_(__sensitiveSearchIndex, buildServerSearchCriteria_('', '', '', '', '', '', '', '', '単巻', '', '', '', ''))",
     serverSandbox
   ),
-  'status genre search excludes 18禁 books when 18禁 is not explicitly selected'
+  'genre search with another category excludes 18禁 books when 題材=18禁 is not selected'
+);
+assert(
+  !vm.runInContext(
+    "matchesSearchCriteria_(__sensitiveSearchIndex, buildServerSearchCriteria_('', '', '', '', '', '18禁', '', '', '', '', '', '', ''))",
+    serverSandbox
+  ),
+  'story field cannot opt into 18禁 books because 18禁 belongs to the theme field'
 );
 assert(
   vm.runInContext(

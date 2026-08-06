@@ -198,7 +198,11 @@ function invoke(runner, method, args) {
 
   const otherStatusArgs = ['', '', '', '', '', '', '', '', '単巻', '', '', '', ''];
   const otherStatus = await invoke(runner, 'searchBooksAdvanced', otherStatusArgs);
-  assert(otherStatus.length === 0, 'local status genre search excludes 18禁 books from other genre searches');
+  assert(otherStatus.length === 0, 'local genre search with another category excludes 18禁 books unless theme=18禁');
+
+  const storySensitiveArgs = ['', '', '', '', '', '18禁', '', '', '', '', '', '', ''];
+  const storySensitive = await invoke(runner, 'searchBooksAdvanced', storySensitiveArgs);
+  assert(storySensitive.length === 0, 'local story field cannot opt into 18禁 books');
 
   const sensitiveGenreArgs = ['', '', '', '', '', '', '18禁', '', '', '', '', '', ''];
   const sensitiveGenre = await invoke(runner, 'searchBooksAdvanced', sensitiveGenreArgs);
@@ -217,7 +221,7 @@ function invoke(runner, method, args) {
   assert(random.length === 2, 'random search returns the requested local count');
   assert(new Set(random.map(book => book.rowIndex)).size === 2, 'random search does not duplicate books');
   assert(appendedScripts.length === 0, 'local queries do not inject JSONP scripts even while offline');
-  assert(perfEntries.filter(entry => entry.meta && entry.meta.local).length === 7, 'local queries record local performance entries');
+  assert(perfEntries.filter(entry => entry.meta && entry.meta.local).length === 8, 'local queries record local performance entries');
 
   console.log('local index checks ok');
 })().catch(error => {
