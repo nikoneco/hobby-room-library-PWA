@@ -217,6 +217,17 @@ window.addEventListener('DOMContentLoaded', function() {
   }
 
   document.addEventListener('click', function(event) {
+    const metadataSearch = event.target.closest('.popup-book-lead-search[data-detail-search-field]');
+    if (metadataSearch) {
+      event.preventDefault();
+      event.stopPropagation();
+      applyBookMetadataSearch_(
+        metadataSearch.dataset.detailSearchField || '',
+        metadataSearch.dataset.detailSearchValue || ''
+      );
+      return;
+    }
+
     const chip = event.target.closest('.genre-chip[data-genre-field]');
     if (!chip) return;
 

@@ -497,6 +497,69 @@ assert(
   sandbox.buildPopupBookLeadHtml_({ author: '<著者>', publisher: '出版社' }).includes('&lt;著者&gt;'),
   'popup lead escapes author text'
 );
+const popupLeadSearchHtml = sandbox.buildPopupBookLeadHtml_({ author: '著者名', publisher: '出版社名' });
+assert(
+  popupLeadSearchHtml.includes('data-detail-search-field="detailAuthor"') &&
+    popupLeadSearchHtml.includes('data-detail-search-value="著者名"') &&
+    popupLeadSearchHtml.includes('data-detail-search-field="detailPublisher"') &&
+    popupLeadSearchHtml.includes('data-detail-search-value="出版社名"'),
+  'popup lead exposes author and publisher as detail-search controls'
+);
+assert(
+  searchScriptSource.includes('function applyBookMetadataSearch_') &&
+    searchScriptSource.includes("detailPublisher: '出版社'") &&
+    searchScriptSource.includes('rerunSearchWithParams_(') &&
+    clientScriptSources[clientScriptFiles.indexOf('script.boot.js.html')].includes('.popup-book-lead-search'),
+  'author and publisher controls use the advanced search rerun route'
+);
+assert(
+  modernModalStyleSource.includes('.popup-book-lead-search') &&
+    modernModalStyleSource.includes('text-decoration: underline') &&
+    modernModalStyleSource.includes('min-height: 0'),
+  'popup metadata search controls remain compact and visibly actionable'
+);
+assertEqual(
+  sandbox.normalizeBookMetadataSearchValue_('detailAuthor', '真白しらこ／著'),
+  '真白しらこ',
+  'author metadata search removes a display-only role suffix'
+);
+assertEqual(
+  sandbox.normalizeBookMetadataSearchValue_('detailAuthor', '空知 英秋 大崎 知仁 1976-'),
+  '空知 英秋 大崎 知仁',
+  'author metadata search removes a display-only birth year suffix'
+);
+{
+  const originalDocument = sandbox.document;
+  const originalFunctions = {
+    closeActiveBookPopup_: sandbox.closeActiveBookPopup_,
+    clearSearchFormValuesForBrowse_: sandbox.clearSearchFormValuesForBrowse_,
+    closeAdvancedSearchPanel_: sandbox.closeAdvancedSearchPanel_,
+    syncSearchStatusPreviewFromForm_: sandbox.syncSearchStatusPreviewFromForm_,
+    getAdvancedSearchParams_: sandbox.getAdvancedSearchParams_,
+    rerunSearchWithParams_: sandbox.rerunSearchWithParams_
+  };
+  const detailPublisher = { value: '', options: [{ value: '出版社名' }] };
+  const calls = [];
+  sandbox.document = { getElementById(id) { return id === 'detailPublisher' ? detailPublisher : null; } };
+  sandbox.closeActiveBookPopup_ = () => calls.push('closePopup');
+  sandbox.clearSearchFormValuesForBrowse_ = () => calls.push('clear');
+  sandbox.closeAdvancedSearchPanel_ = () => calls.push('closeAdvanced');
+  sandbox.syncSearchStatusPreviewFromForm_ = () => calls.push('sync');
+  sandbox.getAdvancedSearchParams_ = () => ({ detailPublisher: detailPublisher.value });
+  sandbox.rerunSearchWithParams_ = (params, message) => calls.push({ params, message });
+  sandbox.applyBookMetadataSearch_('detailPublisher', '出版社名');
+  const rerunCall = calls.find(call => call && call.params);
+  assert(
+    detailPublisher.value === '出版社名' &&
+      rerunCall &&
+      rerunCall.params.detailPublisher === '出版社名' &&
+      calls.includes('closePopup') &&
+      calls.includes('clear'),
+    'publisher click populates detailPublisher before rerunning search'
+  );
+  Object.assign(sandbox, originalFunctions);
+  sandbox.document = originalDocument;
+}
 assert(
   clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('function isBookPopupOpen_()') &&
     clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('if (isBookPopupOpen_() && Array.isArray(popupData)'),

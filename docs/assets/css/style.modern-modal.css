@@ -368,6 +368,39 @@ body.shelf-popup-open #image-popup-overlay {
   background: rgba(214, 164, 95, 0.70);
 }
 
+.popup-book-lead-search {
+  display: inline;
+  min-width: 0;
+  min-height: 0;
+  max-width: 100%;
+  margin: 0;
+  padding: 0.12rem 0.2rem;
+  overflow: visible;
+  border: 1px solid transparent;
+  border-radius: 0.35rem;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+  line-height: inherit;
+  text-align: left;
+  white-space: normal;
+  text-decoration: underline;
+  text-decoration-color: rgba(214, 164, 95, 0.62);
+  text-underline-offset: 0.16em;
+  cursor: pointer;
+  box-shadow: none;
+}
+
+.popup-book-lead-search:hover,
+.popup-book-lead-search:focus-visible {
+  border-color: rgba(214, 164, 95, 0.42);
+  background: rgba(214, 164, 95, 0.08);
+  color: var(--lib-text);
+  outline: none;
+  text-decoration-color: currentColor;
+}
+
 #image-popup-info .book-meta-pills {
   gap: 0.38rem;
   margin-top: 0;

@@ -81,11 +81,33 @@ function buildBookMemoHtml_(book) {
 
 function buildPopupBookLeadHtml_(book) {
   const parts = [];
-  if (hasDisplayValue_(book && book.author)) parts.push(escapeHtml(book.author));
-  if (hasDisplayValue_(book && book.publisher)) parts.push(escapeHtml(book.publisher));
+  if (hasDisplayValue_(book && book.author)) {
+    const author = String(book.author).trim();
+    parts.push(`
+      <button
+        type="button"
+        class="popup-book-lead-search"
+        data-detail-search-field="detailAuthor"
+        data-detail-search-value="${escapeHtml(author)}"
+        aria-label="作者「${escapeHtml(author)}」で検索"
+      >${escapeHtml(author)}</button>
+    `);
+  }
+  if (hasDisplayValue_(book && book.publisher)) {
+    const publisher = String(book.publisher).trim();
+    parts.push(`
+      <button
+        type="button"
+        class="popup-book-lead-search"
+        data-detail-search-field="detailPublisher"
+        data-detail-search-value="${escapeHtml(publisher)}"
+        aria-label="出版社「${escapeHtml(publisher)}」で検索"
+      >${escapeHtml(publisher)}</button>
+    `);
+  }
   if (!parts.length) return '';
 
-  return `<div class="popup-book-lead">${parts.join('<span></span>')}</div>`;
+  return `<div class="popup-book-lead">${parts.join('<span aria-hidden="true"></span>')}</div>`;
 }
 
 function buildBookDetailsHtml_(book) {

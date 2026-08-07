@@ -1024,6 +1024,43 @@ function applyGenreChipSearch_(field, value) {
   rerunSearchWithParams_(getAdvancedSearchParams_(), `${value} の棚をたどっています`);
 }
 
+function normalizeBookMetadataSearchValue_(field, value) {
+  const rawValue = String(value || '').trim();
+  if (String(field || '') !== 'detailAuthor' || !rawValue) return rawValue;
+
+  const normalized = rawValue
+    .replace(/\s*[\/／]\s*(?:著|原作|作画|漫画|脚本|監修|編|編集|著者).*$/, '')
+    .replace(/\s+\d{4}年?\s*[-‐‑‒–—−]\s*$/, '')
+    .trim();
+  return normalized || rawValue;
+}
+
+function applyBookMetadataSearch_(field, value) {
+  const config = {
+    detailAuthor: '作者',
+    detailPublisher: '出版社'
+  }[String(field || '')];
+  const normalizedValue = normalizeBookMetadataSearchValue_(field, value);
+  const input = document.getElementById(field);
+  if (!config || !input || !normalizedValue) return;
+
+  if (field === 'detailPublisher') {
+    const hasOption = Array.from(input.options || [])
+      .some(option => option.value === normalizedValue);
+    if (!hasOption) return;
+  }
+
+  closeActiveBookPopup_();
+  clearSearchFormValuesForBrowse_();
+  input.value = normalizedValue;
+  closeAdvancedSearchPanel_();
+  syncSearchStatusPreviewFromForm_();
+  rerunSearchWithParams_(
+    getAdvancedSearchParams_(),
+    `${config}「${normalizedValue}」の棚をたどっています`
+  );
+}
+
 
 function clearAdvancedFields() {
   const ids = [
