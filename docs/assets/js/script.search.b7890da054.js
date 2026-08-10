@@ -2092,6 +2092,7 @@ function sanitizeBookshelfCacheBook_(book) {
 
   return {
     rowIndex: book.rowIndex,
+    bookId: book.bookId || '',
     detailLoaded: false,
     title: book.title || '',
     isbn: book.isbn || '',

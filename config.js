@@ -15,7 +15,8 @@ const CONFIG = {
     IMAGE    : 10,   // J列：スプシ表示専用
     ISBN     : 19,   // S列
     YOMIGANA : 21,   // U列
-    RESERVED  : 22,   // V列：予備
+    BOOK_UUID : 22,   // V列：蔵書を識別する不変UUID
+    RESERVED  : 22,   // 旧名互換。新規実装では BOOK_UUID を使う。
     GENRE    : 23,   // W列
     SERIES_KEY_AUTO: 24, // X列
     SUMMARY   : 25,   // Y列：あらすじ
@@ -47,7 +48,8 @@ const CONFIG = {
     ISBN     : 10,
     MEMO     : 11,
     YOMIGANA : 12,
-    RESERVED  : 13,
+    BOOK_UUID : 13,
+    RESERVED  : 13, // 旧名互換。新規実装では BOOK_UUID を使う。
     GENRE    : 14,
     SERIES_KEY_AUTO: 15,
     SUMMARY   : 16,
@@ -73,13 +75,32 @@ const NO_IMAGE_URL = "https://i.imgur.com/Q80wBRc.jpeg";
 
 /* ====== Webアプリ検索キャッシュ設定 ====== */
 const CACHE_CONFIG = {
-  LIBRARY_DATASET_KEY: 'library_dataset_v23',
-  SHELF_DATASET_KEY: 'library_shelf_dataset_v3',
+  LIBRARY_DATASET_KEY: 'library_dataset_v24',
+  SHELF_DATASET_KEY: 'library_shelf_dataset_v4',
   DATASET_REVISION_PROPERTY: 'library_dataset_revision_v1',
   TTL_SECONDS: 60 * 60,     // 1時間
   CHUNK_BYTE_LIMIT: 80 * 1024,
   BUILD_LOCK_WAIT_MS: 10000
 };
+
+/* ====== 蔵書UUID ====== */
+const BOOK_UUID_PATTERN_ = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function normalizeBookUuid_(value) {
+  return String(value == null ? '' : value).trim().toLowerCase();
+}
+
+function isValidBookUuid_(value) {
+  return BOOK_UUID_PATTERN_.test(normalizeBookUuid_(value));
+}
+
+function createBookUuid_() {
+  const uuid = normalizeBookUuid_(Utilities.getUuid());
+  if (!isValidBookUuid_(uuid)) {
+    throw new Error('Utilities.getUuid() returned an invalid UUID');
+  }
+  return uuid;
+}
 
 /* ====== 操作モードドロップダウン値 ====== */
 const DROPDOWN_VALUES = {

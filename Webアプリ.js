@@ -19,6 +19,8 @@ const WEB_APP_API_REGISTRY_ = Object.freeze({
     { name: 'getBookshelfBooksChunk', calledBy: 'JSONP API: shelfChunk', role: 'PWA本棚一覧用の軽量分割取得' },
     { name: 'getBookDetailByRowIndex', calledBy: 'script.js.html: showPopup', role: 'PWA本棚一覧から開いた本の詳細取得' },
     { name: 'getBookDetailsByRowIndexes', calledBy: 'script.js.html: detail prefetch', role: 'PWA本棚詳細の少量先読み' },
+    { name: 'getBookDetailById', calledBy: 'script.modal.js.html: showPopup', role: '不変UUIDによるPWA本詳細取得' },
+    { name: 'getBookDetailsByIds', calledBy: 'script.modal.js.html: detail prefetch', role: '不変UUIDによるPWA本詳細の少量先読み' },
     { name: 'getSeriesInventoryStatus', calledBy: 'script.shelf.js.html: showSeriesInventoryStatus', role: 'シリーズ所蔵巻の途中抜け・重複候補確認' },
     { name: 'getBooksBySeriesKey', calledBy: 'script.js.html: loadSeriesPanel', role: 'シリーズ一覧表示' },
   ],
@@ -245,7 +247,7 @@ function getLibraryDatasetRevision_() {
 
 function bumpLibraryDatasetRevision_() {
   try {
-    const nextRevision = String(Date.now());
+    const nextRevision = `${Date.now()}-${Utilities.getUuid()}`;
     PropertiesService.getScriptProperties()
       .setProperty(CACHE_CONFIG.DATASET_REVISION_PROPERTY, nextRevision);
     return nextRevision;
@@ -384,9 +386,12 @@ function clearCachedJson_(key) {
  * 図書館検索用キャッシュを破棄
  */
 function clearLibrarySearchCache_() {
+  // 先にrevisionを進める。構築中の旧revisionキャッシュが後から書かれても、
+  // 読取時のrevision照合と構築後の再確認で無効化できる順序にする。
+  const nextRevision = bumpLibraryDatasetRevision_();
   clearCachedJson_(CACHE_CONFIG.LIBRARY_DATASET_KEY);
   clearCachedJson_(CACHE_CONFIG.SHELF_DATASET_KEY);
-  bumpLibraryDatasetRevision_();
+  return nextRevision;
 }
 
 function addWebAppPerfDuration_(perf, key, startedAt) {
@@ -395,14 +400,46 @@ function addWebAppPerfDuration_(perf, key, startedAt) {
   perf[key] = Math.max(0, Number(perf[key] || 0)) + duration;
 }
 
+function stampDatasetRevision_(dataset, revision) {
+  if (!dataset || typeof dataset !== 'object') return dataset;
+  dataset.datasetRevision = String(revision || '0');
+  return dataset;
+}
+
+function getDatasetSnapshotRevision_(dataset) {
+  const revision = String(dataset && dataset.datasetRevision || '').trim();
+  return revision || getLibraryDatasetRevision_();
+}
+
+function isDatasetSnapshotValidForRevision_(dataset, revision, isValid) {
+  return Boolean(
+    typeof isValid === 'function' &&
+    isValid(dataset) &&
+    String(dataset && dataset.datasetRevision || '') === String(revision || '')
+  );
+}
+
+function buildRevisionStampedDataset_(buildDataset) {
+  const revisionBefore = getLibraryDatasetRevision_();
+  const dataset = stampDatasetRevision_(buildDataset(), revisionBefore);
+  const revisionAfter = getLibraryDatasetRevision_();
+  return {
+    dataset,
+    revisionBefore,
+    revisionAfter,
+    stable: revisionBefore === revisionAfter
+  };
+}
+
 function getOrBuildCachedDataset_(cacheKey, isValid, buildDataset, perf) {
   const datasetStartedAt = Date.now();
 
   try {
     let stepStartedAt = Date.now();
+    let expectedRevision = getLibraryDatasetRevision_();
     const cached = getCachedJson_(cacheKey, perf);
     addWebAppPerfDuration_(perf, 'cacheReadMs', stepStartedAt);
-    if (isValid(cached)) {
+    if (isDatasetSnapshotValidForRevision_(cached, expectedRevision, isValid)) {
       if (perf) perf.cacheStatus = 'hit';
       return cached;
     }
@@ -418,30 +455,62 @@ function getOrBuildCachedDataset_(cacheKey, isValid, buildDataset, perf) {
       if (!locked) {
         console.warn(`Dataset cache build lock timed out: key=${cacheKey}; returning an uncached fallback`);
         if (perf) perf.cacheStatus = 'miss-lock-timeout';
-        stepStartedAt = Date.now();
-        const fallbackDataset = buildDataset();
-        addWebAppPerfDuration_(perf, 'buildMs', stepStartedAt);
-        return fallbackDataset;
+        let fallbackSnapshot = null;
+        for (let attempt = 0; attempt < 2; attempt++) {
+          stepStartedAt = Date.now();
+          fallbackSnapshot = buildRevisionStampedDataset_(buildDataset);
+          addWebAppPerfDuration_(perf, 'buildMs', stepStartedAt);
+          if (fallbackSnapshot.stable) return fallbackSnapshot.dataset;
+        }
+        console.warn(`Dataset changed repeatedly during uncached build: key=${cacheKey}`);
+        return fallbackSnapshot ? fallbackSnapshot.dataset : null;
       }
 
+      expectedRevision = getLibraryDatasetRevision_();
       stepStartedAt = Date.now();
       const cachedAfterLock = getCachedJson_(cacheKey, perf);
       addWebAppPerfDuration_(perf, 'cacheReadMs', stepStartedAt);
-      if (isValid(cachedAfterLock)) {
+      if (isDatasetSnapshotValidForRevision_(cachedAfterLock, expectedRevision, isValid)) {
         if (perf) perf.cacheStatus = 'hit-after-lock';
         return cachedAfterLock;
       }
 
-      stepStartedAt = Date.now();
-      const dataset = buildDataset();
-      addWebAppPerfDuration_(perf, 'buildMs', stepStartedAt);
-      if (isValid(dataset)) {
+      let lastSnapshot = null;
+      for (let attempt = 0; attempt < 2; attempt++) {
         stepStartedAt = Date.now();
-        putCachedJson_(cacheKey, dataset, CACHE_CONFIG.TTL_SECONDS);
+        lastSnapshot = buildRevisionStampedDataset_(buildDataset);
+        addWebAppPerfDuration_(perf, 'buildMs', stepStartedAt);
+
+        const dataset = lastSnapshot.dataset;
+        if (!lastSnapshot.stable) {
+          if (perf) perf.cacheStatus = 'miss-retry-revision';
+          continue;
+        }
+
+        if (!isValid(dataset)) {
+          if (perf) perf.cacheStatus = 'miss-built-invalid';
+          return dataset;
+        }
+
+        stepStartedAt = Date.now();
+        const stored = putCachedJson_(cacheKey, dataset, CACHE_CONFIG.TTL_SECONDS);
         addWebAppPerfDuration_(perf, 'cacheWriteMs', stepStartedAt);
+
+        const revisionAfterWrite = getLibraryDatasetRevision_();
+        if (revisionAfterWrite !== lastSnapshot.revisionBefore) {
+          // putCachedJson_の途中で編集された場合、後勝ちした旧データを残さない。
+          clearCachedJson_(cacheKey);
+          if (perf) perf.cacheStatus = 'miss-retry-after-write';
+          continue;
+        }
+
+        if (perf) perf.cacheStatus = stored ? 'miss-built' : 'miss-built-uncached';
+        return dataset;
       }
-      if (perf) perf.cacheStatus = 'miss-built';
-      return dataset;
+
+      console.warn(`Dataset changed repeatedly during cache build: key=${cacheKey}; returning uncached snapshot`);
+      if (perf) perf.cacheStatus = 'miss-unstable-uncached';
+      return lastSnapshot ? lastSnapshot.dataset : null;
     } finally {
       if (locked) lock.releaseLock();
     }
@@ -644,7 +713,7 @@ function buildPreviewIndexPayload_(dataset) {
   }));
 }
 
-const LOCAL_LIBRARY_INDEX_VERSION_ = 3;
+const LOCAL_LIBRARY_INDEX_VERSION_ = 4;
 
 /**
  * PWAのローカル索引と一緒に保存する検索UI用メタデータを返す。
@@ -677,6 +746,7 @@ function buildLocalLibraryIndexPayload_(dataset) {
 
     return [
       rowIndex,
+      normalizeBookUuid_(row[CONFIG.IDX.BOOK_UUID]),
       row[CONFIG.IDX.TITLE] || '',
       row[CONFIG.IDX.AUTHOR] || '',
       row[CONFIG.IDX.PUBLISHER] || '',
@@ -711,10 +781,10 @@ function buildLocalLibraryIndexPayload_(dataset) {
 
   return {
     version: LOCAL_LIBRARY_INDEX_VERSION_,
-    revision: getLibraryDatasetRevision_(),
+    revision: getDatasetSnapshotRevision_(dataset),
     metadata: buildLocalSearchMetadataPayload_(dataset),
     columns: [
-      'rowIndex', 'title', 'author', 'publisher', 'shelf', 'location', 'released', 'brand',
+      'rowIndex', 'bookId', 'title', 'author', 'publisher', 'shelf', 'location', 'released', 'brand',
       'isbn', 'yomi', 'genre', 'seriesKeyAuto', 'seriesCount', 'seriesSearchTitle',
       'isExtraSeries', 'volume', 'ownedMaxVolume', 'fallbackImg', 'fallbackImageSource',
       'isSensitive', 'indexTitle', 'indexYomi', 'indexAuthor', 'searchKey', 'indexPublisher',
@@ -825,7 +895,7 @@ function getInitialSearchData() {
       suggest: buildSuggestDataPayload_(dataset),
       advancedOptions: buildAdvancedSearchOptionsPayload_(dataset),
       previewIndex: buildPreviewIndexPayload_(dataset),
-      datasetRevision: getLibraryDatasetRevision_(),
+      datasetRevision: getDatasetSnapshotRevision_(dataset),
       userPreferences: getWebAppUserPreferences_()
     };
   } catch (e) {
@@ -869,7 +939,7 @@ function getInitialSearchDataForPwa_() {
       advancedOptions: metadata.advancedOptions,
       previewIndex: [],
       quickBrowseCounts: metadata.quickBrowseCounts,
-      datasetRevision: getLibraryDatasetRevision_(),
+      datasetRevision: getDatasetSnapshotRevision_(dataset),
       userPreferences: getWebAppUserPreferences_()
     };
   } catch (e) {
@@ -1053,6 +1123,7 @@ function mapRowsToBooks_(rows, indexData, options) {
     const isSensitive = isSensitiveIndexItem_(idx) || isSensitiveGenreText_(row[CONFIG.IDX.GENRE]);
 
     const book = {
+      bookId   : normalizeBookUuid_(row[CONFIG.IDX.BOOK_UUID]),
       title    : row[CONFIG.IDX.TITLE]     || '',
       author   : row[CONFIG.IDX.AUTHOR]    || '',
       publisher: row[CONFIG.IDX.PUBLISHER] || '',
@@ -1153,6 +1224,7 @@ function mapRowsToShelfBooks_(rows, indexData, rowOffset) {
     const isSensitive = isSensitiveIndexItem_(idx) || isSensitiveGenreText_(row[CONFIG.IDX.GENRE]);
     const book = {
       rowIndex: offset + i,
+      bookId: normalizeBookUuid_(row[CONFIG.IDX.BOOK_UUID]),
       detailLoaded: false,
       title: row[CONFIG.IDX.TITLE] || '',
       isbn,
@@ -1197,6 +1269,7 @@ function isBookshelfLiteDatasetValid_(dataset) {
       typeof book.location === 'string' &&
       typeof book.fallbackImg === 'string' &&
       typeof book.fallbackImageSource === 'string' &&
+      typeof book.bookId === 'string' &&
       Object.prototype.hasOwnProperty.call(book, 'rowIndex')
     )
   );
@@ -2293,6 +2366,42 @@ function getBookDetailByRowIndex(rowIndex) {
   }
 }
 
+function findBookRowIndexById_(rows, bookId) {
+  const normalizedId = normalizeBookUuid_(bookId);
+  if (!isValidBookUuid_(normalizedId)) return -1;
+
+  for (let i = 0; i < rows.length; i++) {
+    if (normalizeBookUuid_(rows[i] && rows[i][CONFIG.IDX.BOOK_UUID]) === normalizedId) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+function getBookDetailById(bookId) {
+  try {
+    const normalizedId = normalizeBookUuid_(bookId);
+    if (!isValidBookUuid_(normalizedId)) {
+      throw new Error(`Invalid book ID: ${bookId}`);
+    }
+
+    const dataset = getLibraryDataset_();
+    const rows = dataset.rows || [];
+    const index = dataset.index || [];
+    const targetIndex = findBookRowIndexById_(rows, normalizedId);
+    if (targetIndex < 0) return null;
+
+    return mapRowsToBooks_(
+      [rows[targetIndex]],
+      [index[targetIndex] || {}],
+      { includeImages: false, rowOffset: targetIndex }
+    )[0] || null;
+  } catch (e) {
+    console.error('getBookDetailById error:', e);
+    return null;
+  }
+}
+
 function parseBookDetailRowIndexes_(rowIndexes) {
   const seen = {};
   return String(rowIndexes || '')
@@ -2332,6 +2441,52 @@ function getBookDetailsByRowIndexes(rowIndexes) {
   }
 }
 
+function parseBookDetailIds_(bookIds) {
+  const seen = {};
+  return String(bookIds || '')
+    .split(/[,\s]+/)
+    .map(normalizeBookUuid_)
+    .filter(isValidBookUuid_)
+    .filter(value => {
+      if (seen[value]) return false;
+      seen[value] = true;
+      return true;
+    })
+    .slice(0, WEBAPP_API_LIMITS_.BOOK_DETAIL_BATCH_MAX);
+}
+
+function getBookDetailsByIds(bookIds) {
+  try {
+    const targets = parseBookDetailIds_(bookIds);
+    if (!targets.length) return [];
+
+    const dataset = getLibraryDataset_();
+    const rows = dataset.rows || [];
+    const index = dataset.index || [];
+    const rowIndexById = {};
+
+    rows.forEach((row, rowIndex) => {
+      const bookId = normalizeBookUuid_(row && row[CONFIG.IDX.BOOK_UUID]);
+      if (isValidBookUuid_(bookId) && rowIndexById[bookId] === undefined) {
+        rowIndexById[bookId] = rowIndex;
+      }
+    });
+
+    return targets
+      .map(bookId => rowIndexById[bookId])
+      .filter(rowIndex => rowIndex !== undefined)
+      .map(rowIndex => mapRowsToBooks_(
+        [rows[rowIndex]],
+        [index[rowIndex] || {}],
+        { includeImages: false, rowOffset: rowIndex }
+      )[0] || null)
+      .filter(Boolean);
+  } catch (e) {
+    console.error('getBookDetailsByIds error:', e);
+    return [];
+  }
+}
+
 /**
  * 現行WebアプリAPI: 同一 series_key_auto の本を目録順で返す。
  * @param {string} seriesKeyAuto
@@ -2348,6 +2503,7 @@ function getBooksBySeriesKey(seriesKeyAuto) {
 
     const matchedRows = [];
     const matchedIndex = [];
+    const matchedRowIndexes = [];
 
     for (let i = 0; i < index.length; i++) {
       const idx = index[i] || {};
@@ -2355,9 +2511,10 @@ function getBooksBySeriesKey(seriesKeyAuto) {
 
       matchedRows.push(rows[i]);
       matchedIndex.push(idx);
+      matchedRowIndexes.push(i);
     }
 
-    return mapRowsToBooks_(matchedRows, matchedIndex);
+    return mapRowsToBooks_(matchedRows, matchedIndex, { rowIndexes: matchedRowIndexes });
   } catch (e) {
     console.error('getBooksBySeriesKey error:', e);
     return [];
@@ -2407,6 +2564,8 @@ const PUBLIC_WEBAPP_JSONP_API_HANDLERS_ = Object.freeze({
   random: (params, perf) => getRandomBooks(params.count || 10, perf),
   shelf: () => getBookshelfBooks(),
   shelfChunk: params => getBookshelfBooksChunk(params.offset, params.limit),
+  bookDetailById: params => getBookDetailById(params.bookId || params.id || ''),
+  bookDetailsByIds: params => getBookDetailsByIds(params.bookIds || params.ids || ''),
   bookDetail: params => getBookDetailByRowIndex(params.rowIndex),
   bookDetails: params => getBookDetailsByRowIndexes(params.rowIndexes || params.rowIndexesCsv || ''),
   seriesStatus: () => getSeriesInventoryStatus(),

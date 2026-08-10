@@ -59,8 +59,175 @@ function onEdit(e) {
     updateSeriesKeyAutoForEditedRange_(sh, e.range);
   }
 
+  if (
+    sheetName === MAIN &&
+    row >= 2 &&
+    (
+      (col <= CONFIG.COL.TITLE && colEnd >= CONFIG.COL.TITLE) ||
+      (col <= CONFIG.COL.SERIES_KEY_AUTO && colEnd >= CONFIG.COL.SERIES_KEY_AUTO) ||
+      (col <= CONFIG.COL.BOOK_UUID && colEnd >= CONFIG.COL.BOOK_UUID)
+    )
+  ) {
+    ensureBookUuidsForEditedRange_(sh, e.range);
+  }
+
   // 派生列の更新後に破棄し、更新途中のデータが新キャッシュへ戻る窓を狭める。
   if (shouldClearSearchCache) clearLibrarySearchCache_();
+}
+
+function createUniqueBookUuid_(usedUuids) {
+  const used = usedUuids || new Set();
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const uuid = createBookUuid_();
+    if (used.has(uuid)) continue;
+    used.add(uuid);
+    return uuid;
+  }
+  throw new Error('Failed to allocate a unique book UUID');
+}
+
+/**
+ * UUID補完・重複修復の純粋な計画を作る。
+ * targetIndexesを省略した場合は、タイトルがある全行を対象にする。
+ * @param {Array<*>} titles
+ * @param {Array<*>} currentUuids
+ * @param {number[]=} targetIndexes 0始まり
+ * @returns {Object}
+ */
+function buildBookUuidRepairPlan_(titles, currentUuids, targetIndexes) {
+  const titleValues = (Array.isArray(titles) ? titles : []).map(value =>
+    Array.isArray(value) ? value[0] : value
+  );
+  const uuidValues = (Array.isArray(currentUuids) ? currentUuids : []).map(value =>
+    Array.isArray(value) ? value[0] : value
+  );
+  const length = Math.max(titleValues.length, uuidValues.length);
+  const output = Array.from({ length }, (_, index) => [String(uuidValues[index] || '')]);
+  const targets = Array.isArray(targetIndexes)
+    ? targetIndexes.filter(index => Number.isInteger(index) && index >= 0 && index < length)
+    : Array.from({ length }, (_, index) => index);
+  const targetSet = new Set(targets);
+  const occurrences = new Map();
+  const used = new Set();
+
+  for (let index = 0; index < length; index++) {
+    const uuid = normalizeBookUuid_(uuidValues[index]);
+    if (!isValidBookUuid_(uuid)) continue;
+    used.add(uuid);
+    if (!occurrences.has(uuid)) occurrences.set(uuid, []);
+    occurrences.get(uuid).push(index);
+  }
+
+  const keptTargetIds = new Set();
+  const result = {
+    values: output,
+    changedIndices: [],
+    created: 0,
+    repairedDuplicates: 0,
+    repairedInvalid: 0,
+    normalized: 0
+  };
+
+  targets.forEach(index => {
+    if (!String(titleValues[index] || '').trim()) return;
+
+    const raw = String(uuidValues[index] || '');
+    const normalized = normalizeBookUuid_(raw);
+    const valid = isValidBookUuid_(normalized);
+    let needsNewUuid = !valid;
+    let reason = valid ? '' : (normalized ? 'invalid' : 'created');
+
+    if (valid) {
+      const matchingIndexes = occurrences.get(normalized) || [];
+      const hasNonTargetOccurrence = matchingIndexes.some(otherIndex => !targetSet.has(otherIndex));
+      if (
+        matchingIndexes.length > 1 &&
+        (hasNonTargetOccurrence || keptTargetIds.has(normalized))
+      ) {
+        needsNewUuid = true;
+        reason = 'duplicate';
+      } else {
+        keptTargetIds.add(normalized);
+      }
+    }
+
+    let nextUuid = normalized;
+    if (needsNewUuid) {
+      nextUuid = createUniqueBookUuid_(used);
+      if (reason === 'duplicate') result.repairedDuplicates++;
+      else if (reason === 'invalid') result.repairedInvalid++;
+      else result.created++;
+    } else if (raw !== normalized) {
+      result.normalized++;
+    }
+
+    if (raw !== nextUuid) {
+      output[index] = [nextUuid];
+      result.changedIndices.push(index);
+    }
+  });
+
+  result.changed = result.changedIndices.length;
+  return result;
+}
+
+function ensureBookUuidsForEditedRange_(sheet, editedRange) {
+  const lastRow = Math.max(
+    getLastDataRow(sheet, CONFIG.COL.TITLE),
+    editedRange.getRow() + editedRange.getNumRows() - 1
+  );
+  if (lastRow < 2) return { checked: 0, changed: 0 };
+
+  const rowCount = lastRow - 1;
+  const titles = sheet.getRange(2, CONFIG.COL.TITLE, rowCount, 1).getValues();
+  const uuidRange = sheet.getRange(2, CONFIG.COL.BOOK_UUID, rowCount, 1);
+  const currentUuids = uuidRange.getValues();
+  const startIndex = Math.max(0, editedRange.getRow() - 2);
+  const endIndex = Math.min(rowCount - 1, editedRange.getRow() + editedRange.getNumRows() - 3);
+  const targetIndexes = [];
+  for (let index = startIndex; index <= endIndex; index++) targetIndexes.push(index);
+
+  const plan = buildBookUuidRepairPlan_(titles, currentUuids, targetIndexes);
+  if (plan.changed > 0) {
+    const writeValues = plan.values.slice(startIndex, endIndex + 1);
+    sheet.getRange(startIndex + 2, CONFIG.COL.BOOK_UUID, writeValues.length, 1)
+      .setValues(writeValues);
+  }
+
+  return Object.assign({ checked: targetIndexes.length }, plan);
+}
+
+function repairBookUuidsAll_(sheet) {
+  const sh = sheet || getSheet(CONFIG.SHEETS.MAIN);
+  const headerCell = sh.getRange(1, CONFIG.COL.BOOK_UUID);
+  const headerUpdated = String(headerCell.getDisplayValue() || '').trim() !== 'UUID';
+  if (headerUpdated) headerCell.setValue('UUID');
+
+  const lastRow = getLastDataRow(sh, CONFIG.COL.TITLE);
+  if (lastRow < 2) {
+    return { checked: 0, changed: 0, headerUpdated };
+  }
+
+  const rowCount = lastRow - 1;
+  const titles = sh.getRange(2, CONFIG.COL.TITLE, rowCount, 1).getValues();
+  const uuidRange = sh.getRange(2, CONFIG.COL.BOOK_UUID, rowCount, 1);
+  const plan = buildBookUuidRepairPlan_(titles, uuidRange.getValues());
+  if (plan.changed > 0) uuidRange.setValues(plan.values);
+
+  return Object.assign({ checked: rowCount, headerUpdated }, plan);
+}
+
+/**
+ * 既存蔵書のV列(UUID)を一括補完する保守用関数。
+ * GASエディタから明示的に実行する。既存の有効なUUIDは変更しない。
+ */
+function fillMissingBookUuidsAll_() {
+  const result = repairBookUuidsAll_(getSheet(CONFIG.SHEETS.MAIN));
+  if (result.changed > 0 || result.headerUpdated) {
+    SpreadsheetApp.flush();
+    clearLibrarySearchCache_();
+  }
+  return result;
 }
 
 /**
@@ -512,7 +679,7 @@ function fillSeriesKeyAutoAll_() {
     .getSheetByName(CONFIG.SHEETS.MAIN);
 
   const lastRow = getLastDataRow(sheet, CONFIG.COL.TITLE);
-  if (lastRow < 2) return;
+  if (lastRow < 2) return repairBookUuidsAll_(sheet);
 
   const titleCol = CONFIG.COL.TITLE;
   const genreCol = CONFIG.COL.GENRE;
@@ -535,12 +702,19 @@ function fillSeriesKeyAutoAll_() {
 
   const currentOutput = values.map(row => [row[seriesKeyCol - 1] || '']);
   const changed = output.some((row, index) => row[0] !== currentOutput[index][0]);
-  if (!changed) return { updatedRows: 0 };
+  if (changed) {
+    sheet
+      .getRange(2, seriesKeyCol, output.length, 1)
+      .setValues(output);
+  }
 
-  sheet
-    .getRange(2, seriesKeyCol, output.length, 1)
-    .setValues(output);
-  SpreadsheetApp.flush();
-  clearLibrarySearchCache_();
-  return { updatedRows: output.length };
+  const bookUuids = repairBookUuidsAll_(sheet);
+  if (changed || bookUuids.changed > 0 || bookUuids.headerUpdated) {
+    SpreadsheetApp.flush();
+    clearLibrarySearchCache_();
+  }
+  return {
+    updatedRows: changed ? output.length : 0,
+    bookUuids
+  };
 }

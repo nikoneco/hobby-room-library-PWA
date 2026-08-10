@@ -252,16 +252,30 @@ assertEqual(
 );
 
 {
-  const revisionBook = { rowIndex: 12, isbn: '9780000000000', title: 'キャッシュ確認本' };
-  const revisionDetail = { isbn: '9780000000000', title: 'キャッシュ確認本', summary: '新版' };
+  const revisionBook = {
+    bookId: '11111111-1111-4111-8111-111111111111',
+    rowIndex: 12,
+    isbn: '9780000000000',
+    title: 'キャッシュ確認本'
+  };
+  const revisionDetail = {
+    bookId: revisionBook.bookId,
+    isbn: '9780000000000',
+    title: 'キャッシュ確認本',
+    summary: '新版'
+  };
   sandbox.syncBookDetailCacheRevision_('revision-a');
   const revisionKey = sandbox.getBookDetailCacheKey_(revisionBook);
   assert(revisionKey.includes('revision:revision-a'), 'detail cache key includes the dataset revision');
-  assert(revisionKey.includes('isbn:9780000000000'), 'detail cache key includes the ISBN');
-  assert(revisionKey.includes(encodeURIComponent('キャッシュ確認本')), 'detail cache key includes the title');
+  assert(revisionKey.includes(`book:${revisionBook.bookId}`), 'detail cache key prefers the stable book ID');
   sandbox.rememberBookDetail_(revisionBook, revisionDetail);
   assert(sandbox.getCachedBookDetail_(revisionBook), 'detail cache returns an entry for the current dataset revision');
-  const mismatchedDetail = { isbn: '9781111111111', title: '別の本', summary: '混ぜない' };
+  const mismatchedDetail = {
+    bookId: '22222222-2222-4222-8222-222222222222',
+    isbn: revisionBook.isbn,
+    title: revisionBook.title,
+    summary: '混ぜない'
+  };
   sandbox.rememberBookDetail_(revisionBook, mismatchedDetail);
   assertEqual(
     sandbox.getCachedBookDetail_(revisionBook).title,
@@ -276,6 +290,7 @@ assertEqual(
     summary: '同一ISBNの別コピー'
   };
   const locatedBook = Object.assign({}, revisionBook, {
+    bookId: '33333333-3333-4333-8333-333333333333',
     rowIndex: 13,
     shelf: '棚A',
     location: '上-1'
@@ -293,9 +308,10 @@ assertEqual(
 {
   const originalLocalIndexManager = sandbox.window.ShumiLibraryLocalIndex;
   sandbox.window.ShumiLibraryLocalIndex = {
-    getBookByRowIndex(rowIndex) {
-      assertEqual(rowIndex, 4, 'popup local-index hydration uses the current row index');
+    getBookById(bookId) {
+      assertEqual(bookId, '44444444-4444-4444-8444-444444444444', 'popup local-index hydration prefers stable book ID');
       return {
+        bookId,
         rowIndex: 4,
         title: '【推しの子】 04',
         author: '赤坂アカ×横槍メンゴ',
@@ -307,10 +323,14 @@ assertEqual(
           { category: 'status', name: '完結(全巻保有)' }
         ]
       };
+    },
+    getBookByRowIndex(rowIndex) {
+      throw new Error(`row-index fallback should not be used for stable ID ${rowIndex}`);
     }
   };
 
   const lightweightBook = {
+    bookId: '44444444-4444-4444-8444-444444444444',
     rowIndex: 4,
     detailLoaded: false,
     title: '【推しの子】 04',
@@ -324,6 +344,7 @@ assertEqual(
   assertEqual(hydratedBook.genreMeta.length, 3, 'popup immediately restores local genre metadata');
 
   const deferredRenderBook = sandbox.createPopupDeferredRenderBook_(hydratedBook);
+  assertEqual(deferredRenderBook.bookId, lightweightBook.bookId, 'deferred popup preserves stable book ID');
   assertEqual(deferredRenderBook.genreMeta.length, 3, 'deferred popup rendering preserves immediate genres');
   assertEqual(deferredRenderBook.detailLoaded, false, 'deferred popup still waits for synopsis details');
 
@@ -332,6 +353,63 @@ assertEqual(
   } else {
     sandbox.window.ShumiLibraryLocalIndex = originalLocalIndexManager;
   }
+}
+
+{
+  const originalRun = sandbox.google.script.run;
+  const calls = [];
+  let successHandler = null;
+  let failureHandler = null;
+  const runner = {
+    withSuccessHandler(handler) { successHandler = handler; return this; },
+    withFailureHandler(handler) { failureHandler = handler; return this; },
+    getBookDetailById(bookId) {
+      calls.push(`id:${bookId}`);
+      failureHandler(new Error('old GAS without UUID endpoint'));
+    },
+    getBookDetailByRowIndex(rowIndex) {
+      calls.push(`row:${rowIndex}`);
+      successHandler({ rowIndex, title: '互換詳細' });
+    },
+    getBookDetailsByIds(bookIds) {
+      calls.push(`ids:${bookIds}`);
+      failureHandler(new Error('old GAS without UUID batch endpoint'));
+    },
+    getBookDetailsByRowIndexes(rowIndexes) {
+      calls.push(`rows:${rowIndexes}`);
+      successHandler([{ rowIndex: 7 }, { rowIndex: 8 }]);
+    }
+  };
+  sandbox.google.script.run = runner;
+
+  let singleFallbackDetail = null;
+  sandbox.requestBookDetailByStableIdentity_(
+    { bookId: '55555555-5555-4555-8555-555555555555', rowIndex: 7 },
+    detail => { singleFallbackDetail = detail; },
+    error => { throw error; }
+  );
+  assertEqual(
+    calls.slice(0, 2).join(','),
+    'id:55555555-5555-4555-8555-555555555555,row:7',
+    'single detail retries the legacy row API during mixed deployment'
+  );
+  assertEqual(singleFallbackDetail.title, '互換詳細', 'single detail row fallback returns data');
+
+  let batchFallbackUsedIds = true;
+  sandbox.requestBookDetailsByStableIdentities_(
+    [
+      { bookId: '66666666-6666-4666-8666-666666666666', rowIndex: 7 },
+      { bookId: '77777777-7777-4777-8777-777777777777', rowIndex: 8 }
+    ],
+    (details, usedBookIds) => {
+      batchFallbackUsedIds = usedBookIds;
+      assertEqual(details.length, 2, 'batch row fallback returns every detail');
+    },
+    error => { throw error; }
+  );
+  assert(calls.includes('rows:7,8'), 'batch detail retries the legacy row API during mixed deployment');
+  assertEqual(batchFallbackUsedIds, false, 'batch fallback maps responses by row index');
+  sandbox.google.script.run = originalRun;
 }
 
 {
@@ -599,7 +677,7 @@ assert(
   clientScriptSources[clientScriptFiles.indexOf('script.state.js.html')].includes('bookDetailInFlightCallbacks') &&
     clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('settleBookDetailInFlight_') &&
     clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('bookDetailInFlightCallbacks.has(key)'),
-  'deferred detail requests share in-flight row fetches'
+  'deferred detail requests share in-flight identity fetches'
 );
 assert(
   clientScriptSources[clientScriptFiles.indexOf('script.state.js.html')].includes('bookDetailPersistentCachePayload') &&
@@ -626,14 +704,18 @@ assert(
     clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('function schedulePopupCurrentDetailRender_') &&
     clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('function handlePopupContextBookDetailResult_') &&
     clientScriptSources[clientScriptFiles.indexOf('script.state.js.html')].includes('POPUP_CURRENT_DETAIL_RENDER_DELAY_MS') &&
-    clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('getBookDetailsByRowIndexes(rowIndexes)') &&
+    clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('function requestBookDetailByStableIdentity_') &&
+    clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('.getBookDetailById(book.bookId)') &&
+    clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('function requestBookDetailsByStableIdentities_') &&
+    clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('.getBookDetailsByIds(bookIds)') &&
+    clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('.getBookDetailsByRowIndexes(rowIndexes)') &&
     clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes("mode: 'currentOnly'") &&
     clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('forceCurrent: Boolean(popupOptions.forceCurrentDetailFetch)') &&
     clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('deferCurrentApplyMs: deferCurrentDetailRender ? POPUP_CURRENT_DETAIL_RENDER_DELAY_MS : 0') &&
     clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('bookDetailInFlightCallbacks.delete(key)') &&
     clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('function schedulePopupNeighborBookDetails_') &&
     clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes("mode: 'neighborsOnly'"),
-  'book popup fetches current details immediately, can defer heavy detail rendering, and delays nearby detail prefetch'
+  'book popup fetches current details by stable ID with row-index fallback, can defer heavy rendering, and delays nearby prefetch'
 );
 const popupPriorityBooks = Array.from({ length: 9 }, (_, index) => ({
   title: `優先順位 ${index}`,

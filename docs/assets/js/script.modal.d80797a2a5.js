@@ -311,8 +311,10 @@ function shouldFetchDeferredBookDetails_(book, options) {
   return !!(
     book &&
     book.detailLoaded === false &&
-    book.rowIndex !== undefined &&
-    book.rowIndex !== null &&
+    (
+      hasDisplayValue_(book.bookId) ||
+      (book.rowIndex !== undefined && book.rowIndex !== null)
+    ) &&
     (opt.force || !book.detailLoading)
   );
 }
@@ -321,9 +323,15 @@ function hydratePopupBookFromLocalIndex_(book) {
   if (!book || typeof book !== 'object') return book;
 
   const manager = window.ShumiLibraryLocalIndex;
-  if (!manager || typeof manager.getBookByRowIndex !== 'function') return book;
+  if (!manager) return book;
 
-  const localBook = manager.getBookByRowIndex(book.rowIndex);
+  let localBook = null;
+  if (hasDisplayValue_(book.bookId) && typeof manager.getBookById === 'function') {
+    localBook = manager.getBookById(book.bookId);
+  }
+  if (!localBook && typeof manager.getBookByRowIndex === 'function') {
+    localBook = manager.getBookByRowIndex(book.rowIndex);
+  }
   if (!localBook || typeof localBook !== 'object') return book;
 
   [
@@ -351,6 +359,7 @@ function createPopupDeferredRenderBook_(book) {
 
   return {
     title: book.title || '',
+    bookId: book.bookId || '',
     rowIndex: book.rowIndex,
     isbn: book.isbn || '',
     shelf: book.shelf || '',
@@ -385,8 +394,16 @@ function schedulePopupCurrentDetailRender_(book, index, dataArr, seriesContext, 
 }
 
 function getBookDetailCacheKey_(book) {
-  if (!book || book.rowIndex === undefined || book.rowIndex === null) return '';
+  if (!book) return '';
   const revision = String(currentDatasetRevision || '').trim();
+  const bookId = String(book.bookId || '').trim();
+  if (bookId) {
+    return [
+      `revision:${encodeURIComponent(revision)}`,
+      `book:${encodeURIComponent(bookId)}`
+    ].join('|');
+  }
+  if (book.rowIndex === undefined || book.rowIndex === null) return '';
   const isbn = String(book.isbn || '').trim();
   const title = String(book.title || '').trim();
   return [
@@ -565,6 +582,10 @@ function rememberPersistentBookDetail_(key, detail) {
 function isPersistentBookDetailMatch_(book, detail) {
   if (!book || !detail) return false;
 
+  const bookId = String(book.bookId || '').trim();
+  const detailBookId = String(detail.bookId || '').trim();
+  if (bookId && detailBookId) return bookId === detailBookId;
+
   const identityFields = ['title', 'isbn', 'shelf', 'location'];
   for (let i = 0; i < identityFields.length; i++) {
     const field = identityFields[i];
@@ -647,6 +668,67 @@ function handleDeferredBookDetailResult_(book, index, dataArr, seriesContext, op
   if (typeof opt.onDone === 'function') opt.onDone(null);
 }
 
+function requestBookDetailByStableIdentity_(book, onSuccess, onFailure) {
+  const canUseRowIndex = book && book.rowIndex !== undefined && book.rowIndex !== null;
+  const requestByRowIndex_ = function(previousError) {
+    if (!canUseRowIndex) {
+      if (typeof onFailure === 'function') onFailure(previousError || new Error('Book identity is unavailable'));
+      return;
+    }
+    google.script.run
+      .withSuccessHandler(onSuccess)
+      .withFailureHandler(onFailure)
+      .getBookDetailByRowIndex(book.rowIndex);
+  };
+
+  if (book && hasDisplayValue_(book.bookId)) {
+    google.script.run
+      .withSuccessHandler(onSuccess)
+      .withFailureHandler(function(error) {
+        // GAS旧版とPages新版が一時的に混在しても、旧APIで表示を継続する。
+        requestByRowIndex_(error);
+      })
+      .getBookDetailById(book.bookId);
+    return;
+  }
+
+  requestByRowIndex_();
+}
+
+function requestBookDetailsByStableIdentities_(books, onSuccess, onFailure) {
+  const targets = Array.isArray(books) ? books.filter(Boolean) : [];
+  const canUseBookIds = targets.length > 0 && targets.every(book => hasDisplayValue_(book.bookId));
+  const canUseRowIndexes = targets.length > 0 && targets.every(book =>
+    book.rowIndex !== undefined && book.rowIndex !== null
+  );
+
+  const requestByRowIndexes_ = function(previousError) {
+    if (!canUseRowIndexes) {
+      if (typeof onFailure === 'function') onFailure(previousError || new Error('Book identities are unavailable'));
+      return;
+    }
+    const rowIndexes = targets.map(book => book.rowIndex).join(',');
+    google.script.run
+      .withSuccessHandler(function(details) { onSuccess(details, false); })
+      .withFailureHandler(onFailure)
+      .getBookDetailsByRowIndexes(rowIndexes);
+  };
+
+  if (canUseBookIds) {
+    const bookIds = targets.map(book => book.bookId).join(',');
+    google.script.run
+      .withSuccessHandler(function(details) { onSuccess(details, true); })
+      .withFailureHandler(function(error) {
+        // 新UUID APIが未反映の短い配備差も、rowIndex互換APIで吸収する。
+        requestByRowIndexes_(error);
+      })
+      .getBookDetailsByIds(bookIds);
+    return;
+  }
+
+  requestByRowIndexes_();
+}
+
 function fetchDeferredBookDetails_(book, index, dataArr, seriesContext, options) {
   const opt = options || {};
   const cached = getCachedBookDetail_(book);
@@ -680,8 +762,9 @@ function fetchDeferredBookDetails_(book, index, dataArr, seriesContext, options)
     });
   }
 
-  google.script.run
-    .withSuccessHandler(function(detail) {
+  requestBookDetailByStableIdentity_(
+    book,
+    function(detail) {
       if (!detail) {
         if (key) {
           settleBookDetailInFlight_(key, null, null);
@@ -697,15 +780,15 @@ function fetchDeferredBookDetails_(book, index, dataArr, seriesContext, options)
       } else {
         handleDeferredBookDetailResult_(book, index, dataArr, seriesContext, opt, detail, null);
       }
-    })
-    .withFailureHandler(function(err) {
+    },
+    function(err) {
       if (key) {
         settleBookDetailInFlight_(key, null, err);
       } else {
         handleDeferredBookDetailResult_(book, index, dataArr, seriesContext, opt, null, err);
       }
-    })
-    .getBookDetailByRowIndex(book.rowIndex);
+    }
+  );
 }
 
 function removeBookDetailPrefetchItems_(books) {
@@ -840,22 +923,20 @@ function fetchPopupContextBookDetails_(book, index, dataArr, seriesContext, opti
     }
   });
 
-  const rowIndexes = requestTargets
-    .map(target => target.book && target.book.rowIndex)
-    .filter(value => value !== undefined && value !== null)
-    .join(',');
-
-  google.script.run
-    .withSuccessHandler(function(details) {
-      const detailByRowIndex = new Map();
+  requestBookDetailsByStableIdentities_(
+    requestTargets.map(target => target.book),
+    function(details, usedBookIds) {
+      const detailByIdentity = new Map();
       (Array.isArray(details) ? details : []).forEach(detail => {
-        if (detail && detail.rowIndex !== undefined && detail.rowIndex !== null) {
-          detailByRowIndex.set(String(detail.rowIndex), detail);
+        const identity = usedBookIds ? detail && detail.bookId : detail && detail.rowIndex;
+        if (identity !== undefined && identity !== null && identity !== '') {
+          detailByIdentity.set(String(identity), detail);
         }
       });
 
       requestTargets.forEach(target => {
-        const detail = detailByRowIndex.get(String(target.book.rowIndex));
+        const identity = usedBookIds ? target.book.bookId : target.book.rowIndex;
+        const detail = detailByIdentity.get(String(identity));
         const key = getBookDetailCacheKey_(target.book);
         if (detail) rememberBookDetail_(target.book, detail);
         if (key) {
@@ -864,8 +945,8 @@ function fetchPopupContextBookDetails_(book, index, dataArr, seriesContext, opti
           handlePopupContextBookDetailResult_(target, dataArr, seriesContext, detail || null, null);
         }
       });
-    })
-    .withFailureHandler(function(err) {
+    },
+    function(err) {
       requestTargets.forEach(target => {
         const key = getBookDetailCacheKey_(target.book);
         if (key) {
@@ -874,8 +955,8 @@ function fetchPopupContextBookDetails_(book, index, dataArr, seriesContext, opti
           handlePopupContextBookDetailResult_(target, dataArr, seriesContext, null, err);
         }
       });
-    })
-    .getBookDetailsByRowIndexes(rowIndexes);
+    }
+  );
 }
 
 function clearPopupNeighborDetailTimer_() {
@@ -965,22 +1046,20 @@ function processBookDetailPrefetchQueue_() {
     }
   });
 
-  const rowIndexes = batch
-    .map(book => book && book.rowIndex)
-    .filter(value => value !== undefined && value !== null)
-    .join(',');
-
-  google.script.run
-    .withSuccessHandler(function(details) {
-      const detailByRowIndex = new Map();
+  requestBookDetailsByStableIdentities_(
+    batch,
+    function(details, usedBookIds) {
+      const detailByIdentity = new Map();
       (Array.isArray(details) ? details : []).forEach(detail => {
-        if (detail && detail.rowIndex !== undefined && detail.rowIndex !== null) {
-          detailByRowIndex.set(String(detail.rowIndex), detail);
+        const identity = usedBookIds ? detail && detail.bookId : detail && detail.rowIndex;
+        if (identity !== undefined && identity !== null && identity !== '') {
+          detailByIdentity.set(String(identity), detail);
         }
       });
 
       batch.forEach(book => {
-        const detail = detailByRowIndex.get(String(book.rowIndex));
+        const identity = usedBookIds ? book.bookId : book.rowIndex;
+        const detail = detailByIdentity.get(String(identity));
         const key = getBookDetailCacheKey_(book);
         if (detail) rememberBookDetail_(book, detail);
         if (key) {
@@ -989,8 +1068,8 @@ function processBookDetailPrefetchQueue_() {
           handleDeferredBookDetailResult_(book, -1, null, null, { prefetch: true }, detail || null, null);
         }
       });
-    })
-    .withFailureHandler(function(err) {
+    },
+    function(err) {
       batch.forEach(book => {
         const key = getBookDetailCacheKey_(book);
         if (key) {
@@ -999,8 +1078,8 @@ function processBookDetailPrefetchQueue_() {
           handleDeferredBookDetailResult_(book, -1, null, null, { prefetch: true }, null, err);
         }
       });
-    })
-    .getBookDetailsByRowIndexes(rowIndexes);
+    }
+  );
 
   window.setTimeout(function waitForPrefetchBatch_() {
     const stillLoading = batch.some(book => book && book.detailLoading);
@@ -1690,6 +1769,9 @@ function showSeriesPanel(sourceBook, seriesBooks, returnContext) {
 
 function isCurrentSeriesBook_(sourceBook, item) {
   if (!sourceBook || !item) return false;
+  if (hasDisplayValue_(sourceBook.bookId) && hasDisplayValue_(item.bookId)) {
+    return String(sourceBook.bookId) === String(item.bookId);
+  }
   if (hasDisplayValue_(sourceBook.rowIndex) && hasDisplayValue_(item.rowIndex)) {
     return String(sourceBook.rowIndex) === String(item.rowIndex);
   }

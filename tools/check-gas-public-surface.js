@@ -26,6 +26,8 @@ const ALLOWED_PUBLIC_GAS_FUNCTIONS = new Set([
   'getBookshelfBooksChunk',
   'getBookDetailByRowIndex',
   'getBookDetailsByRowIndexes',
+  'getBookDetailById',
+  'getBookDetailsByIds',
   'getSeriesInventoryStatus',
   'getBooksBySeriesKey',
 

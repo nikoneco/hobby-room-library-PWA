@@ -29,6 +29,7 @@ function enrichNewBooksAfterImportByLimit_(limit) {
 
     const yomigana = fillMissingYomiganaForImport_(sheet, batchLimit);
     const series = refreshSeriesKeyAutoForImport_(sheet);
+    const bookUuids = repairBookUuidsAll_(sheet);
     const synopsis = batchFetchSynopsisRawByLimit_(batchLimit);
     const fallbackImage = batchFillFallbackImageUrlsByLimit_(batchLimit, {
       retryFailed: false
@@ -41,12 +42,13 @@ function enrichNewBooksAfterImportByLimit_(limit) {
       limit: batchLimit,
       yomigana,
       series,
+      bookUuids,
       synopsis,
       fallbackImage
     };
 
     SpreadsheetApp.getActive().toast(
-      `New book import: yomi ${yomigana.changed} / series ${series.changed} / synopsis ${synopsis.processed} / image ${fallbackImage.processed}`
+      `New book import: yomi ${yomigana.changed} / series ${series.changed} / UUID ${bookUuids.changed} / synopsis ${synopsis.processed} / image ${fallbackImage.processed}`
     );
 
     console.log(JSON.stringify(result));

@@ -6,7 +6,7 @@
   const LOCAL_INDEX_DB_NAME = 'shumiLibrary.localIndex.v1';
   const LOCAL_INDEX_STORE_NAME = 'snapshots';
   const LOCAL_INDEX_ACTIVE_KEY = 'active';
-  const LOCAL_INDEX_SCHEMA_VERSION = 3;
+  const LOCAL_INDEX_SCHEMA_VERSION = 4;
   const LOCAL_INDEX_CHECK_INTERVAL_MS = 15 * 60 * 1000;
   const LOCAL_INDEX_CHECK_THROTTLE_MS = 5 * 60 * 1000;
 
@@ -58,6 +58,8 @@
     getAllBooks: { api: 'shelf', argNames: [] },
     getBookshelfBooks: { api: 'shelf', argNames: [] },
     getBookshelfBooksChunk: { api: 'shelfChunk', argNames: ['offset', 'limit'] },
+    getBookDetailById: { api: 'bookDetailById', argNames: ['bookId'] },
+    getBookDetailsByIds: { api: 'bookDetailsByIds', argNames: ['bookIds'] },
     getBookDetailByRowIndex: { api: 'bookDetail', argNames: ['rowIndex'] },
     getBookDetailsByRowIndexes: { api: 'bookDetails', argNames: ['rowIndexes'] },
     getSeriesInventoryStatus: { api: 'seriesStatus', argNames: [] },
@@ -283,6 +285,7 @@
 
   let localIndexPayload = null;
   let localIndexRecords = [];
+  let localIndexByBookId = new Map();
   let localIndexByRowIndex = new Map();
   let localIndexLoadPromise = null;
   let localIndexRefreshPromise = null;
@@ -459,46 +462,47 @@
     }
 
     return payload.records.map(function(record) {
-      if (!Array.isArray(record) || record.length < 30) {
+      if (!Array.isArray(record) || record.length < 31) {
         throw createError_('ローカル索引のレコードが壊れています。', 'LOCAL_INDEX_RECORD_INVALID');
       }
-      const story = Array.isArray(record[26]) ? record[26] : [];
-      const theme = Array.isArray(record[27]) ? record[27] : [];
-      const mood = Array.isArray(record[28]) ? record[28] : [];
-      const status = Array.isArray(record[29]) ? record[29] : [];
+      const story = Array.isArray(record[27]) ? record[27] : [];
+      const theme = Array.isArray(record[28]) ? record[28] : [];
+      const mood = Array.isArray(record[29]) ? record[29] : [];
+      const status = Array.isArray(record[30]) ? record[30] : [];
       return {
         book: {
           rowIndex: Number(record[0]),
+          bookId: String(record[1] || ''),
           detailLoaded: false,
-          title: String(record[1] || ''),
-          author: String(record[2] || ''),
-          publisher: String(record[3] || ''),
-          shelf: String(record[4] || ''),
-          location: String(record[5] || ''),
-          released: String(record[6] || ''),
-          brand: String(record[7] || ''),
-          isbn: String(record[8] || ''),
-          yomi: String(record[9] || ''),
-          genre: String(record[10] || ''),
+          title: String(record[2] || ''),
+          author: String(record[3] || ''),
+          publisher: String(record[4] || ''),
+          shelf: String(record[5] || ''),
+          location: String(record[6] || ''),
+          released: String(record[7] || ''),
+          brand: String(record[8] || ''),
+          isbn: String(record[9] || ''),
+          yomi: String(record[10] || ''),
+          genre: String(record[11] || ''),
           genreMeta: buildGenreMetaLocal_(story, theme, mood, status),
-          seriesKeyAuto: String(record[11] || ''),
-          seriesCount: Number(record[12] || 0),
-          seriesSearchTitle: String(record[13] || ''),
-          isExtraSeries: Boolean(record[14]),
-          volume: record[15] || 0,
-          ownedMaxVolume: record[16] || 0,
-          fallbackImg: String(record[17] || ''),
-          fallbackImageSource: String(record[18] || ''),
-          isSensitive: Boolean(record[19])
+          seriesKeyAuto: String(record[12] || ''),
+          seriesCount: Number(record[13] || 0),
+          seriesSearchTitle: String(record[14] || ''),
+          isExtraSeries: Boolean(record[15]),
+          volume: record[16] || 0,
+          ownedMaxVolume: record[17] || 0,
+          fallbackImg: String(record[18] || ''),
+          fallbackImageSource: String(record[19] || ''),
+          isSensitive: Boolean(record[20])
         },
         index: {
-          title: String(record[20] || ''),
-          yomi: String(record[21] || ''),
-          author: String(record[22] || ''),
-          searchKey: String(record[23] || ''),
-          publisher: String(record[24] || ''),
-          releasedYm: Number(record[25] || 0),
-          isSensitive: Boolean(record[19]),
+          title: String(record[21] || ''),
+          yomi: String(record[22] || ''),
+          author: String(record[23] || ''),
+          searchKey: String(record[24] || ''),
+          publisher: String(record[25] || ''),
+          releasedYm: Number(record[26] || 0),
+          isSensitive: Boolean(record[20]),
           genres: { story: story, theme: theme, mood: mood, status: status }
         }
       };
@@ -654,8 +658,10 @@
     const converted = convertLocalIndexPayload_(payload);
     localIndexPayload = payload;
     localIndexRecords = converted;
+    localIndexByBookId = new Map();
     localIndexByRowIndex = new Map();
     converted.forEach(function(record) {
+      if (record.book.bookId) localIndexByBookId.set(String(record.book.bookId), record);
       localIndexByRowIndex.set(Number(record.book.rowIndex), record);
     });
     dispatchLocalIndexReady_(updated);
@@ -740,6 +746,10 @@
     getRevision: function() { return localIndexPayload ? String(localIndexPayload.revision || '') : ''; },
     getRecordCount: function() { return localIndexRecords.length; },
     getPreviewIndex: function() { return localIndexRecords.map(function(record) { return record.index; }); },
+    getBookById: function(bookId) {
+      const record = localIndexByBookId.get(String(bookId || ''));
+      return record ? cloneLocalBook_(record) : null;
+    },
     getBookByRowIndex: function(rowIndex) {
       const record = localIndexByRowIndex.get(Number(rowIndex));
       return record ? cloneLocalBook_(record) : null;

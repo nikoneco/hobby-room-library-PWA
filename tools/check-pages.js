@@ -325,9 +325,10 @@ assert(gasRunShim.includes("window.addEventListener('focus'"), 'Pages client che
 assert(gasRunShim.includes("document.addEventListener('visibilitychange'"), 'Pages client checks the local index when visible again');
 assert(gasRunShim.includes("window.addEventListener('online'"), 'Pages client checks the local index when connectivity returns');
 assert(gasRunShim.includes('LOCAL_INDEX_CHECK_INTERVAL_MS'), 'Pages client periodically checks the local index while active');
-assert(gasRunShim.includes('const LOCAL_INDEX_SCHEMA_VERSION = 3'), 'Pages client invalidates the previous local-index schema');
+assert(gasRunShim.includes('const LOCAL_INDEX_SCHEMA_VERSION = 4'), 'Pages client invalidates the previous local-index schema');
 assert(gasRunShim.includes("getSeriesInventoryStatus: { api: 'seriesStatus', argNames: [] }"), 'Pages client maps the series status read API');
 assert(gasRunShim.includes('getMetadata: function()'), 'Pages client exposes locally stored search metadata');
+assert(gasRunShim.includes('getBookById: function(bookId)'), 'Pages client exposes local book metadata by stable ID');
 assert(gasRunShim.includes('getBookByRowIndex: function(rowIndex)'), 'Pages client exposes local book metadata for immediate popup rendering');
 assert(gasRunShim.includes('whenLoaded: function()'), 'Pages client allows initial UI data to await IndexedDB');
 assert(pwaClient.includes("'popup.detailLoading': 'あらすじを読み込んでいます'"), 'popup loading text identifies the deferred synopsis precisely');
@@ -493,17 +494,33 @@ assert(shelfChunkUrl.searchParams.has('limitB64'), 'JSONP shim serializes shelf 
 
 sandboxWindow.google.script.run
   .withSuccessHandler(() => {})
+  .getBookDetailById('11111111-1111-4111-8111-111111111111');
+assert(appendedScripts.length === 5, 'JSONP shim appends one script for stable-ID book detail');
+const bookDetailByIdUrl = new URL(appendedScripts[4].src);
+assert(bookDetailByIdUrl.searchParams.get('api') === 'bookDetailById', 'JSONP shim maps getBookDetailById');
+assert(bookDetailByIdUrl.searchParams.has('bookIdB64'), 'JSONP shim serializes stable book ID');
+
+sandboxWindow.google.script.run
+  .withSuccessHandler(() => {})
+  .getBookDetailsByIds('11111111-1111-4111-8111-111111111111,22222222-2222-4222-8222-222222222222');
+assert(appendedScripts.length === 6, 'JSONP shim appends one script for stable-ID detail batch');
+const bookDetailsByIdsUrl = new URL(appendedScripts[5].src);
+assert(bookDetailsByIdsUrl.searchParams.get('api') === 'bookDetailsByIds', 'JSONP shim maps getBookDetailsByIds');
+assert(bookDetailsByIdsUrl.searchParams.has('bookIdsB64'), 'JSONP shim serializes stable book IDs');
+
+sandboxWindow.google.script.run
+  .withSuccessHandler(() => {})
   .getBookDetailByRowIndex(12);
-assert(appendedScripts.length === 5, 'JSONP shim appends one script for book detail');
-const bookDetailUrl = new URL(appendedScripts[4].src);
+assert(appendedScripts.length === 7, 'JSONP shim appends one script for legacy row-index detail');
+const bookDetailUrl = new URL(appendedScripts[6].src);
 assert(bookDetailUrl.searchParams.get('api') === 'bookDetail', 'JSONP shim maps getBookDetailByRowIndex');
 assert(bookDetailUrl.searchParams.has('rowIndexB64'), 'JSONP shim serializes book detail row index');
 
 sandboxWindow.google.script.run
   .withSuccessHandler(() => {})
   .searchBooksSimple('');
-assert(appendedScripts.length === 6, 'JSONP shim appends one script for blank search');
-const blankSearchUrl = new URL(appendedScripts[5].src);
+assert(appendedScripts.length === 8, 'JSONP shim appends one script for blank search');
+const blankSearchUrl = new URL(appendedScripts[7].src);
 assert(blankSearchUrl.searchParams.get('api') === 'shelf', 'JSONP shim maps blank search to shelf');
 assert(!blankSearchUrl.searchParams.has('keyword'), 'JSONP shim omits blank keyword');
 

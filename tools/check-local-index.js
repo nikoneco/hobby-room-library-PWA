@@ -11,7 +11,7 @@ function assert(condition, message) {
 
 function createPayload() {
   return {
-    version: 3,
+    version: 4,
     revision: 'fixture-revision',
     metadata: {
       suggest: {
@@ -38,28 +38,28 @@ function createPayload() {
     columns: [],
     records: [
       [
-        0, '【推しの子】 1', '赤坂アカ×横槍メンゴ', '集英社', 'A', '1-1', '2020/07', 'ヤングジャンプ',
+        0, '11111111-1111-4111-8111-111111111111', '【推しの子】 1', '赤坂アカ×横槍メンゴ', '集英社', 'A', '1-1', '2020/07', 'ヤングジャンプ',
         '9784088916507', 'おしのこ', '芸能,連載中', '推しの子', 2, '【推しの子】', false, 1, 2,
         '', '', false,
         '推しの子1', 'おしのこ', '赤坂あか×横槍めんご', '推しの子1おしのこ赤坂あか×横槍めんご', '集英社', 202007,
         [], ['芸能'], [], ['連載中']
       ],
       [
-        1, '【推しの子】 2', '赤坂アカ×横槍メンゴ', '集英社', 'A', '1-2', '2020/10', 'ヤングジャンプ',
+        1, '22222222-2222-4222-8222-222222222222', '【推しの子】 2', '赤坂アカ×横槍メンゴ', '集英社', 'A', '1-2', '2020/10', 'ヤングジャンプ',
         '9784088917177', 'おしのこ', '芸能,連載中', '推しの子', 2, '【推しの子】', false, 2, 2,
         '', '', false,
         '推しの子2', 'おしのこ', '赤坂あか×横槍めんご', '推しの子2おしのこ赤坂あか×横槍めんご', '集英社', 202010,
         [], ['芸能'], [], ['連載中']
       ],
       [
-        2, '葬送のフリーレン 1', '山田鐘人', '小学館', 'B', '2-1', '2020/08', '少年サンデー',
+        2, '33333333-3333-4333-8333-333333333333', '葬送のフリーレン 1', '山田鐘人', '小学館', 'B', '2-1', '2020/08', '少年サンデー',
         '9784098501809', 'そうそうのふりーれん', 'ファンタジー,連載中', '葬送のフリーレン', 1, '葬送のフリーレン', false, 1, 1,
         '', '', false,
         '葬送のふりーれん1', 'そうそうのふりーれん', '山田鐘人', '葬送のふりーれん1 そうそうのふりーれん 山田鐘人', '小学館', 202008,
         ['ファンタジー'], [], [], ['連載中']
       ],
       [
-        3, 'センシティブ本 1', 'テスト作者', '同人出版社', 'C', '3-1', '2024/01', '自主制作',
+        3, '44444444-4444-4444-8444-444444444444', 'センシティブ本 1', 'テスト作者', '同人出版社', 'C', '3-1', '2024/01', '自主制作',
         '', 'せんしてぃぶほん', '18禁,恋愛', 'センシティブ本', 1, 'センシティブ本', false, 1, 1,
         '', '', true,
         'せんしてぃぶ本1', 'せんしてぃぶほん', 'てすとさくしゃ', 'せんしてぃぶ本1 せんしてぃぶほん てすとさくしゃ', '同人出版社', 202401,
@@ -116,7 +116,7 @@ function invoke(runner, method, args) {
   const payload = createPayload();
   const stored = {
     key: 'active',
-    schemaVersion: 3,
+    schemaVersion: 4,
     revision: payload.revision,
     payload
   };
@@ -180,6 +180,8 @@ function invoke(runner, method, args) {
   assert(metadata.quickBrowseCounts.status['連載中'] === 3, 'stored index exposes quick-browse counts');
   const indexedBook = sandboxWindow.ShumiLibraryLocalIndex.getBookByRowIndex(1);
   assert(indexedBook && indexedBook.title === '【推しの子】 2', 'stored index exposes a book by row index');
+  const indexedBookById = sandboxWindow.ShumiLibraryLocalIndex.getBookById('22222222-2222-4222-8222-222222222222');
+  assert(indexedBookById && indexedBookById.title === '【推しの子】 2', 'stored index exposes a book by stable ID');
   assert(indexedBook.genreMeta.some(item => item.name === '芸能'), 'row lookup preserves locally stored genres');
   assert(documentEvents.some(event => event.type === 'shumi-library-local-index-ready'), 'stored index emits a ready event');
 
