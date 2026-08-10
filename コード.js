@@ -22,8 +22,23 @@ function onEdit(e) {
   const row = e.range.getRow();
   const col = e.range.getColumn();
   const colEnd = col + e.range.getNumColumns() - 1;
-  const { MAIN } = CONFIG.SHEETS;
+  const { MAIN, SERIES_MASTER } = CONFIG.SHEETS;
   const shouldClearSearchCache = shouldClearLibrarySearchCacheOnEdit_(sheetName, e.range);
+  const rowEnd = row + e.range.getNumRows() - 1;
+  const touchesMainTitle =
+    sheetName === MAIN &&
+    rowEnd >= 2 &&
+    col <= CONFIG.COL.TITLE &&
+    colEnd >= CONFIG.COL.TITLE;
+  const touchesMainGenre =
+    sheetName === MAIN &&
+    col <= CONFIG.COL.GENRE &&
+    colEnd >= CONFIG.COL.GENRE;
+  const touchesSeriesMasterSource =
+    sheetName === SERIES_MASTER &&
+    rowEnd >= 2 &&
+    col <= SERIES_KEY_AUTO_CONFIG_.MASTER_GENRE_LAST_COL &&
+    colEnd >= SERIES_KEY_AUTO_CONFIG_.MASTER_REGISTERED_KEY_COL;
   // 本棚シート（A1）のモード切り替え
   if (sheetName === MAIN && notation === 'A1') {
     switch (value) {
@@ -50,12 +65,15 @@ function onEdit(e) {
     markSynopsisManualOnEdit_(e);
   }
 
-  if (
-    sheetName === MAIN &&
-    row >= 2 &&
-    col <= CONFIG.COL.TITLE &&
-    colEnd >= CONFIG.COL.TITLE
-  ) {
+  let seriesKeyRefreshError = null;
+  if (touchesSeriesMasterSource || touchesMainGenre) {
+    try {
+      refreshSeriesKeyAutoAfterDerivedChange_(getSheet(MAIN));
+    } catch (error) {
+      seriesKeyRefreshError = error;
+      console.error('series_key_auto refresh failed after derived genre edit:', error);
+    }
+  } else if (touchesMainTitle) {
     updateSeriesKeyAutoForEditedRange_(sh, e.range);
   }
 
@@ -73,6 +91,7 @@ function onEdit(e) {
 
   // 派生列の更新後に破棄し、更新途中のデータが新キャッシュへ戻る窓を狭める。
   if (shouldClearSearchCache) clearLibrarySearchCache_();
+  if (seriesKeyRefreshError) throw seriesKeyRefreshError;
 }
 
 function createUniqueBookUuid_(usedUuids) {
@@ -259,22 +278,259 @@ function shouldClearLibrarySearchCacheOnEdit_(sheetName, range) {
 }
 
 
+function normalizeSeriesMasterLookupKey_(value) {
+  return String(value || '')
+    .replace(/　/g, ' ')
+    .trim()
+    .replace(/\s+/g, ' ')
+    .toLowerCase();
+}
+
+/**
+ * 目録W列のARRAYFORMULAと同じ規則で、タイトルからseries_master検索キーを作る。
+ * W列はタイトルの先頭空白区切り要素だけをXLOOKUPへ渡している。
+ */
+function extractSeriesMasterLookupKeyFromTitle_(title) {
+  const normalized = normalizeSeriesMasterLookupKey_(title);
+  if (!normalized) return '';
+
+  return normalized.split(' ')[0];
+}
+
+/**
+ * series_master B:Gから、W列と同じ「先勝ち」の資料系判定表を構築する。
+ * XLOOKUPは最初の一致を返すため、重複キーを後勝ちで上書きしない。
+ */
+function buildSeriesMasterExtraLookup_(masterRows) {
+  const lookup = new Map();
+  const firstGenreIndex =
+    SERIES_KEY_AUTO_CONFIG_.MASTER_GENRE_FIRST_COL -
+    SERIES_KEY_AUTO_CONFIG_.MASTER_REGISTERED_KEY_COL;
+  const lastGenreIndexExclusive =
+    SERIES_KEY_AUTO_CONFIG_.MASTER_GENRE_LAST_COL -
+    SERIES_KEY_AUTO_CONFIG_.MASTER_REGISTERED_KEY_COL +
+    1;
+  (Array.isArray(masterRows) ? masterRows : []).forEach(row => {
+    const values = Array.isArray(row) ? row : [];
+    const key = normalizeSeriesMasterLookupKey_(values[0]);
+    if (!key || lookup.has(key)) return;
+
+    lookup.set(
+      key,
+      values
+        .slice(firstGenreIndex, lastGenreIndexExclusive)
+        .map(value => String(value || '').trim())
+        .includes(SERIES_KEY_AUTO_CONFIG_.EXTRA_GENRE)
+    );
+  });
+  return lookup;
+}
+
+function loadSeriesMasterExtraLookup_() {
+  const masterSheet = getSheet(CONFIG.SHEETS.SERIES_MASTER);
+  const keyCol = SERIES_KEY_AUTO_CONFIG_.MASTER_REGISTERED_KEY_COL;
+  const lastRow = getLastDataRow(masterSheet, keyCol);
+  if (lastRow < 2) return new Map();
+
+  const width =
+    SERIES_KEY_AUTO_CONFIG_.MASTER_GENRE_LAST_COL -
+    SERIES_KEY_AUTO_CONFIG_.MASTER_REGISTERED_KEY_COL +
+    1;
+  const rows = masterSheet
+    .getRange(2, keyCol, lastRow - 1, width)
+    .getDisplayValues();
+  return buildSeriesMasterExtraLookup_(rows);
+}
+
+function buildSeriesKeyAutoRepairPlan_(titles, genres, currentKeys, extraLookup) {
+  const titleValues = Array.isArray(titles) ? titles : [];
+  const genreValues = Array.isArray(genres) ? genres : [];
+  const keyValues = Array.isArray(currentKeys) ? currentKeys : [];
+  const rowCount = Math.max(titleValues.length, genreValues.length, keyValues.length);
+  const lookup = extraLookup instanceof Map ? extraLookup : null;
+  const values = [];
+  const changedIndices = [];
+  let extraCount = 0;
+
+  for (let index = 0; index < rowCount; index++) {
+    const titleRow = titleValues[index];
+    const genreRow = genreValues[index];
+    const keyRow = keyValues[index];
+    const title = String(Array.isArray(titleRow) ? titleRow[0] || '' : titleRow || '');
+    const genresRaw = Array.isArray(genreRow) ? genreRow[0] || '' : genreRow || '';
+    const currentKey = String(Array.isArray(keyRow) ? keyRow[0] || '' : keyRow || '');
+    const lookupKey = extractSeriesMasterLookupKeyFromTitle_(title);
+    const isExtra = lookup
+      ? lookup.get(lookupKey) === true
+      : isExtraBookByGenres_(genresRaw);
+    const nextKey = title
+      ? (isExtra ? generateExtraSeriesKey_(title) : generateSeriesKeyAuto(title))
+      : '';
+
+    if (isExtra && title) extraCount++;
+    values.push([nextKey]);
+    if (currentKey !== nextKey) changedIndices.push(index);
+  }
+
+  return {
+    values,
+    changedIndices,
+    changed: changedIndices.length,
+    extraCount
+  };
+}
+
+/**
+ * 変更行だけを連続範囲へまとめて書く。変更なしではsetValuesを呼ばない。
+ */
+function writeSeriesKeyAutoRepairPlan_(sheet, startRow, plan) {
+  const changedIndices = Array.isArray(plan && plan.changedIndices)
+    ? plan.changedIndices
+    : [];
+  const updatedRanges = [];
+  if (!changedIndices.length) return updatedRanges;
+
+  let runStart = changedIndices[0];
+  let runEnd = runStart;
+
+  const writeRun = function(firstIndex, lastIndex) {
+    const rowCount = lastIndex - firstIndex + 1;
+    const firstRow = startRow + firstIndex;
+    sheet
+      .getRange(firstRow, CONFIG.COL.SERIES_KEY_AUTO, rowCount, 1)
+      .setValues(plan.values.slice(firstIndex, lastIndex + 1));
+    updatedRanges.push({
+      startRow: firstRow,
+      endRow: firstRow + rowCount - 1
+    });
+  };
+
+  for (let index = 1; index < changedIndices.length; index++) {
+    const current = changedIndices[index];
+    if (current === runEnd + 1) {
+      runEnd = current;
+      continue;
+    }
+    writeRun(runStart, runEnd);
+    runStart = current;
+    runEnd = current;
+  }
+  writeRun(runStart, runEnd);
+  return updatedRanges;
+}
+
+function buildSeriesKeyAutoSheetPlan_(sheet, startRow, rowCount, extraLookup) {
+  if (rowCount <= 0) {
+    return {
+      values: [],
+      changedIndices: [],
+      changed: 0,
+      extraCount: 0,
+      checked: 0,
+      startRow
+    };
+  }
+
+  const titles = sheet
+    .getRange(startRow, CONFIG.COL.TITLE, rowCount, 1)
+    .getValues();
+  const genres = sheet
+    .getRange(startRow, CONFIG.COL.GENRE, rowCount, 1)
+    .getDisplayValues();
+  const currentKeys = sheet
+    .getRange(startRow, CONFIG.COL.SERIES_KEY_AUTO, rowCount, 1)
+    .getValues();
+  const plan = buildSeriesKeyAutoRepairPlan_(titles, genres, currentKeys, extraLookup);
+  plan.checked = rowCount;
+  plan.startRow = startRow;
+  return plan;
+}
+
+function repairSeriesKeyAutoRange_(sheet, startRow, rowCount, extraLookup) {
+  const lookup = extraLookup instanceof Map
+    ? extraLookup
+    : loadSeriesMasterExtraLookup_();
+  const plan = buildSeriesKeyAutoSheetPlan_(sheet, startRow, rowCount, lookup);
+  plan.updatedRanges = writeSeriesKeyAutoRepairPlan_(sheet, startRow, plan);
+  return plan;
+}
+
+function repairSeriesKeyAutoAll_(sheet) {
+  const sh = sheet || getSheet(CONFIG.SHEETS.MAIN);
+  const lastRow = getLastDataRow(sh, CONFIG.COL.TITLE);
+  if (lastRow < 2) return repairSeriesKeyAutoRange_(sh, 2, 0, new Map());
+  return repairSeriesKeyAutoRange_(
+    sh,
+    2,
+    lastRow - 1,
+    loadSeriesMasterExtraLookup_()
+  );
+}
+
+function summarizeSeriesKeyAutoPlan_(plan) {
+  const changedIndices = Array.isArray(plan && plan.changedIndices)
+    ? plan.changedIndices
+    : [];
+  const startRow = Number(plan && plan.startRow || 2);
+  const rowNumbers = changedIndices.slice(0, 100).map(index => startRow + index);
+  return {
+    checked: Number(plan && plan.checked || 0),
+    changed: changedIndices.length,
+    extraCount: Number(plan && plan.extraCount || 0),
+    changedRows: rowNumbers,
+    truncated: changedIndices.length > rowNumbers.length
+  };
+}
+
+function auditSeriesKeyAutoConsistency_() {
+  const sheet = getSheet(CONFIG.SHEETS.MAIN);
+  const lastRow = getLastDataRow(sheet, CONFIG.COL.TITLE);
+  const plan = buildSeriesKeyAutoSheetPlan_(
+    sheet,
+    2,
+    Math.max(0, lastRow - 1),
+    loadSeriesMasterExtraLookup_()
+  );
+  return summarizeSeriesKeyAutoPlan_(plan);
+}
+
+function markSeriesKeyAutoDirty_() {
+  try {
+    PropertiesService.getScriptProperties().setProperty(
+      SERIES_KEY_AUTO_CONFIG_.DIRTY_PROPERTY,
+      String(Date.now())
+    );
+    return true;
+  } catch (error) {
+    console.error('markSeriesKeyAutoDirty_ error:', error);
+    return false;
+  }
+}
+
+function clearSeriesKeyAutoDirty_() {
+  try {
+    PropertiesService.getScriptProperties().deleteProperty(
+      SERIES_KEY_AUTO_CONFIG_.DIRTY_PROPERTY
+    );
+    return true;
+  } catch (error) {
+    console.error('clearSeriesKeyAutoDirty_ error:', error);
+    return false;
+  }
+}
+
+function refreshSeriesKeyAutoAfterDerivedChange_(sheet) {
+  markSeriesKeyAutoDirty_();
+  SpreadsheetApp.flush();
+  const result = repairSeriesKeyAutoAll_(sheet || getSheet(CONFIG.SHEETS.MAIN));
+  SpreadsheetApp.flush();
+  clearSeriesKeyAutoDirty_();
+  return result;
+}
+
 function updateSeriesKeyAutoForRow_(sheet, row) {
-
-  const title = sheet.getRange(row, CONFIG.COL.TITLE).getValue();
-  if (!title) return;   // 空なら何もしない
-
-  const genresRaw = sheet.getRange(row, CONFIG.COL.GENRE).getValue();
-  const key = isExtraBookByGenres_(genresRaw)
-  ? generateExtraSeriesKey_(title)
-  : generateSeriesKeyAuto(title);
-
-  const cell = sheet.getRange(row, CONFIG.COL.SERIES_KEY_AUTO);
-  const current = cell.getValue();
-
-  if (current === key) return;   // 同じなら書かない（無駄onEdit防止）
-
-  cell.setValue(key);
+  if (row < 2) return { checked: 0, changed: 0 };
+  return repairSeriesKeyAutoRange_(sheet, row, 1, loadSeriesMasterExtraLookup_());
 }
 
 /**
@@ -287,35 +543,13 @@ function updateSeriesKeyAutoForEditedRange_(sheet, editedRange) {
   const startRow = Math.max(editedRange.getRow(), 2);
   const endRow = editedRange.getRow() + editedRange.getNumRows() - 1;
   const rowCount = endRow - startRow + 1;
-  if (rowCount <= 0) return;
-
-  const titles = sheet
-    .getRange(startRow, CONFIG.COL.TITLE, rowCount, 1)
-    .getValues();
-  const genres = sheet
-    .getRange(startRow, CONFIG.COL.GENRE, rowCount, 1)
-    .getValues();
-  const keyRange = sheet
-    .getRange(startRow, CONFIG.COL.SERIES_KEY_AUTO, rowCount, 1);
-  const currentKeys = keyRange.getValues();
-
-  let changed = false;
-  const nextKeys = titles.map((row, i) => {
-    const title = row[0] || '';
-    const genresRaw = genres[i][0] || '';
-    const key = title
-      ? (isExtraBookByGenres_(genresRaw)
-        ? generateExtraSeriesKey_(title)
-        : generateSeriesKeyAuto(title))
-      : '';
-
-    if (currentKeys[i][0] !== key) changed = true;
-    return [key];
-  });
-
-  if (changed) {
-    keyRange.setValues(nextKeys);
-  }
+  if (rowCount <= 0) return { checked: 0, changed: 0 };
+  return repairSeriesKeyAutoRange_(
+    sheet,
+    startRow,
+    rowCount,
+    loadSeriesMasterExtraLookup_()
+  );
 }
 
 /**
@@ -677,44 +911,16 @@ t = t.replace(/\s+\d+\s*.*$/i, '');
 function fillSeriesKeyAutoAll_() {
   const sheet = SpreadsheetApp.getActiveSpreadsheet()
     .getSheetByName(CONFIG.SHEETS.MAIN);
-
-  const lastRow = getLastDataRow(sheet, CONFIG.COL.TITLE);
-  if (lastRow < 2) return repairBookUuidsAll_(sheet);
-
-  const titleCol = CONFIG.COL.TITLE;
-  const genreCol = CONFIG.COL.GENRE;
-  const seriesKeyCol = CONFIG.COL.SERIES_KEY_AUTO;
-
-  const values = sheet
-    .getRange(2, 1, lastRow - 1, Math.max(titleCol, genreCol, seriesKeyCol))
-    .getValues();
-
-  const output = values.map(row => {
-    const title = row[titleCol - 1] || '';
-    const genresRaw = row[genreCol - 1] || '';
-
-    const key = isExtraBookByGenres_(genresRaw)
-      ? generateExtraSeriesKey_(title)
-      : generateSeriesKeyAuto(title);
-
-    return [key];
-  });
-
-  const currentOutput = values.map(row => [row[seriesKeyCol - 1] || '']);
-  const changed = output.some((row, index) => row[0] !== currentOutput[index][0]);
-  if (changed) {
-    sheet
-      .getRange(2, seriesKeyCol, output.length, 1)
-      .setValues(output);
-  }
-
+  const series = refreshSeriesKeyAutoAfterDerivedChange_(sheet);
   const bookUuids = repairBookUuidsAll_(sheet);
-  if (changed || bookUuids.changed > 0 || bookUuids.headerUpdated) {
+  if (series.changed > 0 || bookUuids.changed > 0 || bookUuids.headerUpdated) {
     SpreadsheetApp.flush();
     clearLibrarySearchCache_();
   }
   return {
-    updatedRows: changed ? output.length : 0,
+    updatedRows: series.changed > 0 ? series.checked : 0,
+    changedRows: series.changed,
+    series: summarizeSeriesKeyAutoPlan_(series),
     bookUuids
   };
 }

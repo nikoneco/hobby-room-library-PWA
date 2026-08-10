@@ -83,6 +83,15 @@ const CACHE_CONFIG = {
   BUILD_LOCK_WAIT_MS: 10000
 };
 
+/* ====== series_key_auto 整合性 ====== */
+const SERIES_KEY_AUTO_CONFIG_ = {
+  DIRTY_PROPERTY: 'series_key_auto_dirty_v1',
+  MASTER_REGISTERED_KEY_COL: 2, // series_master B列
+  MASTER_GENRE_FIRST_COL: 3,    // series_master C列
+  MASTER_GENRE_LAST_COL: 7,     // series_master G列
+  EXTRA_GENRE: '写真集/画集/資料集'
+};
+
 /* ====== 蔵書UUID ====== */
 const BOOK_UUID_PATTERN_ = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 

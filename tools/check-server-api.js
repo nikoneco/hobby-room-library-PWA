@@ -115,15 +115,43 @@ assert(
   /function\s+resetKoboNotFoundDoneToNotFound_\s*\([^)]*\)[\s\S]*?if\s*\(resetRows\)[\s\S]*?clearLibrarySearchCache_\(\);/.test(koboSynopsisSource),
   'resetting Kobo retry rows invalidates search and PWA detail caches'
 );
-assert(sheetCodeSource.includes('const changed = output.some') && sheetCodeSource.includes('clearLibrarySearchCache_();'), 'series-key batch invalidates cache only after actual changes');
+assert(configSource.includes("DIRTY_PROPERTY: 'series_key_auto_dirty_v1'"), 'series-key repair records an interrupted derived refresh');
+assert(sheetCodeSource.includes('function buildSeriesMasterExtraLookup_'), 'series-key repair reads the source series master directly');
+assert(
+  /function\s+writeSeriesKeyAutoRepairPlan_\s*\([^)]*\)[\s\S]*?if\s*\(!changedIndices\.length\)\s*return updatedRanges;/.test(sheetCodeSource),
+  'series-key repair performs no sheet write when every key is already current'
+);
+assert(
+  /function\s+fillSeriesKeyAutoAll_\s*\([^)]*\)[\s\S]*?if\s*\(series\.changed\s*>\s*0\s*\|\|[\s\S]*?clearLibrarySearchCache_\(\);/.test(sheetCodeSource),
+  'manual series-key repair invalidates caches only after an actual series or UUID change'
+);
+assert(
+  newBookImportSource.includes('return refreshSeriesKeyAutoAfterDerivedChange_('),
+  'new-book enrichment uses the central series-key consistency repair'
+);
 
 const onEditSource = sheetCodeSource.slice(
   sheetCodeSource.indexOf('function onEdit(e)'),
-  sheetCodeSource.indexOf('function shouldClearLibrarySearchCacheOnEdit_')
+  sheetCodeSource.indexOf('function createUniqueBookUuid_')
 );
 assert(
   onEditSource.lastIndexOf('clearLibrarySearchCache_();') > onEditSource.indexOf('updateSeriesKeyAutoForEditedRange_'),
   'onEdit invalidates cache after derived series-key updates'
+);
+assert(
+  onEditSource.lastIndexOf('clearLibrarySearchCache_();') > onEditSource.indexOf('refreshSeriesKeyAutoAfterDerivedChange_'),
+  'series-master and W-column edits repair every derived series key before cache invalidation'
+);
+assert(
+  onEditSource.includes('sheetName === SERIES_MASTER') &&
+    onEditSource.includes('SERIES_KEY_AUTO_CONFIG_.MASTER_REGISTERED_KEY_COL') &&
+    onEditSource.includes('SERIES_KEY_AUTO_CONFIG_.MASTER_GENRE_LAST_COL'),
+  'onEdit detects series_master source-column edits'
+);
+assert(
+  onEditSource.indexOf('if (seriesKeyRefreshError) throw seriesKeyRefreshError;') >
+    onEditSource.lastIndexOf('clearLibrarySearchCache_();'),
+  'a failed series-key repair still invalidates the stale search cache before surfacing the error'
 );
 assert(
   onEditSource.lastIndexOf('clearLibrarySearchCache_();') > onEditSource.indexOf('ensureBookUuidsForEditedRange_'),
@@ -558,6 +586,108 @@ assert(
   copiedUuidRepair.values[1][0] !== copiedUuidRepair.values[0][0],
   'editing a copied row preserves the original ID and allocates a new ID to the copy'
 );
+
+const seriesKeyFixture = vm.runInContext(`(() => {
+  const masterRows = [
+    ['通常作品', '青春', '', '', '', '連載中'],
+    ['資料作品', '写真集/画集/資料集', '', '', '', '単巻'],
+    ['重複作品', '青春', '', '', '', '連載中'],
+    ['重複作品', '写真集/画集/資料集', '', '', '', '単巻']
+  ];
+  const titles = [
+    ['通常作品 1'],
+    ['資料作品 1'],
+    ['資料作品 2'],
+    ['重複作品 1']
+  ];
+  const staleGenres = [['青春'], ['青春'], ['青春'], ['写真集/画集/資料集']];
+  const lookup = buildSeriesMasterExtraLookup_(masterRows);
+  const expected = titles.map(row => [
+    lookup.get(extractSeriesMasterLookupKeyFromTitle_(row[0])) === true
+      ? generateExtraSeriesKey_(row[0])
+      : generateSeriesKeyAuto(row[0])
+  ]);
+  const current = expected.map(row => row.slice());
+  current[1][0] = generateSeriesKeyAuto(titles[1][0]);
+  const plan = buildSeriesKeyAutoRepairPlan_(titles, staleGenres, current, lookup);
+
+  const flippedRows = [
+    ['通常作品', '写真集/画集/資料集', '', '', '', '単巻'],
+    ['資料作品', '青春', '', '', '', '連載中'],
+    ['重複作品', '青春', '', '', '', '連載中']
+  ];
+  const flippedLookup = buildSeriesMasterExtraLookup_(flippedRows);
+  const flippedPlan = buildSeriesKeyAutoRepairPlan_(titles, staleGenres, plan.values, flippedLookup);
+  const idempotentPlan = buildSeriesKeyAutoRepairPlan_(titles, staleGenres, flippedPlan.values, flippedLookup);
+  const genreFallbackPlan = buildSeriesKeyAutoRepairPlan_(
+    [['資料単巻 1'], ['通常単巻 1']],
+    [['写真集/画集/資料集'], ['青春']],
+    [[''], ['']]
+  );
+  const normalizedLookup = buildSeriesMasterExtraLookup_([
+    ['  資料作品　', '写真集/画集/資料集', '', '', '', '単巻']
+  ]);
+
+  return {
+    plan,
+    flippedPlan,
+    idempotentPlan,
+    genreFallbackPlan,
+    normalizedLookupMatches:
+      normalizedLookup.get(extractSeriesMasterLookupKeyFromTitle_('\t資料作品　 10')) === true
+  };
+})()`, uuidSandbox);
+assert(seriesKeyFixture.plan.changed === 1, 'series-key repair changes only a stale row');
+assert(seriesKeyFixture.plan.changedIndices[0] === 1, 'series-master classification wins over a temporarily stale W value');
+assert(
+  /^__extra__/.test(seriesKeyFixture.plan.values[1][0]) &&
+    /^__extra__/.test(seriesKeyFixture.plan.values[2][0]),
+  'photo, art, and reference books remain separated from their normal series'
+);
+assert(!/^__extra__/.test(seriesKeyFixture.plan.values[3][0]), 'duplicate series-master keys keep XLOOKUP first-match behavior');
+assert(
+  /^__extra__/.test(seriesKeyFixture.flippedPlan.values[0][0]) &&
+    !/^__extra__/.test(seriesKeyFixture.flippedPlan.values[1][0]),
+  'series-master changes converge in both normal-to-extra and extra-to-normal directions'
+);
+assert(seriesKeyFixture.idempotentPlan.changed === 0, 'series-key repair is idempotent after convergence');
+assert(
+  /^__extra__/.test(seriesKeyFixture.genreFallbackPlan.values[0][0]) &&
+    !/^__extra__/.test(seriesKeyFixture.genreFallbackPlan.values[1][0]),
+  'the pure repair plan retains W-column genre fallback behavior when no master lookup is supplied'
+);
+assert(seriesKeyFixture.normalizedLookupMatches, 'series-master lookup normalizes fullwidth and repeated whitespace like the W formula');
+
+const seriesKeyWrites = [];
+uuidSandbox.__seriesKeyWriteSheet = {
+  getRange(row, column, rowCount, columnCount) {
+    return {
+      setValues(values) {
+        seriesKeyWrites.push({ row, column, rowCount, columnCount, values });
+      }
+    };
+  }
+};
+uuidSandbox.__seriesKeyWritePlan = {
+  changedIndices: [1, 2, 4],
+  values: [['a'], ['b'], ['c'], ['d'], ['e']]
+};
+vm.runInContext(
+  'writeSeriesKeyAutoRepairPlan_(__seriesKeyWriteSheet, 2, __seriesKeyWritePlan)',
+  uuidSandbox
+);
+assert(seriesKeyWrites.length === 2, 'series-key writes coalesce adjacent changed rows without rewriting the full column');
+assert(
+  seriesKeyWrites[0].row === 3 && seriesKeyWrites[0].rowCount === 2 &&
+    seriesKeyWrites[1].row === 6 && seriesKeyWrites[1].rowCount === 1,
+  'series-key changed-row ranges preserve their original sheet positions'
+);
+uuidSandbox.__seriesKeyNoChangePlan = { changedIndices: [], values: [['a']] };
+vm.runInContext(
+  'writeSeriesKeyAutoRepairPlan_(__seriesKeyWriteSheet, 2, __seriesKeyNoChangePlan)',
+  uuidSandbox
+);
+assert(seriesKeyWrites.length === 2, 'an unchanged series-key audit performs zero writes');
 
 const compactSearchResult = vm.runInContext(`(() => {
   const rows = [];
