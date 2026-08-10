@@ -109,6 +109,11 @@ assert(pagesWorkflow.includes('node tools/check-client-js.js'), 'Pages workflow 
 assert(pagesWorkflow.includes('node tools/check-client-css.js'), 'Pages workflow checks client CSS before deploy');
 assert(pagesWorkflow.includes('node tools/check-pages.js'), 'Pages workflow checks static Pages artifact before deploy');
 assert(pagesWorkflow.includes('node tools/check-server-api.js'), 'Pages workflow checks GAS API surface before deploy');
+assert(pagesWorkflow.includes('node tools/check-gas-public-surface.js'), 'Pages workflow checks public GAS JSONP allowlist before deploy');
+assert(pagesWorkflow.includes('node tools/check-local-index.js'), 'Pages workflow checks local search index before deploy');
+assert(pagesWorkflow.includes("- '*.js'"), 'Pages workflow verifies root GAS JavaScript changes');
+assert(pagesWorkflow.includes('- appsscript.json'), 'Pages workflow verifies Apps Script manifest changes');
+assert(pagesWorkflow.includes('- .claspignore'), 'Pages workflow verifies clasp scope changes');
 assert(pagesWorkflow.includes('actions/upload-pages-artifact@v4'), 'Pages workflow uploads docs artifact');
 assert(pagesWorkflow.includes('path: docs'), 'Pages workflow deploys docs directory');
 assert(pagesWorkflow.includes('pages: write'), 'Pages workflow has pages write permission');

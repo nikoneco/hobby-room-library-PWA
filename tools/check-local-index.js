@@ -41,14 +41,14 @@ function createPayload() {
         0, '【推しの子】 1', '赤坂アカ×横槍メンゴ', '集英社', 'A', '1-1', '2020/07', 'ヤングジャンプ',
         '9784088916507', 'おしのこ', '芸能,連載中', '推しの子', 2, '【推しの子】', false, 1, 2,
         '', '', false,
-        '【推しの子】1', 'おしのこ', '赤坂あか×横槍めんご', '【推しの子】1 おしのこ 赤坂あか×横槍めんご', '集英社', 202007,
+        '推しの子1', 'おしのこ', '赤坂あか×横槍めんご', '推しの子1おしのこ赤坂あか×横槍めんご', '集英社', 202007,
         [], ['芸能'], [], ['連載中']
       ],
       [
         1, '【推しの子】 2', '赤坂アカ×横槍メンゴ', '集英社', 'A', '1-2', '2020/10', 'ヤングジャンプ',
         '9784088917177', 'おしのこ', '芸能,連載中', '推しの子', 2, '【推しの子】', false, 2, 2,
         '', '', false,
-        '【推しの子】2', 'おしのこ', '赤坂あか×横槍めんご', '【推しの子】2 おしのこ 赤坂あか×横槍めんご', '集英社', 202010,
+        '推しの子2', 'おしのこ', '赤坂あか×横槍めんご', '推しの子2おしのこ赤坂あか×横槍めんご', '集英社', 202010,
         [], ['芸能'], [], ['連載中']
       ],
       [
@@ -187,6 +187,8 @@ function invoke(runner, method, args) {
   const simple = await invoke(runner, 'searchBooksSimple', ['推しの子']);
   assert(simple.length === 2, 'simple search runs against the local index');
   assert(simple.every(book => book.detailLoaded === false), 'local search defers full book details');
+  const punctuatedSimple = await invoke(runner, 'searchBooksSimple', ['【推しの子】']);
+  assert(punctuatedSimple.length === 2, 'local search shares the server punctuation-normalization contract');
 
   const advancedArgs = ['', '', '', '', '小学館', '', '', '', '', '', '', '', ''];
   const advanced = await invoke(runner, 'searchBooksAdvanced', advancedArgs);
@@ -221,7 +223,7 @@ function invoke(runner, method, args) {
   assert(random.length === 2, 'random search returns the requested local count');
   assert(new Set(random.map(book => book.rowIndex)).size === 2, 'random search does not duplicate books');
   assert(appendedScripts.length === 0, 'local queries do not inject JSONP scripts even while offline');
-  assert(perfEntries.filter(entry => entry.meta && entry.meta.local).length === 8, 'local queries record local performance entries');
+  assert(perfEntries.filter(entry => entry.meta && entry.meta.local).length === 9, 'local queries record local performance entries');
 
   console.log('local index checks ok');
 })().catch(error => {

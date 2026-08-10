@@ -84,7 +84,7 @@ function normalizeKana(str) {
     .replace(/[\u30a1-\u30f6]/g, function(match) {
       return String.fromCharCode(match.charCodeAt(0) - 0x60);
     })
-    .replace(/[\s　]/g, '');
+    .replace(/[\s【】「」『』（）()・:：\-–—~～・,，.。！？!?[\]{}]/g, '');
 }
 
 function titleYomiMixedMatch_(query, title, yomi) {

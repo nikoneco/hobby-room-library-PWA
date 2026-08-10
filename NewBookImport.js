@@ -34,8 +34,8 @@ function enrichNewBooksAfterImportByLimit_(limit) {
       retryFailed: false
     });
 
-    clearLibrarySearchCache_();
     SpreadsheetApp.flush();
+    clearLibrarySearchCache_();
 
     const result = {
       limit: batchLimit,
@@ -107,7 +107,7 @@ function fillMissingYomiganaForImport_(sheet, limit) {
       const yomi = fetchYomiganaFromRakutenBooksByIsbn_(isbn);
 
       if (yomi) {
-        sh.getRange(rowNumber, CONFIG.COL.YOMIGANA).setValue(yomi);
+        sh.getRange(rowNumber, CONFIG.COL.YOMIGANA).setValue(escapeSheetFormulaText_(yomi));
         changed++;
       } else {
         notFound++;

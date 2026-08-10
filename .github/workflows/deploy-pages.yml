@@ -7,6 +7,9 @@ on:
     paths:
       - docs/**
       - index.html
+      - '*.js'
+      - appsscript.json
+      - .claspignore
       - script.*.js.html
       - style.*.css.html
       - tools/build-pages.js
@@ -57,6 +60,12 @@ jobs:
 
       - name: Check GAS API surface
         run: node tools/check-server-api.js
+
+      - name: Check public GAS JSONP surface
+        run: node tools/check-gas-public-surface.js
+
+      - name: Check local search index
+        run: node tools/check-local-index.js
 
       - name: Configure Pages
         uses: actions/configure-pages@v5

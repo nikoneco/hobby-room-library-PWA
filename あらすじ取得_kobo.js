@@ -1186,6 +1186,7 @@ function resetKoboNotFoundDoneToNotFound_() {
   if (resetRows) {
     range.setValues(next);
     SpreadsheetApp.flush();
+    clearLibrarySearchCache_();
   }
 
   SpreadsheetApp.getActive().toast(`NOT_FOUND. を NOT_FOUND に戻しました: ${resetRows}行`);

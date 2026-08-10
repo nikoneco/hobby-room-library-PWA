@@ -115,6 +115,7 @@ function clearAllSynopsisRawAndSource_() {
     .clearNote();
 
   SpreadsheetApp.flush();
+  clearLibrarySearchCache_();
 
   const result = { clearedRows: rowCount };
   SpreadsheetApp.getActive().toast(`あらすじRAW/SOURCEを全消去しました: ${rowCount}行`);
@@ -1719,7 +1720,7 @@ function escapeRegExp_(text) {
 function writeSynopsisResult_(sheet, rowNumber, raw, source, errorObj) {
   sheet
     .getRange(rowNumber, CONFIG.COL.SUMMARY, 1, 2)
-    .setValues([[raw || '', source || '']]);
+    .setValues([[escapeSheetFormulaText_(raw || ''), source || '']]);
 
   const sourceCell = sheet.getRange(rowNumber, CONFIG.COL.SUMMARY_SOURCE);
   if (errorObj) {

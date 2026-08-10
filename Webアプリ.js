@@ -1034,7 +1034,7 @@ function normalizeReleasedYm_(value) {
  * 行データをWebアプリ返却用オブジェクトへ変換
  * @param {string[][]} rows
  * @param {Object[]=} indexData
- * @param {{compact?: boolean, includeImages?: boolean}=} options
+ * @param {{compact?: boolean, includeImages?: boolean, rowOffset?: number, rowIndexes?: number[]}=} options
  * @returns {Object[]}
  */
 function mapRowsToBooks_(rows, indexData, options) {
@@ -1042,6 +1042,9 @@ function mapRowsToBooks_(rows, indexData, options) {
   const includeImages = !(options && options.includeImages === false);
   const hasRowOffset = options && Number.isFinite(Number(options.rowOffset));
   const rowOffset = hasRowOffset ? Number(options.rowOffset) : 0;
+  const rowIndexes = options && Array.isArray(options.rowIndexes)
+    ? options.rowIndexes
+    : null;
 
   return rows.map((row, i) => {
     const isbn = normalizeIsbn_(row[CONFIG.IDX.ISBN]);
@@ -1070,10 +1073,13 @@ function mapRowsToBooks_(rows, indexData, options) {
       isExtraSeries   : idx ? Boolean(idx.isExtraSeries) : false,
       volume          : idx ? (idx.volume || 0) : 0,
       ownedMaxVolume  : idx ? (idx.ownedMaxVolume || 0) : 0,
-      detailLoaded    : true
+      detailLoaded    : !compact
     };
 
-    if (hasRowOffset) {
+    const explicitRowIndex = rowIndexes ? Number(rowIndexes[i]) : NaN;
+    if (Number.isFinite(explicitRowIndex)) {
+      book.rowIndex = Math.floor(explicitRowIndex);
+    } else if (hasRowOffset) {
       book.rowIndex = rowOffset + i;
     }
 
@@ -2051,7 +2057,7 @@ function searchBooksSimple(keyword, perf) {
     if (!nKeyword) {
       addWebAppPerfDuration_(perf, 'filterMs', filterStartedAt);
       const mapStartedAt = Date.now();
-      const allBooks = mapRowsToBooks_(rows, index, { compact: true });
+      const allBooks = mapRowsToBooks_(rows, index, { compact: true, rowOffset: 0 });
       addWebAppPerfDuration_(perf, 'mapMs', mapStartedAt);
       if (perf) perf.resultCount = allBooks.length;
       return allBooks;
@@ -2059,6 +2065,7 @@ function searchBooksSimple(keyword, perf) {
 
     const matchedRows = [];
     const matchedIndex = [];
+    const matchedRowIndexes = [];
 
     for (let i = 0; i < rows.length; i++) {
       const idx = index[i] || { title: '', yomi: '', searchKey: '' };
@@ -2066,13 +2073,15 @@ function searchBooksSimple(keyword, perf) {
       if (keywordMixedMatch_(nKeyword, idx)) {
         matchedRows.push(rows[i]);
         matchedIndex.push(idx);
+        matchedRowIndexes.push(i);
       }
     }
 
     addWebAppPerfDuration_(perf, 'filterMs', filterStartedAt);
     const mapStartedAt = Date.now();
     const books = mapRowsToBooks_(matchedRows, matchedIndex, {
-      compact: matchedRows.length > 80
+      compact: matchedRows.length > 80,
+      rowIndexes: matchedRowIndexes
     });
     addWebAppPerfDuration_(perf, 'mapMs', mapStartedAt);
     if (perf) perf.resultCount = books.length;
@@ -2199,7 +2208,10 @@ function getSuggestData() {
 function getAllBooks() {
   try {
     const dataset = getLibraryDataset_();
-    return mapRowsToBooks_(dataset.rows || [], dataset.index || [], { compact: true });
+    return mapRowsToBooks_(dataset.rows || [], dataset.index || [], {
+      compact: true,
+      rowOffset: 0
+    });
   } catch (e) {
     console.error('getAllBooks error:', e);
     return [];

@@ -3113,7 +3113,7 @@ function writeGasRunShim() {
       .replace(/[\u30a1-\u30f6]/g, function(match) {
         return String.fromCharCode(match.charCodeAt(0) - 0x60);
       })
-      .replace(/[\\s　]/g, '');
+      .replace(/[\\s【】「」『』（）()・:：\\-–—~～・,，.。！？!?[\\]{}]/g, '');
   }
 
   function isKanaCharLocal_(char) {
@@ -4475,7 +4475,7 @@ function writePwaClient() {
     title.className = 'pwa-settings-row-title';
     note.className = 'pwa-settings-row-note';
     title.textContent = 'センシティブ';
-    note.textContent = '検索結果への表示を切り替えます';
+    note.textContent = '18禁本の表紙画像の表示を切り替えます';
     text.appendChild(title);
     text.appendChild(note);
 

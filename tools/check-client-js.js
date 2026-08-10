@@ -245,6 +245,11 @@ assertEqual(
 }
 
 assertEqual(sandbox.normalizeKana('ＡＢＣ カタカナ'), 'abcかたかな', 'normalizeKana normalizes width and kana');
+assertEqual(
+  sandbox.normalizeKana('【推しの子】（第1巻）'),
+  '推しの子第1巻',
+  'normalizeKana applies the same punctuation contract as the server'
+);
 
 {
   const revisionBook = { rowIndex: 12, isbn: '9780000000000', title: 'キャッシュ確認本' };
@@ -256,6 +261,31 @@ assertEqual(sandbox.normalizeKana('ＡＢＣ カタカナ'), 'abcかたかな', 
   assert(revisionKey.includes(encodeURIComponent('キャッシュ確認本')), 'detail cache key includes the title');
   sandbox.rememberBookDetail_(revisionBook, revisionDetail);
   assert(sandbox.getCachedBookDetail_(revisionBook), 'detail cache returns an entry for the current dataset revision');
+  const mismatchedDetail = { isbn: '9781111111111', title: '別の本', summary: '混ぜない' };
+  sandbox.rememberBookDetail_(revisionBook, mismatchedDetail);
+  assertEqual(
+    sandbox.getCachedBookDetail_(revisionBook).title,
+    'キャッシュ確認本',
+    'detail cache rejects a response for a different book'
+  );
+  const wrongCopyDetail = {
+    isbn: revisionBook.isbn,
+    title: revisionBook.title,
+    shelf: '別棚',
+    location: '別位置',
+    summary: '同一ISBNの別コピー'
+  };
+  const locatedBook = Object.assign({}, revisionBook, {
+    rowIndex: 13,
+    shelf: '棚A',
+    location: '上-1'
+  });
+  sandbox.rememberBookDetail_(locatedBook, wrongCopyDetail);
+  assertEqual(
+    sandbox.getCachedBookDetail_(locatedBook),
+    null,
+    'detail cache rejects a same-ISBN copy from another shelf location'
+  );
   sandbox.syncBookDetailCacheRevision_('revision-b');
   assertEqual(sandbox.getCachedBookDetail_(revisionBook), null, 'dataset revision change clears stale detail cache entries');
 }

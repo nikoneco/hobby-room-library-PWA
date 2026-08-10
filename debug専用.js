@@ -923,7 +923,7 @@ const DEBUG_LIBRARY_SIZE_CONFIG = {
  * @returns {Object}
  */
 function debugCompareLibraryDatasetSize_() {
-  const result = debugCompareLibraryDatasetSize_(DEBUG_LIBRARY_SIZE_CONFIG.SAMPLE_KEYWORD, DEBUG_LIBRARY_SIZE_CONFIG.SAMPLE_LIMIT);
+  const result = debugCompareLibraryDatasetSizeCore_(DEBUG_LIBRARY_SIZE_CONFIG.SAMPLE_KEYWORD, DEBUG_LIBRARY_SIZE_CONFIG.SAMPLE_LIMIT);
   console.log(JSON.stringify(result, null, 2));
   return result;
 }
@@ -938,7 +938,7 @@ function debugCompareLibraryDatasetSizePreset_() {
   const keyword = 'よつばと'; // ←必要に応じて変更
   const limit = 30;           // ←必要に応じて変更
 
-  const result = debugCompareLibraryDatasetSize_(keyword, limit);
+  const result = debugCompareLibraryDatasetSizeCore_(keyword, limit);
   console.log(JSON.stringify(result, null, 2));
   return result;
 }
@@ -950,7 +950,7 @@ function debugCompareLibraryDatasetSizePreset_() {
  * @param {number} limit 検索レスポンス検証用の最大件数。
  * @returns {Object}
  */
-function debugCompareLibraryDatasetSize_(keyword, limit) {
+function debugCompareLibraryDatasetSizeCore_(keyword, limit) {
   const t0 = Date.now();
 
   const dataset = buildLibraryDataset_();
@@ -1637,7 +1637,7 @@ const DEBUG_LAST_ROW_CELL_CONFIG = {
  * @returns {Object}
  */
 function debugCompareLoadMainBookDataWithLastRowCell_() {
-  const result = debugCompareLoadMainBookDataWithLastRowCell_(
+  const result = debugCompareLoadMainBookDataWithLastRowCellCore_(
     DEBUG_LAST_ROW_CELL_CONFIG.TRIALS
   );
 
@@ -1652,7 +1652,7 @@ function debugCompareLoadMainBookDataWithLastRowCell_() {
  */
 function debugCompareLoadMainBookDataWithLastRowCellPreset_() {
   const trials = 10;
-  const result = debugCompareLoadMainBookDataWithLastRowCell_(trials);
+  const result = debugCompareLoadMainBookDataWithLastRowCellCore_(trials);
 
   console.log(JSON.stringify(result, null, 2));
   return result;
@@ -1664,7 +1664,7 @@ function debugCompareLoadMainBookDataWithLastRowCellPreset_() {
  * @param {number} trials
  * @returns {Object}
  */
-function debugCompareLoadMainBookDataWithLastRowCell_(trials) {
+function debugCompareLoadMainBookDataWithLastRowCellCore_(trials) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const mainSheet = ss.getSheetByName(CONFIG.SHEETS.MAIN);
   const dataSheet = ss.getSheetByName(DEBUG_LAST_ROW_CELL_CONFIG.DATA_SHEET_NAME);

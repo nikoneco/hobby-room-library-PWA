@@ -109,6 +109,17 @@ function normalizeKana(str) {
 }
 
 /**
+ * 外部API由来の文字列をGoogle Sheetsへ数式として解釈させない。
+ * 先頭の空白後が数式開始文字の場合だけ、表示されないアポストロフィを付ける。
+ * @param {*} value
+ * @returns {string}
+ */
+function escapeSheetFormulaText_(value) {
+  const text = String(value == null ? '' : value);
+  return /^[\s　]*[=+\-@]/.test(text) ? `'${text}` : text;
+}
+
+/**
  * ISBNをWebアプリ内部で扱いやすい文字列に正規化する
  * - 全角数字 → 半角数字
  * - ISBN表記、ハイフン、空白などを除去

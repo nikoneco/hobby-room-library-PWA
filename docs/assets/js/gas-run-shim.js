@@ -293,7 +293,7 @@
       .replace(/[ァ-ヶ]/g, function(match) {
         return String.fromCharCode(match.charCodeAt(0) - 0x60);
       })
-      .replace(/[\s　]/g, '');
+      .replace(/[\s【】「」『』（）()・:：\-–—~～・,，.。！？!?[\]{}]/g, '');
   }
 
   function isKanaCharLocal_(char) {

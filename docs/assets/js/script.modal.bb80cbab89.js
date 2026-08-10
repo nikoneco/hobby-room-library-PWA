@@ -399,7 +399,12 @@ function getBookDetailCacheKey_(book) {
 
 function rememberBookDetail_(book, detail) {
   const key = getBookDetailCacheKey_(book);
-  if (!key || !detail || typeof detail !== 'object') return;
+  if (
+    !key ||
+    !detail ||
+    typeof detail !== 'object' ||
+    !isPersistentBookDetailMatch_(book, detail)
+  ) return;
 
   bookDetailCache.set(key, detail);
   while (bookDetailCache.size > BOOK_DETAIL_CACHE_LIMIT) {
@@ -560,13 +565,13 @@ function rememberPersistentBookDetail_(key, detail) {
 function isPersistentBookDetailMatch_(book, detail) {
   if (!book || !detail) return false;
 
-  const bookTitle = String(book.title || '').trim();
-  const detailTitle = String(detail.title || '').trim();
-  if (bookTitle && detailTitle && bookTitle !== detailTitle) return false;
-
-  const bookIsbn = String(book.isbn || '').trim();
-  const detailIsbn = String(detail.isbn || '').trim();
-  if (bookIsbn && detailIsbn && bookIsbn !== detailIsbn) return false;
+  const identityFields = ['title', 'isbn', 'shelf', 'location'];
+  for (let i = 0; i < identityFields.length; i++) {
+    const field = identityFields[i];
+    const bookValue = String(book[field] || '').trim();
+    const detailValue = String(detail[field] || '').trim();
+    if (bookValue && detailValue && bookValue !== detailValue) return false;
+  }
 
   return true;
 }
@@ -618,6 +623,15 @@ function handleDeferredBookDetailResult_(book, index, dataArr, seriesContext, op
   const opt = options || {};
   book.detailLoading = false;
   book.detailPrefetching = false;
+
+  if (detail && !isPersistentBookDetailMatch_(book, detail)) {
+    detail = null;
+    error = new Error('Book detail identity mismatch');
+    const localIndexManager = window.ShumiLibraryLocalIndex;
+    if (localIndexManager && typeof localIndexManager.checkForUpdates === 'function') {
+      Promise.resolve(localIndexManager.checkForUpdates()).catch(function() {});
+    }
+  }
 
   if (detail) {
     const merged = mergeDeferredBookDetails_(book, detail);

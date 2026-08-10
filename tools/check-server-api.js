@@ -8,6 +8,7 @@ const configSource = fs.readFileSync(path.join(root, 'config.js'), 'utf8');
 const mainSynopsisSource = fs.readFileSync(path.join(root, 'あらすじ取得_Main.js'), 'utf8');
 const koboSynopsisSource = fs.readFileSync(path.join(root, 'あらすじ取得_kobo.js'), 'utf8');
 const sheetCodeSource = fs.readFileSync(path.join(root, 'コード.js'), 'utf8');
+const newBookImportSource = fs.readFileSync(path.join(root, 'NewBookImport.js'), 'utf8');
 const claspignore = fs.readFileSync(path.join(root, '.claspignore'), 'utf8');
 
 function assert(condition, message) {
@@ -15,6 +16,19 @@ function assert(condition, message) {
     throw new Error(message);
   }
 }
+
+fs.readdirSync(root)
+  .filter(fileName => fileName.endsWith('.js'))
+  .forEach(fileName => {
+    const fileSource = fs.readFileSync(path.join(root, fileName), 'utf8');
+    const declarations = Array.from(fileSource.matchAll(/^function\s+([A-Za-z0-9_$]+)\s*\(/gm));
+    const seen = new Set();
+    declarations.forEach(match => {
+      const functionName = match[1];
+      assert(!seen.has(functionName), `${fileName} does not redeclare top-level function ${functionName}`);
+      seen.add(functionName);
+    });
+  });
 
 assert(/function\s+doGet\s*\(\s*e\s*\)/.test(source), 'doGet accepts event parameter');
 assert(source.includes("String(params.api || '').trim()"), 'doGet routes by api parameter');
@@ -73,7 +87,28 @@ assert(source.includes('getBookDetailByRowIndex'), 'book detail remains availabl
 assert(source.includes('bumpLibraryDatasetRevision_'), 'cache invalidation advances the dataset revision');
 assert(mainSynopsisSource.includes('if (result.processed > 0)') && mainSynopsisSource.includes('clearLibrarySearchCache_();'), 'synopsis batches invalidate cache once after updates');
 assert(koboSynopsisSource.includes('if (result.processed > 0)') && koboSynopsisSource.includes('clearLibrarySearchCache_();'), 'Kobo retry batches invalidate cache once after updates');
+assert(
+  /function\s+clearAllSynopsisRawAndSource_\s*\([^)]*\)[\s\S]*?SpreadsheetApp\.flush\(\);[\s\S]*?clearLibrarySearchCache_\(\);/.test(mainSynopsisSource),
+  'clearing every synopsis invalidates search and PWA detail caches'
+);
+assert(
+  /function\s+resetKoboNotFoundDoneToNotFound_\s*\([^)]*\)[\s\S]*?if\s*\(resetRows\)[\s\S]*?clearLibrarySearchCache_\(\);/.test(koboSynopsisSource),
+  'resetting Kobo retry rows invalidates search and PWA detail caches'
+);
 assert(sheetCodeSource.includes('const changed = output.some') && sheetCodeSource.includes('clearLibrarySearchCache_();'), 'series-key batch invalidates cache only after actual changes');
+
+const onEditSource = sheetCodeSource.slice(
+  sheetCodeSource.indexOf('function onEdit(e)'),
+  sheetCodeSource.indexOf('function shouldClearLibrarySearchCacheOnEdit_')
+);
+assert(
+  onEditSource.lastIndexOf('clearLibrarySearchCache_();') > onEditSource.indexOf('updateSeriesKeyAutoForEditedRange_'),
+  'onEdit invalidates cache after derived series-key updates'
+);
+assert(
+  /function\s+enrichNewBooksAfterImportByLimit_\s*\([^)]*\)[\s\S]*?SpreadsheetApp\.flush\(\);[\s\S]*?clearLibrarySearchCache_\(\);/.test(newBookImportSource),
+  'new-book enrichment flushes sheet writes before invalidating caches'
+);
 
 [
   'initial',
@@ -143,6 +178,24 @@ assert(/^docs\/\*\*/m.test(claspignore), 'docs are excluded from clasp push');
 
 const serverSandbox = vm.createContext({ console, URL, encodeURIComponent, decodeURIComponent });
 vm.runInContext(`${configSource}\n${source}`, serverSandbox, { filename: 'Webアプリ.js' });
+
+assert(
+  vm.runInContext("escapeSheetFormulaText_('=IMPORTXML(\"https://example.invalid\")')", serverSandbox) ===
+    "'=IMPORTXML(\"https://example.invalid\")",
+  'external metadata cannot become a spreadsheet formula'
+);
+assert(
+  vm.runInContext("escapeSheetFormulaText_('通常のあらすじ')", serverSandbox) === '通常のあらすじ',
+  'ordinary external metadata remains unchanged'
+);
+assert(
+  mainSynopsisSource.includes('escapeSheetFormulaText_(raw ||'),
+  'synopsis writes use the spreadsheet-formula guard'
+);
+assert(
+  fs.readFileSync(path.join(root, 'NewBookImport.js'), 'utf8').includes('escapeSheetFormulaText_(yomi)'),
+  'imported yomigana writes use the spreadsheet-formula guard'
+);
 
 [
   ['Sket dance 03 (友達がいっぱい)', 3],
@@ -286,5 +339,40 @@ const sensitivePreview = vm.runInContext(
   serverSandbox
 );
 assert(sensitivePreview[0].isSensitive === true, 'preview index carries the sensitive flag');
+
+const compactSearchResult = vm.runInContext(`(() => {
+  const rows = [];
+  const index = [];
+  for (let i = 0; i < 81; i++) {
+    const row = Array(40).fill('');
+    row[CONFIG.IDX.TITLE] = '大量検索テスト ' + i;
+    row[CONFIG.IDX.SUMMARY] = '遅延取得するあらすじ ' + i;
+    rows.push(row);
+    index.push({
+      title: normalizeKana(row[CONFIG.IDX.TITLE]),
+      yomi: '',
+      author: '',
+      searchKey: normalizeKana(row[CONFIG.IDX.TITLE]),
+      genres: {},
+      genreMeta: []
+    });
+  }
+  const originalGetLibraryDataset = getLibraryDataset_;
+  getLibraryDataset_ = function() { return { rows, index }; };
+  try {
+    return searchBooksSimple('大量検索テスト');
+  } finally {
+    getLibraryDataset_ = originalGetLibraryDataset;
+  }
+})()`, serverSandbox);
+assert(compactSearchResult.length === 81, 'large simple search preserves every match');
+assert(
+  compactSearchResult.every((book, rowIndex) =>
+    book.detailLoaded === false &&
+    book.rowIndex === rowIndex &&
+    !Object.prototype.hasOwnProperty.call(book, 'summary')
+  ),
+  'large simple search keeps source row indexes and marks omitted details as deferred'
+);
 
 console.log('server api checks ok');

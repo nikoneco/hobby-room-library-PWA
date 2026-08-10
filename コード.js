@@ -23,10 +23,7 @@ function onEdit(e) {
   const col = e.range.getColumn();
   const colEnd = col + e.range.getNumColumns() - 1;
   const { MAIN } = CONFIG.SHEETS;
-  // Web検索データに影響するシート・セルが編集されたら検索キャッシュを破棄
-  if (shouldClearLibrarySearchCacheOnEdit_(sheetName, e.range)) {
-    clearLibrarySearchCache_();
-  }
+  const shouldClearSearchCache = shouldClearLibrarySearchCacheOnEdit_(sheetName, e.range);
   // 本棚シート（A1）のモード切り替え
   if (sheetName === MAIN && notation === 'A1') {
     switch (value) {
@@ -45,6 +42,7 @@ function onEdit(e) {
         setDropdownNML_();
         break;
     }
+    if (shouldClearSearchCache) clearLibrarySearchCache_();
     return;
   }
 
@@ -60,6 +58,9 @@ function onEdit(e) {
   ) {
     updateSeriesKeyAutoForEditedRange_(sh, e.range);
   }
+
+  // 派生列の更新後に破棄し、更新途中のデータが新キャッシュへ戻る窓を狭める。
+  if (shouldClearSearchCache) clearLibrarySearchCache_();
 }
 
 /**
