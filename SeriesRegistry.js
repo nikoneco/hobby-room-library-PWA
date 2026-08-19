@@ -8,7 +8,7 @@ const SERIES_REGISTRY_CONFIG_ = Object.freeze({
   EXTRA_PREFIX: '__extra__',
   MASTER_HEADERS: [
     'series_id',
-    'canonical_key',
+    'シリーズ名',
     'J-ストーリー',
     'J-題材1',
     'J-題材2',
@@ -16,7 +16,8 @@ const SERIES_REGISTRY_CONFIG_ = Object.freeze({
     'J-状態',
     '蔵書数',
     '状態',
-    '更新日時'
+    '更新日時',
+    'canonical_key'
   ],
   ALIAS_HEADERS: [
     'alias_key',
@@ -69,6 +70,64 @@ function buildSeriesAliasSignature_(value) {
   const signature = normalizeKana(base);
   if (!signature) return '';
   return `${isExtra ? 'extra' : 'normal'}:${signature}`;
+}
+
+/**
+ * 機械照合用キーとは別に、人が読めるシリーズ名をタイトルから作る。
+ * カタカナ・大小文字・記号は表示上の表記を維持する。
+ */
+function buildSeriesRegistryDisplayName_(title, fallbackKey) {
+  let value = String(title || '').normalize('NFKC').replace(/　/g, ' ').trim();
+  if (value) {
+    const parts = value.split(/\s*=\s*/);
+    if (parts.length >= 2) {
+      const left = String(parts[0] || '').trim();
+      const right = parts.slice(1).join(' = ').trim();
+      if (
+        left &&
+        (/[぀-ヿ㐀-鿿]/.test(left) ||
+          (left.length <= 40 && /[a-zA-Z]/.test(right) && /^[\x00-\x7F\s\p{P}\p{S}]+$/u.test(right)))
+      ) {
+        value = left;
+      }
+    }
+
+    value = value.replace(
+      /(特装版|限定版|通常版|小冊子付き|ドラマCD付き|CD付き|Blu-ray付き|DVD付き|フィギュア付き|特典付き)/gi,
+      ''
+    );
+    value = value.replace(/\s*第\s*\d+\s*巻\s*.*$/i, '');
+    value = value.replace(/\s*第\s*\d+\s*集\s*.*$/i, '');
+    value = value.replace(/\s*[〈<]\s*\d+\s*[〉>]\s*.*$/i, '');
+    value = value.replace(/\s*[〈<]\s*第?\s*[一二三四五六七八九十百千〇零\d]+\s*集\s*[〉>]\s*.*$/i, '');
+    value = value.replace(/\s*\d+\s*巻\s*.*$/i, '');
+    value = value.replace(/\s*[\(（]\s*\d+\s*[\)）]\s*.*$/i, '');
+    value = value.replace(/\s+v(?:ol(?:ume)?\.?|\.?)\s*\d+\s*.*$/i, '');
+    value = value.replace(/\s*#\s*\d+\s*.*$/i, '');
+    value = value.replace(/\s*×\s*\d+\s*.*$/i, '');
+    value = value.replace(/\s*[上中下]\s*巻\s*.*$/i, '');
+    value = value.replace(/\s+[上中下]\s*$/i, '');
+    value = value.replace(/\s+\d+\s*.*$/i, '');
+    value = value.replace(/[\.．。]+$/g, '');
+    value = value.replace(/\s*[:：]\s*$/g, '');
+    value = value.replace(/\s+/g, ' ').trim();
+  }
+
+  if (value) return value;
+  return stripExtraSeriesPrefix_(fallbackKey);
+}
+
+function chooseSeriesRegistryDisplayName_(titles, fallbackKey) {
+  const candidates = (Array.isArray(titles) ? titles : [])
+    .map(title => buildSeriesRegistryDisplayName_(title, ''))
+    .filter(Boolean);
+  if (!candidates.length) return buildSeriesRegistryDisplayName_('', fallbackKey);
+  const unique = Array.from(new Set(candidates));
+  unique.sort((a, b) => {
+    const lengthDiff = a.replace(/\s/g, '').length - b.replace(/\s/g, '').length;
+    return lengthDiff || a.length - b.length || a.localeCompare(b, 'ja');
+  });
+  return unique[0];
 }
 
 function buildGenreCategoryLookup_(rows) {
@@ -175,13 +234,15 @@ function buildSeriesRegistryMigrationPlan_(catalogRows, genreCategoryRows, creat
       if (!seriesId) throw new Error(`series_id generation failed: ${group.canonicalKey}`);
       idByCanonicalKey.set(group.canonicalKey, seriesId);
       const slots = buildSeriesGenreSlots_(genreText, categoryLookup);
+      const displayName = chooseSeriesRegistryDisplayName_(group.titles, group.canonicalKey);
       masterRows.push([
         seriesId,
-        group.canonicalKey,
+        displayName,
         ...slots,
         group.count,
         'ACTIVE',
-        timestamp
+        timestamp,
+        group.canonicalKey
       ]);
       aliasCandidates.push({
         aliasKey: group.canonicalKey,
@@ -286,7 +347,12 @@ function loadSeriesRegistryLookup_() {
   const masterLastRow = getLastDataRow(masterSheet, 1);
   const aliasLastRow = getLastDataRow(aliasSheet, 1);
   const masterRows = masterLastRow >= 2
-    ? masterSheet.getRange(2, 1, masterLastRow - 1, 10).getDisplayValues()
+    ? masterSheet.getRange(
+        2,
+        1,
+        masterLastRow - 1,
+        SERIES_REGISTRY_CONFIG_.MASTER_HEADERS.length
+      ).getDisplayValues()
     : [];
   const aliasRows = aliasLastRow >= 2
     ? aliasSheet.getRange(2, 1, aliasLastRow - 1, 6).getDisplayValues()
@@ -299,7 +365,8 @@ function loadSeriesRegistryLookup_() {
     const genres = row.slice(2, 7).map(value => String(value || '').trim());
     masterById.set(seriesId, {
       seriesId,
-      canonicalKey: normalizeSeriesAliasKey_(row[1]),
+      displayName: String(row[1] || '').trim(),
+      canonicalKey: normalizeSeriesAliasKey_(row[10] || row[1]),
       genres,
       isExtra: genres.includes(SERIES_KEY_AUTO_CONFIG_.EXTRA_GENRE),
       row: index + 2
@@ -355,6 +422,7 @@ function resolveSeriesRegistryKey_(rawKey, lookup) {
   return {
     seriesId,
     canonicalKey: master.canonicalKey,
+    displayName: master.displayName,
     genres: master.genres.slice(),
     isExtra: Boolean(master.isExtra),
     matchedBy
@@ -448,17 +516,18 @@ function appendSeriesReviewRow_(candidateKey, candidateSeriesId, comparisonKey, 
   return true;
 }
 
-function appendSeriesMasterRow_(masterSheet, canonicalKey, genreSlots, count, timestamp) {
+function appendSeriesMasterRow_(masterSheet, canonicalKey, genreSlots, count, timestamp, displayName) {
   const seriesId = `series_${Utilities.getUuid()}`;
   const slots = Array.isArray(genreSlots) ? genreSlots.slice(0, 5) : [];
   while (slots.length < 5) slots.push('');
   masterSheet.appendRow([
     seriesId,
-    normalizeSeriesAliasKey_(canonicalKey),
+    buildSeriesRegistryDisplayName_(displayName, canonicalKey),
     ...slots,
     Number(count || 0),
     'ACTIVE',
-    timestamp || new Date()
+    timestamp || new Date(),
+    normalizeSeriesAliasKey_(canonicalKey)
   ]);
   return seriesId;
 }
@@ -487,7 +556,8 @@ function ensureSeriesRegistryAlias_(rawKey, options) {
     key,
     [],
     options && options.count || 1,
-    new Date()
+    new Date(),
+    options && options.displayName || ''
   );
   appendSeriesAliasRow_(
     registry.aliasSheet,
@@ -500,6 +570,10 @@ function ensureSeriesRegistryAlias_(rawKey, options) {
   return {
     seriesId,
     canonicalKey: key,
+    displayName: buildSeriesRegistryDisplayName_(
+      options && options.displayName || '',
+      key
+    ),
     genres: ['', '', '', '', ''],
     isExtra: false,
     matchedBy: 'NEW_SERIES'
@@ -544,7 +618,7 @@ function buildSeriesTitleEditLinkPlan_(oldKey, newKey, oldResolved, newResolved)
   return { action: 'CREATE', oldKey: oldNormalized, newKey: newNormalized };
 }
 
-function linkSeriesKeyAfterTitleEdit_(oldKey, newKey) {
+function linkSeriesKeyAfterTitleEdit_(oldKey, newKey, displayName) {
   const oldNormalized = normalizeSeriesAliasKey_(oldKey);
   const newNormalized = normalizeSeriesAliasKey_(newKey);
   if (!newNormalized || !isSeriesRegistryV2Active_()) return null;
@@ -579,7 +653,10 @@ function linkSeriesKeyAfterTitleEdit_(oldKey, newKey) {
   }
   if (plan.action === 'UNCHANGED') return newResolved;
   if (plan.action === 'CREATE') {
-    return ensureSeriesRegistryAlias_(newNormalized, { source: 'TITLE_EDIT_NEW' });
+    return ensureSeriesRegistryAlias_(newNormalized, {
+      source: 'TITLE_EDIT_NEW',
+      displayName
+    });
   }
 
   appendSeriesAliasRow_(
@@ -600,6 +677,9 @@ function syncSeriesRegistryAfterTitleEdit_(sheet, startRow, rowCount, oldKeys) {
   const currentKeys = sheet
     .getRange(startRow, CONFIG.COL.SERIES_KEY_AUTO, rowCount, 1)
     .getDisplayValues();
+  const currentTitles = sheet
+    .getRange(startRow, CONFIG.COL.TITLE, rowCount, 1)
+    .getDisplayValues();
   let linked = 0;
   let created = 0;
   let conflicts = 0;
@@ -612,7 +692,11 @@ function syncSeriesRegistryAfterTitleEdit_(sheet, startRow, rowCount, oldKeys) {
       if (newKey) ensureSeriesRegistryAlias_(newKey, { source: 'TITLE_EDIT_EXISTING' });
       continue;
     }
-    const result = linkSeriesKeyAfterTitleEdit_(oldKey, newKey);
+    const result = linkSeriesKeyAfterTitleEdit_(
+      oldKey,
+      newKey,
+      currentTitles[index] ? currentTitles[index][0] : ''
+    );
     if (result && result.matchedBy === 'CONFLICT') {
       sheet.getRange(startRow + index, CONFIG.COL.SERIES_KEY_AUTO).setValue(oldKey);
       conflicts += 1;
@@ -631,10 +715,18 @@ function syncSeriesRegistryFromCatalog_() {
   const keys = sheet
     .getRange(2, CONFIG.COL.SERIES_KEY_AUTO, lastRow - 1, 1)
     .getDisplayValues();
+  const titles = sheet
+    .getRange(2, CONFIG.COL.TITLE, lastRow - 1, 1)
+    .getDisplayValues();
   const counts = new Map();
-  keys.forEach(row => {
+  keys.forEach((row, index) => {
     const key = normalizeSeriesAliasKey_(row[0]);
-    if (key) counts.set(key, (counts.get(key) || 0) + 1);
+    if (!key) return;
+    if (!counts.has(key)) counts.set(key, { count: 0, titles: [] });
+    const item = counts.get(key);
+    item.count += 1;
+    const title = String(titles[index] ? titles[index][0] || '' : '').trim();
+    if (title) item.titles.push(title);
   });
   const registry = loadSeriesRegistryLookup_();
   if (!registry) return { active: true, added: 0, keys: counts.size };
@@ -642,7 +734,8 @@ function syncSeriesRegistryFromCatalog_() {
   const newMasterRows = [];
   const newAliasRows = [];
   let added = 0;
-  counts.forEach((count, key) => {
+  counts.forEach((item, key) => {
+    const count = item.count;
     const resolved = resolveSeriesRegistryKey_(key, registry);
     if (resolved) {
       if (resolved.matchedBy === 'UNIQUE_SIGNATURE' && !registry.aliasByKey.has(key)) {
@@ -660,13 +753,15 @@ function syncSeriesRegistryFromCatalog_() {
     }
 
     const seriesId = `series_${Utilities.getUuid()}`;
+    const displayName = chooseSeriesRegistryDisplayName_(item.titles, key);
     newMasterRows.push([
       seriesId,
-      key,
+      displayName,
       '', '', '', '', '',
       count,
       'ACTIVE',
-      timestamp
+      timestamp,
+      key
     ]);
     newAliasRows.push([
       key,
@@ -678,6 +773,7 @@ function syncSeriesRegistryFromCatalog_() {
     ]);
     registry.masterById.set(seriesId, {
       seriesId,
+      displayName,
       canonicalKey: key,
       genres: ['', '', '', '', ''],
       isExtra: false,
@@ -689,9 +785,19 @@ function syncSeriesRegistryFromCatalog_() {
 
   if (newMasterRows.length) {
     const startRow = getLastDataRow(registry.masterSheet, 1) + 1;
-    const target = registry.masterSheet.getRange(startRow, 1, newMasterRows.length, 10);
+    const target = registry.masterSheet.getRange(
+      startRow,
+      1,
+      newMasterRows.length,
+      SERIES_REGISTRY_CONFIG_.MASTER_HEADERS.length
+    );
     if (startRow > 2) {
-      const template = registry.masterSheet.getRange(startRow - 1, 1, 1, 10);
+      const template = registry.masterSheet.getRange(
+        startRow - 1,
+        1,
+        1,
+        SERIES_REGISTRY_CONFIG_.MASTER_HEADERS.length
+      );
       template.copyTo(target, SpreadsheetApp.CopyPasteType.PASTE_FORMAT, false);
       template.copyTo(target, SpreadsheetApp.CopyPasteType.PASTE_DATA_VALIDATION, false);
     }
@@ -718,7 +824,9 @@ function activateSeriesRegistryV2_() {
   if (!masterSheet || !aliasSheet) {
     throw new Error('series_master_v2 / series_alias_v2 is missing');
   }
-  const masterHeaders = masterSheet.getRange(1, 1, 1, 10).getDisplayValues()[0];
+  const masterHeaders = masterSheet
+    .getRange(1, 1, 1, SERIES_REGISTRY_CONFIG_.MASTER_HEADERS.length)
+    .getDisplayValues()[0];
   const aliasHeaders = aliasSheet.getRange(1, 1, 1, 6).getDisplayValues()[0];
   if (masterHeaders.join('\u0000') !== SERIES_REGISTRY_CONFIG_.MASTER_HEADERS.join('\u0000')) {
     throw new Error('series_master_v2 headers do not match');

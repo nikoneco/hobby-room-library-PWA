@@ -623,6 +623,10 @@ assert(registryPlan.seriesCount === 2, 'series registry migration groups books b
 assert(registryPlan.aliasCount === 3, 'extra series retain both prefixed and base aliases');
 assert(registryPlan.conflicts.length === 0, 'compatible catalog genres migrate without conflicts');
 assert(
+  registryPlan.masterRows.some(row => row[1] === '作品名' && row[10] === '作品名'),
+  'series registry keeps a readable display name separate from the machine key'
+);
+assert(
   registryPlan.masterRows.some(row => row[2] === '日常' && row[3] === '学園' && row[6] === '連載中'),
   'series registry migration reconstructs genre slots from genre_master categories'
 );
@@ -635,6 +639,14 @@ const signaturePair = vm.runInContext(`[
   buildSeriesAliasSignature_('作品名')
 ]`, uuidSandbox);
 assert(signaturePair[0] === signaturePair[1], 'punctuation-only series-name variants share one safe signature');
+const readableSeriesName = vm.runInContext(
+  "buildSeriesRegistryDisplayName_('キノの旅 : the Beautiful World 2', 'きのの旅 : the beautiful world')",
+  uuidSandbox
+);
+assert(
+  readableSeriesName === 'キノの旅 : the Beautiful World',
+  'series display names preserve katakana and title casing while removing volume numbers'
+);
 const titleCorrectionPlan = vm.runInContext(`buildSeriesTitleEditLinkPlan_(
   '誤字しりーず',
   '誤字シリーズ',

@@ -45,7 +45,7 @@ function onEdit(e) {
     seriesRegistryActive &&
     sheetName === SERIES_REGISTRY_CONFIG_.MASTER_SHEET &&
     rowEnd >= 2 &&
-    col <= 7 &&
+    col <= 11 &&
     colEnd >= 2;
   const touchesSeriesRegistryAlias =
     seriesRegistryActive &&
