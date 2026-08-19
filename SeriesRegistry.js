@@ -1,0 +1,771 @@
+/** @OnlyCurrentDoc */
+
+const SERIES_REGISTRY_CONFIG_ = Object.freeze({
+  MASTER_SHEET: 'series_master_v2',
+  ALIAS_SHEET: 'series_alias_v2',
+  REVIEW_SHEET: 'series_match_review_v2',
+  ACTIVE_PROPERTY: 'series_registry_v2_active',
+  EXTRA_PREFIX: '__extra__',
+  MASTER_HEADERS: [
+    'series_id',
+    'canonical_key',
+    'J-ストーリー',
+    'J-題材1',
+    'J-題材2',
+    'J-雰囲気',
+    'J-状態',
+    '蔵書数',
+    '状態',
+    '更新日時'
+  ],
+  ALIAS_HEADERS: [
+    'alias_key',
+    'series_id',
+    '由来',
+    'match_signature',
+    '蔵書数',
+    '更新日時'
+  ],
+  REVIEW_HEADERS: [
+    '候補キー',
+    '候補series_id',
+    '比較対象キー',
+    '比較対象series_id',
+    '理由',
+    '状態',
+    '更新日時'
+  ]
+});
+
+function normalizeSeriesAliasKey_(value) {
+  return String(value || '')
+    .normalize('NFKC')
+    .replace(/　/g, ' ')
+    .trim()
+    .replace(/\s+/g, ' ')
+    .toLowerCase();
+}
+
+function stripExtraSeriesPrefix_(value) {
+  const key = normalizeSeriesAliasKey_(value);
+  return key.indexOf(SERIES_REGISTRY_CONFIG_.EXTRA_PREFIX) === 0
+    ? key.slice(SERIES_REGISTRY_CONFIG_.EXTRA_PREFIX.length)
+    : key;
+}
+
+function hasExtraSeriesPrefix_(value) {
+  return normalizeSeriesAliasKey_(value).indexOf(SERIES_REGISTRY_CONFIG_.EXTRA_PREFIX) === 0;
+}
+
+/**
+ * 空白、括弧、記号、かな表記だけの差を同一候補として扱う照合署名。
+ * 資料系prefixは通常シリーズとの誤結合を避けるため署名へ残す。
+ */
+function buildSeriesAliasSignature_(value) {
+  const normalized = normalizeSeriesAliasKey_(value);
+  if (!normalized) return '';
+  const isExtra = hasExtraSeriesPrefix_(normalized);
+  const base = stripExtraSeriesPrefix_(normalized);
+  const signature = normalizeKana(base);
+  if (!signature) return '';
+  return `${isExtra ? 'extra' : 'normal'}:${signature}`;
+}
+
+function buildGenreCategoryLookup_(rows) {
+  const lookup = new Map();
+  (Array.isArray(rows) ? rows : []).forEach(row => {
+    const genre = String(Array.isArray(row) ? row[0] || '' : '').trim();
+    const category = String(Array.isArray(row) ? row[1] || '' : '').trim();
+    if (genre && category && !lookup.has(genre)) lookup.set(genre, category);
+  });
+  return lookup;
+}
+
+function buildSeriesGenreSlots_(genreText, categoryLookup) {
+  const lookup = categoryLookup instanceof Map ? categoryLookup : new Map();
+  const genres = String(genreText || '')
+    .split(',')
+    .map(value => value.trim())
+    .filter(Boolean);
+  const slots = ['', '', '', '', ''];
+
+  genres.forEach(genre => {
+    if (genre === SERIES_KEY_AUTO_CONFIG_.EXTRA_GENRE) {
+      if (!slots[0]) slots[0] = genre;
+      return;
+    }
+    switch (lookup.get(genre)) {
+      case 'ストーリー':
+        if (!slots[0]) slots[0] = genre;
+        break;
+      case '題材':
+        if (!slots[1]) slots[1] = genre;
+        else if (!slots[2] && slots[1] !== genre) slots[2] = genre;
+        break;
+      case '雰囲気':
+        if (!slots[3]) slots[3] = genre;
+        break;
+      case '状況':
+        if (!slots[4]) slots[4] = genre;
+        break;
+    }
+  });
+
+  return slots;
+}
+
+function buildSeriesRegistryMigrationPlan_(catalogRows, genreCategoryRows, createSeriesId, nowText) {
+  const rows = Array.isArray(catalogRows) ? catalogRows : [];
+  const categoryLookup = buildGenreCategoryLookup_(genreCategoryRows);
+  const createId = typeof createSeriesId === 'function'
+    ? createSeriesId
+    : () => `series_${Utilities.getUuid()}`;
+  const timestamp = String(nowText || new Date().toISOString());
+  const groups = new Map();
+
+  rows.forEach(row => {
+    const item = row && typeof row === 'object' && !Array.isArray(row)
+      ? row
+      : {
+          title: Array.isArray(row) ? row[0] : '',
+          author: Array.isArray(row) ? row[1] : '',
+          publisher: Array.isArray(row) ? row[2] : '',
+          genreText: Array.isArray(row) ? row[3] : '',
+          rawKey: Array.isArray(row) ? row[4] : ''
+        };
+    const rawKey = normalizeSeriesAliasKey_(item.rawKey);
+    if (!rawKey) return;
+    if (!groups.has(rawKey)) {
+      groups.set(rawKey, {
+        canonicalKey: rawKey,
+        titles: [],
+        authors: new Set(),
+        publishers: new Set(),
+        genreTexts: new Set(),
+        count: 0
+      });
+    }
+    const group = groups.get(rawKey);
+    group.count += 1;
+    if (item.title) group.titles.push(String(item.title));
+    if (item.author) group.authors.add(String(item.author).trim());
+    if (item.publisher) group.publishers.add(String(item.publisher).trim());
+    const genreText = String(item.genreText || '').trim();
+    if (genreText) group.genreTexts.add(genreText);
+  });
+
+  const masterRows = [];
+  const aliasCandidates = [];
+  const conflicts = [];
+  const idByCanonicalKey = new Map();
+
+  [...groups.values()]
+    .sort((a, b) => a.canonicalKey.localeCompare(b.canonicalKey, 'ja'))
+    .forEach(group => {
+      const genreTexts = [...group.genreTexts];
+      if (genreTexts.length > 1) {
+        conflicts.push({
+          type: 'GENRE_CONFLICT',
+          key: group.canonicalKey,
+          values: genreTexts
+        });
+      }
+      const genreText = genreTexts[0] || '';
+      const seriesId = String(createId(group.canonicalKey) || '').trim();
+      if (!seriesId) throw new Error(`series_id generation failed: ${group.canonicalKey}`);
+      idByCanonicalKey.set(group.canonicalKey, seriesId);
+      const slots = buildSeriesGenreSlots_(genreText, categoryLookup);
+      masterRows.push([
+        seriesId,
+        group.canonicalKey,
+        ...slots,
+        group.count,
+        'ACTIVE',
+        timestamp
+      ]);
+      aliasCandidates.push({
+        aliasKey: group.canonicalKey,
+        seriesId,
+        source: 'MIGRATION_X',
+        count: group.count
+      });
+
+      if (hasExtraSeriesPrefix_(group.canonicalKey)) {
+        aliasCandidates.push({
+          aliasKey: stripExtraSeriesPrefix_(group.canonicalKey),
+          seriesId,
+          source: 'EXTRA_BASE',
+          count: group.count
+        });
+      }
+    });
+
+  const aliasByKey = new Map();
+  aliasCandidates.forEach(candidate => {
+    const aliasKey = normalizeSeriesAliasKey_(candidate.aliasKey);
+    if (!aliasKey) return;
+    const existing = aliasByKey.get(aliasKey);
+    if (existing && existing.seriesId !== candidate.seriesId) {
+      conflicts.push({
+        type: 'ALIAS_CONFLICT',
+        key: aliasKey,
+        values: [existing.seriesId, candidate.seriesId]
+      });
+      return;
+    }
+    if (!existing || candidate.source === 'MIGRATION_X') {
+      aliasByKey.set(aliasKey, Object.assign({}, candidate, { aliasKey }));
+    }
+  });
+
+  const aliasRows = [...aliasByKey.values()]
+    .sort((a, b) => a.aliasKey.localeCompare(b.aliasKey, 'ja'))
+    .map(candidate => [
+      candidate.aliasKey,
+      candidate.seriesId,
+      candidate.source,
+      buildSeriesAliasSignature_(candidate.aliasKey),
+      candidate.count,
+      timestamp
+    ]);
+
+  const signatureOwners = new Map();
+  aliasRows.forEach(row => {
+    const signature = String(row[3] || '');
+    const seriesId = String(row[1] || '');
+    if (!signature || !seriesId) return;
+    if (!signatureOwners.has(signature)) signatureOwners.set(signature, new Set());
+    signatureOwners.get(signature).add(seriesId);
+  });
+  const signatureConflicts = [...signatureOwners.entries()]
+    .filter(([, ids]) => ids.size > 1)
+    .map(([signature, ids]) => ({
+      type: 'SIGNATURE_CONFLICT',
+      key: signature,
+      values: [...ids]
+    }));
+
+  return {
+    masterRows,
+    aliasRows,
+    conflicts,
+    signatureConflicts,
+    idByCanonicalKey,
+    bookCount: rows.filter(row => normalizeSeriesAliasKey_(row && (row.rawKey || row[4]))).length,
+    seriesCount: masterRows.length,
+    aliasCount: aliasRows.length
+  };
+}
+
+function isSeriesRegistryV2Active_() {
+  try {
+    if (PropertiesService.getScriptProperties().getProperty(
+      SERIES_REGISTRY_CONFIG_.ACTIVE_PROPERTY
+    ) === '1') return true;
+
+    const spreadsheet = SpreadsheetApp.getActive();
+    const masterSheet = spreadsheet.getSheetByName(SERIES_REGISTRY_CONFIG_.MASTER_SHEET);
+    const aliasSheet = spreadsheet.getSheetByName(SERIES_REGISTRY_CONFIG_.ALIAS_SHEET);
+    const mainSheet = spreadsheet.getSheetByName(CONFIG.SHEETS.MAIN);
+    if (!masterSheet || !aliasSheet || !mainSheet) return false;
+    const genreFormula = mainSheet.getRange(1, CONFIG.COL.GENRE).getFormula();
+    return genreFormula.indexOf(`${SERIES_REGISTRY_CONFIG_.ALIAS_SHEET}!`) !== -1;
+  } catch (error) {
+    console.error('isSeriesRegistryV2Active_ error:', error);
+    return false;
+  }
+}
+
+function loadSeriesRegistryLookup_() {
+  if (!isSeriesRegistryV2Active_()) return null;
+  const spreadsheet = SpreadsheetApp.getActive();
+  const masterSheet = spreadsheet.getSheetByName(SERIES_REGISTRY_CONFIG_.MASTER_SHEET);
+  const aliasSheet = spreadsheet.getSheetByName(SERIES_REGISTRY_CONFIG_.ALIAS_SHEET);
+  if (!masterSheet || !aliasSheet) return null;
+
+  const masterLastRow = getLastDataRow(masterSheet, 1);
+  const aliasLastRow = getLastDataRow(aliasSheet, 1);
+  const masterRows = masterLastRow >= 2
+    ? masterSheet.getRange(2, 1, masterLastRow - 1, 10).getDisplayValues()
+    : [];
+  const aliasRows = aliasLastRow >= 2
+    ? aliasSheet.getRange(2, 1, aliasLastRow - 1, 6).getDisplayValues()
+    : [];
+
+  const masterById = new Map();
+  masterRows.forEach((row, index) => {
+    const seriesId = String(row[0] || '').trim();
+    if (!seriesId || masterById.has(seriesId)) return;
+    const genres = row.slice(2, 7).map(value => String(value || '').trim());
+    masterById.set(seriesId, {
+      seriesId,
+      canonicalKey: normalizeSeriesAliasKey_(row[1]),
+      genres,
+      isExtra: genres.includes(SERIES_KEY_AUTO_CONFIG_.EXTRA_GENRE),
+      row: index + 2
+    });
+  });
+
+  const aliasByKey = new Map();
+  const signatureOwners = new Map();
+  aliasRows.forEach((row, index) => {
+    const aliasKey = normalizeSeriesAliasKey_(row[0]);
+    const seriesId = String(row[1] || '').trim();
+    const signature = String(row[3] || buildSeriesAliasSignature_(aliasKey));
+    if (!aliasKey || !seriesId || !masterById.has(seriesId)) return;
+    if (!aliasByKey.has(aliasKey)) {
+      aliasByKey.set(aliasKey, { aliasKey, seriesId, row: index + 2 });
+    }
+    if (signature) {
+      if (!signatureOwners.has(signature)) signatureOwners.set(signature, new Set());
+      signatureOwners.get(signature).add(seriesId);
+    }
+  });
+
+  const uniqueSeriesIdBySignature = new Map();
+  signatureOwners.forEach((seriesIds, signature) => {
+    if (seriesIds.size === 1) uniqueSeriesIdBySignature.set(signature, [...seriesIds][0]);
+  });
+
+  return {
+    masterById,
+    aliasByKey,
+    uniqueSeriesIdBySignature,
+    masterSheet,
+    aliasSheet
+  };
+}
+
+function resolveSeriesRegistryKey_(rawKey, lookup) {
+  const registry = lookup || loadSeriesRegistryLookup_();
+  const key = normalizeSeriesAliasKey_(rawKey);
+  if (!registry || !key) return null;
+  const exact = registry.aliasByKey.get(key);
+  let seriesId = exact ? exact.seriesId : '';
+  let matchedBy = exact ? 'EXACT_ALIAS' : '';
+
+  if (!seriesId) {
+    const signature = buildSeriesAliasSignature_(key);
+    seriesId = registry.uniqueSeriesIdBySignature.get(signature) || '';
+    if (seriesId) matchedBy = 'UNIQUE_SIGNATURE';
+  }
+
+  const master = seriesId ? registry.masterById.get(seriesId) : null;
+  if (!master) return null;
+  return {
+    seriesId,
+    canonicalKey: master.canonicalKey,
+    genres: master.genres.slice(),
+    isExtra: Boolean(master.isExtra),
+    matchedBy
+  };
+}
+
+function buildSeriesRegistryExtraLookup_(lookup) {
+  const registry = lookup || loadSeriesRegistryLookup_();
+  if (!registry) return new Map();
+  const result = new Map();
+  registry.aliasByKey.forEach((alias, aliasKey) => {
+    const master = registry.masterById.get(alias.seriesId);
+    if (master) result.set(aliasKey, Boolean(master.isExtra));
+  });
+  return result;
+}
+
+function ensureSeriesRegistryExtraAliases_() {
+  if (!isSeriesRegistryV2Active_()) return { added: 0 };
+  const registry = loadSeriesRegistryLookup_();
+  if (!registry) return { added: 0 };
+  const additions = [];
+
+  registry.aliasByKey.forEach((alias, aliasKey) => {
+    const master = registry.masterById.get(alias.seriesId);
+    if (!master) return;
+    const baseKey = stripExtraSeriesPrefix_(aliasKey);
+    const desiredKey = master.isExtra
+      ? `${SERIES_REGISTRY_CONFIG_.EXTRA_PREFIX}${baseKey}`
+      : baseKey;
+    if (!desiredKey || desiredKey === aliasKey) return;
+    const existing = registry.aliasByKey.get(desiredKey);
+    if (existing && existing.seriesId !== alias.seriesId) {
+      throw new Error(`Series extra alias conflict: ${desiredKey}`);
+    }
+    if (!existing) {
+      additions.push({
+        aliasKey: desiredKey,
+        seriesId: alias.seriesId,
+        source: master.isExtra ? 'EXTRA_DERIVED' : 'NORMAL_DERIVED'
+      });
+      registry.aliasByKey.set(desiredKey, {
+        aliasKey: desiredKey,
+        seriesId: alias.seriesId,
+        row: 0
+      });
+    }
+  });
+
+  additions.forEach(item => {
+    appendSeriesAliasRow_(
+      registry.aliasSheet,
+      item.aliasKey,
+      item.seriesId,
+      item.source,
+      0,
+      new Date()
+    );
+  });
+  return { added: additions.length };
+}
+
+function appendSeriesAliasRow_(aliasSheet, aliasKey, seriesId, source, count, timestamp) {
+  const key = normalizeSeriesAliasKey_(aliasKey);
+  if (!key || !seriesId) return false;
+  aliasSheet.appendRow([
+    key,
+    seriesId,
+    source || 'AUTO',
+    buildSeriesAliasSignature_(key),
+    Number(count || 0),
+    timestamp || new Date()
+  ]);
+  return true;
+}
+
+function appendSeriesReviewRow_(candidateKey, candidateSeriesId, comparisonKey, comparisonSeriesId, reason) {
+  const reviewSheet = SpreadsheetApp.getActive().getSheetByName(
+    SERIES_REGISTRY_CONFIG_.REVIEW_SHEET
+  );
+  if (!reviewSheet) return false;
+  reviewSheet.appendRow([
+    normalizeSeriesAliasKey_(candidateKey),
+    String(candidateSeriesId || ''),
+    normalizeSeriesAliasKey_(comparisonKey),
+    String(comparisonSeriesId || ''),
+    reason || 'TITLE_EDIT_CONFLICT',
+    '要確認',
+    new Date()
+  ]);
+  return true;
+}
+
+function appendSeriesMasterRow_(masterSheet, canonicalKey, genreSlots, count, timestamp) {
+  const seriesId = `series_${Utilities.getUuid()}`;
+  const slots = Array.isArray(genreSlots) ? genreSlots.slice(0, 5) : [];
+  while (slots.length < 5) slots.push('');
+  masterSheet.appendRow([
+    seriesId,
+    normalizeSeriesAliasKey_(canonicalKey),
+    ...slots,
+    Number(count || 0),
+    'ACTIVE',
+    timestamp || new Date()
+  ]);
+  return seriesId;
+}
+
+function ensureSeriesRegistryAlias_(rawKey, options) {
+  const key = normalizeSeriesAliasKey_(rawKey);
+  if (!key || !isSeriesRegistryV2Active_()) return null;
+  const registry = loadSeriesRegistryLookup_();
+  const resolved = resolveSeriesRegistryKey_(key, registry);
+  if (resolved) {
+    if (resolved.matchedBy === 'UNIQUE_SIGNATURE' && !registry.aliasByKey.has(key)) {
+      appendSeriesAliasRow_(
+        registry.aliasSheet,
+        key,
+        resolved.seriesId,
+        options && options.source || 'AUTO_SIGNATURE',
+        options && options.count || 1,
+        new Date()
+      );
+    }
+    return resolved;
+  }
+
+  const seriesId = appendSeriesMasterRow_(
+    registry.masterSheet,
+    key,
+    [],
+    options && options.count || 1,
+    new Date()
+  );
+  appendSeriesAliasRow_(
+    registry.aliasSheet,
+    key,
+    seriesId,
+    options && options.source || 'AUTO_NEW_KEY',
+    options && options.count || 1,
+    new Date()
+  );
+  return {
+    seriesId,
+    canonicalKey: key,
+    genres: ['', '', '', '', ''],
+    isExtra: false,
+    matchedBy: 'NEW_SERIES'
+  };
+}
+
+function buildSeriesTitleEditLinkPlan_(oldKey, newKey, oldResolved, newResolved) {
+  const oldNormalized = normalizeSeriesAliasKey_(oldKey);
+  const newNormalized = normalizeSeriesAliasKey_(newKey);
+  if (!newNormalized) return { action: 'NONE', oldKey: oldNormalized, newKey: '' };
+  if (oldNormalized === newNormalized) {
+    return { action: 'UNCHANGED', oldKey: oldNormalized, newKey: newNormalized };
+  }
+  if (
+    oldResolved && newResolved &&
+    String(oldResolved.seriesId || '') !== String(newResolved.seriesId || '')
+  ) {
+    return {
+      action: 'CONFLICT',
+      oldKey: oldNormalized,
+      newKey: newNormalized,
+      oldSeriesId: String(oldResolved.seriesId || ''),
+      newSeriesId: String(newResolved.seriesId || '')
+    };
+  }
+  if (newResolved) {
+    return {
+      action: 'USE_EXISTING',
+      oldKey: oldNormalized,
+      newKey: newNormalized,
+      seriesId: String(newResolved.seriesId || '')
+    };
+  }
+  if (oldResolved) {
+    return {
+      action: 'LINK_TO_OLD',
+      oldKey: oldNormalized,
+      newKey: newNormalized,
+      seriesId: String(oldResolved.seriesId || '')
+    };
+  }
+  return { action: 'CREATE', oldKey: oldNormalized, newKey: newNormalized };
+}
+
+function linkSeriesKeyAfterTitleEdit_(oldKey, newKey) {
+  const oldNormalized = normalizeSeriesAliasKey_(oldKey);
+  const newNormalized = normalizeSeriesAliasKey_(newKey);
+  if (!newNormalized || !isSeriesRegistryV2Active_()) return null;
+  const registry = loadSeriesRegistryLookup_();
+  const oldResolved = oldNormalized
+    ? resolveSeriesRegistryKey_(oldNormalized, registry)
+    : null;
+  const newResolved = resolveSeriesRegistryKey_(newNormalized, registry);
+  const plan = buildSeriesTitleEditLinkPlan_(
+    oldNormalized,
+    newNormalized,
+    oldResolved,
+    newResolved
+  );
+
+  if (plan.action === 'CONFLICT') {
+    appendSeriesReviewRow_(
+      oldNormalized,
+      plan.oldSeriesId,
+      newNormalized,
+      plan.newSeriesId,
+      'TITLE_EDIT_CONFLICT'
+    );
+    return Object.assign({}, oldResolved, {
+      matchedBy: 'CONFLICT',
+      conflictKey: newNormalized,
+      conflictSeriesId: plan.newSeriesId
+    });
+  }
+  if (plan.action === 'USE_EXISTING') {
+    return ensureSeriesRegistryAlias_(newNormalized, { source: 'TITLE_EDIT_SIGNATURE' });
+  }
+  if (plan.action === 'UNCHANGED') return newResolved;
+  if (plan.action === 'CREATE') {
+    return ensureSeriesRegistryAlias_(newNormalized, { source: 'TITLE_EDIT_NEW' });
+  }
+
+  appendSeriesAliasRow_(
+    registry.aliasSheet,
+    newNormalized,
+    oldResolved.seriesId,
+    'TITLE_EDIT',
+    1,
+    new Date()
+  );
+  return Object.assign({}, oldResolved, { matchedBy: 'TITLE_EDIT' });
+}
+
+function syncSeriesRegistryAfterTitleEdit_(sheet, startRow, rowCount, oldKeys) {
+  if (!isSeriesRegistryV2Active_() || rowCount <= 0) {
+    return { linked: 0, created: 0, conflicts: 0, conflictRows: [] };
+  }
+  const currentKeys = sheet
+    .getRange(startRow, CONFIG.COL.SERIES_KEY_AUTO, rowCount, 1)
+    .getDisplayValues();
+  let linked = 0;
+  let created = 0;
+  let conflicts = 0;
+  const conflictRows = [];
+
+  for (let index = 0; index < rowCount; index++) {
+    const oldKey = String(oldKeys && oldKeys[index] ? oldKeys[index][0] || '' : '');
+    const newKey = String(currentKeys[index] ? currentKeys[index][0] || '' : '');
+    if (!newKey || normalizeSeriesAliasKey_(oldKey) === normalizeSeriesAliasKey_(newKey)) {
+      if (newKey) ensureSeriesRegistryAlias_(newKey, { source: 'TITLE_EDIT_EXISTING' });
+      continue;
+    }
+    const result = linkSeriesKeyAfterTitleEdit_(oldKey, newKey);
+    if (result && result.matchedBy === 'CONFLICT') {
+      sheet.getRange(startRow + index, CONFIG.COL.SERIES_KEY_AUTO).setValue(oldKey);
+      conflicts += 1;
+      conflictRows.push(startRow + index);
+    } else if (result && result.matchedBy === 'NEW_SERIES') created += 1;
+    else if (result) linked += 1;
+  }
+  return { linked, created, conflicts, conflictRows };
+}
+
+function syncSeriesRegistryFromCatalog_() {
+  if (!isSeriesRegistryV2Active_()) return { active: false, added: 0 };
+  const sheet = getSheet(CONFIG.SHEETS.MAIN);
+  const lastRow = getLastDataRow(sheet, CONFIG.COL.TITLE);
+  if (lastRow < 2) return { active: true, added: 0 };
+  const keys = sheet
+    .getRange(2, CONFIG.COL.SERIES_KEY_AUTO, lastRow - 1, 1)
+    .getDisplayValues();
+  const counts = new Map();
+  keys.forEach(row => {
+    const key = normalizeSeriesAliasKey_(row[0]);
+    if (key) counts.set(key, (counts.get(key) || 0) + 1);
+  });
+  const registry = loadSeriesRegistryLookup_();
+  if (!registry) return { active: true, added: 0, keys: counts.size };
+  const timestamp = new Date();
+  const newMasterRows = [];
+  const newAliasRows = [];
+  let added = 0;
+  counts.forEach((count, key) => {
+    const resolved = resolveSeriesRegistryKey_(key, registry);
+    if (resolved) {
+      if (resolved.matchedBy === 'UNIQUE_SIGNATURE' && !registry.aliasByKey.has(key)) {
+        newAliasRows.push([
+          key,
+          resolved.seriesId,
+          'AUTO_SIGNATURE',
+          buildSeriesAliasSignature_(key),
+          count,
+          timestamp
+        ]);
+        registry.aliasByKey.set(key, { aliasKey: key, seriesId: resolved.seriesId, row: 0 });
+      }
+      return;
+    }
+
+    const seriesId = `series_${Utilities.getUuid()}`;
+    newMasterRows.push([
+      seriesId,
+      key,
+      '', '', '', '', '',
+      count,
+      'ACTIVE',
+      timestamp
+    ]);
+    newAliasRows.push([
+      key,
+      seriesId,
+      'CATALOG_SYNC',
+      buildSeriesAliasSignature_(key),
+      count,
+      timestamp
+    ]);
+    registry.masterById.set(seriesId, {
+      seriesId,
+      canonicalKey: key,
+      genres: ['', '', '', '', ''],
+      isExtra: false,
+      row: 0
+    });
+    registry.aliasByKey.set(key, { aliasKey: key, seriesId, row: 0 });
+    added += 1;
+  });
+
+  if (newMasterRows.length) {
+    const startRow = getLastDataRow(registry.masterSheet, 1) + 1;
+    const target = registry.masterSheet.getRange(startRow, 1, newMasterRows.length, 10);
+    if (startRow > 2) {
+      const template = registry.masterSheet.getRange(startRow - 1, 1, 1, 10);
+      template.copyTo(target, SpreadsheetApp.CopyPasteType.PASTE_FORMAT, false);
+      template.copyTo(target, SpreadsheetApp.CopyPasteType.PASTE_DATA_VALIDATION, false);
+    }
+    target.setValues(newMasterRows);
+  }
+  if (newAliasRows.length) {
+    const startRow = getLastDataRow(registry.aliasSheet, 1) + 1;
+    registry.aliasSheet
+      .getRange(startRow, 1, newAliasRows.length, 6)
+      .setValues(newAliasRows);
+  }
+  return {
+    active: true,
+    added,
+    aliasesAdded: newAliasRows.length,
+    keys: counts.size
+  };
+}
+
+function activateSeriesRegistryV2_() {
+  const spreadsheet = SpreadsheetApp.getActive();
+  const masterSheet = spreadsheet.getSheetByName(SERIES_REGISTRY_CONFIG_.MASTER_SHEET);
+  const aliasSheet = spreadsheet.getSheetByName(SERIES_REGISTRY_CONFIG_.ALIAS_SHEET);
+  if (!masterSheet || !aliasSheet) {
+    throw new Error('series_master_v2 / series_alias_v2 is missing');
+  }
+  const masterHeaders = masterSheet.getRange(1, 1, 1, 10).getDisplayValues()[0];
+  const aliasHeaders = aliasSheet.getRange(1, 1, 1, 6).getDisplayValues()[0];
+  if (masterHeaders.join('\u0000') !== SERIES_REGISTRY_CONFIG_.MASTER_HEADERS.join('\u0000')) {
+    throw new Error('series_master_v2 headers do not match');
+  }
+  if (aliasHeaders.join('\u0000') !== SERIES_REGISTRY_CONFIG_.ALIAS_HEADERS.join('\u0000')) {
+    throw new Error('series_alias_v2 headers do not match');
+  }
+  PropertiesService.getScriptProperties().setProperty(
+    SERIES_REGISTRY_CONFIG_.ACTIVE_PROPERTY,
+    '1'
+  );
+  clearLibrarySearchCache_();
+  return auditSeriesRegistryV2_();
+}
+
+function deactivateSeriesRegistryV2_() {
+  PropertiesService.getScriptProperties().deleteProperty(
+    SERIES_REGISTRY_CONFIG_.ACTIVE_PROPERTY
+  );
+  clearLibrarySearchCache_();
+  return { active: false };
+}
+
+function auditSeriesRegistryV2_() {
+  const active = isSeriesRegistryV2Active_();
+  if (!active) return { active: false };
+  const lookup = loadSeriesRegistryLookup_();
+  if (!lookup) return { active: true, ready: false };
+  const sheet = getSheet(CONFIG.SHEETS.MAIN);
+  const lastRow = getLastDataRow(sheet, CONFIG.COL.TITLE);
+  const keys = lastRow >= 2
+    ? sheet.getRange(2, CONFIG.COL.SERIES_KEY_AUTO, lastRow - 1, 1).getDisplayValues()
+    : [];
+  const unresolved = [];
+  keys.forEach((row, index) => {
+    const key = normalizeSeriesAliasKey_(row[0]);
+    if (key && !resolveSeriesRegistryKey_(key, lookup)) {
+      unresolved.push({ row: index + 2, key });
+    }
+  });
+  return {
+    active: true,
+    ready: true,
+    masterCount: lookup.masterById.size,
+    aliasCount: lookup.aliasByKey.size,
+    checkedBooks: keys.length,
+    unresolvedCount: unresolved.length,
+    unresolved: unresolved.slice(0, 100)
+  };
+}

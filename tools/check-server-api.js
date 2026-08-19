@@ -8,6 +8,7 @@ const configSource = fs.readFileSync(path.join(root, 'config.js'), 'utf8');
 const mainSynopsisSource = fs.readFileSync(path.join(root, 'あらすじ取得_Main.js'), 'utf8');
 const koboSynopsisSource = fs.readFileSync(path.join(root, 'あらすじ取得_kobo.js'), 'utf8');
 const sheetCodeSource = fs.readFileSync(path.join(root, 'コード.js'), 'utf8');
+const seriesRegistrySource = fs.readFileSync(path.join(root, 'SeriesRegistry.js'), 'utf8');
 const newBookImportSource = fs.readFileSync(path.join(root, 'NewBookImport.js'), 'utf8');
 const claspignore = fs.readFileSync(path.join(root, '.claspignore'), 'utf8');
 
@@ -52,7 +53,7 @@ assert(
   'documented public API registry does not contain duplicate names'
 );
 assert(source.includes('buildQuickBrowseCountsPayload_'), 'PWA initial data includes quick browse counts');
-assert(configSource.includes("LIBRARY_DATASET_KEY: 'library_dataset_v24'"), 'library cache key invalidates datasets without UUID/revision stamps');
+assert(configSource.includes("LIBRARY_DATASET_KEY: 'library_dataset_v25'"), 'library cache key invalidates datasets without series-registry identities');
 assert(source.includes('SHELF_DATASET_KEY'), 'server defines a separate bookshelf dataset cache key');
 assert(configSource.includes("SHELF_DATASET_KEY: 'library_shelf_dataset_v4'"), 'bookshelf cache key invalidates datasets without stable book IDs');
 assert(source.includes('getBookshelfLiteDataset_'), 'server has a lightweight bookshelf dataset path');
@@ -92,7 +93,7 @@ assert(source.includes('serverResponseReadyAtEpochMs'), 'JSONP performance trace
 assert(source.includes('perf.jsonpResponseChars'), 'JSONP performance trace includes the final script character count');
 assert(source.includes('datasetRevision: getDatasetSnapshotRevision_(dataset)'), 'initial API responses use the exact dataset snapshot revision');
 assert(source.includes('function buildLocalLibraryIndexPayload_'), 'server builds a lightweight local-search index');
-assert(source.includes('const LOCAL_LIBRARY_INDEX_VERSION_ = 4'), 'server publishes the UUID-aware local-index schema');
+assert(source.includes('const LOCAL_LIBRARY_INDEX_VERSION_ = 5'), 'server publishes the series-registry-aware local-index schema');
 assert(source.includes('function buildLocalSearchMetadataPayload_'), 'server bundles search UI metadata into the local index');
 assert(source.includes('metadata: buildLocalSearchMetadataPayload_(dataset)'), 'local index contains suggestions, filters, and quick-browse counts');
 assert(source.includes('function getLibraryDatasetRevisionForPwa_'), 'server exposes a lightweight revision check');
@@ -126,8 +127,21 @@ assert(
   'manual series-key repair invalidates caches only after an actual series or UUID change'
 );
 assert(
-  newBookImportSource.includes('return refreshSeriesKeyAutoAfterDerivedChange_('),
-  'new-book enrichment uses the central series-key consistency repair'
+  newBookImportSource.includes('syncSeriesRegistryFromCatalog_()') &&
+    newBookImportSource.includes('refreshSeriesKeyAutoAfterDerivedChange_(targetSheet)'),
+  'new-book enrichment converges series keys and the stable registry together'
+);
+assert(seriesRegistrySource.includes("MASTER_SHEET: 'series_master_v2'"), 'series registry uses a separate migration-safe master sheet');
+assert(seriesRegistrySource.includes("ALIAS_SHEET: 'series_alias_v2'"), 'series registry stores title variants independently from genres');
+assert(seriesRegistrySource.includes('function linkSeriesKeyAfterTitleEdit_'), 'title corrections preserve the prior stable series identity');
+assert(
+  seriesRegistrySource.includes("reason || 'TITLE_EDIT_CONFLICT'") &&
+    seriesRegistrySource.includes('setValue(oldKey)'),
+  'title-edit conflicts are reviewed and keep the prior stable series key'
+);
+assert(
+  seriesRegistrySource.includes("source: 'TITLE_EDIT_SIGNATURE'"),
+  'unique normalized title variants are persisted as exact aliases'
 );
 
 const onEditSource = sheetCodeSource.slice(
@@ -238,7 +252,7 @@ assert(!/params\.sid\b/.test(source), 'JSONP route does not use reserved sid par
 assert(/^docs\/\*\*/m.test(claspignore), 'docs are excluded from clasp push');
 
 const serverSandbox = vm.createContext({ console, URL, encodeURIComponent, decodeURIComponent });
-vm.runInContext(`${configSource}\n${source}`, serverSandbox, { filename: 'Webアプリ.js' });
+vm.runInContext(`${configSource}\n${seriesRegistrySource}\n${source}`, serverSandbox, { filename: 'Webアプリ.js' });
 
 const invalidationOrder = vm.runInContext(`(() => {
   const originalBump = bumpLibraryDatasetRevision_;
@@ -549,7 +563,7 @@ const uuidSandbox = vm.createContext({
   console,
   Utilities: { getUuid: () => uuidSequence.shift() }
 });
-vm.runInContext(`${configSource}\n${sheetCodeSource}`, uuidSandbox, { filename: 'コード.js' });
+vm.runInContext(`${configSource}\n${seriesRegistrySource}\n${sheetCodeSource}`, uuidSandbox, { filename: 'コード.js' });
 uuidSandbox.__uuidTitles = [['既存'], ['複製'], ['不正'], ['新規']];
 uuidSandbox.__uuidValues = [
   ['11111111-1111-4111-8111-111111111111'],
@@ -586,6 +600,58 @@ assert(
   copiedUuidRepair.values[1][0] !== copiedUuidRepair.values[0][0],
   'editing a copied row preserves the original ID and allocates a new ID to the copy'
 );
+
+uuidSandbox.__registryCatalogRows = [
+  { title: '作品名 1', author: '作者', publisher: '出版社', genreText: '日常, 学園, 連載中', rawKey: '作品名' },
+  { title: '作品名 2', author: '作者', publisher: '出版社', genreText: '日常, 学園, 連載中', rawKey: '作品名' },
+  { title: '資料作品', author: '作者', publisher: '出版社', genreText: '写真集/画集/資料集, 単巻', rawKey: '__extra__資料作品' }
+];
+uuidSandbox.__registryGenreRows = [
+  ['日常', 'ストーリー'],
+  ['学園', '題材'],
+  ['連載中', '状況'],
+  ['単巻', '状況']
+];
+uuidSandbox.__registryIds = ['series-a', 'series-b'];
+const registryPlan = vm.runInContext(`buildSeriesRegistryMigrationPlan_(
+  __registryCatalogRows,
+  __registryGenreRows,
+  () => __registryIds.shift(),
+  '2026-08-20T00:00:00.000Z'
+)`, uuidSandbox);
+assert(registryPlan.seriesCount === 2, 'series registry migration groups books by the X-column key');
+assert(registryPlan.aliasCount === 3, 'extra series retain both prefixed and base aliases');
+assert(registryPlan.conflicts.length === 0, 'compatible catalog genres migrate without conflicts');
+assert(
+  registryPlan.masterRows.some(row => row[2] === '日常' && row[3] === '学園' && row[6] === '連載中'),
+  'series registry migration reconstructs genre slots from genre_master categories'
+);
+assert(
+  registryPlan.masterRows.some(row => row[2] === '写真集/画集/資料集'),
+  'extra-book classification survives migration even when genre_master uses a nonstandard category'
+);
+const signaturePair = vm.runInContext(`[
+  buildSeriesAliasSignature_('【作品名】'),
+  buildSeriesAliasSignature_('作品名')
+]`, uuidSandbox);
+assert(signaturePair[0] === signaturePair[1], 'punctuation-only series-name variants share one safe signature');
+const titleCorrectionPlan = vm.runInContext(`buildSeriesTitleEditLinkPlan_(
+  '誤字しりーず',
+  '誤字シリーズ',
+  { seriesId: 'stable-series' },
+  null
+)`, uuidSandbox);
+assert(
+  titleCorrectionPlan.action === 'LINK_TO_OLD' && titleCorrectionPlan.seriesId === 'stable-series',
+  'correcting a title keeps the old stable series identity through a new alias'
+);
+const titleConflictPlan = vm.runInContext(`buildSeriesTitleEditLinkPlan_(
+  '旧シリーズ',
+  '別シリーズ',
+  { seriesId: 'series-old' },
+  { seriesId: 'series-other' }
+)`, uuidSandbox);
+assert(titleConflictPlan.action === 'CONFLICT', 'title edits never silently merge two established series identities');
 
 const seriesKeyFixture = vm.runInContext(`(() => {
   const masterRows = [

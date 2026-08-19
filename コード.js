@@ -23,6 +23,7 @@ function onEdit(e) {
   const col = e.range.getColumn();
   const colEnd = col + e.range.getNumColumns() - 1;
   const { MAIN, SERIES_MASTER } = CONFIG.SHEETS;
+  const seriesRegistryActive = isSeriesRegistryV2Active_();
   const shouldClearSearchCache = shouldClearLibrarySearchCacheOnEdit_(sheetName, e.range);
   const rowEnd = row + e.range.getNumRows() - 1;
   const touchesMainTitle =
@@ -35,10 +36,34 @@ function onEdit(e) {
     col <= CONFIG.COL.GENRE &&
     colEnd >= CONFIG.COL.GENRE;
   const touchesSeriesMasterSource =
+    !seriesRegistryActive &&
     sheetName === SERIES_MASTER &&
     rowEnd >= 2 &&
     col <= SERIES_KEY_AUTO_CONFIG_.MASTER_GENRE_LAST_COL &&
     colEnd >= SERIES_KEY_AUTO_CONFIG_.MASTER_REGISTERED_KEY_COL;
+  const touchesSeriesRegistryMaster =
+    seriesRegistryActive &&
+    sheetName === SERIES_REGISTRY_CONFIG_.MASTER_SHEET &&
+    rowEnd >= 2 &&
+    col <= 7 &&
+    colEnd >= 2;
+  const touchesSeriesRegistryAlias =
+    seriesRegistryActive &&
+    sheetName === SERIES_REGISTRY_CONFIG_.ALIAS_SHEET &&
+    rowEnd >= 2 &&
+    col <= 4 &&
+    colEnd >= 1;
+  let oldSeriesKeys = null;
+  let seriesEditStartRow = 0;
+  let seriesEditRowCount = 0;
+  if (seriesRegistryActive && touchesMainTitle) {
+    seriesEditStartRow = Math.max(row, 2);
+    const seriesEditEndRow = Math.max(seriesEditStartRow, rowEnd);
+    seriesEditRowCount = seriesEditEndRow - seriesEditStartRow + 1;
+    oldSeriesKeys = sh
+      .getRange(seriesEditStartRow, CONFIG.COL.SERIES_KEY_AUTO, seriesEditRowCount, 1)
+      .getDisplayValues();
+  }
   // 本棚シート（A1）のモード切り替え
   if (sheetName === MAIN && notation === 'A1') {
     switch (value) {
@@ -66,7 +91,23 @@ function onEdit(e) {
   }
 
   let seriesKeyRefreshError = null;
-  if (touchesSeriesMasterSource || touchesMainGenre) {
+  if (touchesSeriesRegistryMaster) {
+    try {
+      ensureSeriesRegistryExtraAliases_();
+      refreshSeriesKeyAutoAfterDerivedChange_(getSheet(MAIN));
+      syncSeriesRegistryFromCatalog_();
+    } catch (error) {
+      seriesKeyRefreshError = error;
+      console.error('series registry refresh failed after master edit:', error);
+    }
+  } else if (touchesSeriesRegistryAlias) {
+    try {
+      refreshSeriesKeyAutoAfterDerivedChange_(getSheet(MAIN));
+    } catch (error) {
+      seriesKeyRefreshError = error;
+      console.error('series registry refresh failed after alias edit:', error);
+    }
+  } else if (touchesSeriesMasterSource || (!seriesRegistryActive && touchesMainGenre)) {
     try {
       refreshSeriesKeyAutoAfterDerivedChange_(getSheet(MAIN));
     } catch (error) {
@@ -75,6 +116,34 @@ function onEdit(e) {
     }
   } else if (touchesMainTitle) {
     updateSeriesKeyAutoForEditedRange_(sh, e.range);
+    if (seriesRegistryActive) {
+      try {
+        const registrySyncResult = syncSeriesRegistryAfterTitleEdit_(
+          sh,
+          seriesEditStartRow,
+          seriesEditRowCount,
+          oldSeriesKeys
+        );
+        ensureSeriesRegistryExtraAliases_();
+        if (!registrySyncResult.conflicts) {
+          updateSeriesKeyAutoForEditedRange_(sh, e.range);
+        } else {
+          const conflictRows = new Set(registrySyncResult.conflictRows || []);
+          for (let index = 0; index < seriesEditRowCount; index++) {
+            const targetRow = seriesEditStartRow + index;
+            if (!conflictRows.has(targetRow)) {
+              updateSeriesKeyAutoForEditedRange_(
+                sh,
+                sh.getRange(targetRow, CONFIG.COL.TITLE, 1, 1)
+              );
+            }
+          }
+        }
+      } catch (error) {
+        seriesKeyRefreshError = error;
+        console.error('series registry title-link refresh failed:', error);
+      }
+    }
   }
 
   if (
@@ -263,6 +332,8 @@ function shouldClearLibrarySearchCacheOnEdit_(sheetName, range) {
   if (sheetName === MAIN) return true;
   if (sheetName === GENRE_MASTER) return true;
   if (sheetName === SERIES_MASTER) return true;
+  if (sheetName === SERIES_REGISTRY_CONFIG_.MASTER_SHEET) return true;
+  if (sheetName === SERIES_REGISTRY_CONFIG_.ALIAS_SHEET) return true;
 
   if (sheetName !== DATA) return false;
 
@@ -327,6 +398,9 @@ function buildSeriesMasterExtraLookup_(masterRows) {
 }
 
 function loadSeriesMasterExtraLookup_() {
+  if (isSeriesRegistryV2Active_()) {
+    return buildSeriesRegistryExtraLookup_();
+  }
   const masterSheet = getSheet(CONFIG.SHEETS.SERIES_MASTER);
   const keyCol = SERIES_KEY_AUTO_CONFIG_.MASTER_REGISTERED_KEY_COL;
   const lastRow = getLastDataRow(masterSheet, keyCol);
@@ -359,12 +433,16 @@ function buildSeriesKeyAutoRepairPlan_(titles, genres, currentKeys, extraLookup)
     const title = String(Array.isArray(titleRow) ? titleRow[0] || '' : titleRow || '');
     const genresRaw = Array.isArray(genreRow) ? genreRow[0] || '' : genreRow || '';
     const currentKey = String(Array.isArray(keyRow) ? keyRow[0] || '' : keyRow || '');
+    const baseKey = title ? generateSeriesKeyAuto(title) : '';
     const lookupKey = extractSeriesMasterLookupKeyFromTitle_(title);
     const isExtra = lookup
-      ? lookup.get(lookupKey) === true
+      ? (
+          lookup.get(normalizeSeriesMasterLookupKey_(baseKey)) === true ||
+          lookup.get(lookupKey) === true
+        )
       : isExtraBookByGenres_(genresRaw);
     const nextKey = title
-      ? (isExtra ? generateExtraSeriesKey_(title) : generateSeriesKeyAuto(title))
+      ? (isExtra ? generateExtraSeriesKey_(title) : baseKey)
       : '';
 
     if (isExtra && title) extraCount++;

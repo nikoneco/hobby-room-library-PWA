@@ -713,7 +713,7 @@ function buildPreviewIndexPayload_(dataset) {
   }));
 }
 
-const LOCAL_LIBRARY_INDEX_VERSION_ = 4;
+const LOCAL_LIBRARY_INDEX_VERSION_ = 5;
 
 /**
  * PWAのローカル索引と一緒に保存する検索UI用メタデータを返す。
@@ -1474,6 +1474,7 @@ function buildLibraryDataset_() {
   const rows = loadMainBookData_();
   const genreMaster = getGenreMasterData_();
   const publisherOptions = getPublisherOptions_();
+  const seriesRegistry = loadSeriesRegistryLookup_();
 
   const index = [];
   const titleSet = new Set();
@@ -1486,7 +1487,11 @@ function buildLibraryDataset_() {
     const title = row[CONFIG.IDX.TITLE] || '';
     const yomi = row[CONFIG.IDX.YOMIGANA] || '';
     const author = row[CONFIG.IDX.AUTHOR] || '';
-    const seriesKeyAuto = row[CONFIG.IDX.SERIES_KEY_AUTO] || '';
+    const rawSeriesKeyAuto = row[CONFIG.IDX.SERIES_KEY_AUTO] || '';
+    const resolvedSeries = resolveSeriesRegistryKey_(rawSeriesKeyAuto, seriesRegistry);
+    const seriesKeyAuto = resolvedSeries
+      ? resolvedSeries.seriesId
+      : rawSeriesKeyAuto;
     const volume = extractVolumeNumber(title);
     const publisher = row[CONFIG.IDX.PUBLISHER] || '';
     const released = row[CONFIG.IDX.RELEASED] || '';
@@ -1549,6 +1554,10 @@ function buildLibraryDataset_() {
       genres,
       genreMeta,
       seriesKeyAuto,
+      seriesSourceKey: rawSeriesKeyAuto,
+      isExtraSeries: resolvedSeries
+        ? Boolean(resolvedSeries.isExtra)
+        : /^__extra__/.test(String(rawSeriesKeyAuto || '')),
       seriesDisplayTitle: buildSeriesDisplayTitle_(title),
       volume,
       isMainVolume: Number(volume) > 0,
@@ -1591,7 +1600,7 @@ function buildLibraryDataset_() {
     const meta = item.seriesKeyAuto ? seriesMetaMap.get(item.seriesKeyAuto) : null;
     const seriesCount = meta ? Number(meta.count || 0) : 0;
     const seriesSearchTitle = meta ? (meta.searchTitle || '') : '';
-    const isExtraSeries = /^__extra__/.test(String(item.seriesKeyAuto || ''));
+    const isExtraSeries = Boolean(item.isExtraSeries);
 
     if (item.seriesKeyAuto) {
       item.ownedMaxVolume = seriesMaxMap.get(item.seriesKeyAuto) || 0;
@@ -1686,7 +1695,7 @@ function buildSeriesInventoryStatus_(dataset) {
 
   index.forEach((item, rowIndex) => {
     const key = String(item && item.seriesKeyAuto || '').trim();
-    if (!key || /^__extra__/i.test(key)) return;
+    if (!key || Boolean(item && item.isExtraSeries)) return;
 
     const volume = Number(item && item.volume || 0);
     if (!Number.isInteger(volume) || volume <= 0) return;

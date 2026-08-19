@@ -193,7 +193,12 @@ function buildYomiganaImportResult_(
 }
 
 function refreshSeriesKeyAutoForImport_(sheet) {
-  return refreshSeriesKeyAutoAfterDerivedChange_(
-    sheet || getSheet(CONFIG.SHEETS.MAIN)
-  );
+  const targetSheet = sheet || getSheet(CONFIG.SHEETS.MAIN);
+  const series = refreshSeriesKeyAutoAfterDerivedChange_(targetSheet);
+  if (!isSeriesRegistryV2Active_()) return series;
+
+  const registry = syncSeriesRegistryFromCatalog_();
+  ensureSeriesRegistryExtraAliases_();
+  const converged = refreshSeriesKeyAutoAfterDerivedChange_(targetSheet);
+  return Object.assign({}, converged, { registry });
 }
