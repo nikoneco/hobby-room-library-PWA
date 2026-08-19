@@ -35,6 +35,11 @@ function onEdit(e) {
     sheetName === MAIN &&
     col <= CONFIG.COL.GENRE &&
     colEnd >= CONFIG.COL.GENRE;
+  const touchesMainSeriesKey =
+    sheetName === MAIN &&
+    rowEnd >= 2 &&
+    col <= CONFIG.COL.SERIES_KEY_AUTO &&
+    colEnd >= CONFIG.COL.SERIES_KEY_AUTO;
   const touchesSeriesMasterSource =
     !seriesRegistryActive &&
     sheetName === SERIES_MASTER &&
@@ -143,6 +148,18 @@ function onEdit(e) {
         seriesKeyRefreshError = error;
         console.error('series registry title-link refresh failed:', error);
       }
+    }
+  } else if (seriesRegistryActive && touchesMainSeriesKey) {
+    try {
+      const seriesKeyStartRow = Math.max(row, 2);
+      syncSeriesRegistryAfterManualKeyEdit_(
+        sh,
+        seriesKeyStartRow,
+        rowEnd - seriesKeyStartRow + 1
+      );
+    } catch (error) {
+      seriesKeyRefreshError = error;
+      console.error('series registry sync failed after manual series-key edit:', error);
     }
   }
 

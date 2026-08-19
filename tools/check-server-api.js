@@ -176,6 +176,23 @@ assert(
   'editing the generated series-key column also repairs the row UUID'
 );
 assert(
+  onEditSource.includes('seriesRegistryActive && touchesMainSeriesKey') &&
+    onEditSource.includes('syncSeriesRegistryAfterManualKeyEdit_('),
+  'manual series-key edits synchronize the stable V2 registry'
+);
+assert(
+  seriesRegistrySource.includes('function refreshSeriesRegistryUsageCountsFromCatalog_') &&
+    seriesRegistrySource.includes('masterCountsChanged') &&
+    seriesRegistrySource.includes('aliasCountsChanged'),
+  'series registry synchronization refreshes master and alias usage counts from catalog X'
+);
+assert(
+  seriesRegistrySource.includes('function syncSeriesRegistryAfterManualKeyEdit_') &&
+    seriesRegistrySource.includes("'MANUAL_X_MERGE'") &&
+    seriesRegistrySource.includes("setValue('MERGED')"),
+  'manual series-key overrides persist the generated key as an alias and retain merged master history'
+);
+assert(
   /function\s+enrichNewBooksAfterImportByLimit_\s*\([^)]*\)[\s\S]*?SpreadsheetApp\.flush\(\);[\s\S]*?clearLibrarySearchCache_\(\);/.test(newBookImportSource),
   'new-book enrichment flushes sheet writes before invalidating caches'
 );

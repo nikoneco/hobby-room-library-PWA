@@ -809,11 +809,174 @@ function syncSeriesRegistryFromCatalog_() {
       .getRange(startRow, 1, newAliasRows.length, 6)
       .setValues(newAliasRows);
   }
+  const usage = refreshSeriesRegistryUsageCountsFromCatalog_(sheet);
   return {
     active: true,
     added,
     aliasesAdded: newAliasRows.length,
-    keys: counts.size
+    keys: counts.size,
+    masterCountsChanged: usage.masterCountsChanged,
+    aliasCountsChanged: usage.aliasCountsChanged
+  };
+}
+
+/**
+ * 目録X列を正本として、V2マスタとaliasの蔵書数を再集計する。
+ * X列の手修正、タイトル訂正、新刊追加のいずれから呼ばれても同じ状態へ収束させる。
+ */
+function refreshSeriesRegistryUsageCountsFromCatalog_(catalogSheet) {
+  if (!isSeriesRegistryV2Active_()) {
+    return { active: false, masterCountsChanged: 0, aliasCountsChanged: 0 };
+  }
+  const sheet = catalogSheet || getSheet(CONFIG.SHEETS.MAIN);
+  const registry = loadSeriesRegistryLookup_();
+  if (!registry) {
+    return { active: true, masterCountsChanged: 0, aliasCountsChanged: 0 };
+  }
+  const lastRow = getLastDataRow(sheet, CONFIG.COL.TITLE);
+  const keyCounts = new Map();
+  const seriesCounts = new Map();
+  if (lastRow >= 2) {
+    sheet
+      .getRange(2, CONFIG.COL.SERIES_KEY_AUTO, lastRow - 1, 1)
+      .getDisplayValues()
+      .forEach(row => {
+        const key = normalizeSeriesAliasKey_(row[0]);
+        if (!key) return;
+        keyCounts.set(key, (keyCounts.get(key) || 0) + 1);
+        const resolved = resolveSeriesRegistryKey_(key, registry);
+        if (!resolved) return;
+        seriesCounts.set(
+          resolved.seriesId,
+          (seriesCounts.get(resolved.seriesId) || 0) + 1
+        );
+      });
+  }
+
+  const masterLastRow = getLastDataRow(registry.masterSheet, 1);
+  let masterCountsChanged = 0;
+  if (masterLastRow >= 2) {
+    const idValues = registry.masterSheet
+      .getRange(2, 1, masterLastRow - 1, 1)
+      .getDisplayValues();
+    const countRange = registry.masterSheet.getRange(2, 8, masterLastRow - 1, 1);
+    const countValues = countRange.getValues();
+    idValues.forEach((row, index) => {
+      const desired = seriesCounts.get(String(row[0] || '').trim()) || 0;
+      if (Number(countValues[index][0] || 0) === desired) return;
+      countValues[index][0] = desired;
+      masterCountsChanged += 1;
+    });
+    if (masterCountsChanged) countRange.setValues(countValues);
+  }
+
+  const aliasLastRow = getLastDataRow(registry.aliasSheet, 1);
+  let aliasCountsChanged = 0;
+  if (aliasLastRow >= 2) {
+    const aliasValues = registry.aliasSheet
+      .getRange(2, 1, aliasLastRow - 1, 1)
+      .getDisplayValues();
+    const countRange = registry.aliasSheet.getRange(2, 5, aliasLastRow - 1, 1);
+    const countValues = countRange.getValues();
+    aliasValues.forEach((row, index) => {
+      const desired = keyCounts.get(normalizeSeriesAliasKey_(row[0])) || 0;
+      if (Number(countValues[index][0] || 0) === desired) return;
+      countValues[index][0] = desired;
+      aliasCountsChanged += 1;
+    });
+    if (aliasCountsChanged) countRange.setValues(countValues);
+  }
+
+  return { active: true, masterCountsChanged, aliasCountsChanged };
+}
+
+/**
+ * X列の手修正を、元の自動判定キーから修正先series_idへの明示aliasとして保存する。
+ * これにより、後日タイトル編集でX列を再生成しても同じシリーズへ戻る。
+ */
+function syncSeriesRegistryAfterManualKeyEdit_(sheet, startRow, rowCount) {
+  if (!isSeriesRegistryV2Active_() || rowCount <= 0) {
+    return { active: false, aliasesMerged: 0, masterCountsChanged: 0 };
+  }
+  const manualKeys = sheet
+    .getRange(startRow, CONFIG.COL.SERIES_KEY_AUTO, rowCount, 1)
+    .getDisplayValues();
+  const titles = sheet
+    .getRange(startRow, CONFIG.COL.TITLE, rowCount, 1)
+    .getValues();
+  const genres = sheet
+    .getRange(startRow, CONFIG.COL.GENRE, rowCount, 1)
+    .getDisplayValues();
+  const automaticPlan = buildSeriesKeyAutoRepairPlan_(
+    titles,
+    genres,
+    manualKeys,
+    loadSeriesMasterExtraLookup_()
+  );
+
+  // 修正先キーが未知なら、先に通常の同期で新しいseries_idを作る。
+  syncSeriesRegistryFromCatalog_();
+  let registry = loadSeriesRegistryLookup_();
+  if (!registry) return { active: true, aliasesMerged: 0, masterCountsChanged: 0 };
+
+  const timestamp = new Date();
+  const sourceSeriesIds = new Set();
+  const targetSeriesIds = new Set();
+  let aliasesMerged = 0;
+  manualKeys.forEach((row, index) => {
+    const manualKey = normalizeSeriesAliasKey_(row[0]);
+    const automaticKey = normalizeSeriesAliasKey_(
+      automaticPlan.values[index] ? automaticPlan.values[index][0] : ''
+    );
+    if (!manualKey || !automaticKey || manualKey === automaticKey) return;
+
+    const target = resolveSeriesRegistryKey_(manualKey, registry);
+    if (!target) return;
+    targetSeriesIds.add(target.seriesId);
+    const existing = registry.aliasByKey.get(automaticKey);
+    if (existing && existing.seriesId === target.seriesId) return;
+    if (existing) {
+      sourceSeriesIds.add(existing.seriesId);
+      registry.aliasSheet.getRange(existing.row, 2).setValue(target.seriesId);
+      registry.aliasSheet.getRange(existing.row, 3).setValue('MANUAL_X_MERGE');
+      registry.aliasSheet.getRange(existing.row, 6).setValue(timestamp);
+    } else {
+      appendSeriesAliasRow_(
+        registry.aliasSheet,
+        automaticKey,
+        target.seriesId,
+        'MANUAL_X_MERGE',
+        0,
+        timestamp
+      );
+    }
+    aliasesMerged += 1;
+  });
+
+  if (aliasesMerged) registry = loadSeriesRegistryLookup_();
+  const usage = refreshSeriesRegistryUsageCountsFromCatalog_(sheet);
+  if (sourceSeriesIds.size) {
+    const masterLastRow = getLastDataRow(registry.masterSheet, 1);
+    const rows = masterLastRow >= 2
+      ? registry.masterSheet.getRange(2, 1, masterLastRow - 1, 10).getValues()
+      : [];
+    rows.forEach((row, index) => {
+      const seriesId = String(row[0] || '').trim();
+      const count = Number(row[7] || 0);
+      if (targetSeriesIds.has(seriesId) && count > 0) {
+        registry.masterSheet.getRange(index + 2, 9).setValue('ACTIVE');
+        registry.masterSheet.getRange(index + 2, 10).setValue(timestamp);
+      } else if (sourceSeriesIds.has(seriesId) && count === 0) {
+        registry.masterSheet.getRange(index + 2, 9).setValue('MERGED');
+        registry.masterSheet.getRange(index + 2, 10).setValue(timestamp);
+      }
+    });
+  }
+  return {
+    active: true,
+    aliasesMerged,
+    masterCountsChanged: usage.masterCountsChanged,
+    aliasCountsChanged: usage.aliasCountsChanged
   };
 }
 
