@@ -33,6 +33,7 @@ const jsFiles = [
 ];
 
 const jsAssetNames = new Map();
+let gasRunShimAssetName = 'gas-run-shim.js';
 
 function ensureDir(dir) {
   fs.mkdirSync(dir, { recursive: true });
@@ -72,6 +73,23 @@ function buildHashedAssetName(baseName, source) {
   const ext = path.extname(baseName);
   const stem = baseName.slice(0, -ext.length);
   return `${stem}.${shortHash(source)}${ext}`;
+}
+
+function writeHashedGeneratedJsAsset(baseName) {
+  const sourcePath = path.join(jsDir, baseName);
+  const source = fs.readFileSync(sourcePath, 'utf8');
+  const hashedName = buildHashedAssetName(baseName, source);
+  const stem = path.basename(baseName, path.extname(baseName)).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const hashedPattern = new RegExp(`^${stem}\\.[0-9a-f]{10}\\.js$`);
+
+  fs.readdirSync(jsDir).forEach(fileName => {
+    if (hashedPattern.test(fileName) && fileName !== hashedName) {
+      fs.rmSync(path.join(jsDir, fileName));
+    }
+  });
+
+  fs.copyFileSync(sourcePath, path.join(jsDir, hashedName));
+  return hashedName;
 }
 
 function prepareStaticAssetNames() {
@@ -131,7 +149,7 @@ function buildStaticIndex() {
   source = source.replace(
     /\s*<\?!= HtmlService\.createHtmlOutputFromFile\('script\.state\.js\.html'\)\.getContent\(\); \?>/,
     [
-      '\n  <script src="./assets/js/gas-run-shim.js"></script>',
+      `\n  <script src="./assets/js/${gasRunShimAssetName}"></script>`,
       '  <script src="./assets/js/pwa-client.js"></script>',
       `  <script src="./assets/js/${jsOutName('script.state.js.html')}"></script>`
     ].join('\n')
@@ -5064,7 +5082,7 @@ function writePwaFiles() {
   './assets/logo.png',
   './assets/librarian-presence.jpg',
   './assets/splash-lantern.jpg',
-  './assets/js/gas-run-shim.js',
+  './assets/js/' + gasRunShimAssetName,
   './assets/js/pwa-client.js',
   ...jsFiles.map(fileName => './assets/js/' + jsOutName(fileName)),
   './assets/icons/icon-lantern-192.png',
@@ -5382,6 +5400,7 @@ function main() {
   writeStaticAssets();
   writePwaCss();
   writeGasRunShim();
+  gasRunShimAssetName = writeHashedGeneratedJsAsset('gas-run-shim.js');
   writePwaClient();
   writeIcons();
   fs.writeFileSync(path.join(docsDir, 'index.html'), buildStaticIndex(), 'utf8');

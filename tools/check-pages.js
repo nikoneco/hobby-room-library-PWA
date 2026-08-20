@@ -25,6 +25,7 @@ const pwaClientForMenu = read(path.join(docs, 'assets', 'js', 'pwa-client.js'));
 const shelfClientForMenu = read(path.join(docs, 'assets', 'js', 'script.shelf.js'));
 const serverSource = read(path.join(root, 'Webアプリ.js'));
 const buildPagesSource = read(path.join(root, 'tools', 'build-pages.js'));
+const gasRunShimAssetMatch = index.match(/\.\/assets\/js\/(gas-run-shim\.[0-9a-f]{10}\.js)/);
 
 [
   'manifest.webmanifest',
@@ -78,7 +79,9 @@ assert(index.includes('apple-mobile-web-app-status-bar-style" content="black-tra
 assert(index.includes('id="pwaLaunchSplash"'), 'static index includes launch splash overlay');
 assert(index.includes('src="./assets/splash-lantern.jpg"'), 'static index uses optimized lantern splash asset');
 assert(index.includes('id="pwaNetworkBanner"'), 'static index includes offline/network banner');
-assert(index.includes('./assets/js/gas-run-shim.js'), 'static index loads GAS JSONP shim');
+assert(gasRunShimAssetMatch, 'static index loads a fingerprinted GAS JSONP shim');
+assert(fs.existsSync(path.join(docs, 'assets', 'js', gasRunShimAssetMatch[1])), 'fingerprinted GAS JSONP shim exists');
+assert(sw.includes(`./assets/js/${gasRunShimAssetMatch[1]}`), 'service worker precaches the fingerprinted GAS JSONP shim');
 assert(index.includes('./assets/js/pwa-client.js'), 'static index loads PWA client');
 assert(index.includes('./assets/css/pwa.css'), 'static index loads PWA CSS');
 assert(index.includes('src="./assets/logo.png"'), 'static index uses local logo asset');
