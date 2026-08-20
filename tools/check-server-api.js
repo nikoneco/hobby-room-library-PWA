@@ -117,7 +117,12 @@ assert(
   'resetting Kobo retry rows invalidates search and PWA detail caches'
 );
 assert(configSource.includes("DIRTY_PROPERTY: 'series_key_auto_dirty_v1'"), 'series-key repair records an interrupted derived refresh');
-assert(sheetCodeSource.includes('function buildSeriesMasterExtraLookup_'), 'series-key repair reads the source series master directly');
+assert(
+  sheetCodeSource.includes('function loadSeriesRegistryExtraLookup_') &&
+    sheetCodeSource.includes('return buildSeriesRegistryExtraLookup_(registry);'),
+  'series-key repair reads classifications exclusively from the v2 registry'
+);
+assert(!configSource.includes("SERIES_MASTER: 'series_master'"), 'legacy series_master is retired from sheet configuration');
 assert(
   /function\s+writeSeriesKeyAutoRepairPlan_\s*\([^)]*\)[\s\S]*?if\s*\(!changedIndices\.length\)\s*return updatedRanges;/.test(sheetCodeSource),
   'series-key repair performs no sheet write when every key is already current'
@@ -156,12 +161,7 @@ assert(
   onEditSource.lastIndexOf('clearLibrarySearchCache_();') > onEditSource.indexOf('refreshSeriesKeyAutoAfterDerivedChange_'),
   'series-master and W-column edits repair every derived series key before cache invalidation'
 );
-assert(
-  onEditSource.includes('sheetName === SERIES_MASTER') &&
-    onEditSource.includes('SERIES_KEY_AUTO_CONFIG_.MASTER_REGISTERED_KEY_COL') &&
-    onEditSource.includes('SERIES_KEY_AUTO_CONFIG_.MASTER_GENRE_LAST_COL'),
-  'onEdit detects series_master source-column edits'
-);
+assert(!onEditSource.includes('SERIES_MASTER'), 'onEdit no longer depends on the retired series_master sheet');
 assert(
   onEditSource.indexOf('if (seriesKeyRefreshError) throw seriesKeyRefreshError;') >
     onEditSource.lastIndexOf('clearLibrarySearchCache_();'),
@@ -691,22 +691,26 @@ const titleConflictPlan = vm.runInContext(`buildSeriesTitleEditLinkPlan_(
 assert(titleConflictPlan.action === 'CONFLICT', 'title edits never silently merge two established series identities');
 
 const seriesKeyFixture = vm.runInContext(`(() => {
-  const masterRows = [
-    ['通常作品', '青春', '', '', '', '連載中'],
-    ['資料作品', '写真集/画集/資料集', '', '', '', '単巻'],
-    ['重複作品', '青春', '', '', '', '連載中'],
-    ['重複作品', '写真集/画集/資料集', '', '', '', '単巻']
-  ];
+  const registry = {
+    masterById: new Map([
+      ['normal', { isExtra: false }],
+      ['extra', { isExtra: true }]
+    ]),
+    aliasByKey: new Map([
+      ['通常作品', { seriesId: 'normal' }],
+      ['資料作品', { seriesId: 'extra' }]
+    ])
+  };
   const titles = [
     ['通常作品 1'],
     ['資料作品 1'],
     ['資料作品 2'],
-    ['重複作品 1']
+    ['通常作品 2']
   ];
   const staleGenres = [['青春'], ['青春'], ['青春'], ['写真集/画集/資料集']];
-  const lookup = buildSeriesMasterExtraLookup_(masterRows);
+  const lookup = buildSeriesRegistryExtraLookup_(registry);
   const expected = titles.map(row => [
-    lookup.get(extractSeriesMasterLookupKeyFromTitle_(row[0])) === true
+    lookup.get(extractSeriesLookupKeyFromTitle_(row[0])) === true
       ? generateExtraSeriesKey_(row[0])
       : generateSeriesKeyAuto(row[0])
   ]);
@@ -714,12 +718,9 @@ const seriesKeyFixture = vm.runInContext(`(() => {
   current[1][0] = generateSeriesKeyAuto(titles[1][0]);
   const plan = buildSeriesKeyAutoRepairPlan_(titles, staleGenres, current, lookup);
 
-  const flippedRows = [
-    ['通常作品', '写真集/画集/資料集', '', '', '', '単巻'],
-    ['資料作品', '青春', '', '', '', '連載中'],
-    ['重複作品', '青春', '', '', '', '連載中']
-  ];
-  const flippedLookup = buildSeriesMasterExtraLookup_(flippedRows);
+  registry.masterById.get('normal').isExtra = true;
+  registry.masterById.get('extra').isExtra = false;
+  const flippedLookup = buildSeriesRegistryExtraLookup_(registry);
   const flippedPlan = buildSeriesKeyAutoRepairPlan_(titles, staleGenres, plan.values, flippedLookup);
   const idempotentPlan = buildSeriesKeyAutoRepairPlan_(titles, staleGenres, flippedPlan.values, flippedLookup);
   const genreFallbackPlan = buildSeriesKeyAutoRepairPlan_(
@@ -727,9 +728,11 @@ const seriesKeyFixture = vm.runInContext(`(() => {
     [['写真集/画集/資料集'], ['青春']],
     [[''], ['']]
   );
-  const normalizedLookup = buildSeriesMasterExtraLookup_([
-    ['  資料作品　', '写真集/画集/資料集', '', '', '', '単巻']
-  ]);
+  const normalizedRegistry = {
+    masterById: new Map([['extra', { isExtra: true }]]),
+    aliasByKey: new Map([[normalizeSeriesAliasKey_('  資料作品　'), { seriesId: 'extra' }]])
+  };
+  const normalizedLookup = buildSeriesRegistryExtraLookup_(normalizedRegistry);
 
   return {
     plan,
@@ -737,21 +740,21 @@ const seriesKeyFixture = vm.runInContext(`(() => {
     idempotentPlan,
     genreFallbackPlan,
     normalizedLookupMatches:
-      normalizedLookup.get(extractSeriesMasterLookupKeyFromTitle_('\t資料作品　 10')) === true
+      normalizedLookup.get(extractSeriesLookupKeyFromTitle_('\t資料作品　 10')) === true
   };
 })()`, uuidSandbox);
 assert(seriesKeyFixture.plan.changed === 1, 'series-key repair changes only a stale row');
-assert(seriesKeyFixture.plan.changedIndices[0] === 1, 'series-master classification wins over a temporarily stale W value');
+assert(seriesKeyFixture.plan.changedIndices[0] === 1, 'v2 registry classification wins over a temporarily stale W value');
 assert(
   /^__extra__/.test(seriesKeyFixture.plan.values[1][0]) &&
     /^__extra__/.test(seriesKeyFixture.plan.values[2][0]),
   'photo, art, and reference books remain separated from their normal series'
 );
-assert(!/^__extra__/.test(seriesKeyFixture.plan.values[3][0]), 'duplicate series-master keys keep XLOOKUP first-match behavior');
+assert(!/^__extra__/.test(seriesKeyFixture.plan.values[3][0]), 'v2 registry classification overrides a stale row genre');
 assert(
   /^__extra__/.test(seriesKeyFixture.flippedPlan.values[0][0]) &&
     !/^__extra__/.test(seriesKeyFixture.flippedPlan.values[1][0]),
-  'series-master changes converge in both normal-to-extra and extra-to-normal directions'
+  'v2 registry changes converge in both normal-to-extra and extra-to-normal directions'
 );
 assert(seriesKeyFixture.idempotentPlan.changed === 0, 'series-key repair is idempotent after convergence');
 assert(
@@ -759,7 +762,7 @@ assert(
     !/^__extra__/.test(seriesKeyFixture.genreFallbackPlan.values[1][0]),
   'the pure repair plan retains W-column genre fallback behavior when no master lookup is supplied'
 );
-assert(seriesKeyFixture.normalizedLookupMatches, 'series-master lookup normalizes fullwidth and repeated whitespace like the W formula');
+assert(seriesKeyFixture.normalizedLookupMatches, 'v2 registry lookup normalizes fullwidth and repeated whitespace like the W formula');
 
 const seriesKeyWrites = [];
 uuidSandbox.__seriesKeyWriteSheet = {

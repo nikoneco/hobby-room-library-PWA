@@ -22,7 +22,7 @@ function onEdit(e) {
   const row = e.range.getRow();
   const col = e.range.getColumn();
   const colEnd = col + e.range.getNumColumns() - 1;
-  const { MAIN, SERIES_MASTER } = CONFIG.SHEETS;
+  const { MAIN } = CONFIG.SHEETS;
   const seriesRegistryActive = isSeriesRegistryV2Active_();
   const shouldClearSearchCache = shouldClearLibrarySearchCacheOnEdit_(sheetName, e.range);
   const rowEnd = row + e.range.getNumRows() - 1;
@@ -31,21 +31,11 @@ function onEdit(e) {
     rowEnd >= 2 &&
     col <= CONFIG.COL.TITLE &&
     colEnd >= CONFIG.COL.TITLE;
-  const touchesMainGenre =
-    sheetName === MAIN &&
-    col <= CONFIG.COL.GENRE &&
-    colEnd >= CONFIG.COL.GENRE;
   const touchesMainSeriesKey =
     sheetName === MAIN &&
     rowEnd >= 2 &&
     col <= CONFIG.COL.SERIES_KEY_AUTO &&
     colEnd >= CONFIG.COL.SERIES_KEY_AUTO;
-  const touchesSeriesMasterSource =
-    !seriesRegistryActive &&
-    sheetName === SERIES_MASTER &&
-    rowEnd >= 2 &&
-    col <= SERIES_KEY_AUTO_CONFIG_.MASTER_GENRE_LAST_COL &&
-    colEnd >= SERIES_KEY_AUTO_CONFIG_.MASTER_REGISTERED_KEY_COL;
   const touchesSeriesRegistryMaster =
     seriesRegistryActive &&
     sheetName === SERIES_REGISTRY_CONFIG_.MASTER_SHEET &&
@@ -111,13 +101,6 @@ function onEdit(e) {
     } catch (error) {
       seriesKeyRefreshError = error;
       console.error('series registry refresh failed after alias edit:', error);
-    }
-  } else if (touchesSeriesMasterSource || (!seriesRegistryActive && touchesMainGenre)) {
-    try {
-      refreshSeriesKeyAutoAfterDerivedChange_(getSheet(MAIN));
-    } catch (error) {
-      seriesKeyRefreshError = error;
-      console.error('series_key_auto refresh failed after derived genre edit:', error);
     }
   } else if (touchesMainTitle) {
     updateSeriesKeyAutoForEditedRange_(sh, e.range);
@@ -344,11 +327,10 @@ function fillMissingBookUuidsAll_() {
 function shouldClearLibrarySearchCacheOnEdit_(sheetName, range) {
   if (!range) return false;
 
-  const { MAIN, DATA, GENRE_MASTER, SERIES_MASTER } = CONFIG.SHEETS;
+  const { MAIN, DATA, GENRE_MASTER } = CONFIG.SHEETS;
 
   if (sheetName === MAIN) return true;
   if (sheetName === GENRE_MASTER) return true;
-  if (sheetName === SERIES_MASTER) return true;
   if (sheetName === SERIES_REGISTRY_CONFIG_.MASTER_SHEET) return true;
   if (sheetName === SERIES_REGISTRY_CONFIG_.ALIAS_SHEET) return true;
 
@@ -366,7 +348,7 @@ function shouldClearLibrarySearchCacheOnEdit_(sheetName, range) {
 }
 
 
-function normalizeSeriesMasterLookupKey_(value) {
+function normalizeSeriesLookupKey_(value) {
   return String(value || '')
     .replace(/　/g, ' ')
     .trim()
@@ -375,62 +357,22 @@ function normalizeSeriesMasterLookupKey_(value) {
 }
 
 /**
- * 目録W列のARRAYFORMULAと同じ規則で、タイトルからseries_master検索キーを作る。
+ * 目録W列のARRAYFORMULAと同じ規則で、タイトルからシリーズ検索キーを作る。
  * W列はタイトルの先頭空白区切り要素だけをXLOOKUPへ渡している。
  */
-function extractSeriesMasterLookupKeyFromTitle_(title) {
-  const normalized = normalizeSeriesMasterLookupKey_(title);
+function extractSeriesLookupKeyFromTitle_(title) {
+  const normalized = normalizeSeriesLookupKey_(title);
   if (!normalized) return '';
 
   return normalized.split(' ')[0];
 }
 
-/**
- * series_master B:Gから、W列と同じ「先勝ち」の資料系判定表を構築する。
- * XLOOKUPは最初の一致を返すため、重複キーを後勝ちで上書きしない。
- */
-function buildSeriesMasterExtraLookup_(masterRows) {
-  const lookup = new Map();
-  const firstGenreIndex =
-    SERIES_KEY_AUTO_CONFIG_.MASTER_GENRE_FIRST_COL -
-    SERIES_KEY_AUTO_CONFIG_.MASTER_REGISTERED_KEY_COL;
-  const lastGenreIndexExclusive =
-    SERIES_KEY_AUTO_CONFIG_.MASTER_GENRE_LAST_COL -
-    SERIES_KEY_AUTO_CONFIG_.MASTER_REGISTERED_KEY_COL +
-    1;
-  (Array.isArray(masterRows) ? masterRows : []).forEach(row => {
-    const values = Array.isArray(row) ? row : [];
-    const key = normalizeSeriesMasterLookupKey_(values[0]);
-    if (!key || lookup.has(key)) return;
-
-    lookup.set(
-      key,
-      values
-        .slice(firstGenreIndex, lastGenreIndexExclusive)
-        .map(value => String(value || '').trim())
-        .includes(SERIES_KEY_AUTO_CONFIG_.EXTRA_GENRE)
-    );
-  });
-  return lookup;
-}
-
-function loadSeriesMasterExtraLookup_() {
-  if (isSeriesRegistryV2Active_()) {
-    return buildSeriesRegistryExtraLookup_();
+function loadSeriesRegistryExtraLookup_() {
+  const registry = loadSeriesRegistryLookup_();
+  if (!registry) {
+    throw new Error('series_master_v2 / series_alias_v2 registry is not active');
   }
-  const masterSheet = getSheet(CONFIG.SHEETS.SERIES_MASTER);
-  const keyCol = SERIES_KEY_AUTO_CONFIG_.MASTER_REGISTERED_KEY_COL;
-  const lastRow = getLastDataRow(masterSheet, keyCol);
-  if (lastRow < 2) return new Map();
-
-  const width =
-    SERIES_KEY_AUTO_CONFIG_.MASTER_GENRE_LAST_COL -
-    SERIES_KEY_AUTO_CONFIG_.MASTER_REGISTERED_KEY_COL +
-    1;
-  const rows = masterSheet
-    .getRange(2, keyCol, lastRow - 1, width)
-    .getDisplayValues();
-  return buildSeriesMasterExtraLookup_(rows);
+  return buildSeriesRegistryExtraLookup_(registry);
 }
 
 function buildSeriesKeyAutoRepairPlan_(titles, genres, currentKeys, extraLookup) {
@@ -451,10 +393,10 @@ function buildSeriesKeyAutoRepairPlan_(titles, genres, currentKeys, extraLookup)
     const genresRaw = Array.isArray(genreRow) ? genreRow[0] || '' : genreRow || '';
     const currentKey = String(Array.isArray(keyRow) ? keyRow[0] || '' : keyRow || '');
     const baseKey = title ? generateSeriesKeyAuto(title) : '';
-    const lookupKey = extractSeriesMasterLookupKeyFromTitle_(title);
+    const lookupKey = extractSeriesLookupKeyFromTitle_(title);
     const isExtra = lookup
       ? (
-          lookup.get(normalizeSeriesMasterLookupKey_(baseKey)) === true ||
+          lookup.get(normalizeSeriesLookupKey_(baseKey)) === true ||
           lookup.get(lookupKey) === true
         )
       : isExtraBookByGenres_(genresRaw);
@@ -544,7 +486,7 @@ function buildSeriesKeyAutoSheetPlan_(sheet, startRow, rowCount, extraLookup) {
 function repairSeriesKeyAutoRange_(sheet, startRow, rowCount, extraLookup) {
   const lookup = extraLookup instanceof Map
     ? extraLookup
-    : loadSeriesMasterExtraLookup_();
+    : loadSeriesRegistryExtraLookup_();
   const plan = buildSeriesKeyAutoSheetPlan_(sheet, startRow, rowCount, lookup);
   plan.updatedRanges = writeSeriesKeyAutoRepairPlan_(sheet, startRow, plan);
   return plan;
@@ -558,7 +500,7 @@ function repairSeriesKeyAutoAll_(sheet) {
     sh,
     2,
     lastRow - 1,
-    loadSeriesMasterExtraLookup_()
+    loadSeriesRegistryExtraLookup_()
   );
 }
 
@@ -584,7 +526,7 @@ function auditSeriesKeyAutoConsistency_() {
     sheet,
     2,
     Math.max(0, lastRow - 1),
-    loadSeriesMasterExtraLookup_()
+    loadSeriesRegistryExtraLookup_()
   );
   return summarizeSeriesKeyAutoPlan_(plan);
 }
@@ -625,7 +567,7 @@ function refreshSeriesKeyAutoAfterDerivedChange_(sheet) {
 
 function updateSeriesKeyAutoForRow_(sheet, row) {
   if (row < 2) return { checked: 0, changed: 0 };
-  return repairSeriesKeyAutoRange_(sheet, row, 1, loadSeriesMasterExtraLookup_());
+  return repairSeriesKeyAutoRange_(sheet, row, 1, loadSeriesRegistryExtraLookup_());
 }
 
 /**
@@ -643,7 +585,7 @@ function updateSeriesKeyAutoForEditedRange_(sheet, editedRange) {
     sheet,
     startRow,
     rowCount,
-    loadSeriesMasterExtraLookup_()
+    loadSeriesRegistryExtraLookup_()
   );
 }
 

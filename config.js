@@ -4,8 +4,7 @@ const CONFIG = {
   SHEETS: {
     MAIN  : '目録',
     DATA  : 'データ',
-    GENRE_MASTER: 'genre_master',
-    SERIES_MASTER: 'series_master'
+    GENRE_MASTER: 'genre_master'
   },
   // シート列番号（1始まり）
   COL: {
@@ -86,9 +85,6 @@ const CACHE_CONFIG = {
 /* ====== series_key_auto 整合性 ====== */
 const SERIES_KEY_AUTO_CONFIG_ = {
   DIRTY_PROPERTY: 'series_key_auto_dirty_v1',
-  MASTER_REGISTERED_KEY_COL: 2, // series_master B列
-  MASTER_GENRE_FIRST_COL: 3,    // series_master C列
-  MASTER_GENRE_LAST_COL: 7,     // series_master G列
   EXTRA_GENRE: '写真集/画集/資料集'
 };
 

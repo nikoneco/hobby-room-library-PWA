@@ -911,7 +911,7 @@ function syncSeriesRegistryAfterManualKeyEdit_(sheet, startRow, rowCount) {
     titles,
     genres,
     manualKeys,
-    loadSeriesMasterExtraLookup_()
+    loadSeriesRegistryExtraLookup_()
   );
 
   // 修正先キーが未知なら、先に通常の同期で新しいseries_idを作る。
