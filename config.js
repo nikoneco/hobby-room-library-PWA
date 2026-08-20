@@ -74,7 +74,7 @@ const NO_IMAGE_URL = "https://i.imgur.com/Q80wBRc.jpeg";
 
 /* ====== Webアプリ検索キャッシュ設定 ====== */
 const CACHE_CONFIG = {
-    LIBRARY_DATASET_KEY: 'library_dataset_v25',
+    LIBRARY_DATASET_KEY: 'library_dataset_v27',
   SHELF_DATASET_KEY: 'library_shelf_dataset_v4',
   DATASET_REVISION_PROPERTY: 'library_dataset_revision_v1',
   TTL_SECONDS: 60 * 60,     // 1時間

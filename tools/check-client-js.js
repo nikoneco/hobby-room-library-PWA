@@ -487,7 +487,8 @@ const mixedIndex = {
     story: ['冒険'],
     theme: ['魔法'],
     mood: ['静か'],
-    status: ['完結']
+    status: ['完結'],
+    media: ['漫画', '小説']
   }
 };
 
@@ -499,12 +500,21 @@ const criteria = sandbox.buildClientSearchCriteria_({
   detailPublisher: '小学館',
   detailStory: '冒険',
   detailTheme: '魔法',
+  detailMedia: '漫画',
   detailReleasedFromYear: '2024',
   detailReleasedFromMonth: '01',
   detailReleasedToYear: '2024',
   detailReleasedToMonth: '12'
 });
 assert(sandbox.matchesSearchCriteria_(mixedIndex, criteria), 'matchesSearchCriteria_ accepts matching criteria');
+assert(
+  sandbox.matchesSearchCriteria_(mixedIndex, sandbox.buildClientSearchCriteria_({ detailMedia: '小説' })),
+  'client media search matches either series-level media slot'
+);
+assert(
+  !sandbox.matchesSearchCriteria_(mixedIndex, sandbox.buildClientSearchCriteria_({ detailMedia: '絵本' })),
+  'client media search rejects a nonmatching medium'
+);
 
 const missCriteria = sandbox.buildClientSearchCriteria_({
   keyword: 'フリーレン',
@@ -524,7 +534,8 @@ const sensitiveIndex = {
     story: [],
     theme: ['18禁', '恋愛'],
     mood: [],
-    status: ['単巻']
+    status: ['単巻'],
+    media: ['漫画']
   }
 };
 assert(
@@ -540,6 +551,20 @@ assert(
     sandbox.buildClientSearchCriteria_({ detailStatus: '単巻' })
   ),
   'client genre search with another category excludes 18禁 books when 題材=18禁 is not selected'
+);
+assert(
+  !sandbox.matchesSearchCriteria_(
+    sensitiveIndex,
+    sandbox.buildClientSearchCriteria_({ detailMedia: '漫画' })
+  ),
+  'client media-only search excludes 18禁 books unless 題材=18禁 is selected'
+);
+assert(
+  sandbox.matchesSearchCriteria_(
+    sensitiveIndex,
+    sandbox.buildClientSearchCriteria_({ detailMedia: '漫画', detailTheme: '18禁' })
+  ),
+  'client media search can include 18禁 books when 題材=18禁 is explicit'
 );
 assert(
   !sandbox.matchesSearchCriteria_(
@@ -573,7 +598,7 @@ PREVIEW_INDEX = [
     searchKey: normalizeKana('違う本 ちがうほん 別作者'),
     publisher: '講談社',
     releasedYm: 202301,
-    genres: { story: ['日常'], theme: ['学園'], mood: ['明るい'], status: ['連載中'] }
+    genres: { story: ['日常'], theme: ['学園'], mood: ['明るい'], status: ['連載中'], media: ['小説'] }
   }
 ];
 PREVIEW_INDEX_READY = true;
@@ -583,6 +608,7 @@ ADVANCED_OPTIONS = {
   themeGenres: ['18禁', '魔法', '学園'],
   moodGenres: ['静か', '明るい'],
   statusGenres: ['完結', '連載中'],
+  mediaGenres: ['漫画', '小説'],
   releaseYears: ['2023', '2024']
 };
 `, sandbox);
@@ -592,6 +618,11 @@ assertEqual(
   1,
   'countPreviewMatches_ uses shared criteria'
 );
+assertEqual(
+  sandbox.countPreviewMatches_({ detailMedia: '小説' }),
+  2,
+  'countPreviewMatches_ includes both slots in series-level media search'
+);
 
 const quickBrowseVariants = new Set();
 for (let i = 0; i < 12; i++) {
@@ -600,6 +631,28 @@ for (let i = 0; i < 12; i++) {
   quickBrowseVariants.add(items.map(item => `${item.config.field}:${item.value}`).join('|'));
 }
 assert(quickBrowseVariants.size >= 1, 'quick browse renders at least one valid variant');
+
+const limitedGenreMeta = sandbox.getLimitedGenreMeta_([
+  { category: 'story', name: '冒険' },
+  { category: 'theme', name: '魔法' },
+  { category: 'mood', name: '静か' },
+  { category: 'media', name: '漫画' },
+  { category: 'status', name: '完結' }
+], 3);
+assert(
+  limitedGenreMeta.some(item => item.category === 'media') &&
+    limitedGenreMeta.some(item => item.category === 'status'),
+  'limited genre chips reserve one media and one status chip'
+);
+assert(
+  clientScriptSources[clientScriptFiles.indexOf('script.boot.js.html')].includes("'detailMedia'"),
+  'media changes trigger preview synchronization'
+);
+const mediaConditionChip = sandbox.buildSearchStatusChips_('advanced', { detailMedia: '漫画' })[0];
+assert(
+  mediaConditionChip && mediaConditionChip.key === 'detailMedia' && mediaConditionChip.removable,
+  'media search renders a removable condition chip'
+);
 
 assert(
   sandbox.buildPopupBookLeadHtml_({ author: '<著者>', publisher: '出版社' }).includes('&lt;著者&gt;'),

@@ -1370,6 +1370,14 @@ body.pwa-shell .card-view .genre-chip.status {
     color-mix(in srgb, var(--pwa-panel) 30%, transparent);
 }
 
+body.pwa-shell .card-view .genre-chip.media {
+  border-color: color-mix(in srgb, #9ab8e8 34%, transparent);
+  background:
+    linear-gradient(180deg, rgba(119, 153, 212, 0.18), rgba(119, 153, 212, 0.050)),
+    color-mix(in srgb, var(--pwa-panel) 30%, transparent);
+  color: #dce9ff;
+}
+
 body.pwa-shell .list-title-author {
   border-color: color-mix(in srgb, var(--pwa-line) 52%, transparent);
   background:
@@ -2826,7 +2834,7 @@ function writeGasRunShim() {
   const LOCAL_INDEX_DB_NAME = 'shumiLibrary.localIndex.v1';
   const LOCAL_INDEX_STORE_NAME = 'snapshots';
   const LOCAL_INDEX_ACTIVE_KEY = 'active';
-  const LOCAL_INDEX_SCHEMA_VERSION = 4;
+  const LOCAL_INDEX_SCHEMA_VERSION = 6;
   const LOCAL_INDEX_CHECK_INTERVAL_MS = 15 * 60 * 1000;
   const LOCAL_INDEX_CHECK_THROTTLE_MS = 5 * 60 * 1000;
 
@@ -2852,7 +2860,8 @@ function writeGasRunShim() {
         'detailReleasedFromYear',
         'detailReleasedFromMonth',
         'detailReleasedToYear',
-        'detailReleasedToMonth'
+        'detailReleasedToMonth',
+        'detailMedia'
       ]
     },
     searchBooksSimple: { api: 'searchSimple', argNames: ['keyword'] },
@@ -2871,7 +2880,8 @@ function writeGasRunShim() {
         'detailReleasedFromYear',
         'detailReleasedFromMonth',
         'detailReleasedToYear',
-        'detailReleasedToMonth'
+        'detailReleasedToMonth',
+        'detailMedia'
       ]
     },
     getRandomBooks: { api: 'random', argNames: ['count'] },
@@ -3203,7 +3213,8 @@ function writeGasRunShim() {
       mood: valueAt_(7),
       status: valueAt_(8),
       fromYm: normalizeReleasedYmLocal_(valueAt_(9), valueAt_(10), true),
-      toYm: normalizeReleasedYmLocal_(valueAt_(11), valueAt_(12), false)
+      toYm: normalizeReleasedYmLocal_(valueAt_(11), valueAt_(12), false),
+      media: valueAt_(13)
     };
   }
 
@@ -3212,7 +3223,8 @@ function writeGasRunShim() {
       String(criteria.story || '').trim() ||
       String(criteria.theme || '').trim() ||
       String(criteria.mood || '').trim() ||
-      String(criteria.status || '').trim()
+      String(criteria.status || '').trim() ||
+      String(criteria.media || '').trim()
     );
   }
 
@@ -3224,7 +3236,7 @@ function writeGasRunShim() {
     if (item && item.isSensitive === true) return true;
 
     const genres = item && item.genres ? item.genres : {};
-    return ['story', 'theme', 'mood', 'status'].some(function(category) {
+    return ['story', 'theme', 'mood', 'status', 'media'].some(function(category) {
       const values = Array.isArray(genres[category]) ? genres[category] : [];
       return values.some(function(value) { return String(value || '').trim() === '18禁'; });
     });
@@ -3237,7 +3249,7 @@ function writeGasRunShim() {
   }
 
   function matchesAdvancedCriteriaLocal_(item, criteria) {
-    const genres = item.genres || { story: [], theme: [], mood: [], status: [] };
+    const genres = item.genres || { story: [], theme: [], mood: [], status: [], media: [] };
     const releasedYm = Number(item.releasedYm || 0);
     return Boolean(
       (!criteria.keyword || keywordMixedMatchLocal_(criteria.keyword, item)) &&
@@ -3249,19 +3261,21 @@ function writeGasRunShim() {
       (!criteria.theme || genres.theme.includes(criteria.theme)) &&
       (!criteria.mood || genres.mood.includes(criteria.mood)) &&
       (!criteria.status || genres.status.includes(criteria.status)) &&
+      (!criteria.media || genres.media.includes(criteria.media)) &&
       matchesSensitiveGenrePolicyLocal_(item, criteria) &&
       (!criteria.fromYm || (releasedYm && releasedYm >= criteria.fromYm)) &&
       (!criteria.toYm || (releasedYm && releasedYm <= criteria.toYm))
     );
   }
 
-  function buildGenreMetaLocal_(story, theme, mood, status) {
+  function buildGenreMetaLocal_(story, theme, mood, status, media) {
     const meta = [];
     [
       ['story', story],
       ['theme', theme],
       ['mood', mood],
-      ['status', status]
+      ['status', status],
+      ['media', media]
     ].forEach(function(group) {
       (Array.isArray(group[1]) ? group[1] : []).forEach(function(name) {
         meta.push({ name: name, category: group[0] });
@@ -3282,13 +3296,14 @@ function writeGasRunShim() {
     }
 
     return payload.records.map(function(record) {
-      if (!Array.isArray(record) || record.length < 31) {
+      if (!Array.isArray(record) || record.length < 32) {
         throw createError_('ローカル索引のレコードが壊れています。', 'LOCAL_INDEX_RECORD_INVALID');
       }
       const story = Array.isArray(record[27]) ? record[27] : [];
       const theme = Array.isArray(record[28]) ? record[28] : [];
       const mood = Array.isArray(record[29]) ? record[29] : [];
       const status = Array.isArray(record[30]) ? record[30] : [];
+      const media = Array.isArray(record[31]) ? record[31] : [];
       return {
         book: {
           rowIndex: Number(record[0]),
@@ -3304,7 +3319,7 @@ function writeGasRunShim() {
           isbn: String(record[9] || ''),
           yomi: String(record[10] || ''),
           genre: String(record[11] || ''),
-          genreMeta: buildGenreMetaLocal_(story, theme, mood, status),
+          genreMeta: buildGenreMetaLocal_(story, theme, mood, status, media),
           seriesKeyAuto: String(record[12] || ''),
           seriesCount: Number(record[13] || 0),
           seriesSearchTitle: String(record[14] || ''),
@@ -3323,7 +3338,7 @@ function writeGasRunShim() {
           publisher: String(record[25] || ''),
           releasedYm: Number(record[26] || 0),
           isSensitive: Boolean(record[20]),
-          genres: { story: story, theme: theme, mood: mood, status: status }
+          genres: { story: story, theme: theme, mood: mood, status: status, media: media }
         }
       };
     });

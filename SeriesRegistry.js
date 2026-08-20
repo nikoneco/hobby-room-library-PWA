@@ -6,7 +6,7 @@ const SERIES_REGISTRY_CONFIG_ = Object.freeze({
   REVIEW_SHEET: 'series_match_review_v2',
   ACTIVE_PROPERTY: 'series_registry_v2_active',
   EXTRA_PREFIX: '__extra__',
-  MASTER_HEADERS: [
+  LEGACY_MASTER_HEADERS: [
     'series_id',
     'シリーズ名',
     'J-ストーリー',
@@ -18,6 +18,21 @@ const SERIES_REGISTRY_CONFIG_ = Object.freeze({
     '状態',
     '更新日時',
     'canonical_key'
+  ],
+  MASTER_HEADERS: [
+    'series_id',
+    'シリーズ名',
+    'J-ストーリー',
+    'J-題材1',
+    'J-題材2',
+    'J-雰囲気',
+    'J-状態',
+    '蔵書数',
+    '状態',
+    '更新日時',
+    'canonical_key',
+    'J-媒体1',
+    'J-媒体2'
   ],
   ALIAS_HEADERS: [
     'alias_key',
@@ -37,6 +52,99 @@ const SERIES_REGISTRY_CONFIG_ = Object.freeze({
     '更新日時'
   ]
 });
+
+const SERIES_REGISTRY_MEDIA_EXTRA_VALUES_ = Object.freeze([
+  '写真集',
+  '画集',
+  '資料集',
+  '写真集/画集/資料集',
+  '写真集／画集／資料集'
+]);
+
+function normalizeSeriesRegistryMedia_(value) {
+  return String(value || '').normalize('NFKC').trim();
+}
+
+function isSeriesRegistryExtraMedia_(value) {
+  const normalized = normalizeSeriesRegistryMedia_(value);
+  return SERIES_REGISTRY_MEDIA_EXTRA_VALUES_.some(candidate =>
+    normalizeSeriesRegistryMedia_(candidate) === normalized
+  );
+}
+
+function isSeriesRegistryLegacyExtraGenre_(value) {
+  const normalized = normalizeSeriesRegistryMedia_(value);
+  return normalized === normalizeSeriesRegistryMedia_('写真集/画集/資料集');
+}
+
+function isSeriesRegistryExtraClassification_(genres, media, canonicalKey) {
+  if (hasExtraSeriesPrefix_(canonicalKey)) return true;
+  if ((Array.isArray(genres) ? genres : []).some(isSeriesRegistryLegacyExtraGenre_)) return true;
+  const populatedMedia = (Array.isArray(media) ? media : [])
+    .map(normalizeSeriesRegistryMedia_)
+    .filter(Boolean);
+  return populatedMedia.length > 0 && populatedMedia.every(isSeriesRegistryExtraMedia_);
+}
+
+/**
+ * L/Mがまだ存在しない移行前シートも読み書きできるよう、実際のヘッダーから列数を決める。
+ * A:Kは互換性のため完全一致を要求し、L/Mは2列揃った場合だけ有効化する。
+ */
+function getSeriesRegistryMasterColumnCount_(masterSheet) {
+  const legacyHeaders = SERIES_REGISTRY_CONFIG_.LEGACY_MASTER_HEADERS;
+  const fullHeaders = SERIES_REGISTRY_CONFIG_.MASTER_HEADERS;
+  const maxColumns = Number(masterSheet.getMaxColumns());
+  if (maxColumns < legacyHeaders.length) {
+    throw new Error('series_master_v2 does not have enough columns');
+  }
+  const readColumns = Math.min(maxColumns, fullHeaders.length);
+  const actual = masterSheet.getRange(1, 1, 1, readColumns).getDisplayValues()[0];
+  if (actual.slice(0, legacyHeaders.length).join('\u0000') !== legacyHeaders.join('\u0000')) {
+    throw new Error('series_master_v2 headers do not match');
+  }
+  if (readColumns < fullHeaders.length) {
+    if (actual.slice(legacyHeaders.length).some(Boolean)) {
+      throw new Error('series_master_v2 media headers do not match');
+    }
+    return legacyHeaders.length;
+  }
+
+  const actualMedia = actual.slice(legacyHeaders.length, fullHeaders.length);
+  const expectedMedia = fullHeaders.slice(legacyHeaders.length);
+  if (actualMedia.join('\u0000') === expectedMedia.join('\u0000')) return fullHeaders.length;
+  if (actualMedia.some(Boolean)) {
+    throw new Error('series_master_v2 media headers do not match');
+  }
+  return legacyHeaders.length;
+}
+
+function buildSeriesRegistryMasterRow_(
+  seriesId,
+  displayName,
+  genreSlots,
+  count,
+  status,
+  timestamp,
+  canonicalKey,
+  mediaSlots,
+  columnCount
+) {
+  const genres = Array.isArray(genreSlots) ? genreSlots.slice(0, 5) : [];
+  const media = Array.isArray(mediaSlots) ? mediaSlots.slice(0, 2) : [];
+  while (genres.length < 5) genres.push('');
+  while (media.length < 2) media.push('');
+  const row = [
+    seriesId,
+    displayName,
+    ...genres,
+    Number(count || 0),
+    status || 'ACTIVE',
+    timestamp || new Date(),
+    normalizeSeriesAliasKey_(canonicalKey),
+    ...media
+  ];
+  return row.slice(0, Number(columnCount) || SERIES_REGISTRY_CONFIG_.MASTER_HEADERS.length);
+}
 
 function normalizeSeriesAliasKey_(value) {
   return String(value || '')
@@ -140,17 +248,18 @@ function buildGenreCategoryLookup_(rows) {
   return lookup;
 }
 
-function buildSeriesGenreSlots_(genreText, categoryLookup) {
+function buildSeriesGenreClassification_(genreText, categoryLookup) {
   const lookup = categoryLookup instanceof Map ? categoryLookup : new Map();
   const genres = String(genreText || '')
     .split(',')
     .map(value => value.trim())
     .filter(Boolean);
   const slots = ['', '', '', '', ''];
+  const media = ['', ''];
 
   genres.forEach(genre => {
-    if (genre === SERIES_KEY_AUTO_CONFIG_.EXTRA_GENRE) {
-      if (!slots[0]) slots[0] = genre;
+    if (isSeriesRegistryExtraMedia_(genre)) {
+      if (!media[0]) media[0] = genre;
       return;
     }
     switch (lookup.get(genre)) {
@@ -167,10 +276,18 @@ function buildSeriesGenreSlots_(genreText, categoryLookup) {
       case '状況':
         if (!slots[4]) slots[4] = genre;
         break;
+      case '媒体':
+        if (!media[0]) media[0] = genre;
+        else if (!media[1] && media[0] !== genre) media[1] = genre;
+        break;
     }
   });
 
-  return slots;
+  return { genres: slots, media };
+}
+
+function buildSeriesGenreSlots_(genreText, categoryLookup) {
+  return buildSeriesGenreClassification_(genreText, categoryLookup).genres;
 }
 
 function buildSeriesRegistryMigrationPlan_(catalogRows, genreCategoryRows, createSeriesId, nowText) {
@@ -233,17 +350,19 @@ function buildSeriesRegistryMigrationPlan_(catalogRows, genreCategoryRows, creat
       const seriesId = String(createId(group.canonicalKey) || '').trim();
       if (!seriesId) throw new Error(`series_id generation failed: ${group.canonicalKey}`);
       idByCanonicalKey.set(group.canonicalKey, seriesId);
-      const slots = buildSeriesGenreSlots_(genreText, categoryLookup);
+      const classification = buildSeriesGenreClassification_(genreText, categoryLookup);
       const displayName = chooseSeriesRegistryDisplayName_(group.titles, group.canonicalKey);
-      masterRows.push([
+      masterRows.push(buildSeriesRegistryMasterRow_(
         seriesId,
         displayName,
-        ...slots,
+        classification.genres,
         group.count,
         'ACTIVE',
         timestamp,
-        group.canonicalKey
-      ]);
+        group.canonicalKey,
+        classification.media,
+        SERIES_REGISTRY_CONFIG_.MASTER_HEADERS.length
+      ));
       aliasCandidates.push({
         aliasKey: group.canonicalKey,
         seriesId,
@@ -346,12 +465,13 @@ function loadSeriesRegistryLookup_() {
 
   const masterLastRow = getLastDataRow(masterSheet, 1);
   const aliasLastRow = getLastDataRow(aliasSheet, 1);
+  const masterColumnCount = getSeriesRegistryMasterColumnCount_(masterSheet);
   const masterRows = masterLastRow >= 2
     ? masterSheet.getRange(
         2,
         1,
         masterLastRow - 1,
-        SERIES_REGISTRY_CONFIG_.MASTER_HEADERS.length
+        masterColumnCount
       ).getDisplayValues()
     : [];
   const aliasRows = aliasLastRow >= 2
@@ -363,12 +483,20 @@ function loadSeriesRegistryLookup_() {
     const seriesId = String(row[0] || '').trim();
     if (!seriesId || masterById.has(seriesId)) return;
     const genres = row.slice(2, 7).map(value => String(value || '').trim());
+    const media = masterColumnCount > SERIES_REGISTRY_CONFIG_.LEGACY_MASTER_HEADERS.length
+      ? row.slice(11, 13).map(value => String(value || '').trim())
+      : ['', ''];
     masterById.set(seriesId, {
       seriesId,
       displayName: String(row[1] || '').trim(),
       canonicalKey: normalizeSeriesAliasKey_(row[10] || row[1]),
       genres,
-      isExtra: genres.includes(SERIES_KEY_AUTO_CONFIG_.EXTRA_GENRE),
+      media,
+      isExtra: isSeriesRegistryExtraClassification_(
+        genres,
+        media,
+        row[10] || row[1]
+      ),
       row: index + 2
     });
   });
@@ -398,6 +526,7 @@ function loadSeriesRegistryLookup_() {
     masterById,
     aliasByKey,
     uniqueSeriesIdBySignature,
+    masterColumnCount,
     masterSheet,
     aliasSheet
   };
@@ -424,7 +553,8 @@ function resolveSeriesRegistryKey_(rawKey, lookup) {
     canonicalKey: master.canonicalKey,
     displayName: master.displayName,
     genres: master.genres.slice(),
-    isExtra: Boolean(master.isExtra),
+    media: Array.isArray(master.media) ? master.media.slice() : ['', ''],
+    isExtra: Boolean(master.isExtra || hasExtraSeriesPrefix_(key)),
     matchedBy
   };
 }
@@ -435,7 +565,7 @@ function buildSeriesRegistryExtraLookup_(lookup) {
   const result = new Map();
   registry.aliasByKey.forEach((alias, aliasKey) => {
     const master = registry.masterById.get(alias.seriesId);
-    if (master) result.set(aliasKey, Boolean(master.isExtra));
+    if (master) result.set(aliasKey, Boolean(master.isExtra || hasExtraSeriesPrefix_(aliasKey)));
   });
   return result;
 }
@@ -516,19 +646,28 @@ function appendSeriesReviewRow_(candidateKey, candidateSeriesId, comparisonKey, 
   return true;
 }
 
-function appendSeriesMasterRow_(masterSheet, canonicalKey, genreSlots, count, timestamp, displayName) {
+function appendSeriesMasterRow_(
+  masterSheet,
+  canonicalKey,
+  genreSlots,
+  count,
+  timestamp,
+  displayName,
+  mediaSlots
+) {
   const seriesId = `series_${Utilities.getUuid()}`;
-  const slots = Array.isArray(genreSlots) ? genreSlots.slice(0, 5) : [];
-  while (slots.length < 5) slots.push('');
-  masterSheet.appendRow([
+  const masterColumnCount = getSeriesRegistryMasterColumnCount_(masterSheet);
+  masterSheet.appendRow(buildSeriesRegistryMasterRow_(
     seriesId,
     buildSeriesRegistryDisplayName_(displayName, canonicalKey),
-    ...slots,
+    genreSlots,
     Number(count || 0),
     'ACTIVE',
     timestamp || new Date(),
-    normalizeSeriesAliasKey_(canonicalKey)
-  ]);
+    canonicalKey,
+    mediaSlots,
+    masterColumnCount
+  ));
   return seriesId;
 }
 
@@ -557,7 +696,8 @@ function ensureSeriesRegistryAlias_(rawKey, options) {
     [],
     options && options.count || 1,
     new Date(),
-    options && options.displayName || ''
+    options && options.displayName || '',
+    options && options.media || []
   );
   appendSeriesAliasRow_(
     registry.aliasSheet,
@@ -575,7 +715,14 @@ function ensureSeriesRegistryAlias_(rawKey, options) {
       key
     ),
     genres: ['', '', '', '', ''],
-    isExtra: false,
+    media: Array.isArray(options && options.media)
+      ? options.media.slice(0, 2)
+      : ['', ''],
+    isExtra: isSeriesRegistryExtraClassification_(
+      [],
+      options && options.media || [],
+      key
+    ),
     matchedBy: 'NEW_SERIES'
   };
 }
@@ -754,15 +901,17 @@ function syncSeriesRegistryFromCatalog_() {
 
     const seriesId = `series_${Utilities.getUuid()}`;
     const displayName = chooseSeriesRegistryDisplayName_(item.titles, key);
-    newMasterRows.push([
+    newMasterRows.push(buildSeriesRegistryMasterRow_(
       seriesId,
       displayName,
-      '', '', '', '', '',
+      ['', '', '', '', ''],
       count,
       'ACTIVE',
       timestamp,
-      key
-    ]);
+      key,
+      ['', ''],
+      registry.masterColumnCount
+    ));
     newAliasRows.push([
       key,
       seriesId,
@@ -776,7 +925,8 @@ function syncSeriesRegistryFromCatalog_() {
       displayName,
       canonicalKey: key,
       genres: ['', '', '', '', ''],
-      isExtra: false,
+      media: ['', ''],
+      isExtra: hasExtraSeriesPrefix_(key),
       row: 0
     });
     registry.aliasByKey.set(key, { aliasKey: key, seriesId, row: 0 });
@@ -789,14 +939,14 @@ function syncSeriesRegistryFromCatalog_() {
       startRow,
       1,
       newMasterRows.length,
-      SERIES_REGISTRY_CONFIG_.MASTER_HEADERS.length
+      registry.masterColumnCount
     );
     if (startRow > 2) {
       const template = registry.masterSheet.getRange(
         startRow - 1,
         1,
         1,
-        SERIES_REGISTRY_CONFIG_.MASTER_HEADERS.length
+        registry.masterColumnCount
       );
       template.copyTo(target, SpreadsheetApp.CopyPasteType.PASTE_FORMAT, false);
       template.copyTo(target, SpreadsheetApp.CopyPasteType.PASTE_DATA_VALIDATION, false);
@@ -987,13 +1137,9 @@ function activateSeriesRegistryV2_() {
   if (!masterSheet || !aliasSheet) {
     throw new Error('series_master_v2 / series_alias_v2 is missing');
   }
-  const masterHeaders = masterSheet
-    .getRange(1, 1, 1, SERIES_REGISTRY_CONFIG_.MASTER_HEADERS.length)
-    .getDisplayValues()[0];
+  // 移行前A:Kと移行後A:Mのどちらも有効。部分的なL/Mだけは拒否する。
+  getSeriesRegistryMasterColumnCount_(masterSheet);
   const aliasHeaders = aliasSheet.getRange(1, 1, 1, 6).getDisplayValues()[0];
-  if (masterHeaders.join('\u0000') !== SERIES_REGISTRY_CONFIG_.MASTER_HEADERS.join('\u0000')) {
-    throw new Error('series_master_v2 headers do not match');
-  }
   if (aliasHeaders.join('\u0000') !== SERIES_REGISTRY_CONFIG_.ALIAS_HEADERS.join('\u0000')) {
     throw new Error('series_alias_v2 headers do not match');
   }

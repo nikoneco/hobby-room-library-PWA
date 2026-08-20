@@ -23,6 +23,8 @@ const pagesWorkflow = read(pagesWorkflowPath);
 const pwaCssForMenu = read(path.join(docs, 'assets', 'css', 'pwa.css'));
 const pwaClientForMenu = read(path.join(docs, 'assets', 'js', 'pwa-client.js'));
 const shelfClientForMenu = read(path.join(docs, 'assets', 'js', 'script.shelf.js'));
+const serverSource = read(path.join(root, 'Webアプリ.js'));
+const buildPagesSource = read(path.join(root, 'tools', 'build-pages.js'));
 
 [
   'manifest.webmanifest',
@@ -82,6 +84,7 @@ assert(index.includes('./assets/css/pwa.css'), 'static index loads PWA CSS');
 assert(index.includes('src="./assets/logo.png"'), 'static index uses local logo asset');
 assert(index.includes('id="pwaSettingsButton"'), 'static index includes PWA settings button');
 assert(index.includes('id="pwaSettingsPanel"'), 'static index includes PWA settings panel');
+assert(index.includes('id="detailMedia"'), 'static index includes the series media filter');
 assert(index.includes('aria-label="メニューを開く"'), 'static index labels the top-right control as a menu');
 assert(index.includes('id="pwaSeriesStatusEntry"'), 'static menu includes the series status entry');
 assert(index.includes('data-action="series-status"'), 'static menu routes to the series status screen');
@@ -325,7 +328,12 @@ assert(gasRunShim.includes("window.addEventListener('focus'"), 'Pages client che
 assert(gasRunShim.includes("document.addEventListener('visibilitychange'"), 'Pages client checks the local index when visible again');
 assert(gasRunShim.includes("window.addEventListener('online'"), 'Pages client checks the local index when connectivity returns');
 assert(gasRunShim.includes('LOCAL_INDEX_CHECK_INTERVAL_MS'), 'Pages client periodically checks the local index while active');
-assert(gasRunShim.includes('const LOCAL_INDEX_SCHEMA_VERSION = 4'), 'Pages client invalidates the previous local-index schema');
+assert(gasRunShim.includes('const LOCAL_INDEX_SCHEMA_VERSION = 6'), 'Pages client invalidates the previous local-index schema');
+const serverIndexVersion = Number((serverSource.match(/LOCAL_LIBRARY_INDEX_VERSION_\s*=\s*(\d+)/) || [])[1]);
+const pagesIndexVersion = Number((buildPagesSource.match(/LOCAL_INDEX_SCHEMA_VERSION\s*=\s*(\d+)/) || [])[1]);
+assert(serverIndexVersion === pagesIndexVersion && serverIndexVersion === 6, 'GAS and Pages use the same media-aware local-index schema');
+assert(gasRunShim.includes("'detailMedia'"), 'Pages JSONP and local-search shim forwards the media filter');
+assert(gasRunShim.includes('genres.media.includes(criteria.media)'), 'Pages local search applies the media filter');
 assert(gasRunShim.includes("getSeriesInventoryStatus: { api: 'seriesStatus', argNames: [] }"), 'Pages client maps the series status read API');
 assert(gasRunShim.includes('getMetadata: function()'), 'Pages client exposes locally stored search metadata');
 assert(gasRunShim.includes('getBookById: function(bookId)'), 'Pages client exposes local book metadata by stable ID');

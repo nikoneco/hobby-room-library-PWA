@@ -2204,12 +2204,28 @@ button.quick-browse-chip:focus-visible {
   color: #f4dfbd;
 }
 
+.genre-chip.media {
+  border-color: rgba(154, 184, 232, 0.34);
+  background:
+    linear-gradient(180deg, rgba(119, 153, 212, 0.17), rgba(119, 153, 212, 0.055)),
+    rgba(8, 13, 19, 0.22);
+  color: #dce9ff;
+}
+
 .card-view .genre-chip.status {
   border-color: rgba(214, 164, 95, 0.22);
   background:
     linear-gradient(180deg, rgba(214, 164, 95, 0.13), rgba(214, 164, 95, 0.040)),
     rgba(8, 13, 19, 0.18);
   color: rgba(244, 223, 189, 0.90);
+}
+
+.card-view .genre-chip.media {
+  border-color: rgba(154, 184, 232, 0.28);
+  background:
+    linear-gradient(180deg, rgba(119, 153, 212, 0.15), rgba(119, 153, 212, 0.045)),
+    rgba(8, 13, 19, 0.20);
+  color: rgba(220, 233, 255, 0.94);
 }
 
 button.genre-chip {
@@ -2229,6 +2245,12 @@ button.genre-chip.status:hover,
 button.genre-chip.status:focus-visible {
   border-color: rgba(240, 195, 122, 0.54);
   background: rgba(214, 164, 95, 0.18);
+}
+
+button.genre-chip.media:hover,
+button.genre-chip.media:focus-visible {
+  border-color: rgba(180, 205, 244, 0.58);
+  background: rgba(119, 153, 212, 0.20);
 }
 
 .summary-chip-toggle {

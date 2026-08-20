@@ -53,7 +53,7 @@ assert(
   'documented public API registry does not contain duplicate names'
 );
 assert(source.includes('buildQuickBrowseCountsPayload_'), 'PWA initial data includes quick browse counts');
-assert(configSource.includes("LIBRARY_DATASET_KEY: 'library_dataset_v25'"), 'library cache key invalidates datasets without series-registry identities');
+assert(configSource.includes("LIBRARY_DATASET_KEY: 'library_dataset_v27'"), 'library cache key invalidates pre-media datasets');
 assert(source.includes('SHELF_DATASET_KEY'), 'server defines a separate bookshelf dataset cache key');
 assert(configSource.includes("SHELF_DATASET_KEY: 'library_shelf_dataset_v4'"), 'bookshelf cache key invalidates datasets without stable book IDs');
 assert(source.includes('getBookshelfLiteDataset_'), 'server has a lightweight bookshelf dataset path');
@@ -93,7 +93,9 @@ assert(source.includes('serverResponseReadyAtEpochMs'), 'JSONP performance trace
 assert(source.includes('perf.jsonpResponseChars'), 'JSONP performance trace includes the final script character count');
 assert(source.includes('datasetRevision: getDatasetSnapshotRevision_(dataset)'), 'initial API responses use the exact dataset snapshot revision');
 assert(source.includes('function buildLocalLibraryIndexPayload_'), 'server builds a lightweight local-search index');
-assert(source.includes('const LOCAL_LIBRARY_INDEX_VERSION_ = 5'), 'server publishes the series-registry-aware local-index schema');
+assert(source.includes('const LOCAL_LIBRARY_INDEX_VERSION_ = 6'), 'server publishes the media-aware local-index schema');
+assert(source.includes("'releasedYm', 'story', 'theme', 'mood', 'status', 'media'"), 'local index appends media without shifting existing columns');
+assert((source.match(/params\.detailMedia/g) || []).length >= 2, 'JSONP preview and advanced search forward detailMedia');
 assert(source.includes('function buildLocalSearchMetadataPayload_'), 'server bundles search UI metadata into the local index');
 assert(source.includes('metadata: buildLocalSearchMetadataPayload_(dataset)'), 'local index contains suggestions, filters, and quick-browse counts');
 assert(source.includes('function getLibraryDatasetRevisionForPwa_'), 'server exposes a lightweight revision check');
@@ -497,7 +499,7 @@ const sensitiveSearchIndex = {
   publisher: 'テスト出版社',
   releasedYm: 202401,
   genresRaw: ['18禁', '恋愛'],
-  genres: { story: [], theme: ['18禁', '恋愛'], mood: [], status: ['単巻'] },
+  genres: { story: [], theme: ['18禁', '恋愛'], mood: [], status: ['単巻'], media: ['漫画'] },
   genreMeta: [
     { name: '18禁', category: 'theme' },
     { name: '恋愛', category: 'theme' }
@@ -517,6 +519,20 @@ assert(
     serverSandbox
   ),
   'genre search with another category excludes 18禁 books when 題材=18禁 is not selected'
+);
+assert(
+  !vm.runInContext(
+    "matchesSearchCriteria_(__sensitiveSearchIndex, buildServerSearchCriteria_('', '', '', '', '', '', '', '', '', '', '', '', '', '漫画'))",
+    serverSandbox
+  ),
+  'media-only search excludes 18禁 books unless 題材=18禁 is selected'
+);
+assert(
+  vm.runInContext(
+    "matchesSearchCriteria_(__sensitiveSearchIndex, buildServerSearchCriteria_('', '', '', '', '', '', '18禁', '', '', '', '', '', '', '漫画'))",
+    serverSandbox
+  ),
+  'media search includes 18禁 books when 題材=18禁 is explicit'
 );
 assert(
   !vm.runInContext(
@@ -544,6 +560,26 @@ const sensitivePreview = vm.runInContext(
   serverSandbox
 );
 assert(sensitivePreview[0].isSensitive === true, 'preview index carries the sensitive flag');
+
+serverSandbox.__seriesMediaIndex = {
+  title: '混在シリーズ', yomi: '', author: '', searchKey: '混在シリーズ', publisher: '', releasedYm: 0,
+  genres: { story: [], theme: [], mood: [], status: [], media: ['漫画', '小説'] }
+};
+assert(
+  vm.runInContext(
+    "matchesSearchCriteria_(__seriesMediaIndex, buildServerSearchCriteria_('', '', '', '', '', '', '', '', '', '', '', '', '', '漫画')) && " +
+    "matchesSearchCriteria_(__seriesMediaIndex, buildServerSearchCriteria_('', '', '', '', '', '', '', '', '', '', '', '', '', '小説'))",
+    serverSandbox
+  ),
+  'server media search matches either series-level media slot'
+);
+assert(
+  !vm.runInContext(
+    "matchesSearchCriteria_(__seriesMediaIndex, buildServerSearchCriteria_('', '', '', '', '', '', '', '', '', '', '', '', '', '絵本'))",
+    serverSandbox
+  ),
+  'server media search rejects a nonmatching medium'
+);
 
 const stableIdLookup = vm.runInContext(`(() => {
   const idA = '11111111-1111-4111-8111-111111111111';
@@ -627,15 +663,17 @@ assert(
 );
 
 uuidSandbox.__registryCatalogRows = [
-  { title: '作品名 1', author: '作者', publisher: '出版社', genreText: '日常, 学園, 連載中', rawKey: '作品名' },
-  { title: '作品名 2', author: '作者', publisher: '出版社', genreText: '日常, 学園, 連載中', rawKey: '作品名' },
+  { title: '作品名 1', author: '作者', publisher: '出版社', genreText: '日常, 学園, 連載中, 漫画, 小説', rawKey: '作品名' },
+  { title: '作品名 2', author: '作者', publisher: '出版社', genreText: '日常, 学園, 連載中, 漫画, 小説', rawKey: '作品名' },
   { title: '資料作品', author: '作者', publisher: '出版社', genreText: '写真集/画集/資料集, 単巻', rawKey: '__extra__資料作品' }
 ];
 uuidSandbox.__registryGenreRows = [
   ['日常', 'ストーリー'],
   ['学園', '題材'],
   ['連載中', '状況'],
-  ['単巻', '状況']
+  ['単巻', '状況'],
+  ['漫画', '媒体'],
+  ['小説', '媒体']
 ];
 uuidSandbox.__registryIds = ['series-a', 'series-b'];
 const registryPlan = vm.runInContext(`buildSeriesRegistryMigrationPlan_(
@@ -656,9 +694,80 @@ assert(
   'series registry migration reconstructs genre slots from genre_master categories'
 );
 assert(
-  registryPlan.masterRows.some(row => row[2] === '写真集/画集/資料集'),
-  'extra-book classification survives migration even when genre_master uses a nonstandard category'
+  registryPlan.masterRows.some(row => row[11] === '写真集/画集/資料集'),
+  'legacy extra-book classification migrates to the appended media slots'
 );
+assert(
+  registryPlan.masterRows.some(row => row[11] === '漫画' && row[12] === '小説'),
+  'series registry migration keeps up to two series-level media values'
+);
+assert(
+  registryPlan.masterRows.every(row => row[10]) && registryPlan.masterRows.every(row => row.length === 13),
+  'media columns are appended after the stable A:K master schema'
+);
+const mediaCompatibility = vm.runInContext(`({
+  asciiLegacy: isSeriesRegistryExtraClassification_([], ['写真集/画集/資料集']),
+  fullwidthLegacy: isSeriesRegistryExtraClassification_([], ['写真集／画集／資料集']),
+  photo: isSeriesRegistryExtraClassification_([], ['写真集']),
+  art: isSeriesRegistryExtraClassification_([], ['画集']),
+  reference: isSeriesRegistryExtraClassification_([], ['資料集']),
+  novel: isSeriesRegistryExtraClassification_([], ['小説']),
+  mixed: isSeriesRegistryExtraClassification_([], ['漫画', '画集']),
+  prefixedMixed: isSeriesRegistryExtraClassification_([], ['漫画', '画集'], '__extra__作品'),
+  legacyGenre: isSeriesRegistryExtraClassification_(['写真集／画集／資料集'], ['漫画']),
+  legacyRowLength: buildSeriesRegistryMasterRow_(
+    'legacy', '旧行', ['', '', '', '', ''], 1, 'ACTIVE', 'now', 'legacy', ['漫画', ''], 11
+  ).length
+})`, uuidSandbox);
+assert(
+  mediaCompatibility.asciiLegacy && mediaCompatibility.fullwidthLegacy &&
+    mediaCompatibility.photo && mediaCompatibility.art && mediaCompatibility.reference,
+  'extra classification accepts individual media and both legacy slash spellings'
+);
+assert(!mediaCompatibility.novel, 'ordinary media does not become an extra series');
+assert(!mediaCompatibility.mixed, 'a manga and art-book mixed series does not become an extra series');
+assert(
+  mediaCompatibility.prefixedMixed && mediaCompatibility.legacyGenre,
+  'an explicit extra prefix or legacy extra genre keeps priority during migration'
+);
+assert(mediaCompatibility.legacyRowLength === 11, 'legacy A:K master writes remain backward compatible'
+);
+const masterHeaderCompatibility = vm.runInContext(`(() => {
+  const makeSheet = headers => ({
+    getMaxColumns: () => headers.length,
+    getRange: (_row, _column, _rows, columns) => ({
+      getDisplayValues: () => [headers.slice(0, columns)]
+    })
+  });
+  const legacy = SERIES_REGISTRY_CONFIG_.LEGACY_MASTER_HEADERS.slice();
+  const current = SERIES_REGISTRY_CONFIG_.MASTER_HEADERS.slice();
+  let partialRejected = false;
+  try {
+    getSeriesRegistryMasterColumnCount_(makeSheet(legacy.concat(['J-媒体1', '誤り'])));
+  } catch (_error) {
+    partialRejected = true;
+  }
+  const prefixedResolution = resolveSeriesRegistryKey_('__extra__混在', {
+    masterById: new Map([['mixed', {
+      seriesId: 'mixed', canonicalKey: '混在', displayName: '混在',
+      genres: ['', '', '', '', ''], media: ['漫画', '画集'], isExtra: false
+    }]]),
+    aliasByKey: new Map([['__extra__混在', { seriesId: 'mixed' }]]),
+    uniqueSeriesIdBySignature: new Map()
+  });
+  return {
+    legacyColumns: getSeriesRegistryMasterColumnCount_(makeSheet(legacy)),
+    currentColumns: getSeriesRegistryMasterColumnCount_(makeSheet(current)),
+    partialRejected,
+    prefixedIsExtra: prefixedResolution.isExtra
+  };
+})()`, uuidSandbox);
+assert(
+  masterHeaderCompatibility.legacyColumns === 11 && masterHeaderCompatibility.currentColumns === 13,
+  'series master accepts both pre-media and media-aware complete headers'
+);
+assert(masterHeaderCompatibility.partialRejected, 'series master rejects a partial or misspelled media header');
+assert(masterHeaderCompatibility.prefixedIsExtra, 'an explicit alias prefix wins during resolution');
 const signaturePair = vm.runInContext(`[
   buildSeriesAliasSignature_('【作品名】'),
   buildSeriesAliasSignature_('作品名')

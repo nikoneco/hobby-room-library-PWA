@@ -1306,6 +1306,9 @@ function debugProfileBuildLibraryDataset_() {
   const publisherOptions = getPublisherOptions_();
   mark('getPublisherOptions');
 
+  const seriesRegistry = loadSeriesRegistryLookup_();
+  mark('loadSeriesRegistry');
+
   const index = [];
   const titleSet = new Set();
   const yomiSet = new Set();
@@ -1317,7 +1320,9 @@ function debugProfileBuildLibraryDataset_() {
     const title = row[CONFIG.IDX.TITLE] || '';
     const yomi = row[CONFIG.IDX.YOMIGANA] || '';
     const author = row[CONFIG.IDX.AUTHOR] || '';
-    const seriesKeyAuto = row[CONFIG.IDX.SERIES_KEY_AUTO] || '';
+    const rawSeriesKeyAuto = row[CONFIG.IDX.SERIES_KEY_AUTO] || '';
+    const resolvedSeries = resolveSeriesRegistryKey_(rawSeriesKeyAuto, seriesRegistry);
+    const seriesKeyAuto = resolvedSeries ? resolvedSeries.seriesId : rawSeriesKeyAuto;
     const volume = extractVolumeNumber(title);
     const publisher = row[CONFIG.IDX.PUBLISHER] || '';
     const released = row[CONFIG.IDX.RELEASED] || '';
@@ -1327,13 +1332,20 @@ function debugProfileBuildLibraryDataset_() {
       .split(',')
       .map(v => v.trim())
       .filter(v => v !== '');
+    (resolvedSeries && Array.isArray(resolvedSeries.media) ? resolvedSeries.media : [])
+      .map(value => String(value || '').trim())
+      .filter(Boolean)
+      .forEach(value => {
+        if (!rawGenres.includes(value)) rawGenres.push(value);
+      });
 
     const genreMeta = [];
     const genres = {
       story: [],
       theme: [],
       mood: [],
-      status: []
+      status: [],
+      media: []
     };
 
     rawGenres.forEach(genre => {
@@ -1358,6 +1370,10 @@ function debugProfileBuildLibraryDataset_() {
           genres.status.push(genre);
           genreMeta.push({ name: genre, category: 'status' });
           break;
+        case '媒体':
+          genres.media.push(genre);
+          genreMeta.push({ name: genre, category: 'media' });
+          break;
       }
     });
 
@@ -1380,6 +1396,10 @@ function debugProfileBuildLibraryDataset_() {
       genres,
       genreMeta,
       seriesKeyAuto,
+      seriesSourceKey: rawSeriesKeyAuto,
+      isExtraSeries: resolvedSeries
+        ? Boolean(resolvedSeries.isExtra)
+        : /^__extra__/.test(String(rawSeriesKeyAuto || '')),
       seriesDisplayTitle: buildSeriesDisplayTitle_(title),
       volume,
       isMainVolume: Number(volume) > 0,
@@ -1430,7 +1450,7 @@ function debugProfileBuildLibraryDataset_() {
     const meta = item.seriesKeyAuto ? seriesMetaMap.get(item.seriesKeyAuto) : null;
     const seriesCount = meta ? Number(meta.count || 0) : 0;
     const seriesSearchTitle = meta ? (meta.searchTitle || '') : '';
-    const isExtraSeries = /^__extra__/.test(String(item.seriesKeyAuto || ''));
+    const isExtraSeries = Boolean(item.isExtraSeries);
 
     if (item.seriesKeyAuto) {
       item.ownedMaxVolume = seriesMaxMap.get(item.seriesKeyAuto) || 0;
@@ -1479,6 +1499,7 @@ function debugProfileBuildLibraryDataset_() {
       themeGenres: genreMaster.options.theme,
       moodGenres : genreMaster.options.mood,
       statusGenres: genreMaster.options.status,
+      mediaGenres: genreMaster.options.media,
       releaseYears: releaseYears
     }
   };
@@ -1912,6 +1933,7 @@ function debugGetInitialSearchData_() {
       themeGenres: data.advancedOptions.themeGenres.length,
       moodGenres: data.advancedOptions.moodGenres.length,
       statusGenres: data.advancedOptions.statusGenres.length,
+      mediaGenres: data.advancedOptions.mediaGenres.length,
       releaseYears: data.advancedOptions.releaseYears.length
     },
     previewIndex: data.previewIndex.length
@@ -1959,6 +1981,7 @@ function debugCompareInitialSearchApiIntegration_() {
       themeGenres: Array.isArray(oldAdvanced.themeGenres) ? oldAdvanced.themeGenres.length : 0,
       moodGenres: Array.isArray(oldAdvanced.moodGenres) ? oldAdvanced.moodGenres.length : 0,
       statusGenres: Array.isArray(oldAdvanced.statusGenres) ? oldAdvanced.statusGenres.length : 0,
+      mediaGenres: Array.isArray(oldAdvanced.mediaGenres) ? oldAdvanced.mediaGenres.length : 0,
       releaseYears: Array.isArray(oldAdvanced.releaseYears) ? oldAdvanced.releaseYears.length : 0
     },
     previewCount: Array.isArray(oldPreview) ? oldPreview.length : 0,
@@ -1988,6 +2011,7 @@ function debugCompareInitialSearchApiIntegration_() {
       themeGenres: Array.isArray(unified.advancedOptions.themeGenres) ? unified.advancedOptions.themeGenres.length : 0,
       moodGenres: Array.isArray(unified.advancedOptions.moodGenres) ? unified.advancedOptions.moodGenres.length : 0,
       statusGenres: Array.isArray(unified.advancedOptions.statusGenres) ? unified.advancedOptions.statusGenres.length : 0,
+      mediaGenres: Array.isArray(unified.advancedOptions.mediaGenres) ? unified.advancedOptions.mediaGenres.length : 0,
       releaseYears: Array.isArray(unified.advancedOptions.releaseYears) ? unified.advancedOptions.releaseYears.length : 0
     },
     previewCount: Array.isArray(unified.previewIndex) ? unified.previewIndex.length : 0,

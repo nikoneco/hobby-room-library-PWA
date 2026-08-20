@@ -9,6 +9,7 @@ let ADVANCED_OPTIONS = {
   themeGenres: [],
   moodGenres: [],
   statusGenres: [],
+  mediaGenres: [],
   releaseYears: []
 };
 
@@ -42,6 +43,13 @@ let QUICK_BROWSE_COUNTS = null;
 let quickBrowseLastSignature = '';
 
 const QUICK_BROWSE_CONFIG = [
+  {
+    field: 'detailMedia',
+    source: 'mediaGenres',
+    genreKey: 'media',
+    label: '媒体',
+    priority: ['漫画', '小説', '絵本', '写真集', '画集', '資料集', '理論書', '雑誌']
+  },
   {
     field: 'detailMood',
     source: 'moodGenres',
@@ -178,6 +186,7 @@ const SEARCH_CONDITION_KEYS = [
   'detailYomi',
   'detailAuthor',
   'detailPublisher',
+  'detailMedia',
   'detailStory',
   'detailTheme',
   'detailMood',
@@ -214,6 +223,7 @@ function buildClientSearchCriteria_(params) {
     nYomi: normalizeKana(normalized.detailYomi),
     nAuthor: normalizeKana(normalized.detailAuthor),
     selectedPublisher: normalized.detailPublisher,
+    selectedMedia: normalized.detailMedia,
     selectedStory: normalized.detailStory,
     selectedTheme: normalized.detailTheme,
     selectedMood: normalized.detailMood,
@@ -239,7 +249,7 @@ function getDefaultPreviewIndexItem_() {
     searchKey: '',
     publisher: '',
     releasedYm: 0,
-    genres: { story: [], theme: [], mood: [], status: [] }
+    genres: { story: [], theme: [], mood: [], status: [], media: [] }
   };
 }
 
@@ -249,7 +259,8 @@ function hasGenreSearchCriteria_(criteria) {
     String(c.selectedStory || '').trim() ||
     String(c.selectedTheme || '').trim() ||
     String(c.selectedMood || '').trim() ||
-    String(c.selectedStatus || '').trim()
+    String(c.selectedStatus || '').trim() ||
+    String(c.selectedMedia || '').trim()
   );
 }
 
@@ -262,7 +273,7 @@ function isSensitiveSearchIndexItem_(idx) {
   if (idx && idx.isSensitive === true) return true;
 
   const genres = idx && idx.genres ? idx.genres : {};
-  return ['story', 'theme', 'mood', 'status'].some(category => {
+  return ['story', 'theme', 'mood', 'status', 'media'].some(category => {
     const values = Array.isArray(genres[category]) ? genres[category] : [];
     return values.some(value => String(value || '').trim() === SENSITIVE_THEME_NAME);
   });
@@ -287,6 +298,7 @@ function matchesSearchCriteria_(idx, criteria) {
   const themeMatch = !c.selectedTheme || (item.genres.theme || []).includes(c.selectedTheme);
   const moodMatch = !c.selectedMood || (item.genres.mood || []).includes(c.selectedMood);
   const statusMatch = !c.selectedStatus || (item.genres.status || []).includes(c.selectedStatus);
+  const mediaMatch = !c.selectedMedia || (item.genres.media || []).includes(c.selectedMedia);
   const sensitiveGenreMatch = matchesSensitiveGenrePolicy_(item, c);
 
   const releasedYm = Number(item.releasedYm || 0);
@@ -303,6 +315,7 @@ function matchesSearchCriteria_(idx, criteria) {
     themeMatch &&
     moodMatch &&
     statusMatch &&
+    mediaMatch &&
     sensitiveGenreMatch &&
     releasedFromMatch &&
     releasedToMatch
@@ -325,6 +338,7 @@ function getEmptyAdvancedOptions_() {
     themeGenres: [],
     moodGenres: [],
     statusGenres: [],
+    mediaGenres: [],
     releaseYears: []
   };
 }
@@ -578,6 +592,7 @@ function syncReleasedRangeOptions_() {
 
 function populateAdvancedOptions() {
   populateSelect('detailPublisher', ADVANCED_OPTIONS.publishers);
+  populateSelect('detailMedia', ADVANCED_OPTIONS.mediaGenres);
   populateSelect('detailStory', ADVANCED_OPTIONS.storyGenres);
   populateSelect('detailTheme', ADVANCED_OPTIONS.themeGenres);
   populateSelect('detailMood', ADVANCED_OPTIONS.moodGenres);
@@ -964,6 +979,8 @@ function applyQuickBrowseCondition_(field, value) {
 
 function getGenreSearchField_(category) {
   switch (category) {
+    case 'media':
+      return 'detailMedia';
     case 'story':
       return 'detailStory';
     case 'theme':
@@ -979,6 +996,8 @@ function getGenreSearchField_(category) {
 
 function getGenreCategoryLabel_(category) {
   switch (category) {
+    case 'media':
+      return '媒体';
     case 'story':
       return 'ストーリー';
     case 'theme':
@@ -1067,6 +1086,7 @@ function clearAdvancedFields() {
     'detailYomi',
     'detailAuthor',
     'detailPublisher',
+    'detailMedia',
     'detailStory',
     'detailTheme',
     'detailMood',
@@ -1104,6 +1124,7 @@ function clearSearchFormValuesForBrowse_() {
     'detailYomi',
     'detailAuthor',
     'detailPublisher',
+    'detailMedia',
     'detailStory',
     'detailTheme',
     'detailMood',
@@ -1146,6 +1167,7 @@ function getAdvancedSearchParams_() {
     detailYomi: document.getElementById('detailYomi').value || '',
     detailAuthor: document.getElementById('detailAuthor').value || '',
     detailPublisher: document.getElementById('detailPublisher').value || '',
+    detailMedia: document.getElementById('detailMedia').value || '',
     detailStory: document.getElementById('detailStory').value || '',
     detailTheme: document.getElementById('detailTheme').value || '',
     detailMood: document.getElementById('detailMood').value || '',
@@ -1168,6 +1190,7 @@ function getEffectiveSearchParams_() {
     detailYomi: '',
     detailAuthor: '',
     detailPublisher: '',
+    detailMedia: '',
     detailStory: '',
     detailTheme: '',
     detailMood: '',
@@ -1359,6 +1382,16 @@ function buildSearchStatusChips_(mode, params) {
       labelPrefix: '出版社',
       label: params.detailPublisher,
       className: '',
+      removable: true
+    });
+  }
+  if (params.detailMedia) {
+    chips.push({
+      key: 'detailMedia',
+      value: params.detailMedia,
+      labelPrefix: '媒体',
+      label: params.detailMedia,
+      className: 'media',
       removable: true
     });
   }
@@ -1743,7 +1776,8 @@ function requestAuthoritativePreviewCount_(mode, params) {
         params.detailReleasedFromYear,
         params.detailReleasedFromMonth,
         params.detailReleasedToYear,
-        params.detailReleasedToMonth
+        params.detailReleasedToMonth,
+        params.detailMedia
       );
   }, 120);
 }
@@ -1844,7 +1878,8 @@ function rerunSearchWithParams_(params, loadingMessage) {
         params.detailReleasedFromYear,
         params.detailReleasedFromMonth,
         params.detailReleasedToYear,
-        params.detailReleasedToMonth
+        params.detailReleasedToMonth,
+        params.detailMedia
       );
     return;
   }
@@ -1906,6 +1941,9 @@ function removeSearchCondition_(key) {
         break;
       case 'detailPublisher':
         document.getElementById('detailPublisher').value = '';
+        break;
+      case 'detailMedia':
+        document.getElementById('detailMedia').value = '';
         break;
       case 'detailStory':
         document.getElementById('detailStory').value = '';
@@ -2022,7 +2060,8 @@ function search() {
         params.detailReleasedFromYear,
         params.detailReleasedFromMonth,
         params.detailReleasedToYear,
-        params.detailReleasedToMonth
+        params.detailReleasedToMonth,
+        params.detailMedia
       );
     return;
   }

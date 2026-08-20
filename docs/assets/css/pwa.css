@@ -1092,6 +1092,14 @@ body.pwa-shell .card-view .genre-chip.status {
     color-mix(in srgb, var(--pwa-panel) 30%, transparent);
 }
 
+body.pwa-shell .card-view .genre-chip.media {
+  border-color: color-mix(in srgb, #9ab8e8 34%, transparent);
+  background:
+    linear-gradient(180deg, rgba(119, 153, 212, 0.18), rgba(119, 153, 212, 0.050)),
+    color-mix(in srgb, var(--pwa-panel) 30%, transparent);
+  color: #dce9ff;
+}
+
 body.pwa-shell .list-title-author {
   border-color: color-mix(in srgb, var(--pwa-line) 52%, transparent);
   background:

@@ -531,7 +531,8 @@ function getOrBuildCachedDataset_(cacheKey, isValid, buildDataset, perf) {
  *     story: string[],
  *     theme: string[],
  *     mood: string[],
- *     status: string[]
+ *     status: string[],
+ *     media: string[]
  *   }
  * }}
  */
@@ -542,7 +543,7 @@ function getGenreMasterData_() {
     console.error(`シート「${CONFIG.SHEETS.GENRE_MASTER}」が見つかりません。`);
     return {
       genreToCategory: {},
-      options: { story: [], theme: [], mood: [], status: [] }
+      options: { story: [], theme: [], mood: [], status: [], media: [] }
     };
   }
 
@@ -550,7 +551,7 @@ function getGenreMasterData_() {
   if (lastRow <= 1) {
     return {
       genreToCategory: {},
-      options: { story: [], theme: [], mood: [], status: [] }
+      options: { story: [], theme: [], mood: [], status: [], media: [] }
     };
   }
 
@@ -561,7 +562,8 @@ function getGenreMasterData_() {
     story: [],
     theme: [],
     mood: [],
-    status: []
+    status: [],
+    media: []
   };
 
   values.forEach(row => {
@@ -586,6 +588,9 @@ function getGenreMasterData_() {
         break;
       case '状況':
         options.status.push(genre);
+        break;
+      case '媒体':
+        options.media.push(genre);
         break;
     }
   });
@@ -635,6 +640,7 @@ function buildEmptySuggestData_() {
  *   themeGenres: string[],
  *   moodGenres: string[],
  *   statusGenres: string[],
+ *   mediaGenres: string[],
  *   releaseYears: string[]
  * }}
  */
@@ -645,6 +651,7 @@ function buildEmptyAdvancedSearchOptions_() {
     themeGenres: [],
     moodGenres: [],
     statusGenres: [],
+    mediaGenres: [],
     releaseYears: []
   };
 }
@@ -673,6 +680,7 @@ function buildSuggestDataPayload_(dataset) {
  *   themeGenres: string[],
  *   moodGenres: string[],
  *   statusGenres: string[],
+ *   mediaGenres: string[],
  *   releaseYears: string[]
  * }}
  */
@@ -684,6 +692,7 @@ function buildAdvancedSearchOptionsPayload_(dataset) {
     themeGenres: Array.isArray(advanced.themeGenres) ? advanced.themeGenres : [],
     moodGenres : Array.isArray(advanced.moodGenres) ? advanced.moodGenres : [],
     statusGenres: Array.isArray(advanced.statusGenres) ? advanced.statusGenres : [],
+    mediaGenres: Array.isArray(advanced.mediaGenres) ? advanced.mediaGenres : [],
     releaseYears: Array.isArray(advanced.releaseYears) ? advanced.releaseYears : []
   };
 }
@@ -708,12 +717,13 @@ function buildPreviewIndexPayload_(dataset) {
       story: Array.isArray(item && item.genres && item.genres.story) ? item.genres.story : [],
       theme: Array.isArray(item && item.genres && item.genres.theme) ? item.genres.theme : [],
       mood: Array.isArray(item && item.genres && item.genres.mood) ? item.genres.mood : [],
-      status: Array.isArray(item && item.genres && item.genres.status) ? item.genres.status : []
+      status: Array.isArray(item && item.genres && item.genres.status) ? item.genres.status : [],
+      media: Array.isArray(item && item.genres && item.genres.media) ? item.genres.media : []
     }
   }));
 }
 
-const LOCAL_LIBRARY_INDEX_VERSION_ = 5;
+const LOCAL_LIBRARY_INDEX_VERSION_ = 6;
 
 /**
  * PWAのローカル索引と一緒に保存する検索UI用メタデータを返す。
@@ -775,7 +785,8 @@ function buildLocalLibraryIndexPayload_(dataset) {
       Array.isArray(genres.story) ? genres.story : [],
       Array.isArray(genres.theme) ? genres.theme : [],
       Array.isArray(genres.mood) ? genres.mood : [],
-      Array.isArray(genres.status) ? genres.status : []
+      Array.isArray(genres.status) ? genres.status : [],
+      Array.isArray(genres.media) ? genres.media : []
     ];
   });
 
@@ -788,7 +799,7 @@ function buildLocalLibraryIndexPayload_(dataset) {
       'isbn', 'yomi', 'genre', 'seriesKeyAuto', 'seriesCount', 'seriesSearchTitle',
       'isExtraSeries', 'volume', 'ownedMaxVolume', 'fallbackImg', 'fallbackImageSource',
       'isSensitive', 'indexTitle', 'indexYomi', 'indexAuthor', 'searchKey', 'indexPublisher',
-      'releasedYm', 'story', 'theme', 'mood', 'status'
+      'releasedYm', 'story', 'theme', 'mood', 'status', 'media'
     ],
     records
   };
@@ -810,14 +821,15 @@ function getLocalLibraryIndexForPwa_() {
  * 全件プレビューインデックスより小さく、初期表示のチップ生成に必要な情報に絞る。
  *
  * @param {{index:Object[]}=} dataset
- * @returns {{story:Object<string, number>, theme:Object<string, number>, mood:Object<string, number>, status:Object<string, number>}}
+ * @returns {{story:Object<string, number>, theme:Object<string, number>, mood:Object<string, number>, status:Object<string, number>, media:Object<string, number>}}
  */
 function buildQuickBrowseCountsPayload_(dataset) {
   const counts = {
     story: {},
     theme: {},
     mood: {},
-    status: {}
+    status: {},
+    media: {}
   };
   const index = dataset && Array.isArray(dataset.index) ? dataset.index : [];
 
@@ -999,7 +1011,7 @@ function getPreviewIndex() {
  */
 function countPreviewMatchesAuthoritative(
   keyword, title, yomi, author, publisher, story, theme, mood, status,
-  releasedFromYear, releasedFromMonth, releasedToYear, releasedToMonth
+  releasedFromYear, releasedFromMonth, releasedToYear, releasedToMonth, media
 ) {
   try {
     const dataset = getLibraryDataset_();
@@ -1010,7 +1022,7 @@ function countPreviewMatchesAuthoritative(
 
     const criteria = buildServerSearchCriteria_(
       keyword, title, yomi, author, publisher, story, theme, mood, status,
-      releasedFromYear, releasedFromMonth, releasedToYear, releasedToMonth
+      releasedFromYear, releasedFromMonth, releasedToYear, releasedToMonth, media
     );
     let count = 0;
 
@@ -1191,7 +1203,8 @@ function hasGenreSearchCriteria_(criteria) {
     String(c.selectedStory || '').trim() ||
     String(c.selectedTheme || '').trim() ||
     String(c.selectedMood || '').trim() ||
-    String(c.selectedStatus || '').trim()
+    String(c.selectedStatus || '').trim() ||
+    String(c.selectedMedia || '').trim()
   );
 }
 
@@ -1380,7 +1393,7 @@ function keywordMixedMatch_(query, idx) {
 
 function buildServerSearchCriteria_(
   keyword, title, yomi, author, publisher, story, theme, mood, status,
-  releasedFromYear, releasedFromMonth, releasedToYear, releasedToMonth
+  releasedFromYear, releasedFromMonth, releasedToYear, releasedToMonth, media
 ) {
   return {
     nKeyword: normalizeKana(keyword || ''),
@@ -1392,6 +1405,7 @@ function buildServerSearchCriteria_(
     selectedTheme: String(theme || '').trim(),
     selectedMood: String(mood || '').trim(),
     selectedStatus: String(status || '').trim(),
+    selectedMedia: String(media || '').trim(),
     fromYm: releasedFromYear
       ? normalizeReleasedYm_(`${releasedFromYear}-${releasedFromMonth || '01'}`)
       : 0,
@@ -1409,7 +1423,7 @@ function getDefaultSearchIndexItem_() {
     searchKey: '',
     publisher: '',
     releasedYm: 0,
-    genres: { story: [], theme: [], mood: [], status: [] }
+    genres: { story: [], theme: [], mood: [], status: [], media: [] }
   };
 }
 
@@ -1426,6 +1440,7 @@ function matchesSearchCriteria_(idx, criteria) {
   const themeMatch = !c.selectedTheme || (item.genres.theme || []).includes(c.selectedTheme);
   const moodMatch = !c.selectedMood || (item.genres.mood || []).includes(c.selectedMood);
   const statusMatch = !c.selectedStatus || (item.genres.status || []).includes(c.selectedStatus);
+  const mediaMatch = !c.selectedMedia || (item.genres.media || []).includes(c.selectedMedia);
   const sensitiveGenreMatch = matchesSensitiveGenrePolicy_(item, c);
 
   const releasedYm = Number(item.releasedYm || 0);
@@ -1442,6 +1457,7 @@ function matchesSearchCriteria_(idx, criteria) {
     themeMatch &&
     moodMatch &&
     statusMatch &&
+    mediaMatch &&
     sensitiveGenreMatch &&
     releasedFromMatch &&
     releasedToMatch
@@ -1467,6 +1483,7 @@ function matchesSearchCriteria_(idx, criteria) {
  *     themeGenres: string[],
  *     moodGenres: string[],
  *     statusGenres: string[]
+ *     mediaGenres: string[]
  *   }
  * }}
  */
@@ -1502,12 +1519,20 @@ function buildLibraryDataset_() {
       .map(v => v.trim())
       .filter(v => v !== '');
 
+    (resolvedSeries && Array.isArray(resolvedSeries.media) ? resolvedSeries.media : [])
+      .map(value => String(value || '').trim())
+      .filter(Boolean)
+      .forEach(value => {
+        if (!rawGenres.includes(value)) rawGenres.push(value);
+      });
+
     const genreMeta = [];
     const genres = {
       story: [],
       theme: [],
       mood: [],
-      status: []
+      status: [],
+      media: []
     };
 
     rawGenres.forEach(genre => {
@@ -1531,6 +1556,10 @@ function buildLibraryDataset_() {
         case '状況':
           genres.status.push(genre);
           genreMeta.push({ name: genre, category: 'status' });
+          break;
+        case '媒体':
+          genres.media.push(genre);
+          genreMeta.push({ name: genre, category: 'media' });
           break;
       }
     });
@@ -1645,6 +1674,7 @@ function buildLibraryDataset_() {
       themeGenres: genreMaster.options.theme,
       moodGenres : genreMaster.options.mood,
       statusGenres: genreMaster.options.status,
+      mediaGenres: genreMaster.options.media,
       releaseYears: releaseYears
     }
   };
@@ -2238,7 +2268,7 @@ function getRandomBooks(count, perf) {
  */
 function searchBooksAdvanced(
   keyword, title, yomi, author, publisher, story, theme, mood, status,
-  releasedFromYear, releasedFromMonth, releasedToYear, releasedToMonth
+  releasedFromYear, releasedFromMonth, releasedToYear, releasedToMonth, media
 ) {
   try {
     const dataset = getLibraryDataset_();
@@ -2249,7 +2279,7 @@ function searchBooksAdvanced(
 
     const criteria = buildServerSearchCriteria_(
       keyword, title, yomi, author, publisher, story, theme, mood, status,
-      releasedFromYear, releasedFromMonth, releasedToYear, releasedToMonth
+      releasedFromYear, releasedFromMonth, releasedToYear, releasedToMonth, media
     );
     const matchedRows = [];
     const matchedIndex = [];
@@ -2552,7 +2582,8 @@ const PUBLIC_WEBAPP_JSONP_API_HANDLERS_ = Object.freeze({
     params.detailReleasedFromYear,
     params.detailReleasedFromMonth,
     params.detailReleasedToYear,
-    params.detailReleasedToMonth
+    params.detailReleasedToMonth,
+    params.detailMedia
   ),
   searchSimple: (params, perf) => searchBooksSimple(params.keyword || '', perf),
   searchAdvanced: params => searchBooksAdvanced(
@@ -2568,7 +2599,8 @@ const PUBLIC_WEBAPP_JSONP_API_HANDLERS_ = Object.freeze({
     params.detailReleasedFromYear,
     params.detailReleasedFromMonth,
     params.detailReleasedToYear,
-    params.detailReleasedToMonth
+    params.detailReleasedToMonth,
+    params.detailMedia
   ),
   random: (params, perf) => getRandomBooks(params.count || 10, perf),
   shelf: () => getBookshelfBooks(),

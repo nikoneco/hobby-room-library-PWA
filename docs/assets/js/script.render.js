@@ -196,10 +196,12 @@ function getLimitedGenreMeta_(meta, limit) {
   if (!safeLimit || meta.length <= safeLimit) return meta;
 
   const statusItems = meta.filter(item => item && item.category === 'status');
-  const regularItems = meta.filter(item => item && item.category !== 'status');
+  const mediaItems = meta.filter(item => item && item.category === 'media');
+  const regularItems = meta.filter(item => item && item.category !== 'status' && item.category !== 'media');
   const reservedStatus = statusItems.length ? [statusItems[0]] : [];
-  const regularLimit = Math.max(0, safeLimit - reservedStatus.length);
-  return regularItems.slice(0, regularLimit).concat(reservedStatus);
+  const reservedMedia = mediaItems.length ? [mediaItems[0]] : [];
+  const regularLimit = Math.max(0, safeLimit - reservedStatus.length - reservedMedia.length);
+  return regularItems.slice(0, regularLimit).concat(reservedMedia, reservedStatus);
 }
 
 function buildGenreChips(book, options) {
@@ -208,7 +210,11 @@ function buildGenreChips(book, options) {
   if (!meta.length) return '';
 
   return getLimitedGenreMeta_(meta, opt.limit).map(item => {
-    const cls = item.category === 'status' ? 'genre-chip status' : 'genre-chip';
+    const cls = item.category === 'status'
+      ? 'genre-chip status'
+      : item.category === 'media'
+        ? 'genre-chip media'
+        : 'genre-chip';
     const field = getGenreSearchField_(item.category);
     const label = getGenreCategoryLabel_(item.category);
     if (!field || !hasDisplayValue_(item.name)) return '';

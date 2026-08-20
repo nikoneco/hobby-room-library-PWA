@@ -43,6 +43,7 @@ window.addEventListener('DOMContentLoaded', function() {
     'detailYomi',
     'detailAuthor',
     'detailPublisher',
+    'detailMedia',
     'detailStory',
     'detailTheme',
     'detailMood',
