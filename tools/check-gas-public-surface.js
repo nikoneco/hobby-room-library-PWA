@@ -10,6 +10,10 @@ const ALLOWED_PUBLIC_GAS_FUNCTIONS = new Set([
   // Simple trigger. It is invoked by Sheets, not by the anonymous web UI.
   'onEdit',
 
+  // Spreadsheet drawing callback. A Sheets UI confirmation is required before
+  // it delegates to the private write function, so anonymous web calls stop.
+  'enrichNewBooksAfterImport',
+
   // Public read-only GAS HTML / JSONP APIs.
   'doGet',
   'getInitialSearchData',
@@ -41,6 +45,10 @@ const ALLOWED_PUBLIC_GAS_FUNCTIONS = new Set([
   'generateSeriesKeyAuto'
 ]);
 
+const ALLOWED_SPREADSHEET_UI_WRITE_FUNCTIONS = new Set([
+  'enrichNewBooksAfterImport'
+]);
+
 function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
@@ -68,7 +76,11 @@ sourceFiles.forEach(fileName => {
 
 assert(publicFunctions.some(entry => entry.endsWith(':doGet')), 'doGet remains the web entrypoint');
 assert(
-  !publicFunctions.some(entry => /:(?:debug|dbg|batch|retry|clear|reset|set|fill|enrich|convert)/i.test(entry)),
+  !publicFunctions.some(entry => {
+    const name = entry.slice(entry.lastIndexOf(':') + 1);
+    return /^(?:debug|dbg|batch|retry|clear|reset|set|fill|enrich|convert)/i.test(name) &&
+      !ALLOWED_SPREADSHEET_UI_WRITE_FUNCTIONS.has(name);
+  }),
   'Maintenance, write, and debug functions must not be public GAS functions'
 );
 

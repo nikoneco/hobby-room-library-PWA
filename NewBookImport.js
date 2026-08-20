@@ -6,6 +6,27 @@ const NEW_BOOK_IMPORT_CONFIG = {
   LOCK_WAIT_MS: 10000
 };
 
+// Spreadsheet drawings can invoke only a top-level function without a trailing
+// underscore. Keep the actual write operation private and require the Sheets UI
+// confirmation before delegating to it. Calls from the web app have no Sheets UI
+// context and therefore stop before any data is changed.
+function enrichNewBooksAfterImport() {
+  const ui = SpreadsheetApp.getUi();
+  const response = ui.alert(
+    '新刊登録後処理',
+    '本の登録作業が完了していることを確認してください。\n\n新刊処理を最大20冊分実行し、残っているあらすじのNOT_FOUNDを最大50件Koboで再確認します。',
+    ui.ButtonSet.OK_CANCEL
+  );
+
+  if (response !== ui.Button.OK) {
+    SpreadsheetApp.getActive().toast('新刊登録後処理をキャンセルしました。');
+    return { cancelled: true };
+  }
+
+  SpreadsheetApp.getActive().toast('新刊登録後処理を開始します。');
+  return enrichNewBooksAfterImport_();
+}
+
 function enrichNewBooksAfterImport_() {
   return enrichNewBooksAfterImportByLimit_(NEW_BOOK_IMPORT_CONFIG.DEFAULT_LIMIT);
 }
@@ -31,6 +52,7 @@ function enrichNewBooksAfterImportByLimit_(limit) {
     const series = refreshSeriesKeyAutoForImport_(sheet);
     const bookUuids = repairBookUuidsAll_(sheet);
     const synopsis = batchFetchSynopsisRawByLimit_(batchLimit);
+    const synopsisKobo = retryNotFoundSynopsisFromRakutenKobo_();
     const fallbackImage = batchFillFallbackImageUrlsByLimit_(batchLimit, {
       retryFailed: false
     });
@@ -44,11 +66,12 @@ function enrichNewBooksAfterImportByLimit_(limit) {
       series,
       bookUuids,
       synopsis,
+      synopsisKobo,
       fallbackImage
     };
 
     SpreadsheetApp.getActive().toast(
-      `New book import: yomi ${yomigana.changed} / series ${series.changed} / UUID ${bookUuids.changed} / synopsis ${synopsis.processed} / image ${fallbackImage.processed}`
+      `New book import: yomi ${yomigana.changed} / series ${series.changed} / UUID ${bookUuids.changed} / synopsis ${synopsis.processed} / Kobo ${synopsisKobo.processed} / image ${fallbackImage.processed}`
     );
 
     console.log(JSON.stringify(result));

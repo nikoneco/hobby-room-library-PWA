@@ -196,6 +196,14 @@ assert(
   /function\s+enrichNewBooksAfterImportByLimit_\s*\([^)]*\)[\s\S]*?SpreadsheetApp\.flush\(\);[\s\S]*?clearLibrarySearchCache_\(\);/.test(newBookImportSource),
   'new-book enrichment flushes sheet writes before invalidating caches'
 );
+assert(
+  /function\s+enrichNewBooksAfterImport\s*\(\)\s*{[\s\S]*?SpreadsheetApp\.getUi\(\)[\s\S]*?ui\.ButtonSet\.OK_CANCEL[\s\S]*?response\s*!==\s*ui\.Button\.OK[\s\S]*?return enrichNewBooksAfterImport_\(\);/.test(newBookImportSource),
+  'the spreadsheet drawing entrypoint requires explicit Sheets UI confirmation before enrichment'
+);
+assert(
+  newBookImportSource.includes('const synopsisKobo = retryNotFoundSynopsisFromRakutenKobo_();'),
+  'new-book enrichment runs the standard Kobo rescue batch for all pending NOT_FOUND synopsis rows'
+);
 assert(newBookImportSource.includes('const bookUuids = repairBookUuidsAll_(sheet);'), 'new-book enrichment assigns UUIDs with series keys');
 
 [
