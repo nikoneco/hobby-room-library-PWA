@@ -343,6 +343,18 @@ function getEmptyAdvancedOptions_() {
   };
 }
 
+function requestBookDetailCacheRevisionSync_(datasetRevision) {
+  const revision = String(datasetRevision || '').trim();
+  if (!revision) return;
+
+  if (typeof syncBookDetailCacheRevision_ === 'function') {
+    syncBookDetailCacheRevision_(revision);
+    return;
+  }
+
+  pendingBookDetailCacheRevision = revision;
+}
+
 function syncSearchDataFromLocalIndex_() {
   const manager = window.ShumiLibraryLocalIndex;
   if (!manager || typeof manager.isReady !== 'function' || !manager.isReady()) return false;
@@ -363,7 +375,7 @@ function syncSearchDataFromLocalIndex_() {
   PREVIEW_INDEX = Array.isArray(localPreview) ? localPreview : [];
   PREVIEW_INDEX_READY = true;
   if (typeof manager.getRevision === 'function') {
-    syncBookDetailCacheRevision_(manager.getRevision());
+    requestBookDetailCacheRevisionSync_(manager.getRevision());
   }
   populateAdvancedOptions();
   renderQuickBrowseRail_();
@@ -387,7 +399,7 @@ function applyInitialSearchData_(data) {
     ? payload.quickBrowseCounts
     : null;
   PREVIEW_INDEX_READY = true;
-  syncBookDetailCacheRevision_(payload.datasetRevision);
+  requestBookDetailCacheRevisionSync_(payload.datasetRevision);
 
   const localIndexManager = window.ShumiLibraryLocalIndex;
   if (localIndexManager && typeof localIndexManager.noteServerRevision === 'function') {

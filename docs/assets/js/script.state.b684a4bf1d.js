@@ -15,6 +15,7 @@ let popupReturnScrollY = 0;
 let bookDetailCache = new Map();
 let bookDetailPersistentCachePayload = undefined;
 let currentDatasetRevision = '';
+let pendingBookDetailCacheRevision = '';
 let bookDetailPrefetchQueue = [];
 let bookDetailPrefetchActive = 0;
 let bookDetailPrefetchTimer = 0;

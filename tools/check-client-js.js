@@ -1034,6 +1034,13 @@ assert(
   );
   assert(!modalSource.includes('popup-detail-skeleton-chip-row'), 'popup loading skeleton no longer impersonates unavailable genres');
   assert(modalSource.includes('あらすじを読み込んでいます'), 'popup loading copy describes the deferred synopsis precisely');
+  assert(
+    searchScriptSource.includes("typeof syncBookDetailCacheRevision_ === 'function'") &&
+      searchScriptSource.includes('pendingBookDetailCacheRevision = revision;') &&
+      modalSource.includes('if (pendingBookDetailCacheRevision)') &&
+      modalSource.includes('syncBookDetailCacheRevision_(queuedRevision);'),
+    'fast local-index readiness queues detail-cache revision sync until the modal script is loaded'
+  );
 }
 {
   const immediateSeriesLinks = sandbox.buildImmediateBookSearchLinks_({

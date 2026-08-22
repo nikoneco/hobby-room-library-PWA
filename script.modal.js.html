@@ -585,6 +585,12 @@ function syncBookDetailCacheRevision_(datasetRevision) {
   }
 }
 
+if (pendingBookDetailCacheRevision) {
+  const queuedRevision = pendingBookDetailCacheRevision;
+  pendingBookDetailCacheRevision = '';
+  syncBookDetailCacheRevision_(queuedRevision);
+}
+
 function rememberPersistentBookDetail_(key, detail) {
   const payload = readPersistentBookDetailCache_();
   if (!payload || !key || !detail || typeof detail !== 'object') return;
