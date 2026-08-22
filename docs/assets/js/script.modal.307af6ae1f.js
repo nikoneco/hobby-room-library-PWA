@@ -86,13 +86,38 @@ function shouldShowSeriesButton(book) {
   );
 }
 
+function buildImmediateBookSearchLinks_(book) {
+  if (!book || typeof book !== 'object') return null;
+
+  const useSeriesTitle = Number(book.seriesCount || 0) >= 2 &&
+    !book.isExtraSeries &&
+    hasDisplayValue_(book.seriesSearchTitle);
+  const searchTitle = String(
+    useSeriesTitle ? book.seriesSearchTitle : (book.title || '')
+  ).trim();
+  if (!searchTitle) return null;
+
+  const q = encodeURIComponent(searchTitle);
+  return {
+    googleUrl: 'https://www.google.com/search?q=' + q + '%20新刊%20発売日',
+    bellUrl: 'https://alert.shop-bell.com/search/?Books=1&BrowseNode=&Title=' + q,
+    amazonUrl: 'https://www.amazon.co.jp/s?k=' + q + '&i=stripbooks'
+  };
+}
+
+function getBookSearchLinks_(book) {
+  if (book && book.links && typeof book.links === 'object') return book.links;
+  return buildImmediateBookSearchLinks_(book);
+}
+
 function buildExternalLinksHtml(book) {
-  if (!book || !book.links) return '';
+  const bookLinks = getBookSearchLinks_(book);
+  if (!bookLinks) return '';
 
   const links = [
-    { url: book.links.googleUrl, icon: 'search', label: 'Googleで新刊検索' },
-    { url: book.links.bellUrl, icon: 'bell', label: 'BellAlert' },
-    { url: book.links.amazonUrl, icon: 'store', label: 'Amazon' }
+    { url: bookLinks.googleUrl, icon: 'search', label: 'Googleで新刊検索' },
+    { url: bookLinks.bellUrl, icon: 'bell', label: 'BellAlert' },
+    { url: bookLinks.amazonUrl, icon: 'store', label: 'Amazon' }
   ].filter(item => hasDisplayValue_(item.url));
 
   if (!links.length) return '';
@@ -372,6 +397,11 @@ function createPopupDeferredRenderBook_(book) {
     genreMeta: Array.isArray(book.genreMeta)
       ? book.genreMeta.map(item => Object.assign({}, item))
       : [],
+    seriesKeyAuto: book.seriesKeyAuto || '',
+    seriesCount: Number(book.seriesCount || 0),
+    seriesSearchTitle: book.seriesSearchTitle || '',
+    isExtraSeries: Boolean(book.isExtraSeries),
+    links: book.links || null,
     isSensitive: book.isSensitive,
     detailLoaded: false,
     detailLoading: true,

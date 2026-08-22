@@ -1035,6 +1035,41 @@ assert(
   assert(!modalSource.includes('popup-detail-skeleton-chip-row'), 'popup loading skeleton no longer impersonates unavailable genres');
   assert(modalSource.includes('あらすじを読み込んでいます'), 'popup loading copy describes the deferred synopsis precisely');
 }
+{
+  const immediateSeriesLinks = sandbox.buildImmediateBookSearchLinks_({
+    title: 'ヤニねこ 2',
+    seriesSearchTitle: 'ヤニねこ',
+    seriesCount: 4,
+    isExtraSeries: false,
+    detailLoaded: false
+  });
+  assert(
+    immediateSeriesLinks.googleUrl.includes(encodeURIComponent('ヤニねこ')) &&
+      !immediateSeriesLinks.googleUrl.includes(encodeURIComponent('ヤニねこ 2')),
+    'deferred book details build new-release links immediately from the canonical series title'
+  );
+  assert(
+    sandbox.buildExternalLinksHtml({
+      title: 'ヤニねこ 2',
+      seriesSearchTitle: 'ヤニねこ',
+      seriesCount: 4,
+      isExtraSeries: false,
+      detailLoaded: false
+    }).includes('Googleで新刊検索'),
+    'popup renders new-release actions before synopsis details finish loading'
+  );
+  const immediateExtraLinks = sandbox.buildImmediateBookSearchLinks_({
+    title: '画集 完全版',
+    seriesSearchTitle: '通常シリーズ',
+    seriesCount: 3,
+    isExtraSeries: true
+  });
+  assert(
+    immediateExtraLinks.amazonUrl.includes(encodeURIComponent('画集 完全版')) &&
+      !immediateExtraLinks.amazonUrl.includes(encodeURIComponent('通常シリーズ')),
+    'extra-series books keep their individual title in immediate external searches'
+  );
+}
 assert(
   clientScriptSources[clientScriptFiles.indexOf('script.state.js.html')].includes('BOOK_DETAIL_PREFETCH_WARM_DELAY_MS') &&
     clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('function scheduleBookDetailPrefetchQueue_') &&
