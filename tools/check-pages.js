@@ -327,6 +327,15 @@ assert(gasRunShim.includes('function searchLocalSimple_'), 'Pages client can run
 assert(gasRunShim.includes('function searchLocalAdvanced_'), 'Pages client can run advanced searches locally');
 assert(gasRunShim.includes('function pickLocalRandom_'), 'Pages client can pick random books locally');
 assert(gasRunShim.includes('local index refresh failed; previous index remains active'), 'Pages client keeps the previous index when refresh fails');
+assert(gasRunShim.includes("localIndexFreshnessState = 'unchecked'"), 'Pages client tracks whether the stored local index is fresh');
+assert(
+  gasRunShim.includes("localIndexFreshnessState !== 'fresh'"),
+  'Pages client bypasses local queries until the server revision is confirmed'
+);
+assert(
+  gasRunShim.includes("getFreshnessState: function()"),
+  'Pages client exposes local-index freshness for diagnostics and regression checks'
+);
 assert(gasRunShim.includes("window.addEventListener('focus'"), 'Pages client checks the local index when focus returns');
 assert(gasRunShim.includes("document.addEventListener('visibilitychange'"), 'Pages client checks the local index when visible again');
 assert(gasRunShim.includes("window.addEventListener('online'"), 'Pages client checks the local index when connectivity returns');
@@ -342,6 +351,10 @@ assert(gasRunShim.includes('getMetadata: function()'), 'Pages client exposes loc
 assert(gasRunShim.includes('getBookById: function(bookId)'), 'Pages client exposes local book metadata by stable ID');
 assert(gasRunShim.includes('getBookByRowIndex: function(rowIndex)'), 'Pages client exposes local book metadata for immediate popup rendering');
 assert(gasRunShim.includes('whenLoaded: function()'), 'Pages client allows initial UI data to await IndexedDB');
+assert(
+  /window\.addEventListener\('load',[\s\S]*?refreshLocalIndex_\(true, ''\)/.test(gasRunShim),
+  'Pages client starts a freshness check immediately on page load'
+);
 assert(pwaClient.includes("'popup.detailLoading': 'あらすじを読み込んでいます'"), 'popup loading text identifies the deferred synopsis precisely');
 assert(searchClient.includes('syncSearchDataFromLocalIndex_'), 'search UI adopts metadata and preview data from the active local index');
 assert(searchClient.includes('if (!syncSearchDataFromLocalIndex_())'), 'initial data falls back to GAS only when local metadata is unavailable');

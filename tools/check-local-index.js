@@ -175,6 +175,11 @@ function invoke(runner, method, args) {
   assert(sandboxWindow.ShumiLibraryLocalIndex.isSupported(), 'IndexedDB support is exposed');
   assert(await sandboxWindow.ShumiLibraryLocalIndex.whenLoaded(), 'stored index load can be awaited');
   assert(sandboxWindow.ShumiLibraryLocalIndex.isReady(), 'stored index becomes ready');
+  await sandboxWindow.ShumiLibraryLocalIndex.checkForUpdates();
+  assert(
+    sandboxWindow.ShumiLibraryLocalIndex.getFreshnessState() === 'offline',
+    'offline clients keep the stored index available without a revision check'
+  );
   assert(sandboxWindow.ShumiLibraryLocalIndex.getRecordCount() === 4, 'stored index exposes its record count');
   const metadata = sandboxWindow.ShumiLibraryLocalIndex.getMetadata();
   assert(metadata.suggest.titles.includes('【推しの子】'), 'stored index exposes search suggestions');
@@ -248,6 +253,100 @@ function invoke(runner, method, args) {
   assert(new Set(random.map(book => book.rowIndex)).size === 2, 'random search does not duplicate books');
   assert(appendedScripts.length === 0, 'local queries do not inject JSONP scripts even while offline');
   assert(perfEntries.filter(entry => entry.meta && entry.meta.local).length === 12, 'local queries record local performance entries');
+
+  const onlineScripts = [];
+  const onlineLoadHandlers = [];
+  const onlineWindow = {
+    indexedDB: createIndexedDb(stored),
+    CustomEvent: function(type, init) { this.type = type; this.detail = init && init.detail; },
+    addEventListener(type, handler) {
+      if (type === 'load') onlineLoadHandlers.push(handler);
+    },
+    setTimeout(callback, delay) {
+      if (!delay) queueMicrotask(callback);
+      return 1;
+    },
+    clearTimeout() {},
+    setInterval() { return 1; },
+    ShumiLibraryPwa: {
+      perfStart(name, meta) { return { name, meta }; },
+      perfEnd() {},
+      handleApiFailure() {},
+      clearApiFailure() {}
+    }
+  };
+  const onlineDocument = {
+    visibilityState: 'visible',
+    addEventListener() {},
+    dispatchEvent() {},
+    createElement() {
+      return { parentNode: { removeChild() {} } };
+    },
+    head: { appendChild(script) { onlineScripts.push(script); } }
+  };
+
+  vm.runInNewContext(shimSource, {
+    window: onlineWindow,
+    document: onlineDocument,
+    navigator: { onLine: true },
+    URLSearchParams,
+    btoa: value => Buffer.from(String(value), 'binary').toString('base64'),
+    Proxy,
+    Promise,
+    Error,
+    Date,
+    String,
+    Array,
+    Object,
+    Math,
+    Number,
+    Boolean,
+    console
+  });
+
+  await new Promise(resolve => setImmediate(resolve));
+  onlineLoadHandlers.forEach(handler => handler());
+  await new Promise(resolve => setImmediate(resolve));
+
+  const onlineManager = onlineWindow.ShumiLibraryLocalIndex;
+  assert(onlineManager.isReady(), 'online client can load the stored index before freshness confirmation');
+  assert(onlineManager.getFreshnessState() === 'checking', 'page load starts the freshness check immediately');
+
+  const onlineRunner = onlineWindow.google.script.run;
+  const remoteSearchPromise = invoke(onlineRunner, 'searchBooksSimple', ['推しの子']);
+  await new Promise(resolve => setImmediate(resolve));
+
+  const getScriptApi = script => new URL(script.src).searchParams.get('api');
+  const invokeScriptCallback = (targetWindow, script, data) => {
+    const callback = new URL(script.src).searchParams.get('callback');
+    targetWindow[callback]({ ok: true, data, error: null });
+  };
+  const revisionScript = onlineScripts.find(script => getScriptApi(script) === 'libraryRevision');
+  const searchScript = onlineScripts.find(script => getScriptApi(script) === 'searchSimple');
+  assert(revisionScript, 'page load requests the lightweight server revision');
+  assert(searchScript, 'search during freshness confirmation bypasses the stored local index');
+
+  invokeScriptCallback(onlineWindow, searchScript, [{ title: 'サーバー最新本' }]);
+  const remoteSearch = await remoteSearchPromise;
+  assert(
+    remoteSearch.length === 1 && remoteSearch[0].title === 'サーバー最新本',
+    'freshness-gated search returns the authoritative server result'
+  );
+
+  invokeScriptCallback(onlineWindow, revisionScript, {
+    version: 6,
+    revision: payload.revision
+  });
+  await new Promise(resolve => setImmediate(resolve));
+  assert(onlineManager.getFreshnessState() === 'fresh', 'matching revision enables local queries');
+
+  const scriptCountBeforeLocalSearch = onlineScripts.length;
+  const confirmedLocalSearch = await invoke(onlineRunner, 'searchBooksSimple', ['推しの子']);
+  assert(confirmedLocalSearch.length === 2, 'confirmed-fresh index serves subsequent searches locally');
+  assert(
+    onlineScripts.length === scriptCountBeforeLocalSearch,
+    'confirmed-fresh local search does not add another JSONP request'
+  );
 
   console.log('local index checks ok');
 })().catch(error => {

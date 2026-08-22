@@ -3138,6 +3138,7 @@ function writeGasRunShim() {
   let localIndexLoadPromise = null;
   let localIndexRefreshPromise = null;
   let localIndexLastCheckedAt = 0;
+  let localIndexFreshnessState = 'unchecked';
 
   function normalizeKanaLocal_(value) {
     return String(value || '').toLowerCase().normalize('NFKC')
@@ -3400,6 +3401,9 @@ function writeGasRunShim() {
 
   function canHandleLocally_(methodName, args) {
     if (!localIndexPayload) return false;
+    if (!(navigator && navigator.onLine === false) && localIndexFreshnessState !== 'fresh') {
+      return false;
+    }
     if (methodName === 'searchBooksSimple') return Boolean(String(args[0] || '').trim());
     return methodName === 'searchBooksAdvanced' || methodName === 'getRandomBooks';
   }
@@ -3534,6 +3538,7 @@ function writeGasRunShim() {
     convertLocalIndexPayload_(payload);
     await writeStoredLocalIndex_(payload);
     activateLocalIndex_(payload, true);
+    localIndexFreshnessState = 'fresh';
     return true;
   }
 
@@ -3561,11 +3566,20 @@ function writeGasRunShim() {
     if (localIndexRefreshPromise) return localIndexRefreshPromise;
     localIndexRefreshPromise = ensureLocalIndexLoaded_()
       .then(async function() {
-        if (navigator && navigator.onLine === false) return false;
-        const now = Date.now();
-        if (!force && localIndexPayload && now - localIndexLastCheckedAt < LOCAL_INDEX_CHECK_THROTTLE_MS) {
+        if (navigator && navigator.onLine === false) {
+          localIndexFreshnessState = 'offline';
           return false;
         }
+        const now = Date.now();
+        if (
+          !force &&
+          localIndexPayload &&
+          localIndexFreshnessState === 'fresh' &&
+          now - localIndexLastCheckedAt < LOCAL_INDEX_CHECK_THROTTLE_MS
+        ) {
+          return false;
+        }
+        localIndexFreshnessState = 'checking';
         localIndexLastCheckedAt = now;
 
         let revision = String(knownRevision || '').trim();
@@ -3578,11 +3592,13 @@ function writeGasRunShim() {
         }
 
         if (localIndexPayload && revision && revision === String(localIndexPayload.revision || '')) {
+          localIndexFreshnessState = 'fresh';
           return false;
         }
         return downloadAndActivateLocalIndex_();
       })
       .catch(function(error) {
+        localIndexFreshnessState = navigator && navigator.onLine === false ? 'offline' : 'failed';
         console.warn('local index refresh failed; previous index remains active', error);
         return false;
       })
@@ -3612,6 +3628,7 @@ function writeGasRunShim() {
         ? localIndexPayload.metadata
         : null;
     },
+    getFreshnessState: function() { return localIndexFreshnessState; },
     noteServerRevision: function(revision) { return refreshLocalIndex_(true, revision); },
     checkForUpdates: function() { return refreshLocalIndex_(true, ''); }
   };
@@ -3620,7 +3637,7 @@ function writeGasRunShim() {
 
   if (typeof window.addEventListener === 'function') {
     window.addEventListener('load', function() {
-      window.setTimeout(function() { refreshLocalIndex_(false, ''); }, 1500);
+      refreshLocalIndex_(true, '');
     });
     window.addEventListener('focus', function() { refreshLocalIndex_(false, ''); });
     window.addEventListener('online', function() { refreshLocalIndex_(true, ''); });
