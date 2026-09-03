@@ -277,8 +277,17 @@ body.sandbox-redesign.pwa-librarian-presence .app-brand-librarian-image {
 
 body.sandbox-redesign .preview-brand-copy {
   display: grid;
-  gap: 0.48rem;
+  gap: 0;
   min-width: 0;
+}
+
+body.sandbox-redesign .preview-brand-wordmark {
+  display: block;
+  width: min(100%, 15.4rem);
+  height: auto;
+  margin: 0.5rem 0 0.46rem;
+  color: var(--night-accent-strong);
+  overflow: visible;
 }
 
 body.sandbox-redesign .preview-brand-name {
@@ -289,6 +298,7 @@ body.sandbox-redesign .preview-brand-name {
 }
 
 body.sandbox-redesign .preview-brand-note {
+  margin-top: 0.38rem;
   color: var(--night-muted);
   font-size: 0.86rem;
   line-height: 1.6;
@@ -654,6 +664,12 @@ body.sandbox-redesign .search-container.shrink.shelf-view-active .preview-brand-
 body.sandbox-redesign .search-container.shrink .preview-brand-note,
 body.sandbox-redesign .search-container.shrink.compact .preview-brand-note,
 body.sandbox-redesign .search-container.shrink.shelf-view-active .preview-brand-note {
+  display: none;
+}
+
+body.sandbox-redesign .search-container.shrink .preview-brand-wordmark,
+body.sandbox-redesign .search-container.shrink.compact .preview-brand-wordmark,
+body.sandbox-redesign .search-container.shrink.shelf-view-active .preview-brand-wordmark {
   display: none;
 }
 

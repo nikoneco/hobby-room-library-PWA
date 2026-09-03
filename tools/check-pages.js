@@ -100,6 +100,10 @@ assert(index.includes('id="pwaLibrarianPresence"'), 'static index includes libra
 assert(index.includes('class="sandbox-redesign"'), 'static index enables the night library redesign');
 assert(index.includes('id="appBrandResetBtn"'), 'static index includes the redesigned brand reset button');
 assert(index.includes('id="appBrandLibrarianImage"'), 'static index includes the librarian brand image');
+assert(index.includes('class="preview-brand-wordmark"'), 'static index includes the outlined English wordmark');
+assert(index.includes('aria-label="Hobby Room Library"'), 'English wordmark has a text alternative');
+assert(index.includes('本と、出会いなおす。'), 'static index includes the updated library tagline');
+assert(!index.includes('個人の蔵書を探す、眺める。'), 'static index removes the previous library tagline');
 assert(index.includes('id="pwaQuietMotion"'), 'static index includes quiet motion setting');
 assert(index.includes('id="pwaPerfHudEnabled"'), 'static index includes performance HUD setting');
 ['shinhaku', 'kohi', 'shikon', 'kohaku'].forEach(value => {

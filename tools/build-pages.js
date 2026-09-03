@@ -105,6 +105,11 @@ function buildStaticIndex() {
   let source = readUtf8('index.html');
 
   source = source.replace(
+    /\s*<\?!= HtmlService\.createHtmlOutputFromFile\('brand\.wordmark\.svg\.html'\)\.getContent\(\); \?>/,
+    `\n        ${readUtf8('brand.wordmark.svg.html').trim()}`
+  );
+
+  source = source.replace(
     /\s*<!-- PWA_REMOVE_START:series-status-home -->[\s\S]*?<!-- PWA_REMOVE_END:series-status-home -->/,
     ''
   );
