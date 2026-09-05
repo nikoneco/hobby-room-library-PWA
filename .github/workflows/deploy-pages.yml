@@ -52,6 +52,9 @@ jobs:
       - name: Check client JavaScript
         run: node tools/check-client-js.js
 
+      - name: Check client request races
+        run: node tools/check-client-races.js
+
       - name: Check client CSS
         run: node tools/check-client-css.js
 

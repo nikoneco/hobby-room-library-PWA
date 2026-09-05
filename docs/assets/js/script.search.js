@@ -1846,7 +1846,21 @@ function hasAnyAdvancedCondition_(params) {
   });
 }
 
+function beginResultRequest_() {
+  resultRequestGeneration += 1;
+  cancelShelfJump_();
+  searchStatusState.removingChipKey = '';
+  isRandomBooksLoading = false;
+  setRandomRerollLoading_(false);
+  return resultRequestGeneration;
+}
+
+function isCurrentResultRequest_(generation) {
+  return generation === resultRequestGeneration;
+}
+
 function rerunSearchWithParams_(params, loadingMessage) {
+  const requestGeneration = beginResultRequest_();
   if (!hasAnySearchCondition_(params)) {
     hideSpinner();
     syncSearchStatusPreviewFromForm_();
@@ -1867,12 +1881,14 @@ function rerunSearchWithParams_(params, loadingMessage) {
   if (hasAdvancedCondition) {
     google.script.run
       .withSuccessHandler(function(data) {
+        if (!isCurrentResultRequest_(requestGeneration)) return;
         lastResultKind = 'search';
         lastResult = data;
         showResult(data);
         showSearchStatusResult_('advanced', data.length, params);
       })
       .withFailureHandler(function(err) {
+        if (!isCurrentResultRequest_(requestGeneration)) return;
         console.error('rerun advanced search failed:', err);
         hideSpinner();
         alert('検索中にエラーが発生しました。時間をおいて再度お試しください。');
@@ -1898,12 +1914,14 @@ function rerunSearchWithParams_(params, loadingMessage) {
 
   google.script.run
     .withSuccessHandler(function(data) {
+      if (!isCurrentResultRequest_(requestGeneration)) return;
       lastResultKind = 'search';
       lastResult = data;
       showResult(data);
       showSearchStatusResult_('normal', data.length, { keyword: params.keyword });
     })
     .withFailureHandler(function(err) {
+      if (!isCurrentResultRequest_(requestGeneration)) return;
       console.error('rerun simple search failed:', err);
       hideSpinner();
       alert('検索中にエラーが発生しました。時間をおいて再度お試しください。');
@@ -1927,6 +1945,8 @@ function removeSearchCondition_(key) {
     return;
   }
 
+  const requestGeneration = beginResultRequest_();
+
   hideAllSuggest();
 
   const remainingChipCount = currentChips.filter(chip => chip && chip.removable && chip.key !== key).length;
@@ -1938,6 +1958,7 @@ function removeSearchCondition_(key) {
   renderSearchStatus_();
 
   window.setTimeout(function() {
+    if (!isCurrentResultRequest_(requestGeneration)) return;
     switch (key) {
       case 'keyword':
         document.getElementById('keyword').value = '';
@@ -2026,6 +2047,7 @@ function showEmptySearchNotice_(message) {
 }
 
 function search() {
+  const requestGeneration = beginResultRequest_();
   hideAllSuggest();
 
   const keywordEl = document.getElementById('keyword');
@@ -2048,6 +2070,7 @@ function search() {
 
     google.script.run
       .withSuccessHandler(function(data) {
+        if (!isCurrentResultRequest_(requestGeneration)) return;
         closeAdvancedSearchPanel_();
         lastResultKind = 'search';
         lastResult = data;
@@ -2055,6 +2078,7 @@ function search() {
         showSearchStatusResult_('advanced', data.length, params);
       })
       .withFailureHandler(function(err) {
+        if (!isCurrentResultRequest_(requestGeneration)) return;
         console.error('searchBooksAdvanced failed:', err);
         hideSpinner();
         alert('検索中にエラーが発生しました。時間をおいて再度お試しください。');
@@ -2094,12 +2118,14 @@ function search() {
 
   google.script.run
     .withSuccessHandler(function(data) {
+      if (!isCurrentResultRequest_(requestGeneration)) return;
       lastResultKind = 'search';
       lastResult = data;
       showResult(data);
       showSearchStatusResult_('normal', data.length, { keyword: keyword });
     })
     .withFailureHandler(function(err) {
+      if (!isCurrentResultRequest_(requestGeneration)) return;
       console.error('searchBooksSimple failed:', err);
       hideSpinner();
       alert('検索中にエラーが発生しました。時間をおいて再度お試しください。');
@@ -2109,6 +2135,7 @@ function search() {
 
 function showRandomBooks() {
   if (isRandomBooksLoading) return;
+  const requestGeneration = beginResultRequest_();
   isRandomBooksLoading = true;
   setRandomRerollLoading_(true);
   resetViewModeForNewResults_();
@@ -2118,6 +2145,7 @@ function showRandomBooks() {
   showSpinner('棚から10冊抜き出しています', { kind: 'random' });
   google.script.run
     .withSuccessHandler(function(data) {
+      if (!isCurrentResultRequest_(requestGeneration)) return;
       isRandomBooksLoading = false;
       lastResultKind = 'random';
       lastResult = data;
@@ -2129,6 +2157,7 @@ function showRandomBooks() {
       container.classList.add('shrink');
     })
     .withFailureHandler(function(err) {
+      if (!isCurrentResultRequest_(requestGeneration)) return;
       isRandomBooksLoading = false;
       setRandomRerollLoading_(false);
       console.error('showRandomBooks failed:', err);
@@ -2252,6 +2281,8 @@ function bindBookshelfScrollMemory_() {
 }
 
 function restoreBookshelfScroll_() {
+  const requestGeneration = resultRequestGeneration;
+  const jumpGeneration = shelfJumpGeneration;
   const state = readBookshelfScrollState_();
   if (!state) {
     scrollToBookshelfTop_();
@@ -2259,6 +2290,7 @@ function restoreBookshelfScroll_() {
   }
 
   window.requestAnimationFrame(function() {
+    if (!isCurrentResultRequest_(requestGeneration) || jumpGeneration !== shelfJumpGeneration) return;
     const maxY = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
     const targetY = Math.min(state.scrollY, maxY);
     window.scrollTo({ top: targetY, behavior: 'auto' });
@@ -2266,6 +2298,8 @@ function restoreBookshelfScroll_() {
 }
 
 function showAllBookshelf() {
+  const requestGeneration = beginResultRequest_();
+  const initialJumpGeneration = shelfJumpGeneration;
   try {
     clearSearchFormValuesForBrowse_();
     closeAdvancedSearchPanel_();
@@ -2293,6 +2327,7 @@ function showAllBookshelf() {
     let renderedFromCache = false;
 
     function finishBookshelfLoad_(loadedBooks, options) {
+      if (!isCurrentResultRequest_(requestGeneration)) return;
       const opt = options || {};
       const resultBooks = Array.isArray(loadedBooks) ? loadedBooks : [];
       if (!resultBooks.length && renderedFromCache) return;
@@ -2309,6 +2344,7 @@ function showAllBookshelf() {
     }
 
     function failBookshelfLoad_(err) {
+      if (!isCurrentResultRequest_(requestGeneration)) return;
       console.error('showAllBookshelf failed:', err);
       if (renderedFromCache && Array.isArray(lastResult)) {
         showSearchStatusResult_('shelf', lastResult.length, { source: 'cache', refreshFailed: true });
@@ -2329,12 +2365,23 @@ function showAllBookshelf() {
 
     google.script.run
       .withSuccessHandler(function(payload) {
+        if (!isCurrentResultRequest_(requestGeneration)) return;
         if (!Array.isArray(payload)) {
           failBookshelfLoad_(new Error('Bookshelf API returned an unexpected payload.'));
           return;
         }
 
         writeBookshelfCache_(payload);
+        // Keep an opened book/map or a user-selected shelf in place. The fresh
+        // cache will be used on the next visit instead of interrupting this one.
+        if (renderedFromCache && (
+          document.body.classList.contains('modal-open') ||
+          document.body.classList.contains('shelf-room-map-modal-open') ||
+          initialJumpGeneration !== shelfJumpGeneration
+        )) {
+          showSearchStatusResult_('shelf', lastResult.length, { source: 'cache' });
+          return;
+        }
         finishBookshelfLoad_(payload, {
           keepScroll: renderedFromCache,
           statusParams: { source: 'network' }
@@ -2353,12 +2400,16 @@ function showAllBookshelf() {
 window.showAllBookshelf = showAllBookshelf;
 
 function scrollToBookshelfTop_() {
+  const requestGeneration = resultRequestGeneration;
   window.requestAnimationFrame(function() {
+    if (!isCurrentResultRequest_(requestGeneration)) return;
     window.scrollTo({ top: 0, behavior: 'smooth' });
   });
 }
 
 function resetSearch() {
+  beginResultRequest_();
+  hideSpinner();
   document.getElementById('keyword').value = '';
   clearAdvancedFields();
 

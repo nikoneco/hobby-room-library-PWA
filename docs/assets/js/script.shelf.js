@@ -225,7 +225,7 @@ function renderShelfJumpNav_(groups, totalCount, immersive) {
       const target = document.getElementById(button.dataset.shelfTarget);
       if (!target) return;
       syncActiveShelfNavigation_(button.dataset.shelfTarget);
-      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      scrollToShelfGroup_(target);
     };
     chips.appendChild(button);
   });
@@ -305,8 +305,35 @@ function scrollToRoomMapShelf_(groups, mapKey) {
 
   const target = document.getElementById(getShelfNavTargetId_(index));
   if (!target) return;
-  target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  scrollToShelfGroup_(target);
 }
+
+function scrollToShelfGroup_(target) {
+  // Smooth scrolling uses estimated offscreen heights while content-visibility
+  // reveals shelves on the way. A direct jump lets layout resolve the target.
+  const jumpGeneration = ++shelfJumpGeneration;
+  bookshelfPendingRestoreScroll = false;
+  const requestGeneration = resultRequestGeneration;
+  const renderRunId = shelfRenderRunId;
+  pendingShelfJump = shelfRenderInProgress ? { target, requestGeneration, renderRunId } : null;
+  target.scrollIntoView({ behavior: 'instant', block: 'start' });
+  function alignAfterLayout_(remaining) {
+    window.requestAnimationFrame(function() {
+      if (jumpGeneration !== shelfJumpGeneration || !isCurrentResultRequest_(requestGeneration) || renderRunId !== shelfRenderRunId || !target.isConnected) return;
+      target.scrollIntoView({ behavior: 'instant', block: 'start' });
+      if (remaining > 0) alignAfterLayout_(remaining - 1);
+    });
+  }
+  alignAfterLayout_(2);
+}
+
+function cancelShelfJump_() {
+  shelfJumpGeneration += 1;
+  pendingShelfJump = null;
+}
+
+window.addEventListener('wheel', cancelShelfJump_, { passive: true });
+window.addEventListener('touchstart', cancelShelfJump_, { passive: true });
 
 function setRoomMapBoxStyle_(el, config) {
   el.style.left = `${config.x}%`;
@@ -874,12 +901,20 @@ function appendShelfBookItems_(strip, items, context) {
 
 function finishShelfRenderQueue_(context) {
   if (!context || context.runId !== shelfRenderRunId) return;
+  shelfRenderInProgress = false;
   pwaPerfEnd_(context.perfToken, {
     count: context.totalCount,
     chunks: context.chunkCount || 0
   });
   if (typeof context.onComplete === 'function') {
     context.onComplete();
+  }
+  if (pendingShelfJump) {
+    const jump = pendingShelfJump;
+    pendingShelfJump = null;
+    if (jump.renderRunId === context.runId && isCurrentResultRequest_(jump.requestGeneration) && jump.target.isConnected) {
+      scrollToShelfGroup_(jump.target);
+    }
   }
 }
 
@@ -963,6 +998,7 @@ function renderShelfView_(data) {
   });
   resetBookDetailPrefetchObserver_();
   const renderRunId = ++shelfRenderRunId;
+  shelfRenderInProgress = true;
 
   const groups = groupBooksByShelf_(data);
   const shelfPopupItems = flattenShelfBooksForPopup_(groups);
@@ -1760,13 +1796,16 @@ function renderSeriesInventoryStatus_(payload) {
   });
 
   result.appendChild(section);
+  const requestGeneration = resultRequestGeneration;
   window.requestAnimationFrame(function() {
+    if (!isCurrentResultRequest_(requestGeneration)) return;
     result.classList.add('show');
     window.scrollTo({ top: 0, behavior: 'auto' });
   });
 }
 
 function showSeriesInventoryStatus() {
+  const requestGeneration = beginResultRequest_();
   hideAllSuggest();
   clearSearchFormValuesForBrowse_();
   closeAdvancedSearchPanel_();
@@ -1789,8 +1828,12 @@ function showSeriesInventoryStatus() {
 
   showSpinner('シリーズの巻数を確かめています', { kind: 'refine' });
   google.script.run
-    .withSuccessHandler(renderSeriesInventoryStatus_)
+    .withSuccessHandler(function(payload) {
+      if (!isCurrentResultRequest_(requestGeneration)) return;
+      renderSeriesInventoryStatus_(payload);
+    })
     .withFailureHandler(function(err) {
+      if (!isCurrentResultRequest_(requestGeneration)) return;
       console.error('getSeriesInventoryStatus failed:', err);
       hideSpinner();
       alert('シリーズ所蔵状況を確認できませんでした。時間をおいて再度お試しください。');

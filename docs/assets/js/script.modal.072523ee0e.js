@@ -354,10 +354,11 @@ function hydratePopupBookFromLocalIndex_(book) {
   if (hasDisplayValue_(book.bookId) && typeof manager.getBookById === 'function') {
     localBook = manager.getBookById(book.bookId);
   }
-  if (!localBook && typeof manager.getBookByRowIndex === 'function') {
+  if (!hasDisplayValue_(book.bookId) && typeof manager.getBookByRowIndex === 'function') {
     localBook = manager.getBookByRowIndex(book.rowIndex);
   }
   if (!localBook || typeof localBook !== 'object') return book;
+  if (hasDisplayValue_(book.bookId) && String(localBook.bookId || '').trim() !== String(book.bookId).trim()) return book;
 
   [
     'author', 'publisher', 'released', 'brand', 'genre', 'yomi',
@@ -571,7 +572,9 @@ function syncBookDetailCacheRevision_(datasetRevision) {
   if (!revision || revision === currentDatasetRevision) return;
 
   currentDatasetRevision = revision;
+  bookDetailRequestGeneration += 1;
   bookDetailCache.clear();
+  const cancelledCallbacks = Array.from(bookDetailInFlightCallbacks.values()).flat();
   bookDetailInFlightCallbacks.clear();
 
   const payload = readPersistentBookDetailCache_();
@@ -582,6 +585,14 @@ function syncBookDetailCacheRevision_(datasetRevision) {
       items: {}
     });
   }
+  // Release waiters before a response from the previous dataset can arrive.
+  cancelledCallbacks.forEach(callback => callback(null, createStaleBookDetailError_()));
+}
+
+function createStaleBookDetailError_() {
+  const error = new Error('Book dataset changed during detail loading');
+  error.code = 'BOOK_DETAIL_STALE';
+  return error;
 }
 
 if (pendingBookDetailCacheRevision) {
@@ -678,8 +689,27 @@ function replaceDeferredBookReference_(book, merged, index, dataArr, seriesConte
 
 function handleDeferredBookDetailResult_(book, index, dataArr, seriesContext, options, detail, error) {
   const opt = options || {};
+  if (opt.detailGeneration !== undefined && opt.detailGeneration !== bookDetailRequestGeneration) {
+    // A deferred render must not clear the flags belonging to a newer request.
+    if (book.detailRequestGeneration !== undefined && book.detailRequestGeneration !== opt.detailGeneration) {
+      if (typeof opt.onDone === 'function') opt.onDone(null);
+      return;
+    }
+    detail = null;
+    error = createStaleBookDetailError_();
+  }
   book.detailLoading = false;
   book.detailPrefetching = false;
+  book.detailRequestGeneration = undefined;
+
+  if (error && error.code === 'BOOK_DETAIL_STALE') {
+    book.detailError = '';
+    if (typeof opt.onDone === 'function') opt.onDone(null);
+    if (isBookPopupOpen_() && Array.isArray(popupData) && popupData[popupIndex] === book) {
+      schedulePopupCurrentDetailRender_(book, popupIndex, popupData, popupSeriesContext, 1);
+    }
+    return;
+  }
 
   if (detail && !isPersistentBookDetailMatch_(book, detail)) {
     detail = null;
@@ -766,7 +796,8 @@ function requestBookDetailsByStableIdentities_(books, onSuccess, onFailure) {
 }
 
 function fetchDeferredBookDetails_(book, index, dataArr, seriesContext, options) {
-  const opt = options || {};
+  const requestGeneration = bookDetailRequestGeneration;
+  const opt = Object.assign({}, options, { detailGeneration: requestGeneration });
   const cached = getCachedBookDetail_(book);
   if (cached) {
     const mergedFromCache = mergeDeferredBookDetails_(book, cached);
@@ -777,6 +808,7 @@ function fetchDeferredBookDetails_(book, index, dataArr, seriesContext, options)
 
   const key = getBookDetailCacheKey_(book);
   if (key && bookDetailInFlightCallbacks.has(key)) {
+    book.detailRequestGeneration = requestGeneration;
     book.detailLoading = true;
     book.detailPrefetching = Boolean(opt.prefetch);
     addBookDetailInFlightCallback_(key, function(detail, error) {
@@ -791,6 +823,7 @@ function fetchDeferredBookDetails_(book, index, dataArr, seriesContext, options)
   }
 
   book.detailLoading = true;
+  book.detailRequestGeneration = requestGeneration;
   book.detailPrefetching = Boolean(opt.prefetch);
   if (key) {
     addBookDetailInFlightCallback_(key, function(detail, error) {
@@ -801,6 +834,7 @@ function fetchDeferredBookDetails_(book, index, dataArr, seriesContext, options)
   requestBookDetailByStableIdentity_(
     book,
     function(detail) {
+      if (requestGeneration !== bookDetailRequestGeneration) return;
       if (!detail) {
         if (key) {
           settleBookDetailInFlight_(key, null, null);
@@ -818,6 +852,7 @@ function fetchDeferredBookDetails_(book, index, dataArr, seriesContext, options)
       }
     },
     function(err) {
+      if (requestGeneration !== bookDetailRequestGeneration) return;
       if (key) {
         settleBookDetailInFlight_(key, null, err);
       } else {
@@ -856,6 +891,7 @@ function collectPopupContextDetailTargets_(book, index, dataArr, options) {
       book: targetBook,
       index: targetIndex,
       options: {
+        detailGeneration: bookDetailRequestGeneration,
         current: Boolean(isCurrent),
         prefetch: !isCurrent,
         force: Boolean(isCurrent && opt.forceCurrent),
@@ -883,16 +919,8 @@ function handlePopupContextBookDetailResult_(target, dataArr, seriesContext, det
 
   const delayMs = Math.max(0, Number(target.options && target.options.deferApplyMs || 0));
   const applyResult_ = function() {
-    if (
-      delayMs &&
-      target.options &&
-      target.options.current &&
-      isBookPopupOpen_() &&
-      (popupIndex !== target.index || popupData !== dataArr)
-    ) {
-      return;
-    }
-
+    // Still settle the book after a swipe; replaceDeferredBookReference_ only
+    // redraws it when it is the currently visible book.
     handleDeferredBookDetailResult_(
       target.book,
       target.index,
@@ -904,7 +932,7 @@ function handlePopupContextBookDetailResult_(target, dataArr, seriesContext, det
     );
   };
 
-  if (delayMs) {
+  if (delayMs && !(error && error.code === 'BOOK_DETAIL_STALE')) {
     window.setTimeout(applyResult_, delayMs);
   } else {
     applyResult_();
@@ -912,6 +940,7 @@ function handlePopupContextBookDetailResult_(target, dataArr, seriesContext, det
 }
 
 function fetchPopupContextBookDetails_(book, index, dataArr, seriesContext, options) {
+  const requestGeneration = bookDetailRequestGeneration;
   const targets = collectPopupContextDetailTargets_(book, index, dataArr, options);
   if (!targets.length) return;
 
@@ -929,10 +958,8 @@ function fetchPopupContextBookDetails_(book, index, dataArr, seriesContext, opti
     }
 
     const key = getBookDetailCacheKey_(targetBook);
-    if (key && target.options.current && target.options.force) {
-      bookDetailInFlightCallbacks.delete(key);
-    }
     if (key && bookDetailInFlightCallbacks.has(key)) {
+      targetBook.detailRequestGeneration = requestGeneration;
       targetBook.detailLoading = true;
       targetBook.detailPrefetching = Boolean(target.options.prefetch);
       addBookDetailInFlightCallback_(key, function(detail, error) {
@@ -949,6 +976,7 @@ function fetchPopupContextBookDetails_(book, index, dataArr, seriesContext, opti
   removeBookDetailPrefetchItems_(requestTargets.map(target => target.book));
 
   requestTargets.forEach(target => {
+    target.book.detailRequestGeneration = requestGeneration;
     target.book.detailLoading = true;
     target.book.detailPrefetching = Boolean(target.options.prefetch);
     const key = getBookDetailCacheKey_(target.book);
@@ -962,6 +990,7 @@ function fetchPopupContextBookDetails_(book, index, dataArr, seriesContext, opti
   requestBookDetailsByStableIdentities_(
     requestTargets.map(target => target.book),
     function(details, usedBookIds) {
+      if (requestGeneration !== bookDetailRequestGeneration) return;
       const detailByIdentity = new Map();
       (Array.isArray(details) ? details : []).forEach(detail => {
         const identity = usedBookIds ? detail && detail.bookId : detail && detail.rowIndex;
@@ -983,6 +1012,7 @@ function fetchPopupContextBookDetails_(book, index, dataArr, seriesContext, opti
       });
     },
     function(err) {
+      if (requestGeneration !== bookDetailRequestGeneration) return;
       requestTargets.forEach(target => {
         const key = getBookDetailCacheKey_(target.book);
         if (key) {
@@ -1047,6 +1077,8 @@ function processBookDetailPrefetchQueue_() {
   if (!canRunBackgroundBookDetailPrefetch_()) return;
   if (bookDetailPrefetchActive >= getBookDetailPrefetchConcurrency_()) return;
 
+  const requestGeneration = bookDetailRequestGeneration;
+  const prefetchOptions = { prefetch: true, detailGeneration: requestGeneration };
   const batch = [];
   while (bookDetailPrefetchQueue.length && batch.length < BOOK_DETAIL_PREFETCH_BATCH_SIZE) {
     const item = bookDetailPrefetchQueue.shift();
@@ -1055,10 +1087,11 @@ function processBookDetailPrefetchQueue_() {
     if (!shouldFetchDeferredBookDetails_(item) || getCachedBookDetail_(item)) continue;
     const inFlightKey = getBookDetailCacheKey_(item);
     if (inFlightKey && bookDetailInFlightCallbacks.has(inFlightKey)) {
+      item.detailRequestGeneration = requestGeneration;
       item.detailLoading = true;
       item.detailPrefetching = true;
       addBookDetailInFlightCallback_(inFlightKey, function(detail, error) {
-        handleDeferredBookDetailResult_(item, -1, null, null, { prefetch: true }, detail, error);
+        handleDeferredBookDetailResult_(item, -1, null, null, prefetchOptions, detail, error);
       });
       continue;
     }
@@ -1072,12 +1105,13 @@ function processBookDetailPrefetchQueue_() {
 
   bookDetailPrefetchActive += 1;
   batch.forEach(book => {
+    book.detailRequestGeneration = requestGeneration;
     book.detailLoading = true;
     book.detailPrefetching = true;
     const key = getBookDetailCacheKey_(book);
     if (key) {
       addBookDetailInFlightCallback_(key, function(detail, error) {
-        handleDeferredBookDetailResult_(book, -1, null, null, { prefetch: true }, detail, error);
+        handleDeferredBookDetailResult_(book, -1, null, null, prefetchOptions, detail, error);
       });
     }
   });
@@ -1085,6 +1119,7 @@ function processBookDetailPrefetchQueue_() {
   requestBookDetailsByStableIdentities_(
     batch,
     function(details, usedBookIds) {
+      if (requestGeneration !== bookDetailRequestGeneration) return;
       const detailByIdentity = new Map();
       (Array.isArray(details) ? details : []).forEach(detail => {
         const identity = usedBookIds ? detail && detail.bookId : detail && detail.rowIndex;
@@ -1101,24 +1136,25 @@ function processBookDetailPrefetchQueue_() {
         if (key) {
           settleBookDetailInFlight_(key, detail || null, null);
         } else {
-          handleDeferredBookDetailResult_(book, -1, null, null, { prefetch: true }, detail || null, null);
+          handleDeferredBookDetailResult_(book, -1, null, null, prefetchOptions, detail || null, null);
         }
       });
     },
     function(err) {
+      if (requestGeneration !== bookDetailRequestGeneration) return;
       batch.forEach(book => {
         const key = getBookDetailCacheKey_(book);
         if (key) {
           settleBookDetailInFlight_(key, null, err);
         } else {
-          handleDeferredBookDetailResult_(book, -1, null, null, { prefetch: true }, null, err);
+          handleDeferredBookDetailResult_(book, -1, null, null, prefetchOptions, null, err);
         }
       });
     }
   );
 
   window.setTimeout(function waitForPrefetchBatch_() {
-    const stillLoading = batch.some(book => book && book.detailLoading);
+    const stillLoading = batch.some(book => book && book.detailLoading && book.detailRequestGeneration === requestGeneration);
     if (stillLoading) {
       window.setTimeout(waitForPrefetchBatch_, 120);
       return;
