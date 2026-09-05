@@ -722,7 +722,7 @@ function buildRakutenBooksSearchUrl_(safeIsbn, credentials) {
  * 楽天Books APIからJSONを取得する。
  * Webアプリケーション登録のReferer制限対策としてReferer/Originを付ける。
  * @param {string} url
- * @returns {*|null}
+ * @returns {Object}
  */
 function fetchRakutenBooksJson_(url) {
   const res = fetchUrlWithRetry_(url, buildRakutenBooksFetchOptions_());
@@ -730,12 +730,23 @@ function fetchRakutenBooksJson_(url) {
   const text = res.getContentText('UTF-8');
 
   if (code < 200 || code >= 300) {
-    console.error(`RakutenBooks HTTP ${code}: ${String(text || '').slice(0, 500)}`);
-    return null;
+    throw new Error(`RakutenBooks HTTP ${code}`);
   }
 
-  if (!text) return null;
-  return JSON.parse(text);
+  return parseRakutenSearchResponse_(text, 'RakutenBooks');
+}
+
+function parseRakutenSearchResponse_(text, service) {
+  let json;
+  try {
+    json = JSON.parse(text);
+  } catch (e) {
+    throw new Error(`${service}: 検索応答を読み取れませんでした。`);
+  }
+  if (!json || !Array.isArray(json.Items)) {
+    throw new Error(`${service}: 検索応答の形式が不正です。`);
+  }
+  return json;
 }
 
 /**

@@ -19,6 +19,7 @@ function retryNotFoundSynopsisFromRakutenKoboTest10_() {
 
 /**
  * NOT_FOUND行だけを楽天Koboで救済する指定件数バッチ。
+ * API検索の失敗時はNOT_FOUNDを保ち、その回のバッチを終了する。
  * @param {number} limit
  * @returns {Object}
  */
@@ -63,9 +64,6 @@ function retryNotFoundSynopsisFromRakutenKoboByLimit_(limit) {
     const context = buildRakutenKoboSearchContextFromRow_(row);
     if (!context.title) {
       skipped++;
-      processed++;
-      writeSynopsisResult_(sheet, rowNumber, '', SYNOPSIS_SOURCE.NOT_FOUND_DONE);
-      Utilities.sleep(50);
       continue;
     }
 
@@ -82,8 +80,10 @@ function retryNotFoundSynopsisFromRakutenKoboByLimit_(limit) {
       }
     } catch (e) {
       console.error(`retryNotFoundSynopsisFromRakutenKobo row=${rowNumber} title=${context.title}:`, e);
-      writeSynopsisResult_(sheet, rowNumber, '', SYNOPSIS_SOURCE.ERROR, e);
+      // Keep the pending source and existing synopsis intact. A failed search
+      // is not evidence of absence, and ERROR is outside this retry selector.
       error++;
+      break;
     }
 
     Utilities.sleep(Math.max(SYNOPSIS_FETCH_CONFIG.SLEEP_MS, SYNOPSIS_FETCH_CONFIG.KOBO_API_SLEEP_MS));
@@ -96,7 +96,7 @@ function retryNotFoundSynopsisFromRakutenKoboByLimit_(limit) {
     clearLibrarySearchCache_();
   }
   SpreadsheetApp.getActive().toast(
-    `Kobo救済: 処理${result.processed} / 成功${result.success} / 未発見確定${result.notFoundDone}`
+    `Kobo救済: 処理${result.processed} / 成功${result.success} / 未発見確定${result.notFoundDone} / 再試行待ち${result.error}`
   );
 
   return result;
@@ -165,7 +165,7 @@ function fetchBestRakutenKoboSynopsisForContext_(context) {
  */
 function fetchRakutenKoboCandidateRecords_(context) {
   const credentials = getRakutenBooksApiCredentials_();
-  if (!credentials) return [];
+  if (!credentials) throw new Error('楽天Koboの認証設定が不足しています。');
 
   const keywords = buildRakutenKoboKeywordCandidates_(context);
   const seenItemNumbers = {};
@@ -233,7 +233,7 @@ function buildRakutenKoboSearchUrl_(keyword, credentials) {
 /**
  * Kobo APIからJSONを取得する。
  * @param {string} url
- * @returns {*|null}
+ * @returns {Object}
  */
 function fetchRakutenKoboJson_(url) {
   const max = Math.max(1, Number(SYNOPSIS_FETCH_CONFIG.KOBO_RATE_LIMIT_RETRY_COUNT || 4));
@@ -248,23 +248,20 @@ function fetchRakutenKoboJson_(url) {
       const wait = sleepMs * (attempt + 1);
       console.warn(`RakutenKobo HTTP 429: rate limit. retry=${attempt + 1}/${max}, wait=${wait}ms`);
       if (attempt >= max - 1) {
-        console.error(`RakutenKobo HTTP 429: ${String(text || '').slice(0, 500)}`);
-        return null;
+        throw new Error('RakutenKobo HTTP 429: 次回の実行で再試行します。');
       }
       Utilities.sleep(wait);
       continue;
     }
 
     if (code < 200 || code >= 300) {
-      console.error(`RakutenKobo HTTP ${code}: ${String(text || '').slice(0, 500)}`);
-      return null;
+      throw new Error(`RakutenKobo HTTP ${code}`);
     }
 
-    if (!text) return null;
-    return JSON.parse(text);
+    return parseRakutenSearchResponse_(text, 'RakutenKobo');
   }
 
-  return null;
+  throw new Error('RakutenKobo: 検索を完了できませんでした。');
 }
 
 /**

@@ -3,7 +3,8 @@
 const NEW_BOOK_IMPORT_CONFIG = {
   DEFAULT_LIMIT: 20,
   TEST_LIMIT: 5,
-  LOCK_WAIT_MS: 10000
+  LOCK_WAIT_MS: 10000,
+  YOMIGANA_CURSOR_PREFIX: 'newBookImport.yomiganaNextRow.'
 };
 
 // Spreadsheet drawings can invoke only a top-level function without a trailing
@@ -70,8 +71,10 @@ function enrichNewBooksAfterImportByLimit_(limit) {
       fallbackImage
     };
 
+    const retryPending = yomigana.error + synopsisKobo.error;
     SpreadsheetApp.getActive().toast(
       `New book import: yomi ${yomigana.changed} / series ${series.changed} / UUID ${bookUuids.changed} / synopsis ${synopsis.processed} / Kobo ${synopsisKobo.processed} / image ${fallbackImage.processed}`
+      + (retryPending > 0 ? ` / 再試行待ち ${retryPending}` : '')
     );
 
     console.log(JSON.stringify(result));
@@ -93,6 +96,12 @@ function fillMissingYomiganaForImport_(sheet, limit) {
   const rowCount = lastRow - 1;
   const readWidth = Math.max(CONFIG.COL.TITLE, CONFIG.COL.ISBN, CONFIG.COL.YOMIGANA);
   const rows = sh.getRange(2, 1, rowCount, readWidth).getDisplayValues();
+  const properties = PropertiesService.getScriptProperties();
+  const cursorKey = NEW_BOOK_IMPORT_CONFIG.YOMIGANA_CURSOR_PREFIX + sh.getParent().getId() + '.' + sh.getSheetId();
+  const savedNextRow = Number(properties.getProperty(cursorKey));
+  const startIndex = Number.isInteger(savedNextRow) && savedNextRow >= 2 && savedNextRow <= lastRow
+    ? savedNextRow - 2
+    : 0;
 
   let processed = 0;
   let changed = 0;
@@ -102,9 +111,11 @@ function fillMissingYomiganaForImport_(sheet, limit) {
   let notFound = 0;
   let error = 0;
 
-  for (let i = 0; i < rows.length; i++) {
+  // Scan at most one full cycle; unresolved rows cannot monopolize every run.
+  for (let offset = 0; offset < rows.length; offset++) {
     if (processed >= batchLimit) break;
 
+    const i = (startIndex + offset) % rows.length;
     const row = rows[i];
     const rowNumber = i + 2;
     const title = String(row[CONFIG.COL.TITLE - 1] || '').trim();
@@ -121,13 +132,14 @@ function fillMissingYomiganaForImport_(sheet, limit) {
       continue;
     }
 
-    processed++;
-
     if (!isbn) {
       skippedNoIsbn++;
       continue;
     }
 
+    processed++;
+    // Checkpoint before external I/O so even an interrupted execution advances.
+    properties.setProperty(cursorKey, String(rowNumber + 1));
     try {
       const yomi = fetchYomiganaFromRakutenBooksByIsbn_(isbn);
 
@@ -140,6 +152,7 @@ function fillMissingYomiganaForImport_(sheet, limit) {
     } catch (e) {
       console.error(`fillMissingYomiganaForImport row=${rowNumber} isbn=${isbn}:`, e);
       error++;
+      break;
     }
 
     Utilities.sleep(120);
@@ -161,7 +174,7 @@ function fetchYomiganaFromRakutenBooksByIsbn_(isbn) {
   if (!safeIsbn) return '';
 
   const credentials = getRakutenBooksApiCredentials_();
-  if (!credentials) return '';
+  if (!credentials) throw new Error('楽天Booksの認証設定が不足しています。');
 
   const url = buildRakutenBooksSearchUrl_(safeIsbn, credentials);
   const json = fetchRakutenBooksJson_(url);
