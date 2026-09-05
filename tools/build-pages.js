@@ -246,6 +246,10 @@ function buildStaticIndex() {
         <input id="pwaPerfHudEnabled" type="checkbox">
         <span class="pwa-mini-switch" aria-hidden="true"></span>
       </label>
+      <label class="pwa-settings-row pwa-settings-toggle-row">
+        <span><span class="pwa-settings-row-title">失敗再現モード</span><span class="pwa-settings-row-note">検索エラー・日本語入力の検証パネルを表示します。オフで通常に戻ります。</span></span>
+        <input id="pwaFailureTestsEnabled" type="checkbox"><span class="pwa-mini-switch" aria-hidden="true"></span>
+      </label>
     </div>
   </section>`
   );
@@ -683,6 +687,11 @@ body.pwa-settings-open {
   cursor: pointer;
   transition: border-color 160ms ease, background 160ms ease, color 160ms ease, transform 160ms ease;
 }
+
+#pwaFailureTestPanel { position: fixed; bottom: 0; left: 0; z-index: 9999; display: flex; flex-wrap: wrap; gap: 4px; max-width: 100vw; box-sizing: border-box; padding: 6px; background: #fff; color: #111; font: 12px/1.5 sans-serif; }
+#pwaFailureTestPanel[hidden], body.modal-open #pwaFailureTestPanel, body.pwa-settings-open #pwaFailureTestPanel { display: none; }
+#pwaFailureTestPanel button { min-height: 40px; padding: 6px 10px; border: 1px solid #bac8d2; border-radius: 4px; background: #fff; color: #243746; font: inherit; cursor: pointer; }
+#pwaFailureTestPanel output { align-self: center; }
 
 .pwa-settings-button span {
   width: 16px;
@@ -1676,20 +1685,12 @@ body.pwa-shell .series-list-item:focus-visible {
 
 body.pwa-shell #image-popup-content {
   border-color: color-mix(in srgb, var(--pwa-line) 58%, var(--pwa-warm-2) 12%);
-  background:
-    radial-gradient(circle at 0% 0%, rgba(var(--pwa-warm-rgb), 0.10), transparent 30%),
-    radial-gradient(circle at 98% 8%, rgba(var(--pwa-accent-rgb), 0.070), transparent 28%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.056), rgba(255, 255, 255, 0.024)),
-    color-mix(in srgb, var(--pwa-panel-strong) 92%, transparent);
-  box-shadow:
-    0 24px 70px rgba(var(--pwa-shadow-rgb), 0.42),
-    inset 0 1px 0 rgba(255, 255, 255, 0.060);
+  background: var(--night-bg-raised, var(--pwa-panel-strong));
+  box-shadow: 0 24px 70px rgba(var(--pwa-shadow-rgb), 0.3);
 }
 
 body.pwa-shell #image-popup-content::after {
-  background:
-    linear-gradient(90deg, rgba(var(--pwa-warm-rgb), 0.058), transparent 24%, rgba(var(--pwa-accent-rgb), 0.032)),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.020), transparent 38%);
+  content: none;
 }
 
 body.pwa-shell #image-popup-content:not(.series-mode) #image-popup-img {
@@ -1699,29 +1700,20 @@ body.pwa-shell #image-popup-content:not(.series-mode) #image-popup-img {
 }
 
 body.pwa-shell #image-popup-content:not(.series-mode) #image-popup-info {
-  border-color: color-mix(in srgb, var(--pwa-line) 52%, transparent);
-  background:
-    radial-gradient(circle at 0% 0%, rgba(var(--pwa-warm-rgb), 0.072), transparent 36%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.040), rgba(255, 255, 255, 0.014)),
-    color-mix(in srgb, var(--pwa-panel) 36%, transparent);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.040),
-    0 14px 34px rgba(var(--pwa-shadow-rgb), 0.18);
+  border: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 body.pwa-shell #image-popup-content:not(.series-mode) #image-popup-info::before {
-  background: linear-gradient(180deg, rgba(var(--pwa-warm-rgb), 0.48), rgba(var(--pwa-accent-rgb), 0.24), transparent);
+  content: none;
 }
 
 body.pwa-shell #image-popup-info .popup-summary-text {
-  border-color: color-mix(in srgb, var(--pwa-line) 54%, transparent);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.034), rgba(255, 255, 255, 0.012)),
-    rgba(4, 9, 14, 0.22);
-  color: rgba(232, 242, 246, 0.9);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.034),
-    0 8px 18px rgba(var(--pwa-shadow-rgb), 0.12);
+  border: 0;
+  background: transparent;
+  color: var(--night-text, #f1ede4);
+  box-shadow: none;
 }
 
 body.pwa-shell #image-popup-info .genre-chip-wrap.popup,
@@ -1731,10 +1723,9 @@ body.pwa-shell #image-popup-info .popup-book-primary-meta:has(.book-note) {
 }
 
 body.pwa-shell #image-popup-info .genre-chip-wrap.popup {
-  border-color: color-mix(in srgb, var(--pwa-line) 46%, transparent);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.034), rgba(255, 255, 255, 0.012)),
-    color-mix(in srgb, var(--pwa-panel) 30%, transparent);
+  border: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 body.pwa-shell #image-popup-info .popup-book-primary-meta:has(.book-meta-pills),
@@ -1754,13 +1745,9 @@ body.pwa-shell #image-popup-info .popup-book-head {
 }
 
 body.pwa-shell #image-popup-info .popup-action-area {
-  border-color: color-mix(in srgb, var(--pwa-line) 52%, transparent);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.042), rgba(255, 255, 255, 0.014)),
-    color-mix(in srgb, var(--pwa-panel) 40%, transparent);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.040),
-    0 10px 22px rgba(var(--pwa-shadow-rgb), 0.14);
+  border: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 body.pwa-shell #image-popup-info .popup-action-btn,
@@ -2938,6 +2925,7 @@ function writeGasRunShim() {
   }
 
   function notifyFailure_(error) {
+    if (error && error.code === 'TEST_SEARCH_FAILURE') return;
     if (window.ShumiLibraryPwa && typeof window.ShumiLibraryPwa.handleApiFailure === 'function') {
       window.ShumiLibraryPwa.handleApiFailure(error);
     }
@@ -3445,6 +3433,15 @@ function writeGasRunShim() {
   }
 
   function invokeJsonp_(methodName, args, successHandler, failureHandler) {
+    const testMode = window.ShumiLibraryTestMode;
+    if (testMode && testMode.enabled && /^searchBooks(Simple|Advanced)$/.test(methodName)) {
+      testMode.calls += 1;
+      testMode.render();
+      if (testMode.searchFailure) {
+        window.setTimeout(function() { invokeFailure_(failureHandler, createError_('検証用の検索エラーです。', 'TEST_SEARCH_FAILURE')); }, 0);
+        return;
+      }
+    }
     if (canHandleLocally_(methodName, args)) {
       invokeLocal_(methodName, args, successHandler, failureHandler);
       return;
@@ -3620,6 +3617,11 @@ function writeGasRunShim() {
     whenLoaded: function() { return ensureLocalIndexLoaded_(); },
     getRevision: function() { return localIndexPayload ? String(localIndexPayload.revision || '') : ''; },
     getRecordCount: function() { return localIndexRecords.length; },
+    getSuggestionTitles: function() {
+      return Array.from(new Set(localIndexRecords.filter(function(record) {
+        return record.book.seriesCount > 1 && record.book.seriesSearchTitle;
+      }).map(function(record) { return record.book.seriesSearchTitle; })));
+    },
     getPreviewIndex: function() { return localIndexRecords.map(function(record) { return record.index; }); },
     getBookById: function(bookId) {
       const record = localIndexByBookId.get(String(bookId || ''));
@@ -3999,11 +4001,7 @@ function writePwaClient() {
     });
     banner.appendChild(button);
 
-    window.setTimeout(function() {
-      if (updateWaitingWorker === worker) {
-        applyServiceWorkerUpdate_(worker);
-      }
-    }, 900);
+    // Apply only after the reader chooses 更新; reading and search state stay in place.
   }
 
   function applyServiceWorkerUpdate_(worker) {
@@ -4570,6 +4568,46 @@ function writePwaClient() {
     }
   }
 
+  function bindFailureTests_() {
+    const toggle = document.getElementById('pwaFailureTestsEnabled');
+    if (!toggle) return;
+    const state = { enabled: false, searchFailure: false, calls: 0 };
+    const panel = document.createElement('aside');
+    panel.id = 'pwaFailureTestPanel';
+    panel.setAttribute('aria-label', '失敗再現の検証パネル');
+    panel.hidden = true;
+    panel.innerHTML = '<button type="button" id="pwaTestFail">検索通信を失敗させる</button><button type="button" id="pwaTestResume">検索通信を復旧</button><button type="button" id="pwaTestIme">変換中のEnterを検証</button><output aria-live="polite"></output>';
+    document.body.appendChild(panel);
+    const output = panel.querySelector('output');
+    state.render = function() {
+      panel.hidden = !state.enabled;
+      output.textContent = '検索要求 ' + state.calls + (state.searchFailure ? ' / 失敗モード' : ' / 通常');
+      panel.querySelector('#pwaTestFail').setAttribute('aria-pressed', String(state.searchFailure));
+    };
+    window.ShumiLibraryTestMode = state;
+    toggle.checked = false;
+    toggle.addEventListener('change', function() {
+      state.enabled = toggle.checked;
+      state.searchFailure = false;
+      state.calls = 0;
+      state.render();
+    });
+    panel.querySelector('#pwaTestFail').addEventListener('click', function() { state.searchFailure = true; state.render(); });
+    panel.querySelector('#pwaTestResume').addEventListener('click', function() { state.searchFailure = false; state.render(); });
+    panel.querySelector('#pwaTestIme').addEventListener('click', function() {
+      const input = document.getElementById('keyword');
+      if (!input) return;
+      const before = state.calls;
+      input.focus();
+      input.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', isComposing: true, bubbles: true, cancelable: true }));
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', keyCode: 229, bubbles: true, cancelable: true }));
+      input.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true }));
+      output.textContent = '変換中Enterの検索要求 ' + (state.calls - before) + (state.searchFailure ? ' / 失敗モード' : ' / 通常');
+    });
+    state.render();
+  }
+
   function bindSettingsPanel_() {
     const panel = document.getElementById('pwaSettingsPanel');
     const backdrop = document.getElementById('pwaSettingsBackdrop');
@@ -4578,6 +4616,7 @@ function writePwaClient() {
     if (!panel || !backdrop || !button || !closeButton) return;
 
     moveSensitiveToggleToSettings_();
+    bindFailureTests_();
     applyTheme_(getStoredTheme_());
     applyPlaySettings_();
 

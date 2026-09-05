@@ -939,4 +939,23 @@ assert(
   'large simple search keeps source row indexes and marks omitted details as deferred'
 );
 
+// An unavailable catalogue is an error, never a successful zero-book search.
+const uiServer = vm.createContext({ console: { error() {}, warn() {}, log() {} } });
+vm.runInContext(configSource + '\n' + seriesRegistrySource + '\n' + source, uiServer);
+vm.runInContext(`getLibraryDataset_ = function(){ throw new Error('catalogue unavailable'); }; getBookshelfLiteDataset_ = getLibraryDataset_;`, uiServer);
+['searchBooksSimple', 'searchBooksAdvanced', 'getRandomBooks', 'getBookshelfBooks'].forEach(name => {
+  let failed = false;
+  try { uiServer[name]('book'); } catch (error) { failed = error.message === 'catalogue unavailable'; }
+  assert(failed, name + ' propagates acquisition errors');
+});
+const hintSheet = raw => ({
+  getParent: () => ({ getSheetByName: () => ({ getRange: () => ({ getDisplayValue: () => raw }) }) }),
+  getMaxRows: () => 1000, getLastRow: () => 20,
+  getRange: row => ({ getDisplayValue: () => row === 20 ? 'Last real book' : '' })
+});
+['', ' ', 'not a number', '0', '1'].forEach(raw => assert(uiServer.getMainLastDataRowHintForWebApp_(hintSheet(raw)) === null, 'invalid or empty hint falls back: ' + raw));
+assert(uiServer.getMainLastDataRowHintForWebApp_(hintSheet('20')) === 20, 'validated last-row hint remains usable');
+const uiBrowseCounts = uiServer.buildQuickBrowseCountsPayload_({ index: [{ genres: { media: ['漫画'] }, isSensitive: false }, { genres: { media: ['漫画'] }, isSensitive: true }] });
+assert(uiBrowseCounts.media['漫画'] === 1, 'browse count uses the same sensitive exclusion as genre search');
+
 console.log('server api checks ok');

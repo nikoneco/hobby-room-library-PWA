@@ -302,11 +302,7 @@
     });
     banner.appendChild(button);
 
-    window.setTimeout(function() {
-      if (updateWaitingWorker === worker) {
-        applyServiceWorkerUpdate_(worker);
-      }
-    }, 900);
+    // Apply only after the reader chooses 更新; reading and search state stay in place.
   }
 
   function applyServiceWorkerUpdate_(worker) {
@@ -873,6 +869,46 @@
     }
   }
 
+  function bindFailureTests_() {
+    const toggle = document.getElementById('pwaFailureTestsEnabled');
+    if (!toggle) return;
+    const state = { enabled: false, searchFailure: false, calls: 0 };
+    const panel = document.createElement('aside');
+    panel.id = 'pwaFailureTestPanel';
+    panel.setAttribute('aria-label', '失敗再現の検証パネル');
+    panel.hidden = true;
+    panel.innerHTML = '<button type="button" id="pwaTestFail">検索通信を失敗させる</button><button type="button" id="pwaTestResume">検索通信を復旧</button><button type="button" id="pwaTestIme">変換中のEnterを検証</button><output aria-live="polite"></output>';
+    document.body.appendChild(panel);
+    const output = panel.querySelector('output');
+    state.render = function() {
+      panel.hidden = !state.enabled;
+      output.textContent = '検索要求 ' + state.calls + (state.searchFailure ? ' / 失敗モード' : ' / 通常');
+      panel.querySelector('#pwaTestFail').setAttribute('aria-pressed', String(state.searchFailure));
+    };
+    window.ShumiLibraryTestMode = state;
+    toggle.checked = false;
+    toggle.addEventListener('change', function() {
+      state.enabled = toggle.checked;
+      state.searchFailure = false;
+      state.calls = 0;
+      state.render();
+    });
+    panel.querySelector('#pwaTestFail').addEventListener('click', function() { state.searchFailure = true; state.render(); });
+    panel.querySelector('#pwaTestResume').addEventListener('click', function() { state.searchFailure = false; state.render(); });
+    panel.querySelector('#pwaTestIme').addEventListener('click', function() {
+      const input = document.getElementById('keyword');
+      if (!input) return;
+      const before = state.calls;
+      input.focus();
+      input.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', isComposing: true, bubbles: true, cancelable: true }));
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', keyCode: 229, bubbles: true, cancelable: true }));
+      input.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true }));
+      output.textContent = '変換中Enterの検索要求 ' + (state.calls - before) + (state.searchFailure ? ' / 失敗モード' : ' / 通常');
+    });
+    state.render();
+  }
+
   function bindSettingsPanel_() {
     const panel = document.getElementById('pwaSettingsPanel');
     const backdrop = document.getElementById('pwaSettingsBackdrop');
@@ -881,6 +917,7 @@
     if (!panel || !backdrop || !button || !closeButton) return;
 
     moveSensitiveToggleToSettings_();
+    bindFailureTests_();
     applyTheme_(getStoredTheme_());
     applyPlaySettings_();
 

@@ -357,6 +357,17 @@ function invoke(runner, method, args) {
   shelf[0].detailLoading = true;
   const shelfAgain = await invoke(onlineRunner, 'getBookshelfBooks', []);
   assert(!shelfAgain[0].detailLoading, 'shelf calls clone their records without leaking loading flags');
+  onlineWindow.ShumiLibraryTestMode = { enabled: true, searchFailure: true, calls: 0, render() {} };
+  const beforeFailureScripts = onlineScripts.length;
+  let testFailure;
+  try { await invoke(onlineRunner, 'searchBooksSimple', ['推しの子']); } catch (error) { testFailure = error; }
+  assert(testFailure && testFailure.code === 'TEST_SEARCH_FAILURE', 'test mode fails even a cached local search');
+  assert(onlineWindow.ShumiLibraryTestMode.calls === 1, 'test panel counts the failed request');
+  assert(onlineScripts.length === beforeFailureScripts, 'simulated failure does not call GAS');
+  onlineWindow.ShumiLibraryTestMode.enabled = false;
+  const normalAfterTest = await invoke(onlineRunner, 'searchBooksSimple', ['推しの子']);
+  assert(normalAfterTest.length === 2, 'turning test mode off restores normal search even with a stale failure flag');
+  assert(onlineWindow.ShumiLibraryTestMode.calls === 1, 'disabled test mode does not count normal searches');
 })().catch(error => {
   console.error(error);
   process.exitCode = 1;

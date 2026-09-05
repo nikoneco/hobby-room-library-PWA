@@ -6,23 +6,43 @@ function shouldIgnoreBookOpenSurfaceClick_(target) {
   );
 }
 
-function getPopupDragAxis_(diffX, diffY, canScroll) {
-  const absX = Math.abs(Number(diffX) || 0);
-  const absY = Math.abs(Number(diffY) || 0);
-  if (Math.max(absX, absY) <= 8) return '';
-  if (canScroll && absY > absX * 0.82) return 'y';
-  if (absX > absY * 0.82) return 'x';
-  return '';
-}
-
-function getPopupManualScrollTop_(startTop, diffY, maxScrollTop) {
-  const start = Math.max(0, Number(startTop) || 0);
-  const diff = Number(diffY) || 0;
-  const max = Math.max(0, Number(maxScrollTop) || 0);
-  return Math.max(0, Math.min(max, start - diff));
+function shouldHandlePopupArrowKey_(event) {
+  if (event.defaultPrevented || event.shiftKey || event.ctrlKey || event.altKey || event.metaKey || event.isComposing) return false;
+  const target = event.target;
+  if (target && typeof target.closest === 'function' && target.closest('input, textarea, select, [contenteditable="true"]')) return false;
+  const selection = typeof window.getSelection === 'function' ? window.getSelection() : null;
+  return !selection || selection.isCollapsed !== false;
 }
 
 let popupPageScrollLockY_ = null;
+let popupFocusReturn_ = null;
+let coverFocusReturn_ = null;
+const popupInertElements_ = new Map();
+let popupSeriesRequestGeneration_ = 0;
+
+function focusPopupIfNeeded_() {
+  const cover = document.getElementById('cover-fullscreen-overlay');
+  const popup = document.getElementById('image-popup-content');
+  const active = cover && cover.style.display === 'flex' ? cover : popup;
+  if (!active || !document.body.classList.contains('modal-open') || active.contains(document.activeElement)) return;
+  const close = active.querySelector('button');
+  (close || active).focus({ preventScroll: true });
+}
+
+document.addEventListener('keydown', function(event) {
+  if (event.key !== 'Tab' || !document.body.classList.contains('modal-open')) return;
+  const cover = document.getElementById('cover-fullscreen-overlay');
+  const active = cover && cover.style.display === 'flex' ? cover : document.getElementById('image-popup-content');
+  if (!active) return;
+  const items = Array.from(active.querySelectorAll('button, [href], input, select, textarea, summary, [tabindex]'))
+    .filter(el => !el.disabled && el.tabIndex >= 0 && !el.closest('[inert]') && el.getClientRects().length);
+  const first = items[0] || active;
+  const last = items[items.length - 1] || active;
+  if (!active.contains(document.activeElement) || (event.shiftKey && document.activeElement === first) || (!event.shiftKey && document.activeElement === last)) {
+    event.preventDefault();
+    (event.shiftKey ? last : first).focus({ preventScroll: true });
+  }
+}, true);
 
 function setPopupModalOpen_(enabled) {
   const body = document.body;
@@ -31,6 +51,12 @@ function setPopupModalOpen_(enabled) {
 
   if (enabled) {
     if (!body.classList.contains('modal-open')) {
+      popupFocusReturn_ = document.activeElement;
+      Array.from(body.children || []).forEach(element => {
+        if (element.id === 'image-popup-overlay' || element.id === 'cover-fullscreen-overlay' || /^(SCRIPT|STYLE)$/.test(element.tagName)) return;
+        popupInertElements_.set(element, element.inert);
+        element.inert = true;
+      });
       popupPageScrollLockY_ = Math.max(0, Number(window.scrollY) || 0);
       if (body.style && typeof body.style.setProperty === 'function') {
         body.style.setProperty('--modal-scroll-lock-y', `-${popupPageScrollLockY_}px`);
@@ -38,16 +64,24 @@ function setPopupModalOpen_(enabled) {
     }
     body.classList.add('modal-open');
     if (root && root.classList) root.classList.add('modal-open');
+    window.requestAnimationFrame(focusPopupIfNeeded_);
     return;
   }
 
   const restoreY = popupPageScrollLockY_;
+  popupSeriesRequestGeneration_ += 1;
   body.classList.remove('modal-open');
   if (root && root.classList) root.classList.remove('modal-open');
   if (body.style && typeof body.style.removeProperty === 'function') {
     body.style.removeProperty('--modal-scroll-lock-y');
   }
   popupPageScrollLockY_ = null;
+  popupInertElements_.forEach((inert, element) => { element.inert = inert; });
+  popupInertElements_.clear();
+  if (popupFocusReturn_ && popupFocusReturn_.isConnected && typeof popupFocusReturn_.focus === 'function') {
+    popupFocusReturn_.focus({ preventScroll: true });
+  }
+  popupFocusReturn_ = null;
   if (restoreY !== null && Number.isFinite(restoreY) && typeof window.scrollTo === 'function') {
     window.scrollTo({ top: restoreY, behavior: 'auto' });
   }
@@ -228,10 +262,14 @@ function updatePopupNavPlacement_() {
     const imgRect = img.getBoundingClientRect();
     if (!contentRect.height || !imgRect.height) return;
 
-    const centerY = imgRect.top - contentRect.top + (imgRect.height / 2);
+    const centerY = imgRect.bottom - contentRect.top + popupContent.scrollTop + 32;
     popupContent.style.setProperty('--popup-nav-y', `${Math.round(centerY)}px`);
+    popupContent.style.setProperty('--popup-nav-next-x', `${Math.round(imgRect.right - contentRect.left - 96)}px`);
+    popupContent.style.setProperty('--popup-nav-prev-x', `${Math.max(8, Math.round(imgRect.left - contentRect.left))}px`);
   });
 }
+
+window.addEventListener('resize', updatePopupNavPlacement_);
 
 function clearPopupTouchHandlers_() {
   const overlay = document.getElementById('image-popup-overlay');
@@ -1551,6 +1589,10 @@ function closeCoverFullscreen_() {
   if (caption) caption.textContent = '';
   document.onkeydown = coverFullscreenPreviousKeydown || null;
   coverFullscreenPreviousKeydown = null;
+  const bookOverlay = document.getElementById('image-popup-overlay');
+  if (bookOverlay) bookOverlay.inert = false;
+  if (coverFocusReturn_ && coverFocusReturn_.isConnected) coverFocusReturn_.focus({ preventScroll: true });
+  coverFocusReturn_ = null;
 }
 
 function openCoverFullscreen_(book) {
@@ -1574,6 +1616,10 @@ function openCoverFullscreen_(book) {
 
   overlay.style.display = 'flex';
   overlay.setAttribute('aria-hidden', 'false');
+  coverFocusReturn_ = document.activeElement;
+  const bookOverlay = document.getElementById('image-popup-overlay');
+  if (bookOverlay) bookOverlay.inert = true;
+  closeBtn.focus({ preventScroll: true });
   document.body.classList.add('cover-fullscreen-open');
 
   coverFullscreenPreviousKeydown = document.onkeydown;
@@ -1585,83 +1631,6 @@ function openCoverFullscreen_(book) {
 
   overlay.onclick = function(e) {
     if (e.target === overlay) closeCoverFullscreen_();
-  };
-
-  let coverPointerStartX = 0;
-  let coverPointerStartY = 0;
-  let coverPointerDragging = false;
-  let coverPointerSource = '';
-
-  function startCoverDrag_(source, x, y) {
-    if (coverPointerDragging && coverPointerSource !== source) return false;
-
-    coverPointerStartX = x;
-    coverPointerStartY = y;
-    coverPointerDragging = true;
-    coverPointerSource = source;
-    return true;
-  }
-
-  function updateCoverDrag_(x, y) {
-    const diffY = Math.max(0, y - coverPointerStartY);
-    if (diffY < 6) return false;
-
-    const dragY = Math.min(diffY, 150);
-    const opacity = Math.max(0.48, 1 - dragY / 260);
-    overlay.style.setProperty('--cover-drag-y', `${dragY}px`);
-    overlay.style.setProperty('--cover-drag-opacity', String(opacity));
-    return true;
-  }
-
-  function resetCoverDrag_() {
-    coverPointerDragging = false;
-    coverPointerSource = '';
-    overlay.style.removeProperty('--cover-drag-y');
-    overlay.style.removeProperty('--cover-drag-opacity');
-  }
-
-  function endCoverDrag_(x, y) {
-    const diffX = x - coverPointerStartX;
-    const diffY = y - coverPointerStartY;
-    resetCoverDrag_();
-
-    if (diffY > 76 && Math.abs(diffY) > Math.abs(diffX) * 1.15) {
-      closeCoverFullscreen_();
-    }
-  }
-
-  overlay.onpointerdown = function(e) {
-    if (!e.isPrimary) return;
-    if (!startCoverDrag_('pointer', e.clientX, e.clientY)) return;
-    if (typeof overlay.setPointerCapture === 'function') {
-      overlay.setPointerCapture(e.pointerId);
-    }
-  };
-  overlay.onpointermove = function(e) {
-    if (!coverPointerDragging || coverPointerSource !== 'pointer' || !e.isPrimary) return;
-    if (updateCoverDrag_(e.clientX, e.clientY)) e.preventDefault();
-  };
-  overlay.onpointerup = function(e) {
-    if (!coverPointerDragging || coverPointerSource !== 'pointer' || !e.isPrimary) return;
-    endCoverDrag_(e.clientX, e.clientY);
-  };
-  overlay.onpointercancel = function() {
-    if (coverPointerSource === 'pointer') resetCoverDrag_();
-  };
-  overlay.onmousedown = function(e) {
-    if (e.button !== 0) return;
-    startCoverDrag_('mouse', e.clientX, e.clientY);
-  };
-  overlay.onmousemove = function(e) {
-    if (!coverPointerDragging || coverPointerSource !== 'mouse') return;
-    if (updateCoverDrag_(e.clientX, e.clientY)) e.preventDefault();
-  };
-  overlay.onmouseup = function(e) {
-    if (!coverPointerDragging || coverPointerSource !== 'mouse') return;
-    endCoverDrag_(e.clientX, e.clientY);
-  };
-  overlay.onmouseleave = function() {
-    if (coverPointerSource === 'mouse') resetCoverDrag_();
   };
 
   img.onclick = function(e) {
@@ -1682,6 +1651,7 @@ function openCoverFullscreen_(book) {
 
 function openSeriesPanel(sourceBook) {
   if (!sourceBook || !sourceBook.seriesKeyAuto) return;
+  const requestGeneration = ++popupSeriesRequestGeneration_;
 
   const overlay = document.getElementById('image-popup-overlay');
   const popupContent = document.getElementById('image-popup-content');
@@ -1713,29 +1683,34 @@ function openSeriesPanel(sourceBook) {
     </div>
   `;
 
-  google.script.run
-    .withSuccessHandler(function(seriesBooks) {
+  runBookDetailRequest_(function(success, failure) {
+    google.script.run.withSuccessHandler(success).withFailureHandler(failure).getBooksBySeriesKey(sourceBook.seriesKeyAuto);
+  }, function(seriesBooks) {
+      if (requestGeneration !== popupSeriesRequestGeneration_) return;
       showSeriesPanel(sourceBook, Array.isArray(seriesBooks) ? seriesBooks : [], returnContext);
-    })
-    .withFailureHandler(function(error) {
+    }, function(error) {
+      if (requestGeneration !== popupSeriesRequestGeneration_) return;
       info.innerHTML = `
           <div class="series-panel">
             <div class="series-panel-title">シリーズ一覧を取得できませんでした</div>
-            <div class="series-panel-subtitle">${escapeHtml(error && error.message ? error.message : '時間を置いて再度お試しください。')}</div>
+            <div class="series-panel-subtitle">通信状態を確認して、もう一度お試しください。</div>
+          <button type="button" id="series-panel-retry" class="popup-action-btn">もう一度読み込む</button>
           <button type="button" id="series-panel-back-detail" class="popup-action-btn primary">${uiIcon_('back', 'ui-icon-inline')}<span>詳細へ戻る</span></button>
         </div>
       `;
+      document.getElementById('series-panel-retry').onclick = function(e) { e.stopPropagation(); openSeriesPanel(sourceBook); };
       const backBtn = document.getElementById('series-panel-back-detail');
       if (backBtn) backBtn.onclick = function(e) {
         e.stopPropagation();
         showPopup(sourceBook, returnContext.index, returnContext.data, returnContext.seriesContext || null);
       };
-    })
-    .getBooksBySeriesKey(sourceBook.seriesKeyAuto);
+      focusPopupIfNeeded_();
+    });
 }
 
 function showSearchResultSeriesPanel_(group) {
   if (!group || !Array.isArray(group.books) || group.books.length < 2) return;
+  popupSeriesRequestGeneration_ += 1;
 
   const overlay = document.getElementById('image-popup-overlay');
   const popupContent = document.getElementById('image-popup-content');
@@ -1753,7 +1728,10 @@ function showSearchResultSeriesPanel_(group) {
   }
   overlay.style.display = 'flex';
   setPopupModalOpen_(true);
-  if (popupContent) popupContent.classList.add('series-mode', 'search-result-series-mode');
+  if (popupContent) {
+    popupContent.classList.add('series-mode', 'search-result-series-mode');
+    popupContent.setAttribute('aria-label', `${sourceTitle}の検索一致巻`);
+  }
   img.style.display = 'none';
   prevBtn.style.display = 'none';
   nextBtn.style.display = 'none';
@@ -1763,7 +1741,7 @@ function showSearchResultSeriesPanel_(group) {
     <div class="series-panel search-result-series-panel">
       <div class="series-panel-title">${escapeHtml(sourceTitle)}</div>
       <div class="series-panel-subtitle">検索一致 ${items.length}冊</div>
-      <div class="search-result-series-list" role="list" aria-label="${escapeHtml(sourceTitle)}の検索一致巻"></div>
+      <div class="search-result-series-list" role="group" aria-label="${escapeHtml(sourceTitle)}の検索一致巻"></div>
     </div>
   `;
 
@@ -1774,7 +1752,6 @@ function showSearchResultSeriesPanel_(group) {
       const button = document.createElement('button');
       button.type = 'button';
       button.className = 'search-result-series-book';
-      button.setAttribute('role', 'listitem');
       button.setAttribute('aria-label', `${book && book.title ? book.title : '検索一致巻'}の詳細を開く`);
 
       const cover = document.createElement('img');
@@ -1788,7 +1765,8 @@ function showSearchResultSeriesPanel_(group) {
 
       const title = document.createElement('span');
       title.className = 'search-result-series-book-title';
-      title.textContent = book && book.title ? book.title : '(タイトルなし)';
+      title.textContent = getSeriesVolumeLabel_(book);
+      button.title = book && book.title ? book.title : '(タイトルなし)';
 
       button.appendChild(cover);
       button.appendChild(title);
@@ -1855,6 +1833,7 @@ function showSeriesPanel(sourceBook, seriesBooks, returnContext) {
       const badgeLabel = getSeriesListBadgeLabel_(item, idx);
       return `
         <button type="button" class="series-list-item${isCurrent ? ' is-current' : ''}" data-series-index="${idx}" aria-label="${escapeHtml(item.title || 'シリーズ内の本')} の詳細を開く">
+          <span class="series-volume-label">${escapeHtml(getSeriesVolumeLabel_(item))}</span>
           <span class="series-list-title" data-series-label="${escapeHtml(badgeLabel)}">${escapeHtml(item.title || '(タイトルなし)')}</span>
         </button>
       `;
@@ -1961,6 +1940,14 @@ function getSeriesListBadgeLabel_(item, index) {
   return String(Math.max(0, Number(index) || 0) + 1).padStart(2, '0');
 }
 
+function getSeriesVolumeLabel_(book) {
+  const part = getSeriesPartLabel_(book);
+  if (part) return /前|後/.test(part) ? `${part}編` : `${part}巻`;
+  const volume = Number(book && book.volume);
+  if (Number.isFinite(volume) && volume > 0) return `${volume}巻`;
+  return String(book && book.title || '巻情報なし');
+}
+
 function sortSeriesBooksForDisplay_(books) {
   const rank = { '前': 1, '上': 2, '中': 3, '下': 4, '後': 5 };
   return books
@@ -1975,6 +1962,7 @@ function sortSeriesBooksForDisplay_(books) {
 }
 
 function showPopup(book, index, dataArr, seriesContext, options) {
+  popupSeriesRequestGeneration_ += 1;
   const popupRenderPerfToken = pwaPerfStart_('popup:render', {
     index,
     count: Array.isArray(dataArr) ? dataArr.length : 0,
@@ -2026,7 +2014,10 @@ function showPopup(book, index, dataArr, seriesContext, options) {
     clearPopupMotionState_(popupContent);
   }
   img.style.display = '';
-  if (popupContent) popupContent.classList.remove('series-mode', 'search-result-series-mode');
+  if (popupContent) {
+    popupContent.classList.remove('series-mode', 'search-result-series-mode');
+    popupContent.setAttribute('aria-label', renderBook.title || '本の詳細');
+  }
   img.alt = renderBook.title || '表紙';
   img.setAttribute('role', 'button');
   img.setAttribute('tabindex', '0');
@@ -2040,11 +2031,6 @@ function showPopup(book, index, dataArr, seriesContext, options) {
   updatePopupNavPlacement_();
   img.onclick = function(e) {
     e.stopPropagation();
-    if (popupDragSuppressNextClick) {
-      e.preventDefault();
-      popupDragSuppressNextClick = false;
-      return;
-    }
     openCoverFullscreen_(sourceBook || renderBook);
   };
   img.onkeydown = function(e) {
@@ -2060,19 +2046,22 @@ function showPopup(book, index, dataArr, seriesContext, options) {
         <div class="popup-book-head">
           <div class="popup-book-title">${escapeHtml(renderBook.title || '(タイトルなし)')}</div>
           ${buildPopupBookLeadHtml_(renderBook)}
+          <div class="popup-book-location"><span>置き場所</span><strong>${escapeHtml(formatShelfLabel_(renderBook) || '配置未定')}</strong></div>
         </div>
-      <div class="genre-chip-wrap popup">${buildGenreChips(renderBook)}</div>
+      <div class="popup-summary-section"></div>
       ${buildPopupDetailLoadingHtml_(renderBook)}
-      <div class="popup-book-primary-meta">
-        ${buildBookMetaPillsHtml_(renderBook, { includeIsbn: true })}
-        ${buildBookMemoHtml_(renderBook)}
-      </div>
+      <div class="genre-chip-wrap popup" aria-label="この本の分類">${buildGenreChips(renderBook)}</div>
+      ${buildBookMemoHtml_(renderBook)}
+      <details class="popup-book-bibliography">
+        <summary>書誌情報</summary>
+        ${buildPopupBibliographyHtml_(renderBook)}
+      </details>
       ${actionsHtml}
       <div class="popup-position">${popupIndex + 1} / ${popupData.length}</div>
     </div>
   `;
 
-  appendPopupSummaryAccordion_(info.querySelector('.genre-chip-wrap.popup'), renderBook);
+  appendPopupSummaryAccordion_(info.querySelector('.popup-summary-section'), renderBook);
   bindPopupDetailRetry_(info, sourceBook);
   attachPopupActionHandlers(renderBook, popupSeriesContext);
   if (deferCurrentDetailRender) {
@@ -2126,8 +2115,9 @@ function showPopup(book, index, dataArr, seriesContext, options) {
 
   document.onkeydown = function(e) {
     if (e.key === 'Escape') hide();
-    if (e.key === 'ArrowLeft') popupMove(-1);
-    if (e.key === 'ArrowRight') popupMove(1);
+    if (!shouldHandlePopupArrowKey_(e)) return;
+    if (e.key === 'ArrowLeft') { e.preventDefault(); popupMove(-1); }
+    if (e.key === 'ArrowRight') { e.preventDefault(); popupMove(1); }
   };
 
   pwaPerfEnd_(popupRenderPerfToken, {
@@ -2136,173 +2126,14 @@ function showPopup(book, index, dataArr, seriesContext, options) {
     deferred: Boolean(deferCurrentDetailRender)
   });
 
-  prevBtn.style.display = (popupIndex > 0) ? 'block' : 'none';
-  nextBtn.style.display = (popupIndex < popupData.length - 1) ? 'block' : 'none';
-  setupPopupNavButton_(prevBtn, popupIndex - 1, '前へ');
-  setupPopupNavButton_(nextBtn, popupIndex + 1, '次へ');
+  prevBtn.style.display = (popupIndex > 0) ? 'flex' : 'none';
+  nextBtn.style.display = (popupIndex < popupData.length - 1) ? 'flex' : 'none';
+  setupPopupNavButton_(prevBtn, popupIndex - 1, '前の本');
+  setupPopupNavButton_(nextBtn, popupIndex + 1, '次の本');
   prevBtn.onclick = function(e) { e.stopPropagation(); popupMove(-1); };
   nextBtn.onclick = function(e) { e.stopPropagation(); popupMove(1); };
 
-  let popupDragStartX = 0;
-  let popupDragStartY = 0;
-  let popupDragging = false;
-  let popupDragSource = '';
-  let popupDragScrollTarget = false;
-  let popupDragNativeScrollTarget = false;
-  let popupDragCanScroll = false;
-  let popupDragStartScrollTop = 0;
-  let popupDragAxis = '';
 
-  function startPopupDrag_(source, x, y, target) {
-    if (popupDragging && popupDragSource !== source) return false;
-
-    popupDragStartX = x;
-    popupDragStartY = y;
-    popupDragging = true;
-    popupDragSource = source;
-    popupDragNativeScrollTarget = isPopupSummaryScrollTarget_(target);
-    popupDragScrollTarget = popupDragNativeScrollTarget;
-    popupDragCanScroll = popupDragNativeScrollTarget || Boolean(
-      target &&
-      typeof target.closest === 'function' &&
-      target.closest('#image-popup-content') &&
-      popupContent.scrollHeight > popupContent.clientHeight + 1
-    );
-    popupDragStartScrollTop = Math.max(0, Number(popupContent.scrollTop) || 0);
-    popupDragAxis = popupDragNativeScrollTarget ? 'y' : '';
-    popupContent.classList.add('is-dragging');
-    return true;
-  }
-
-  function updatePopupDrag_(x, y) {
-    if (popupDragNativeScrollTarget) return false;
-
-    const diffX = x - popupDragStartX;
-    const diffYRaw = y - popupDragStartY;
-    const absX = Math.abs(diffX);
-    const absY = Math.abs(diffYRaw);
-
-    if (!popupDragAxis) {
-      popupDragAxis = getPopupDragAxis_(diffX, diffYRaw, popupDragCanScroll);
-    }
-
-    if (popupDragAxis === 'y') {
-      const isDownwardCloseFromTop = popupDragStartScrollTop <= 0 && diffYRaw > 0;
-      if (!isDownwardCloseFromTop) {
-        const maxScrollTop = Math.max(0, popupContent.scrollHeight - popupContent.clientHeight);
-        popupContent.scrollTop = getPopupManualScrollTop_(
-          popupDragStartScrollTop,
-          diffYRaw,
-          maxScrollTop
-        );
-        popupDragScrollTarget = true;
-        popupContent.classList.remove('is-dragging');
-        return true;
-      }
-      popupDragScrollTarget = false;
-    }
-
-    if (absX > 8 && absX > absY * 0.82) {
-      const maxDragX = Math.min(178, Math.max(96, window.innerWidth * 0.42));
-      const dragX = Math.max(-maxDragX, Math.min(maxDragX, diffX));
-      const opacity = Math.max(0.66, 1 - Math.abs(dragX) / 360);
-      popupContent.style.setProperty('--popup-drag-x', `${dragX}px`);
-      popupContent.style.setProperty('--popup-drag-y', '0px');
-      popupContent.style.setProperty('--popup-drag-opacity', String(opacity));
-      return true;
-    }
-
-    const diffY = Math.max(0, diffYRaw);
-    if (diffY < 8) return false;
-
-    const dragY = Math.min(diffY, 130);
-    const opacity = Math.max(0.56, 1 - dragY / 260);
-    popupContent.style.setProperty('--popup-drag-x', '0px');
-    popupContent.style.setProperty('--popup-drag-y', `${dragY}px`);
-    popupContent.style.setProperty('--popup-drag-opacity', String(opacity));
-    return true;
-  }
-
-  function resetPopupDrag_() {
-    popupDragging = false;
-    popupDragSource = '';
-    popupDragScrollTarget = false;
-    popupDragNativeScrollTarget = false;
-    popupDragCanScroll = false;
-    popupDragStartScrollTop = 0;
-    popupDragAxis = '';
-    clearPopupMotionState_(popupContent);
-  }
-
-  function endPopupDrag_(x, y) {
-    const diffX = x - popupDragStartX;
-    const diffY = y - popupDragStartY;
-    const shouldClose = !popupDragScrollTarget && diffY > 92 && Math.abs(diffY) > Math.abs(diffX) * 1.12;
-    const shouldMove = !popupDragScrollTarget && Math.abs(diffX) > 48 && Math.abs(diffX) > Math.abs(diffY);
-    const moveDiff = diffX > 0 ? -1 : 1;
-
-    if (shouldClose) {
-      popupDragSuppressNextClick = true;
-      resetPopupDrag_();
-      hide();
-      window.setTimeout(function() {
-        popupDragSuppressNextClick = false;
-      }, 260);
-    } else if (shouldMove) {
-      const targetIndex = popupIndex + moveDiff;
-      if (targetIndex < 0 || targetIndex >= popupData.length) {
-        resetPopupDrag_();
-        return;
-      }
-
-      popupDragging = false;
-      popupDragSource = '';
-      popupDragScrollTarget = false;
-      popupDragNativeScrollTarget = false;
-      popupDragSuppressNextClick = true;
-      popupContent.classList.remove('is-dragging');
-      popupMove(moveDiff, { useTransitionClone: true });
-      window.setTimeout(function() {
-        popupDragSuppressNextClick = false;
-      }, 360);
-    } else {
-      resetPopupDrag_();
-    }
-  }
-
-  overlay.ontouchstart = function(e) {
-    if (e.touches.length === 1) {
-      startPopupDrag_('touch', e.touches[0].clientX, e.touches[0].clientY, e.target);
-    }
-  };
-  overlay.ontouchmove = function(e) {
-    if (!popupDragging || popupDragSource !== 'touch' || !e.touches || e.touches.length !== 1) return;
-    if (popupDragNativeScrollTarget) return;
-    if (updatePopupDrag_(e.touches[0].clientX, e.touches[0].clientY)) e.preventDefault();
-  };
-  overlay.ontouchend = function(e) {
-    if (!popupDragging || popupDragSource !== 'touch') return;
-    if (e.changedTouches && e.changedTouches.length === 1) {
-      endPopupDrag_(e.changedTouches[0].clientX, e.changedTouches[0].clientY);
-    } else {
-      resetPopupDrag_();
-    }
-  };
-  overlay.onmousedown = function(e) {
-    if (e.button !== 0) return;
-    startPopupDrag_('mouse', e.clientX, e.clientY, e.target);
-  };
-  overlay.onmousemove = function(e) {
-    if (!popupDragging || popupDragSource !== 'mouse') return;
-    if (updatePopupDrag_(e.clientX, e.clientY)) e.preventDefault();
-  };
-  overlay.onmouseup = function(e) {
-    if (!popupDragging || popupDragSource !== 'mouse') return;
-    endPopupDrag_(e.clientX, e.clientY);
-  };
-  overlay.onmouseleave = function() {
-    if (popupDragSource === 'mouse') resetPopupDrag_();
-  };
 }
 
 function popupMove(diff, options) {

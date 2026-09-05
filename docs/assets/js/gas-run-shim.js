@@ -87,6 +87,7 @@
   }
 
   function notifyFailure_(error) {
+    if (error && error.code === 'TEST_SEARCH_FAILURE') return;
     if (window.ShumiLibraryPwa && typeof window.ShumiLibraryPwa.handleApiFailure === 'function') {
       window.ShumiLibraryPwa.handleApiFailure(error);
     }
@@ -594,6 +595,15 @@
   }
 
   function invokeJsonp_(methodName, args, successHandler, failureHandler) {
+    const testMode = window.ShumiLibraryTestMode;
+    if (testMode && testMode.enabled && /^searchBooks(Simple|Advanced)$/.test(methodName)) {
+      testMode.calls += 1;
+      testMode.render();
+      if (testMode.searchFailure) {
+        window.setTimeout(function() { invokeFailure_(failureHandler, createError_('検証用の検索エラーです。', 'TEST_SEARCH_FAILURE')); }, 0);
+        return;
+      }
+    }
     if (canHandleLocally_(methodName, args)) {
       invokeLocal_(methodName, args, successHandler, failureHandler);
       return;
@@ -769,6 +779,11 @@
     whenLoaded: function() { return ensureLocalIndexLoaded_(); },
     getRevision: function() { return localIndexPayload ? String(localIndexPayload.revision || '') : ''; },
     getRecordCount: function() { return localIndexRecords.length; },
+    getSuggestionTitles: function() {
+      return Array.from(new Set(localIndexRecords.filter(function(record) {
+        return record.book.seriesCount > 1 && record.book.seriesSearchTitle;
+      }).map(function(record) { return record.book.seriesSearchTitle; })));
+    },
     getPreviewIndex: function() { return localIndexRecords.map(function(record) { return record.index; }); },
     getBookById: function(bookId) {
       const record = localIndexByBookId.get(String(bookId || ''));

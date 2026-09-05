@@ -334,4 +334,54 @@ for (const batch of [false, true]) {
   assert(!c.areBookshelfSnapshotsEqual_([book], [{ ...book, bookId: 'replacement' }]));
 }
 
+// Closing or replacing a series view invalidates its outstanding response.
+{
+  const { c, requests, rendered } = client();
+  c.showSeriesPanel = (book, books) => rendered.push(books.map(b => b.title));
+  c.clearPopupTouchHandlers_ = () => {};
+  const book = { title: 'Series', seriesKeyAuto: 'series' };
+  c.openSeriesPanel(book);
+  c.setPopupModalOpen_(false);
+  requests[0].ok([{ title: 'Closed response' }]);
+  assert.equal(rendered.length, 0);
+  c.openSeriesPanel(book);
+  c.openSeriesPanel(book);
+  requests[1].ok([{ title: 'Replaced response' }]);
+  requests[2].ok([{ title: 'Current response' }]);
+  assert.equal(rendered.length, 1);
+  assert.equal(rendered[0][0], 'Current response');
+}
+
+// A failed search is visibly distinct from an empty result and preserves the query for retry.
+{
+  const { c, requests } = client();
+  c.document.getElementById('detailAuthor').value = 'Selected author';
+  c.document.getElementById('detailMedia').value = '漫画';
+  c.document.getElementById('keyword').value = 'New keyword';
+  assert.equal(c.getEffectiveSearchParams_().detailAuthor, 'Selected author');
+  c.search();
+  assert.equal(requests[0].method, 'searchBooksAdvanced');
+  assert.equal(requests[0].args[0], 'New keyword');
+  assert.equal(requests[0].args[3], 'Selected author');
+}
+
+// A failed search is visibly distinct from an empty result and preserves the query for retry.
+{
+  const { c, requests, nodes } = client();
+  const retryButton = {};
+  c.renderSearchStatus_ = () => {};
+  c.resetResultRenderQueue_ = () => {};
+  const input = c.document.getElementById('keyword');
+  input.value = 'Saved query';
+  const result = c.document.getElementById('result');
+  result.querySelector = () => retryButton;
+  c.search();
+  requests[0].fail(new Error('Simulated offline'));
+  assert(result.innerHTML.includes('検索結果を取得できませんでした'));
+  assert.equal(input.value, 'Saved query');
+  retryButton.onclick();
+  assert.equal(requests.length, 2);
+  assert.equal(requests[1].args[0], 'Saved query');
+}
+
 console.log('client race, cache and detail recovery checks ok');

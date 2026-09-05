@@ -633,19 +633,51 @@ function populateAdvancedOptions() {
 function suggest(input, type) {
   if (!input || input.length < 1) return [];
   const nInput = normalizeKana(input);
+  const manager = window.ShumiLibraryLocalIndex;
+  const groupedTitles = manager && typeof manager.getSuggestionTitles === 'function'
+    ? manager.getSuggestionTitles(input)
+    : (SUGGEST_DATA.seriesTitles || []);
+  const seriesMatches = groupedTitles.filter(v => normalizeKana(v).includes(nInput));
+  const titles = (SUGGEST_DATA.titles || []).filter(title => !seriesMatches.some(series =>
+    normalizeKana(title).startsWith(normalizeKana(series))
+  ));
 
   let arr = [];
   if (type === 'keyword') {
     arr = Array.from(new Set([
-      ...(SUGGEST_DATA.titles || []),
-      ...(SUGGEST_DATA.yomis || []),
-      ...(SUGGEST_DATA.authors || [])
+      ...seriesMatches,
+      ...titles,
+      ...(SUGGEST_DATA.authors || []),
+      ...(SUGGEST_DATA.yomis || []).filter(yomi => !seriesMatches.some(series =>
+        normalizeKana(yomi).startsWith(normalizeKana(series))
+      )).map(yomi => /[0-9０-９]/.test(input) ? yomi : String(yomi).replace(/[\s.・]+(?:第)?[0-9０-９]+(?:巻)?\s*$/, ''))
     ]));
   } else if (type === 'detailTitle') {
-    arr = SUGGEST_DATA.titles || [];
+    arr = Array.from(new Set([...seriesMatches, ...titles]));
   }
 
-  return arr.filter(v => normalizeKana(v).includes(nInput)).slice(0, 20);
+  return arr.filter(v => normalizeKana(v).includes(nInput)).slice(0, 6);
+}
+
+function isSearchCompositionEvent_(event) {
+  return Boolean(event && (event.isComposing || event.keyCode === 229 || (event.target && event.target.dataset && event.target.dataset.composing === 'true')));
+}
+
+function closeSuggest_(suggestId) {
+  const box = document.getElementById(suggestId);
+  const input = document.getElementById(suggestId.replace(/-suggest$/, ''));
+  if (box) box.style.display = 'none';
+  if (input) {
+    input.setAttribute('aria-expanded', 'false');
+    input.removeAttribute('aria-activedescendant');
+  }
+}
+
+function chooseSuggestion_(input, suggestId, value) {
+  input.value = value;
+  closeSuggest_(suggestId);
+  input.focus();
+  syncSearchStatusPreviewFromForm_();
 }
 
 function showSuggestList(inputId, suggestId, type) {
@@ -659,19 +691,23 @@ function showSuggestList(inputId, suggestId, type) {
   suggestBox.innerHTML = '';
 
   if (list.length === 0 || !value) {
-    suggestBox.style.display = 'none';
+    closeSuggest_(suggestId);
     return;
   }
 
   suggestBox.style.display = 'block';
-  list.forEach(item => {
+  input.setAttribute('aria-expanded', 'true');
+  input.removeAttribute('aria-activedescendant');
+  list.forEach((item, index) => {
     const div = document.createElement('div');
     div.className = 'suggest-item';
+    div.id = `${suggestId}-${index}`;
+    div.setAttribute('role', 'option');
+    div.setAttribute('aria-selected', 'false');
     div.innerHTML = highlightMatch(item, value);
+    div.onmousedown = event => event.preventDefault();
     div.onclick = function() {
-      input.value = item;
-      suggestBox.style.display = 'none';
-      input.focus();
+      chooseSuggestion_(input, suggestId, item);
     };
     suggestBox.appendChild(div);
   });
@@ -680,9 +716,13 @@ function showSuggestList(inputId, suggestId, type) {
 function updateSuggestActive(suggestId, type) {
   const suggestBox = document.getElementById(suggestId);
   const items = suggestBox.querySelectorAll('.suggest-item');
+  const input = document.getElementById(suggestId.replace(/-suggest$/, ''));
   items.forEach((el, idx) => {
+    el.setAttribute('aria-selected', idx === currentSuggestIndex[type] ? 'true' : 'false');
     if (idx === currentSuggestIndex[type]) {
       el.classList.add('active');
+      input.setAttribute('aria-activedescendant', el.id);
+      el.scrollIntoView({ block: 'nearest' });
     } else {
       el.classList.remove('active');
     }
@@ -691,21 +731,24 @@ function updateSuggestActive(suggestId, type) {
 
 function hideSuggestBox(suggestId) {
   setTimeout(() => {
-    const box = document.getElementById(suggestId);
-    if (box) box.style.display = 'none';
+    const input = document.getElementById(suggestId.replace(/-suggest$/, ''));
+    // Keep the pressed action in place until its click handler runs.
+    const active = document.activeElement;
+    if (active && typeof active.closest === 'function' && active.closest('#searchContainer [data-action]')) return;
+    if (document.activeElement !== input) closeSuggest_(suggestId);
   }, 150);
 }
 
 function hideAllSuggest() {
   ['keyword-suggest', 'detailTitle-suggest'].forEach(id => {
-    const box = document.getElementById(id);
-    if (box) box.style.display = 'none';
+    closeSuggest_(id);
   });
 }
 
 function addSuggestKeyHandler(inputId, suggestId, type) {
   const input = document.getElementById(inputId);
   input.addEventListener('keydown', function(event) {
+    if (isSearchCompositionEvent_(event)) return;
     const suggestBox = document.getElementById(suggestId);
     if (suggestBox.style.display === 'block') {
       if (event.key === 'ArrowDown') {
@@ -727,12 +770,15 @@ function addSuggestKeyHandler(inputId, suggestId, type) {
       } else if (event.key === 'Enter') {
         if (currentSuggestIndex[type] >= 0 && currentSuggestList[type][currentSuggestIndex[type]]) {
           event.preventDefault();
-          input.value = currentSuggestList[type][currentSuggestIndex[type]];
-          suggestBox.style.display = 'none';
-          input.focus();
+          event.stopImmediatePropagation();
+          chooseSuggestion_(input, suggestId, currentSuggestList[type][currentSuggestIndex[type]]);
         }
       } else if (event.key === 'Escape') {
-        suggestBox.style.display = 'none';
+        event.preventDefault();
+        event.stopPropagation();
+        closeSuggest_(suggestId);
+      } else if (event.key === 'Tab') {
+        closeSuggest_(suggestId);
       }
     }
   });
@@ -781,9 +827,9 @@ function setAdvancedToggleButtonState_(open) {
   const label = btn.querySelector('.advanced-toggle-label') || btn.querySelector('span:last-child');
   btn.classList.toggle('active', Boolean(open));
   btn.setAttribute('aria-expanded', open ? 'true' : 'false');
-  btn.setAttribute('title', open ? '詳細検索を閉じる' : '詳細検索を開く');
+  btn.setAttribute('title', open ? '絞り込みを閉じる' : '絞り込みを開く');
   if (label) {
-    label.textContent = open ? '閉じる' : '詳細';
+    label.textContent = open ? '閉じる' : '絞り込み';
   }
 }
 
@@ -796,6 +842,8 @@ function toggleAdvancedSearch() {
     area.style.display = 'block';
     area.setAttribute('aria-hidden', 'false');
     setAdvancedToggleButtonState_(true);
+    const more = document.getElementById('filterMore');
+    if (more && getExtraFilterCount_()) more.open = true;
   } else {
     closeAdvancedSearchPanel_();
   }
@@ -809,6 +857,19 @@ function toggleAdvancedSearch() {
   if (!preservingAppliedStatus) {
     syncSearchStatusPreviewFromForm_();
   }
+}
+
+function getExtraFilterCount_() {
+  return ['detailTitle', 'detailYomi', 'detailAuthor', 'detailPublisher', 'detailReleasedFromYear', 'detailReleasedToYear']
+    .filter(id => { const element = document.getElementById(id); return element && String(element.value || '').trim(); }).length;
+}
+
+function syncExtraFilterLabel_() {
+  const more = document.getElementById('filterMore');
+  const summary = more && more.querySelector('summary');
+  if (!summary) return;
+  const count = getExtraFilterCount_();
+  summary.textContent = 'タイトル・作者・出版社・発売日' + (count ? `（${count}条件）` : '');
 }
 
 function closeAdvancedSearchPanel_() {
@@ -856,6 +917,7 @@ function countQuickBrowseMatches_(config, value) {
   const category = config && config.genreKey ? config.genreKey : '';
   const key = String(value || '').trim();
   if (
+    !PREVIEW_INDEX.length &&
     QUICK_BROWSE_COUNTS &&
     category &&
     key &&
@@ -868,6 +930,7 @@ function countQuickBrowseMatches_(config, value) {
   if (!Array.isArray(PREVIEW_INDEX) || !PREVIEW_INDEX.length) return 0;
 
   return PREVIEW_INDEX.reduce((count, item) => {
+    if (isSensitiveSearchIndexItem_(item)) return count;
     const genres = item && item.genres ? item.genres : {};
     const values = Array.isArray(genres[config.genreKey]) ? genres[config.genreKey] : [];
     return values.includes(value) ? count + 1 : count;
@@ -1195,7 +1258,7 @@ function getAdvancedSearchParams_() {
 
 function getEffectiveSearchParams_() {
   const params = getAdvancedSearchParams_();
-  if (isAdvancedOpen()) return params;
+  if (isAdvancedOpen() || hasAnyAdvancedCondition_(params)) return params;
 
   return {
     keyword: params.keyword,
@@ -1560,7 +1623,7 @@ function renderSearchStatus_() {
   const els = getSearchStatusElements_();
   if (!els.area || !els.count || !els.chips) return;
 
-  if (!searchStatusState.visible) {
+  if (!searchStatusState.visible || (['normal', 'advanced', 'preview'].includes(searchStatusState.mode) && !searchStatusState.chips.length && !searchStatusState.message)) {
     els.area.hidden = true;
     els.area.classList.remove('is-preview', 'is-result', 'is-random', 'is-shelf', 'is-notice');
     els.count.textContent = '';
@@ -1766,7 +1829,7 @@ function requestAuthoritativePreviewCount_(mode, params) {
         if (requestSeq !== PREVIEW_COUNT_REQUEST_SEQ) return;
 
         const currentParams = getEffectiveSearchParams_();
-        const currentMode = isAdvancedOpen() ? 'advanced' : 'normal';
+        const currentMode = isAdvancedOpen() || hasAnyAdvancedCondition_(currentParams) ? 'advanced' : 'normal';
         const currentKey = buildPreviewCountRequestKey_(currentParams, currentMode);
         if (currentKey !== requestKey) return;
 
@@ -1796,8 +1859,9 @@ function requestAuthoritativePreviewCount_(mode, params) {
 }
 
 function syncSearchStatusPreviewFromForm_() {
+  syncExtraFilterLabel_();
   const params = getEffectiveSearchParams_();
-  const mode = isAdvancedOpen() ? 'advanced' : 'normal';
+  const mode = isAdvancedOpen() || hasAnyAdvancedCondition_(params) ? 'advanced' : 'normal';
 
   if (!hasAnySearchCondition_(params)) {
     PREVIEW_COUNT_REQUEST_SEQ++;
@@ -1892,7 +1956,7 @@ function rerunSearchWithParams_(params, loadingMessage) {
         if (!isCurrentResultRequest_(requestGeneration)) return;
         console.error('rerun advanced search failed:', err);
         hideSpinner();
-        alert('検索中にエラーが発生しました。時間をおいて再度お試しください。');
+        showSearchFailure_(function() { rerunSearchWithParams_(params); });
       })
       .searchBooksAdvanced(
         params.keyword,
@@ -1925,7 +1989,7 @@ function rerunSearchWithParams_(params, loadingMessage) {
       if (!isCurrentResultRequest_(requestGeneration)) return;
       console.error('rerun simple search failed:', err);
       hideSpinner();
-      alert('検索中にエラーが発生しました。時間をおいて再度お試しください。');
+      showSearchFailure_(function() { rerunSearchWithParams_(params); });
     })
     .searchBooksSimple(params.keyword);
 }
@@ -2047,6 +2111,20 @@ function showEmptySearchNotice_(message) {
   showSearchStatusNotice_(getLibrarianNoticeText_(message));
 }
 
+function showSearchFailure_(retry) {
+  hideSpinner();
+  resetResultRenderQueue_();
+  lastResult = null;
+  currentSearchResultPresentationStats = null;
+  const result = document.getElementById('result');
+  result.innerHTML = '<div class="empty-result search-error" role="alert"><div class="empty-result-title">検索結果を取得できませんでした</div><p class="empty-result-text">通信状態を確認して、もう一度お試しください。検索条件はそのまま残っています。</p><button type="button" class="quiet-action search-retry">もう一度検索する</button></div>';
+  result.querySelector('.search-retry').onclick = retry;
+  document.getElementById('viewToggle').style.display = 'none';
+  searchStatusState.message = '検索結果を取得できませんでした';
+  searchStatusState.previewPending = false;
+  renderSearchStatus_();
+}
+
 function search() {
   const requestGeneration = beginResultRequest_();
   hideAllSuggest();
@@ -2054,8 +2132,8 @@ function search() {
   const keywordEl = document.getElementById('keyword');
   const keyword = keywordEl ? (keywordEl.value || '') : '';
 
-  if (isAdvancedOpen()) {
-    const params = getAdvancedSearchParams_();
+  const params = getAdvancedSearchParams_();
+  if (isAdvancedOpen() || hasAnyAdvancedCondition_(params)) {
     if (!hasAnySearchCondition_(params)) {
       showEmptySearchNotice_('検索条件を入力してください');
       return;
@@ -2082,7 +2160,7 @@ function search() {
         if (!isCurrentResultRequest_(requestGeneration)) return;
         console.error('searchBooksAdvanced failed:', err);
         hideSpinner();
-        alert('検索中にエラーが発生しました。時間をおいて再度お試しください。');
+        showSearchFailure_(search);
       })
       .searchBooksAdvanced(
         params.keyword,
@@ -2129,7 +2207,7 @@ function search() {
       if (!isCurrentResultRequest_(requestGeneration)) return;
       console.error('searchBooksSimple failed:', err);
       hideSpinner();
-      alert('検索中にエラーが発生しました。時間をおいて再度お試しください。');
+      showSearchFailure_(search);
     })
     .searchBooksSimple(keyword);
 }
@@ -2163,7 +2241,7 @@ function showRandomBooks() {
       setRandomRerollLoading_(false);
       console.error('showRandomBooks failed:', err);
       hideSpinner();
-      alert('ランダム検索中にエラーが発生しました。時間をおいて再度お試しください。');
+      showSearchFailure_(showRandomBooks);
     })
     .getRandomBooks(10);
 }

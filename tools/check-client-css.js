@@ -89,7 +89,7 @@ assertBalancedBraces(combinedCss);
   /@media\s*\(max-width:\s*700px\)[\s\S]*?#image-popup-content\s*\{[^}]*overflow-y:\s*auto\s*!important[^}]*-webkit-overflow-scrolling:\s*touch[^}]*overscroll-behavior-y:\s*contain/,
   /html\.modal-open\s*\{[^}]*overflow:\s*hidden\s*!important[^}]*overscroll-behavior:\s*none/,
   /body\.modal-open\s*\{[^}]*position:\s*fixed[^}]*top:\s*var\(--modal-scroll-lock-y,[^}]*height:\s*100dvh[^}]*overscroll-behavior:\s*none/,
-  /@media\s*\(max-width:\s*700px\)[\s\S]*?#image-popup-content\s*\{[^}]*touch-action:\s*none/,
+  /@media\s*\(max-width:\s*700px\)[\s\S]*?#image-popup-content\s*\{[^}]*touch-action:\s*auto/,
   /@media\s*\(max-width:\s*760px\)[\s\S]*?#image-popup-content:not\(\.series-mode\)\s+#image-popup-info\s*\{[^}]*flex:\s*0\s+0\s+auto[^}]*overflow:\s*visible/,
   /\.popup-summary-text\s*\{[^}]*touch-action:\s*pan-y/,
   /\.search-series-card\s*\{/,

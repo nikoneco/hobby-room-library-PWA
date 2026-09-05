@@ -126,13 +126,16 @@ function getMainLastDataRowHintForWebApp_(sheet) {
     if (!dataSheet) return null;
 
     const rawValue = dataSheet.getRange(a1).getDisplayValue();
-    const hintedRow = Number(String(rawValue || '').replace(/,/g, '').trim());
+    const hintText = String(rawValue || '').replace(/,/g, '').trim();
+    if (!hintText) return null;
+    const hintedRow = Number(hintText);
     const maxRows = sheet.getMaxRows();
 
     if (!Number.isFinite(hintedRow)) return null;
 
     const row = Math.floor(hintedRow);
-    if (row <= 1) return 1;
+    if (row < 1) return null;
+    if (row === 1) return sheet.getLastRow() <= 1 ? 1 : null;
     if (row > maxRows) return null;
 
     const titleAtHint = String(sheet.getRange(row, CONFIG.COL.TITLE).getDisplayValue() || '')
@@ -665,6 +668,9 @@ function buildSuggestDataPayload_(dataset) {
   const suggest = dataset && dataset.suggest ? dataset.suggest : {};
   return {
     titles : Array.isArray(suggest.titles) ? suggest.titles : [],
+    seriesTitles: Array.from(new Set((dataset && Array.isArray(dataset.index) ? dataset.index : [])
+      .filter(item => item.seriesSearchTitle && Number(item.seriesCount) > 1)
+      .map(item => String(item.seriesSearchTitle)))),
     yomis  : Array.isArray(suggest.yomis) ? suggest.yomis : [],
     authors: Array.isArray(suggest.authors) ? suggest.authors : [],
     genres : Array.isArray(suggest.genres) ? suggest.genres : []
@@ -834,6 +840,7 @@ function buildQuickBrowseCountsPayload_(dataset) {
   const index = dataset && Array.isArray(dataset.index) ? dataset.index : [];
 
   index.forEach(item => {
+    if (isSensitiveIndexItem_(item)) return;
     const genres = item && item.genres ? item.genres : {};
     Object.keys(counts).forEach(category => {
       const values = Array.isArray(genres[category]) ? genres[category] : [];
@@ -2200,7 +2207,7 @@ function searchBooksSimple(keyword, perf) {
     return books;
   } catch (e) {
     console.error('searchBooksSimple error:', e);
-    return [];
+    throw e;
   }
 }
 
@@ -2256,7 +2263,7 @@ function getRandomBooks(count, perf) {
     return books;
   } catch (e) {
     console.error('getRandomBooks error:', e);
-    return [];
+    throw e;
   }
 }
 
@@ -2295,7 +2302,7 @@ function searchBooksAdvanced(
     return mapRowsToBooks_(matchedRows, matchedIndex);
   } catch (e) {
     console.error('searchBooksAdvanced error:', e);
-    return [];
+    throw e;
   }
 }
 
@@ -2340,7 +2347,7 @@ function getBookshelfBooks() {
     return dataset.books || [];
   } catch (e) {
     console.error('getBookshelfBooks error:', e);
-    return [];
+    throw e;
   }
 }
 
@@ -2556,7 +2563,7 @@ function getBooksBySeriesKey(seriesKeyAuto) {
     return mapRowsToBooks_(matchedRows, matchedIndex, { rowIndexes: matchedRowIndexes });
   } catch (e) {
     console.error('getBooksBySeriesKey error:', e);
-    return [];
+    throw e;
   }
 }
 

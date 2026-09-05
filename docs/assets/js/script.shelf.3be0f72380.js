@@ -35,74 +35,13 @@ function getShelfViewStats_(groups, totalCount) {
 
 function renderShelfViewOverview_(groups, totalCount, immersive) {
   const stats = getShelfViewStats_(groups, totalCount);
-  const overview = document.createElement('section');
+  const overview = document.createElement('details');
   overview.className = immersive ? 'shelf-view-overview immersive' : 'shelf-view-overview result';
   overview.setAttribute('aria-label', '本棚表示の概要');
-
-  const headingBlock = document.createElement('div');
-  headingBlock.className = 'shelf-view-heading';
-
-  const modeBadge = document.createElement('span');
-  modeBadge.className = 'shelf-view-mode-badge';
-  modeBadge.textContent = immersive ? '全体本棚' : '検索結果';
-  headingBlock.appendChild(modeBadge);
-
-  const heading = document.createElement('div');
-  heading.className = 'shelf-view-mode';
-  const headingText = immersive
-    ? '蔵書全体を本棚順で表示中'
-    : '検索結果を本棚順で表示中';
-  heading.textContent = getPwaLibrarianText_(
-    immersive ? 'shelfOverview.heading.immersive' : 'shelfOverview.heading.result',
-    headingText
-  );
-  headingBlock.appendChild(heading);
-
-  if (!immersive) {
-    const note = document.createElement('div');
-    note.className = 'shelf-view-note';
-    note.textContent = getPwaLibrarianText_(
-      'shelfOverview.note.result',
-      '検索結果だけを棚順に並べています。全体を眺めるときはトップの「本棚を見る」を使います。'
-    );
-    headingBlock.appendChild(note);
-  }
-
-  if (immersive) {
-    const librarianNoteText = getPwaLibrarianText_(
-      'status.note.shelf',
-      '',
-      { count: stats.total }
-    );
-    if (librarianNoteText) {
-      const librarianNote = document.createElement('div');
-      librarianNote.className = 'shelf-view-librarian-note';
-      librarianNote.textContent = librarianNoteText;
-      headingBlock.appendChild(librarianNote);
-    }
-  }
-
-  overview.appendChild(headingBlock);
-
-  const statGrid = document.createElement('div');
-  statGrid.className = 'shelf-view-stat-grid';
-
-  [
-    { label: '表示冊数', value: `${stats.total}冊` },
-    { label: '棚グループ', value: `${stats.groups}件` },
-    { label: '棚段', value: `${stats.levels}段` },
-    { label: '整理待ち', value: `${stats.unresolved}冊` }
-  ].forEach(item => {
-    const stat = document.createElement('div');
-    stat.className = 'shelf-view-stat';
-    stat.innerHTML = `
-      <span class="shelf-view-stat-label">${escapeHtml(item.label)}</span>
-      <span class="shelf-view-stat-value">${escapeHtml(item.value)}</span>
-    `;
-    statGrid.appendChild(stat);
-  });
-
-  overview.appendChild(statGrid);
+  overview.innerHTML = `
+    <summary>${immersive ? '蔵書全体' : '検索結果'} ${stats.total}冊 <span>本棚の内訳</span></summary>
+    <div class="shelf-overview-details">${stats.groups}か所 / ${stats.levels}段 / 配置未定 ${stats.unresolved}冊</div>
+  `;
 
   return overview;
 }
@@ -675,7 +614,7 @@ function parseBookshelfPosition_(book) {
     groupKey: '__unknown__',
     groupLabel: '未分類・未定',
     sectionKey: `unknown:${shelf || '-'}`,
-    sectionLabel: shelf ? `解析不能：${shelf}` : '配置未定',
+    sectionLabel: shelf ? `その他の置き場所：${shelf}` : '配置未定',
     levelKey: location && location !== '-' ? location : '__unknown__',
     levelLabel: location && location !== '-' ? `${location}段` : '段未定',
     groupSort: 9999,

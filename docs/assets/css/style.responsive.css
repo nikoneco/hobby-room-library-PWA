@@ -34,7 +34,7 @@
     overflow-x: hidden !important;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior-y: contain;
-    touch-action: none;
+    touch-action: auto;
     padding: 1.35rem 0.9rem 0.9rem;
   }
 

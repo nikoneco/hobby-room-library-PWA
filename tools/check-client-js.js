@@ -126,6 +126,7 @@ const sandbox = {
   },
   window: {
     scrollY: 0,
+    requestAnimationFrame() {},
     location: { search: '' },
     localStorage: null,
     addEventListener() {},
@@ -1025,8 +1026,9 @@ assert(
     ? modalSource.slice(popupStart, popupEnd)
     : '';
   assert(
-    popupMarkupSource.indexOf('genre-chip-wrap popup') < popupMarkupSource.indexOf('buildPopupDetailLoadingHtml_'),
-    'popup renders local genres before the deferred-detail loading state'
+    popupMarkupSource.includes('buildGenreChips(renderBook)') &&
+      popupMarkupSource.indexOf('popup-book-location') < popupMarkupSource.indexOf('buildPopupDetailLoadingHtml_'),
+    'popup shows local genres immediately and prioritizes location before synopsis loading'
   );
   assert(
     modalSource.includes('if (targetBook.detailLoaded !== false) return;'),
@@ -1136,26 +1138,20 @@ assert(
     clientScriptSources[clientScriptFiles.indexOf('script.search.js.html')].includes('bookshelfPendingRestoreScroll = Boolean(opt.restoreScroll)'),
   'bookshelf scroll restore waits for asynchronous shelf tile rendering'
 );
-assert(
-  clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes("--popup-drag-x', `${dragX}px`") &&
-    modernModalStyleSource.includes('translate(var(--popup-drag-x, 0), var(--popup-drag-y, 0))'),
-  'book popup provides horizontal drag feedback while swiping'
-);
-assert(
-  clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('popupDragCanScroll') &&
-    clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('getPopupDragAxis_(diffX, diffYRaw, popupDragCanScroll)') &&
-    clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('popupContent.scrollTop = getPopupManualScrollTop_(') &&
-    clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes("if (updatePopupDrag_(e.touches[0].clientX, e.touches[0].clientY)) e.preventDefault();"),
-  'book popup manually scrolls the detail card while keeping horizontal book swipes'
-);
-assertEqual(sandbox.getPopupDragAxis_(4, 7, true), '', 'popup drag waits for a clear gesture direction');
-assertEqual(sandbox.getPopupDragAxis_(12, 44, true), 'y', 'popup drag keeps vertical movement for card scrolling');
-assertEqual(sandbox.getPopupDragAxis_(48, 9, true), 'x', 'popup drag keeps horizontal movement for book navigation');
-assertEqual(sandbox.getPopupDragAxis_(9, 48, false), '', 'non-scrollable popup keeps downward close gesture available');
-assertEqual(sandbox.getPopupManualScrollTop_(120, -45, 400), 165, 'upward touch movement scrolls the detail card down');
-assertEqual(sandbox.getPopupManualScrollTop_(120, 50, 400), 70, 'downward touch movement scrolls the detail card up');
-assertEqual(sandbox.getPopupManualScrollTop_(10, 80, 400), 0, 'manual detail scrolling clamps at the top');
-assertEqual(sandbox.getPopupManualScrollTop_(390, -80, 400), 400, 'manual detail scrolling clamps at the bottom');
+{
+  const modalSource = clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')];
+  assert(!/overlay\.on(?:touchstart|touchmove|touchend|pointerdown|pointermove|pointerup|mousedown|mousemove|mouseup)\s*=\s*function/.test(modalSource), 'details and enlarged covers do not register navigation or close gestures');
+  assert(!modalSource.includes('getPopupManualScrollTop_'), 'detail scrolling is native');
+  sandbox.window.getSelection = () => ({ isCollapsed: true });
+  assert(sandbox.shouldHandlePopupArrowKey_({}), 'unmodified arrow keys navigate');
+  for (const key of ['shiftKey', 'ctrlKey', 'altKey', 'metaKey', 'isComposing', 'defaultPrevented']) {
+    assert(!sandbox.shouldHandlePopupArrowKey_({ [key]: true }), `${key} preserves text and browser operations`);
+  }
+  sandbox.window.getSelection = () => ({ isCollapsed: false });
+  assert(!sandbox.shouldHandlePopupArrowKey_({}), 'selected text prevents arrow navigation');
+  sandbox.window.getSelection = () => ({ isCollapsed: true });
+  assert(!sandbox.shouldHandlePopupArrowKey_({ target: { closest: () => ({}) } }), 'editable controls retain arrow keys');
+}
 {
   sandbox.window.scrollY = 384;
   sandbox.window.lastScrollTo = null;
@@ -1325,4 +1321,19 @@ assertEqual(
   'quick browse uses browse spinner detail'
 );
 
+
+// Suggestions preserve an explicit volume query and do not spend all six slots on volumes.
+vm.runInContext(`SUGGEST_DATA = { titles: ['フラジャイル 1','フラジャイル 10','フラジャイル 11'], seriesTitles: ['フラジャイル'], yomis: ['ふらじゃいる 1','ふらじゃいる 10'], authors: [] };`, sandbox);
+assertEqual(sandbox.suggest('フラジャ', 'keyword').join('|'), 'フラジャイル', 'series and reading variants collapse into one suggestion');
+assertEqual(sandbox.suggest('フラジャイル 1', 'detailTitle').length, 3, 'explicit volume input keeps matching volumes');
+vm.runInContext(`SUGGEST_DATA = {titles: Array.from({length:20}, (_,i) => '候補' + i), yomis:[], authors:[]};`, sandbox);
+assertEqual(sandbox.suggest('候補', 'keyword').length, 6, 'suggestions stay bounded');
+assert(sandbox.isSearchCompositionEvent_({isComposing:true}), 'composition Enter is ignored');
+assert(sandbox.isSearchCompositionEvent_({keyCode:229}), 'IME compatibility key code is ignored');
+assert(sandbox.isSearchCompositionEvent_({target:{dataset:{composing:'true'}}}), 'composition lifecycle also protects selection keys');
+assert(!sandbox.isSearchCompositionEvent_({key:'Enter'}), 'ordinary Enter can search');
+assertEqual(sandbox.getSeriesVolumeLabel_({volume:10,title:'シリーズ 10'}), '10巻', 'volume label uses actual number');
+assertEqual(sandbox.getSeriesVolumeLabel_({volume:0,title:'旅行記 下'}), '下巻', 'part label takes precedence');
+assertEqual(sandbox.getSeriesVolumeLabel_({volume:0,title:'番外編'}), '番外編', 'unknown volume does not invent a number');
+assert(sandbox.buildPopupBibliographyHtml_({isbn:'<unsafe>',price:'660円'}).includes('&lt;unsafe&gt;'), 'bibliography escapes source values');
 console.log('client js checks ok');

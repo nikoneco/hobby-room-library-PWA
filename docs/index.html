@@ -106,6 +106,10 @@
         <input id="pwaPerfHudEnabled" type="checkbox">
         <span class="pwa-mini-switch" aria-hidden="true"></span>
       </label>
+      <label class="pwa-settings-row pwa-settings-toggle-row">
+        <span><span class="pwa-settings-row-title">失敗再現モード</span><span class="pwa-settings-row-note">検索エラー・日本語入力の検証パネルを表示します。オフで通常に戻ります。</span></span>
+        <input id="pwaFailureTestsEnabled" type="checkbox"><span class="pwa-mini-switch" aria-hidden="true"></span>
+      </label>
     </div>
   </section>
   <div id="searchContainer" class="search-container centered">
@@ -144,8 +148,8 @@
       <!-- 通常検索 -->
       <div class="input-group">
         <label for="keyword">検索</label>
-        <input type="text" id="keyword" autocomplete="off" placeholder="タイトル・読み仮名・作者で検索">
-        <div id="keyword-suggest" class="suggest-box"></div>
+        <input type="text" id="keyword" autocomplete="off" role="combobox" aria-autocomplete="list" aria-controls="keyword-suggest" aria-expanded="false" placeholder="タイトル・読み仮名・作者で検索">
+        <div id="keyword-suggest" class="suggest-box" role="listbox" aria-label="検索候補"></div>
       </div>
 
       <div class="button-group">
@@ -161,11 +165,11 @@
           </span>
           <span>ランダム</span>
         </button>
-        <button type="button" class="quiet-action" id="advancedToggleBtn" data-action="toggle-advanced" aria-controls="advancedSearchArea" aria-expanded="false" title="詳細検索を開く">
+        <button type="button" class="quiet-action" id="advancedToggleBtn" data-action="toggle-advanced" aria-controls="advancedSearchArea" aria-expanded="false" title="絞り込みを開く">
           <span class="ui-icon advanced-toggle-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24"><path d="M4 7h16"></path><path d="M7 12h10"></path><path d="M10 17h4"></path></svg>
           </span>
-          <span class="advanced-toggle-label">詳細</span>
+          <span class="advanced-toggle-label">絞り込み</span>
         </button>
       </div>
 
@@ -184,30 +188,8 @@
 
       <!-- 詳細検索 -->
       <div id="advancedSearchArea" class="advanced-search-area" style="display:none;" aria-hidden="true">
-        <div class="advanced-grid">
-          <div class="input-group">
-            <label for="detailTitle">タイトル</label>
-            <input type="text" id="detailTitle" autocomplete="off">
-            <div id="detailTitle-suggest" class="suggest-box"></div>
-          </div>
-
-          <div class="input-group">
-            <label for="detailYomi">読み仮名</label>
-            <input type="text" id="detailYomi" autocomplete="off">
-          </div>
-
-          <div class="input-group">
-            <label for="detailAuthor">作者</label>
-            <input type="text" id="detailAuthor" autocomplete="off">
-          </div>
-
-          <div class="input-group">
-            <label for="detailPublisher">出版社</label>
-            <select id="detailPublisher">
-              <option value="">すべて</option>
-            </select>
-          </div>
-
+        <p class="filter-hint">選んだ条件すべてに合う本を探します。</p>
+        <div class="advanced-grid filter-main-grid">
           <div class="input-group">
             <label for="detailMedia">媒体</label>
             <select id="detailMedia">
@@ -243,29 +225,54 @@
             </select>
           </div>
         </div>
+        <details class="filter-more" id="filterMore">
+          <summary>タイトル・作者・出版社・発売日</summary>
+          <div class="advanced-grid">
+          <div class="input-group">
+            <label for="detailTitle">タイトル</label>
+            <input type="text" id="detailTitle" autocomplete="off" role="combobox" aria-autocomplete="list" aria-controls="detailTitle-suggest" aria-expanded="false">
+            <div id="detailTitle-suggest" class="suggest-box" role="listbox" aria-label="タイトル候補"></div>
+          </div>
 
-        <div class="released-range-row">
+          <div class="input-group">
+            <label for="detailYomi">読み仮名</label>
+            <input type="text" id="detailYomi" autocomplete="off">
+          </div>
+
+          <div class="input-group">
+            <label for="detailAuthor">作者</label>
+            <input type="text" id="detailAuthor" autocomplete="off">
+          </div>
+
+          <div class="input-group">
+            <label for="detailPublisher">出版社</label>
+            <select id="detailPublisher">
+              <option value="">すべて</option>
+            </select>
+          </div>
+          </div>
+<div class="released-range-row">
           <label for="detailReleasedFromYear">発売日</label>
 
           <div class="released-range-controls">
-            <select id="detailReleasedFromYear">
+            <select id="detailReleasedFromYear" aria-label="発売日の開始年">
               <option value="">年</option>
             </select>
-            <select id="detailReleasedFromMonth" disabled>
+            <select id="detailReleasedFromMonth" aria-label="発売日の開始月" disabled>
               <option value="">月</option>
             </select>
 
             <span class="released-range-separator">〜</span>
 
-            <select id="detailReleasedToYear">
+            <select id="detailReleasedToYear" aria-label="発売日の終了年">
               <option value="">年</option>
             </select>
-            <select id="detailReleasedToMonth" disabled>
+            <select id="detailReleasedToMonth" aria-label="発売日の終了月" disabled>
               <option value="">月</option>
             </select>
           </div>
         </div>
-
+        </details>
 
         <div class="advanced-actions">
           <button type="button" class="primary-action" data-action="search">
@@ -284,17 +291,17 @@
             <span class="ui-icon" aria-hidden="true">
               <svg viewBox="0 0 24 24"><path d="M6 15l6-6 6 6"></path></svg>
             </span>
-            <span>詳細を閉じる</span>
+            <span>絞り込みを閉じる</span>
           </button>
         </div>
       </div>
 
       <div class="bookshelf-cta-wrap">
-        <button type="button" class="bookshelf-cta-card top-shelf-btn" aria-label="本棚を見る。棚マップから所蔵本を眺める">
+        <button type="button" class="bookshelf-cta-card top-shelf-btn" aria-label="すべての本棚を見る。棚マップから所蔵本を眺める">
           <span class="bookshelf-cta-icon ui-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24"><path d="M5 4h3v16H5z"></path><path d="M10 4h3v16h-3z"></path><path d="M15 5l3-.8 4.1 15.4-3 .8z"></path></svg>
           </span>
-          <span class="bookshelf-cta-title">本棚を見る</span>
+          <span class="bookshelf-cta-title">すべての本棚</span>
           <span class="bookshelf-cta-subtitle">棚マップから所蔵本を眺める</span>
           <span class="preview-cta-arrow ui-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"></path></svg>
@@ -317,11 +324,11 @@
         </span>
         <span class="toggle-label">リスト</span>
       </button>
-      <button id="shelfViewBtn" class="toggle-btn" aria-label="本棚表示" aria-pressed="false">
+      <button id="shelfViewBtn" class="toggle-btn" aria-label="検索結果を棚表示" aria-pressed="false">
         <span class="toggle-icon ui-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24"><path d="M4 20h16"></path><path d="M5 4h3v13H5z"></path><path d="M10 4h3v13h-3z"></path><path d="M15 5l3-.8 3.4 12.8-3 .8z"></path></svg>
         </span>
-        <span class="toggle-label">本棚</span>
+        <span class="toggle-label">棚表示</span>
       </button>
     </div>
   </div>
@@ -388,40 +395,40 @@
   </nav>
 
   <div id="image-popup-overlay" style="display:none;">
-    <div id="image-popup-content">
+    <div id="image-popup-content" role="dialog" aria-modal="true" aria-label="本の詳細" tabindex="-1">
       <button id="image-popup-close" class="ui-icon" aria-label="閉じる" type="button">
         <svg viewBox="0 0 24 24"><path d="M6 6l12 12"></path><path d="M18 6L6 18"></path></svg>
       </button>
-      <button id="popup-prev" class="popup-arrow" aria-label="前へ" type="button">
+      <button id="popup-prev" class="popup-arrow" aria-label="前の本" type="button">
         <span class="ui-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"></path></svg>
-        </span>
+        </span><span class="popup-arrow-caption">前の本</span>
       </button>
-      <button id="popup-next" class="popup-arrow" aria-label="次へ" type="button">
+      <button id="popup-next" class="popup-arrow" aria-label="次の本" type="button">
         <span class="ui-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"></path></svg>
-        </span>
+        </span><span class="popup-arrow-caption">次の本</span>
       </button>
       <img id="image-popup-img" src="" alt="拡大画像">
       <div id="image-popup-info"></div>
     </div>
   </div>
 
-  <div id="cover-fullscreen-overlay" style="display:none;" aria-hidden="true">
+  <div id="cover-fullscreen-overlay" role="dialog" aria-modal="true" aria-label="表紙の拡大" tabindex="-1" style="display:none;" aria-hidden="true">
     <button id="cover-fullscreen-close" class="ui-icon" aria-label="拡大画像を閉じる" type="button">
       <svg viewBox="0 0 24 24"><path d="M6 6l12 12"></path><path d="M18 6L6 18"></path></svg>
     </button>
     <img id="cover-fullscreen-img" src="" alt="表紙の拡大画像">
     <div id="cover-fullscreen-caption"></div>
   </div>
-  <script src="./assets/js/gas-run-shim.56217d9582.js"></script>
+  <script src="./assets/js/gas-run-shim.2a594a0544.js"></script>
   <script src="./assets/js/pwa-client.js"></script>
   <script src="./assets/js/script.state.9b4bc9a55e.js"></script>
-  <script src="./assets/js/script.images.296dbf1d8a.js"></script>
-  <script src="./assets/js/script.search.252e0f6f0d.js"></script>
-  <script src="./assets/js/script.render.663374af5f.js"></script>
-  <script src="./assets/js/script.shelf.7126e95538.js"></script>
-  <script src="./assets/js/script.modal.d749ff14e5.js"></script>
-  <script src="./assets/js/script.boot.df9238b927.js"></script>
+  <script src="./assets/js/script.images.fe64b7d2bb.js"></script>
+  <script src="./assets/js/script.search.82c845843f.js"></script>
+  <script src="./assets/js/script.render.d688f8b72e.js"></script>
+  <script src="./assets/js/script.shelf.3be0f72380.js"></script>
+  <script src="./assets/js/script.modal.c6c691266c.js"></script>
+  <script src="./assets/js/script.boot.25283a121e.js"></script>
 </body>
 </html>

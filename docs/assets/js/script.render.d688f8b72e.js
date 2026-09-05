@@ -267,41 +267,31 @@ function appendSummaryAccordion_(chipWrap, book) {
   chipWrap.insertAdjacentElement('afterend', summaryText);
 }
 
-function appendPopupSummaryAccordion_(chipWrap, book) {
-  if (!chipWrap || !book || !book.summary) return;
+function appendPopupSummaryAccordion_(container, book) {
+  if (!container || !book) return;
+  if (!hasDisplayValue_(book.summary)) {
+    if (book.detailLoaded !== false) container.innerHTML = '<p class="popup-summary-empty">あらすじは未登録です。</p>';
+    return;
+  }
+  const summary = document.createElement('details');
+  summary.className = 'popup-summary';
+  summary.open = true;
+  const heading = document.createElement('summary');
+  heading.textContent = 'あらすじ';
+  const text = document.createElement('div');
+  text.className = 'summary-text popup-summary-text is-open';
+  text.textContent = book.summary;
+  text.style.display = 'block';
+  summary.appendChild(heading);
+  summary.appendChild(text);
+  container.appendChild(summary);
+}
 
-  const summaryId = `popupSummaryText-${++summaryAccordionIdSeed_}`;
-  const summaryBtn = document.createElement('button');
-  summaryBtn.type = 'button';
-  summaryBtn.className = 'summary-chip-toggle popup-summary-toggle';
-  summaryBtn.textContent = 'あらすじを見る';
-  summaryBtn.setAttribute('aria-expanded', 'false');
-  summaryBtn.setAttribute('aria-controls', summaryId);
-
-  const summaryText = document.createElement('div');
-  summaryText.id = summaryId;
-  summaryText.className = 'summary-text popup-summary-text';
-  summaryText.textContent = book.summary || '';
-  summaryText.style.display = 'none';
-
-  summaryBtn.onclick = function(e) {
-    e.stopPropagation();
-    const visible = summaryText.style.display === 'block';
-    const nextOpen = !visible;
-    summaryText.style.display = nextOpen ? 'block' : 'none';
-    summaryText.classList.toggle('is-open', nextOpen);
-    summaryBtn.classList.toggle('is-expanded', nextOpen);
-    summaryBtn.textContent = nextOpen ? 'あらすじを閉じる' : 'あらすじを見る';
-    summaryBtn.setAttribute('aria-expanded', nextOpen ? 'true' : 'false');
-    if (nextOpen && typeof summaryText.scrollIntoView === 'function') {
-      window.requestAnimationFrame(function() {
-        summaryText.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-      });
-    }
-  };
-
-  chipWrap.appendChild(summaryBtn);
-  chipWrap.insertAdjacentElement('afterend', summaryText);
+function buildPopupBibliographyHtml_(book) {
+  const rows = [['発売日', book.released], ['価格', book.price], ['レーベル', book.brand], ['ISBN', book.isbn]]
+    .filter(row => hasDisplayValue_(row[1]));
+  if (!rows.length) return '<p class="popup-summary-empty">書誌情報は未登録です。</p>';
+  return '<dl>' + rows.map(([label, value]) => `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd></div>`).join('') + '</dl>';
 }
 
 function isPopupSummaryScrollTarget_(target) {
@@ -359,7 +349,7 @@ function updateViewToggleButtons_() {
   const labelMap = {
     card: 'タイル',
     list: 'リスト',
-    shelf: '本棚'
+    shelf: '棚'
   };
   const currentLabel = labelMap[mode] || labelMap.card;
   const buttonMap = {

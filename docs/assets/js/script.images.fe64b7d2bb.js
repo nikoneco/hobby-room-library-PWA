@@ -177,6 +177,7 @@ function bindStaticActionHandlers_() {
 
     element.addEventListener('click', function(event) {
       event.preventDefault();
+      hideAllSuggest();
       handler();
     });
 

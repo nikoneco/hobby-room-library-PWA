@@ -17,6 +17,13 @@ window.addEventListener('DOMContentLoaded', function() {
   bindMobileAppDockInputState_();
   bindBookshelfScrollMemory_();
 
+  ['keyword', 'detailTitle', 'detailYomi', 'detailAuthor'].forEach(id => {
+    const input = document.getElementById(id);
+    if (!input) return;
+    input.addEventListener('compositionstart', function() { input.dataset.composing = 'true'; });
+    input.addEventListener('compositionend', function() { input.dataset.composing = 'false'; });
+  });
+
   const keywordInput = document.getElementById('keyword');
   keywordInput.addEventListener('input', function() {
     showSuggestList('keyword', 'keyword-suggest', 'keyword');
@@ -109,6 +116,7 @@ window.addEventListener('DOMContentLoaded', function() {
     if (!input) return;
 
     input.addEventListener('keydown', function(event) {
+      if (event.defaultPrevented || isSearchCompositionEvent_(event)) return;
       const keywordSuggestOpen =
         id === 'keyword' &&
         document.getElementById('keyword-suggest').style.display === 'block' &&
