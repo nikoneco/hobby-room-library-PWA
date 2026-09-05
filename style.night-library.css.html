@@ -30,6 +30,9 @@ body.sandbox-redesign {
   --night-shadow: 0 18px 60px rgba(0, 0, 0, 0.28);
   --night-max: 1320px;
   --night-ease: 160ms cubic-bezier(0.2, 0, 0, 1);
+  --night-search-surface: color-mix(in srgb, var(--night-panel-strong) 90%, var(--night-text));
+  --night-search-border: color-mix(in srgb, var(--night-accent) 78%, var(--night-panel-strong));
+  --night-dock-surface: color-mix(in srgb, var(--night-panel) 88%, transparent);
 
   --pwa-bg-top: var(--night-bg);
   --pwa-bg: var(--night-bg);
@@ -1928,5 +1931,83 @@ body.sandbox-redesign #image-popup-info { user-select: text; -webkit-user-select
 @media (max-width: 760px) {
   body.sandbox-redesign #image-popup-content #popup-prev { left: 18px; }
   body.sandbox-redesign #image-popup-content #popup-next { left: auto; right: 18px; }
+}
+/* Hallmark · component: search and mobile navigation · design-system: design.md
+ * Preserve a clear search boundary; remove decorative lighting from working surfaces.
+ */
+body.sandbox-redesign #advancedSearchArea::before {
+  content: none;
+}
+
+body.sandbox-redesign #searchContainer #keyword {
+  min-height: 56px;
+  border: 2px solid var(--night-search-border);
+  background: var(--night-search-surface);
+  box-shadow: none;
+  transition: none;
+}
+
+body.sandbox-redesign #searchContainer #keyword::placeholder {
+  color: var(--night-muted);
+}
+
+body.sandbox-redesign #searchContainer #keyword:focus {
+  border-color: var(--night-accent-strong);
+  outline: 2px solid var(--night-accent-strong);
+  outline-offset: 2px;
+  box-shadow: none;
+}
+
+body.sandbox-redesign #mobileAppDock {
+  background: var(--night-dock-surface);
+  border: 1px solid var(--night-line-strong);
+  border-radius: var(--night-radius-panel);
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+body.sandbox-redesign #mobileAppDock button {
+  background: transparent;
+  border-color: transparent;
+  border-radius: var(--night-radius-control);
+  box-shadow: none;
+}
+
+body.sandbox-redesign #mobileAppDock button::before,
+body.sandbox-redesign #mobileAppDock button::after {
+  content: none;
+}
+
+body.sandbox-redesign #mobileAppDock button:hover,
+body.sandbox-redesign #mobileAppDock button.active {
+  color: var(--night-accent-strong);
+  background: var(--night-panel-strong);
+}
+
+body.sandbox-redesign #mobileAppDock button:focus-visible {
+  outline: 2px solid var(--night-accent-strong);
+  outline-offset: -2px;
+  transition: none;
+}
+
+/* The inline filter action owns search while the conditions are open. */
+body.sandbox-redesign:has(#advancedToggleBtn[aria-expanded="true"]) #mobileAppDock,
+body.sandbox-redesign #searchContainer:has(#advancedToggleBtn[aria-expanded="true"]) .button-group > [data-action="search"] {
+  display: none;
+}
+
+body.sandbox-redesign #searchContainer:has(#advancedToggleBtn[aria-expanded="true"]) .button-group {
+  grid-template-columns: 1fr 1fr;
+}
+
+@media (max-width: 760px) {
+  body.sandbox-redesign #searchContainer .advanced-actions > .primary-action { grid-column: 1/-1; }
+  body.sandbox-redesign #searchContainer .advanced-actions > button:last-child { grid-column: auto; }
+  body.sandbox-redesign #searchContainer .advanced-actions > button { white-space: nowrap; }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  body.sandbox-redesign #mobileAppDock { background: var(--night-panel); }
 }
 </style>

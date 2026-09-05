@@ -1537,9 +1537,7 @@ body.pwa-shell .search-container {
 }
 
 body.pwa-shell .search-container.centered {
-  background:
-    linear-gradient(90deg, rgba(var(--pwa-warm-rgb), 0.080), transparent 31%, rgba(var(--pwa-accent-rgb), 0.045)),
-    linear-gradient(180deg, rgba(6, 10, 14, 0.22), color-mix(in srgb, var(--pwa-panel) 72%, transparent));
+  background: var(--night-bg, var(--pwa-bg));
   border-color: color-mix(in srgb, var(--pwa-warm-2) 22%, transparent);
   box-shadow: none;
 }
