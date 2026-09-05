@@ -1671,6 +1671,7 @@ function openSeriesPanel(sourceBook) {
   if (popupContent) {
     popupContent.classList.add('series-mode');
     popupContent.classList.remove('search-result-series-mode');
+    popupContent.setAttribute('aria-label', `${sourceBook.seriesSearchTitle || sourceBook.title || 'シリーズ'}のシリーズ一覧`);
   }
   img.style.display = 'none';
   prevBtn.style.display = 'none';

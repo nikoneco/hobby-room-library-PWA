@@ -20,7 +20,7 @@ function client() {
       documentElement: { classList: classes() },
       addEventListener() {}, querySelector() { return null; }, querySelectorAll() { return []; },
       getElementById(id) {
-        if (!nodes.has(id)) nodes.set(id, { value: '', style: {}, classList: classes(), focus() {} });
+        if (!nodes.has(id)) nodes.set(id, { value: '', style: {}, attributes: {}, setAttribute(name, value) { this.attributes[name] = value; }, classList: classes(), focus() {} });
         return nodes.get(id);
       }
     },

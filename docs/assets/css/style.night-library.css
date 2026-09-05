@@ -1893,6 +1893,7 @@ body.sandbox-redesign #result .shelf-overview-details { padding: 0 0 12px; font-
 body.sandbox-redesign .shelf-jump-nav.immersive { background: var(--night-bg-raised); backdrop-filter: none; box-shadow: none; }
 body.sandbox-redesign :is(button, a, summary, [tabindex]):focus-visible { outline: 2px solid var(--night-accent); outline-offset: 3px; }
 @media (min-width: 761px) {
+  body.sandbox-redesign #image-popup-content:not(.series-mode) #image-popup-info { max-height: calc(100dvh - 96px); min-height: 0; overflow-y: auto !important; overscroll-behavior-y: contain; }
   body.sandbox-redesign #image-popup-content #popup-next { left: var(--popup-nav-next-x, 38%); right: auto; }
   body.sandbox-redesign #image-popup-content #popup-prev { left: var(--popup-nav-prev-x, 8px); right: auto; }
 }
