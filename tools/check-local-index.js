@@ -349,6 +349,14 @@ function invoke(runner, method, args) {
   );
 
   console.log('local index checks ok');
+  const scriptCountBeforeShelf = onlineScripts.length;
+  const shelf = await invoke(onlineRunner, 'getBookshelfBooks', []);
+  assert(shelf.length === payload.records.length, 'the shelf reuses all local books, including sensitive books');
+  assert(shelf.every(book => book.bookId && book.detailLoaded === false), 'local shelf keeps stable IDs and deferred detail state');
+  assert(onlineScripts.length === scriptCountBeforeShelf, 'fresh local shelf needs no additional catalog request');
+  shelf[0].detailLoading = true;
+  const shelfAgain = await invoke(onlineRunner, 'getBookshelfBooks', []);
+  assert(!shelfAgain[0].detailLoading, 'shelf calls clone their records without leaking loading flags');
 })().catch(error => {
   console.error(error);
   process.exitCode = 1;

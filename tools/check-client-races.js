@@ -53,7 +53,7 @@ function client() {
     }
   });
   const read = expression => vm.runInContext(expression, c);
-  return { c, read, timers, requests, rendered, alerts, nodes };
+  return { c, read, timers, requests, rendered, alerts, nodes, storage };
 }
 
 // Stable IDs must never fall back to a row occupied by another book.
@@ -244,4 +244,94 @@ for (const start of ['simple', 'advanced', 'rerun', 'status']) {
   flushFrames();
   assert.equal(calls.first, beforeNavigation);
 }
-console.log('client race checks ok');
+// Details remain available immediately while a burst produces only one disk write.
+{
+  const { c, read, storage } = client();
+  c.syncBookDetailCacheRevision_('cache-burst');
+  let writes = 0;
+  c.window.localStorage.setItem = (key, value) => { writes++; storage.set(key, value); };
+  for (let i = 0; i < 12; i++) {
+    const book = { bookId: `burst-${i}` };
+    c.rememberBookDetail_(book, { bookId: book.bookId, summary: `Summary ${i}` });
+    assert.equal(c.getCachedBookDetail_(book).summary, `Summary ${i}`);
+  }
+  assert.equal(writes, 0, 'display and memory cache do not wait for persistent storage');
+  c.flushPersistentBookDetailSave_();
+  assert.equal(writes, 1, 'twelve details produce one serialization/write');
+  assert.equal(Object.keys(JSON.parse(storage.get(read('BOOK_DETAIL_PERSISTENT_CACHE_KEY'))).items).length, 12);
+  c.rememberBookDetail_({ bookId: 'obsolete' }, { bookId: 'obsolete', summary: 'Old revision' });
+  c.syncBookDetailCacheRevision_('new-revision');
+  c.flushPersistentBookDetailSave_();
+  assert.equal(c.getCachedBookDetail_({ bookId: 'obsolete' }), null);
+  assert.equal(Object.keys(JSON.parse(storage.get(read('BOOK_DETAIL_PERSISTENT_CACHE_KEY'))).items).length, 0);
+  c.window.localStorage.setItem = () => { throw new Error('Quota exceeded'); };
+  c.rememberBookDetail_({ bookId: 'memory-only' }, { bookId: 'memory-only', summary: 'Still readable' });
+  c.flushPersistentBookDetailSave_();
+  assert.equal(c.getCachedBookDetail_({ bookId: 'memory-only' }).summary, 'Still readable');
+}
+
+// A silent transport must release foreground and prefetch waiters, and reject late replies.
+for (const batch of [false, true]) {
+  const { c, read, requests, timers } = client();
+  const book = { bookId: 'timeout', rowIndex: 2, detailLoaded: false };
+  const load = () => batch
+    ? c.fetchPopupContextBookDetails_(book, 0, [book], null, { mode: 'currentOnly' })
+    : c.fetchDeferredBookDetails_(book, 0, [book], null, {});
+  c.syncBookDetailCacheRevision_('timeouts');
+  load();
+  const firstRequest = requests[0];
+  timers.find(t => t.ms === read('BOOK_DETAIL_REQUEST_TIMEOUT_MS')).fn();
+  assert.equal(book.detailLoading, false);
+  assert.match(book.detailError, /時間がかかっています/);
+  assert.equal(read('bookDetailInFlightCallbacks.size'), 0);
+  load();
+  const detail = { bookId: 'timeout', rowIndex: 2, summary: 'Recovered' };
+  firstRequest.ok(batch ? [detail] : detail);
+  firstRequest.fail(new Error('Late failure'));
+  assert.equal(requests.length, 2, 'expired request cannot start a legacy fallback');
+  assert.equal(book.detailLoading, true, 'late reply cannot settle the retry');
+  requests[1].ok(batch ? [detail] : detail);
+  assert.equal(book.summary, 'Recovered');
+  assert.equal(book.detailLoading, false);
+  assert.equal(book.detailError, '');
+}
+
+// The currently open popup replaces its spinner and offers a working retry.
+{
+  const { c, read, requests, nodes } = client();
+  const book = { bookId: 'visible', detailLoaded: false };
+  c.visibleFixtureBook = book;
+  read('popupData = [visibleFixtureBook]; popupIndex = 0;');
+  c.isBookPopupOpen_ = () => true;
+  const state = { outerHTML: '' };
+  const retry = {};
+  nodes.set('image-popup-info', { querySelector: selector => selector === '.popup-detail-loading' ? state : retry });
+  c.handleDeferredBookDetailResult_(book, 0, [book], null, {}, null, new Error('Offline'));
+  assert.match(state.outerHTML, /もう一度読み込む/);
+  assert(!state.outerHTML.includes('skeleton'));
+  retry.onclick({ preventDefault() {}, stopPropagation() {} });
+  assert.match(state.outerHTML, /skeleton/);
+  assert.equal(requests.length, 1);
+  assert.equal(book.detailLoading, true);
+  c.replaceDeferredBookReference_ = () => {};
+  requests[0].ok([{ bookId: 'visible', summary: 'Back online' }]);
+  assert.equal(book.summary, 'Back online');
+  assert.equal(book.detailError, '');
+}
+
+// Identical shelf refreshes preserve the rendered shelf and do not write it again.
+{
+  const { c, requests, rendered } = client();
+  const book = { bookId: 'shelf', title: 'Same shelf book', shelf: '7', location: '2' };
+  let writes = 0;
+  c.readBookshelfCache_ = () => ({ books: [book] });
+  c.writeBookshelfCache_ = () => { writes++; };
+  c.showAllBookshelf();
+  requests[0].ok([{ ...book }]);
+  assert.equal(rendered.length, 1);
+  assert.equal(writes, 0);
+  assert(!c.areBookshelfSnapshotsEqual_([book], [{ ...book, location: '3' }]));
+  assert(!c.areBookshelfSnapshotsEqual_([book], [{ ...book, bookId: 'replacement' }]));
+}
+
+console.log('client race, cache and detail recovery checks ok');

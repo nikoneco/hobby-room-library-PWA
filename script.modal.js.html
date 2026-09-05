@@ -559,6 +559,10 @@ function readPersistentBookDetailCache_() {
 }
 
 function writePersistentBookDetailCache_(payload) {
+  if (bookDetailPersistentSaveTimer) {
+    window.clearTimeout(bookDetailPersistentSaveTimer);
+    bookDetailPersistentSaveTimer = 0;
+  }
   try {
     if (!window.localStorage || !payload) return;
     bookDetailPersistentCachePayload = payload;
@@ -614,6 +618,24 @@ function rememberPersistentBookDetail_(key, detail) {
     detail: detail
   };
 
+  schedulePersistentBookDetailSave_();
+}
+
+function schedulePersistentBookDetailSave_() {
+  if (bookDetailPersistentSaveTimer) return;
+  bookDetailPersistentSaveTimer = window.setTimeout(flushPersistentBookDetailSave_, BOOK_DETAIL_PERSISTENT_SAVE_DELAY_MS);
+}
+
+function flushPersistentBookDetailSave_() {
+  if (!bookDetailPersistentSaveTimer) return;
+  const payload = bookDetailPersistentCachePayload;
+  if (!payload || !payload.items) {
+    window.clearTimeout(bookDetailPersistentSaveTimer);
+    bookDetailPersistentSaveTimer = 0;
+    return;
+  }
+  const now = Date.now();
+
   const entries = Object.keys(payload.items)
     .map(cacheKey => ({ key: cacheKey, entry: payload.items[cacheKey] }))
     .filter(item => item.entry && now - Number(item.entry.savedAt || 0) <= BOOK_DETAIL_PERSISTENT_CACHE_TTL_MS)
@@ -626,6 +648,11 @@ function rememberPersistentBookDetail_(key, detail) {
   });
   writePersistentBookDetailCache_(payload);
 }
+
+window.addEventListener('pagehide', flushPersistentBookDetailSave_);
+document.addEventListener('visibilitychange', function() {
+  if (document.visibilityState === 'hidden') flushPersistentBookDetailSave_();
+});
 
 function isPersistentBookDetailMatch_(book, detail) {
   if (!book || !detail) return false;
@@ -657,7 +684,7 @@ function getPersistentBookDetail_(book, key) {
 
   if (Date.now() - Number(entry.savedAt || 0) > BOOK_DETAIL_PERSISTENT_CACHE_TTL_MS) {
     delete payload.items[key];
-    writePersistentBookDetailCache_(payload);
+    schedulePersistentBookDetailSave_();
     return null;
   }
 
@@ -730,14 +757,43 @@ function handleDeferredBookDetailResult_(book, index, dataArr, seriesContext, op
 
   if (!opt.prefetch) {
     if (error) console.warn('getBookDetailByRowIndex failed:', error);
-    book.detailError = '詳細データを取得できませんでした。';
+    book.detailError = error && error.code === 'BOOK_DETAIL_TIMEOUT'
+      ? 'あらすじの取得に時間がかかっています。もう一度読み込めます。'
+      : '詳細データを取得できませんでした。もう一度読み込めます。';
+    updatePopupDetailState_(book);
   }
   if (typeof opt.onDone === 'function') opt.onDone(null);
 }
 
+function runBookDetailRequest_(request, onSuccess, onFailure) {
+  let settled = false;
+  const timer = window.setTimeout(function() {
+    const error = new Error('Book detail request timed out');
+    error.code = 'BOOK_DETAIL_TIMEOUT';
+    finish_(onFailure, [error]);
+  }, BOOK_DETAIL_REQUEST_TIMEOUT_MS);
+  function finish_(callback, args) {
+    if (settled) return;
+    settled = true;
+    window.clearTimeout(timer);
+    if (typeof callback === 'function') callback(...args);
+  }
+  try {
+    request(
+      (...args) => finish_(onSuccess, args),
+      (...args) => finish_(onFailure, args),
+      () => !settled
+    );
+  } catch (error) {
+    finish_(onFailure, [error]);
+  }
+}
+
 function requestBookDetailByStableIdentity_(book, onSuccess, onFailure) {
+  runBookDetailRequest_(function(onSuccess, onFailure, isActive) {
   const canUseRowIndex = book && book.rowIndex !== undefined && book.rowIndex !== null;
   const requestByRowIndex_ = function(previousError) {
+    if (!isActive()) return;
     if (!canUseRowIndex) {
       if (typeof onFailure === 'function') onFailure(previousError || new Error('Book identity is unavailable'));
       return;
@@ -760,9 +816,11 @@ function requestBookDetailByStableIdentity_(book, onSuccess, onFailure) {
   }
 
   requestByRowIndex_();
+  }, onSuccess, onFailure);
 }
 
 function requestBookDetailsByStableIdentities_(books, onSuccess, onFailure) {
+  runBookDetailRequest_(function(onSuccess, onFailure, isActive) {
   const targets = Array.isArray(books) ? books.filter(Boolean) : [];
   const canUseBookIds = targets.length > 0 && targets.every(book => hasDisplayValue_(book.bookId));
   const canUseRowIndexes = targets.length > 0 && targets.every(book =>
@@ -770,6 +828,7 @@ function requestBookDetailsByStableIdentities_(books, onSuccess, onFailure) {
   );
 
   const requestByRowIndexes_ = function(previousError) {
+    if (!isActive()) return;
     if (!canUseRowIndexes) {
       if (typeof onFailure === 'function') onFailure(previousError || new Error('Book identities are unavailable'));
       return;
@@ -794,6 +853,7 @@ function requestBookDetailsByStableIdentities_(books, onSuccess, onFailure) {
   }
 
   requestByRowIndexes_();
+  }, onSuccess, onFailure);
 }
 
 function fetchDeferredBookDetails_(book, index, dataArr, seriesContext, options) {
@@ -1418,7 +1478,10 @@ function observeBookDetailPrefetch_(element, book) {
 function buildPopupDetailLoadingHtml_(book) {
   if (!book || book.detailLoaded !== false) return '';
   if (book.detailError) {
-    return `<div class="popup-detail-state error">${escapeHtml(book.detailError)}</div>`;
+    return `<div class="popup-detail-loading" aria-live="polite">
+      <div class="popup-detail-state error">${escapeHtml(book.detailError)}</div>
+      <button type="button" class="popup-action-btn popup-detail-retry">もう一度読み込む</button>
+    </div>`;
   }
   return `
     <div class="popup-detail-loading" aria-live="polite">
@@ -1429,6 +1492,28 @@ function buildPopupDetailLoadingHtml_(book) {
       </div>
     </div>
   `;
+}
+
+function bindPopupDetailRetry_(info, book) {
+  const retry = info && info.querySelector('.popup-detail-retry');
+  if (!retry) return;
+  retry.onclick = function(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!isBookPopupOpen_() || !Array.isArray(popupData) || popupData[popupIndex] !== book) return;
+    book.detailError = '';
+    updatePopupDetailState_(book);
+    fetchPopupContextBookDetails_(book, popupIndex, popupData, popupSeriesContext, { mode: 'currentOnly', forceCurrent: true });
+  };
+}
+
+function updatePopupDetailState_(book) {
+  if (!isBookPopupOpen_() || !Array.isArray(popupData) || popupData[popupIndex] !== book) return;
+  const info = document.getElementById('image-popup-info');
+  const state = info && info.querySelector('.popup-detail-loading');
+  if (!state) return;
+  state.outerHTML = buildPopupDetailLoadingHtml_(book);
+  bindPopupDetailRetry_(info, book);
 }
 
 function closeCoverFullscreen_() {
@@ -1989,6 +2074,7 @@ function showPopup(book, index, dataArr, seriesContext, options) {
   `;
 
   appendPopupSummaryAccordion_(info.querySelector('.genre-chip-wrap.popup'), renderBook);
+  bindPopupDetailRetry_(info, sourceBook);
   attachPopupActionHandlers(renderBook, popupSeriesContext);
   if (deferCurrentDetailRender) {
     schedulePopupCurrentDetailRender_(

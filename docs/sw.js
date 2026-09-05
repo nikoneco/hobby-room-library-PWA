@@ -1,4 +1,4 @@
-const CACHE_NAME = "shumi-library-pwa-6ef4e9841245";
+const CACHE_NAME = "shumi-library-pwa-d33ebc76f1db";
 const CACHE_PREFIX = 'shumi-library-pwa-';
 const APP_SHELL = [
   "./",
@@ -18,14 +18,14 @@ const APP_SHELL = [
   "./assets/logo.png",
   "./assets/librarian-presence.jpg",
   "./assets/splash-lantern.jpg",
-  "./assets/js/gas-run-shim.fb53edd147.js",
+  "./assets/js/gas-run-shim.56217d9582.js",
   "./assets/js/pwa-client.js",
-  "./assets/js/script.state.924864857c.js",
+  "./assets/js/script.state.9b4bc9a55e.js",
   "./assets/js/script.images.296dbf1d8a.js",
-  "./assets/js/script.search.1bfdff0ee2.js",
+  "./assets/js/script.search.252e0f6f0d.js",
   "./assets/js/script.render.663374af5f.js",
   "./assets/js/script.shelf.7126e95538.js",
-  "./assets/js/script.modal.072523ee0e.js",
+  "./assets/js/script.modal.d749ff14e5.js",
   "./assets/js/script.boot.df9238b927.js",
   "./assets/icons/icon-lantern-192.png",
   "./assets/icons/icon-lantern-512.png",

@@ -559,7 +559,7 @@
       return false;
     }
     if (methodName === 'searchBooksSimple') return Boolean(String(args[0] || '').trim());
-    return methodName === 'searchBooksAdvanced' || methodName === 'getRandomBooks';
+    return methodName === 'searchBooksAdvanced' || methodName === 'getRandomBooks' || methodName === 'getBookshelfBooks';
   }
 
   function invokeLocal_(methodName, args, successHandler, failureHandler) {
@@ -574,6 +574,7 @@
       try {
         let result = [];
         if (methodName === 'searchBooksSimple') result = searchLocalSimple_(args[0]);
+        if (methodName === 'getBookshelfBooks') result = localIndexRecords.map(cloneLocalBook_);
         if (methodName === 'searchBooksAdvanced') result = searchLocalAdvanced_(args);
         if (methodName === 'getRandomBooks') result = pickLocalRandom_(args[0]);
         endPerf_(perfToken, {

@@ -2297,6 +2297,15 @@ function restoreBookshelfScroll_() {
   });
 }
 
+function areBookshelfSnapshotsEqual_(previous, next) {
+  if (!Array.isArray(previous) || !Array.isArray(next) || previous.length !== next.length) return false;
+  const fields = ['rowIndex', 'bookId', 'title', 'isbn', 'shelf', 'location', 'isSensitive', 'fallbackImg', 'fallbackImageSource'];
+  return previous.every((book, index) => {
+    const other = next[index];
+    return book && other && fields.every(field => String(book[field] ?? '') === String(other[field] ?? ''));
+  });
+}
+
 function showAllBookshelf() {
   const requestGeneration = beginResultRequest_();
   const initialJumpGeneration = shelfJumpGeneration;
@@ -2371,6 +2380,10 @@ function showAllBookshelf() {
           return;
         }
 
+        if (renderedFromCache && areBookshelfSnapshotsEqual_(cachedBookshelf.books, payload)) {
+          showSearchStatusResult_('shelf', lastResult.length, { source: 'cache' });
+          return;
+        }
         writeBookshelfCache_(payload);
         // Keep an opened book/map or a user-selected shelf in place. The fresh
         // cache will be used on the next visit instead of interrupting this one.
