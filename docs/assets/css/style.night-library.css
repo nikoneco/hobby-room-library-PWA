@@ -1133,7 +1133,7 @@ body.sandbox-redesign .shelf-view {
 body.sandbox-redesign .shelf-jump-nav,
 body.sandbox-redesign .shelf-jump-nav.immersive {
   position: sticky;
-  top: 112px;
+  top: 12px;
   z-index: 24;
   margin: 0 0 1rem;
   padding: 0.75rem;
@@ -1495,7 +1495,7 @@ body.sandbox-redesign .mobile-dock-view-btn[aria-pressed="true"] {
   }
 
   body.sandbox-redesign .shelf-jump-nav {
-    top: 108px;
+    top: 12px;
   }
 }
 

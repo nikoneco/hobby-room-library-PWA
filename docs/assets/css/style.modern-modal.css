@@ -1006,7 +1006,8 @@ button.popup-arrow:active {
 }
 
 .search-result-series-panel {
-  width: min(900px, 88vw);
+  width: 100%;
+  max-width: 100%;
   max-height: min(78vh, 720px);
 }
 
