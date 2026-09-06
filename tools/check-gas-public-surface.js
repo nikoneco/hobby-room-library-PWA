@@ -9,6 +9,8 @@ const root = path.resolve(__dirname, '..');
 const ALLOWED_PUBLIC_GAS_FUNCTIONS = new Set([
   // Simple trigger. It is invoked by Sheets, not by the anonymous web UI.
   'onEdit',
+  // Menu registration only; SpreadsheetApp.getUi() requires the bound Sheets UI.
+  'onOpen',
 
   // Spreadsheet drawing callback. A Sheets UI confirmation is required before
   // it delegates to the private write function, so anonymous web calls stop.

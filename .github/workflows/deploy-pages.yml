@@ -67,6 +67,9 @@ jobs:
       - name: Check import enrichment retries
         run: node tools/check-import-retries.js
 
+      - name: Check spreadsheet mode transitions
+        run: node tools/check-sheet-modes.js
+
       - name: Check public GAS JSONP surface
         run: node tools/check-gas-public-surface.js
 

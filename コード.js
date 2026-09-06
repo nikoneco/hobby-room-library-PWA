@@ -13,12 +13,13 @@ function onEdit(e) {
   const sh = e.range.getSheet();
   const sheetName = sh.getName();
   const notation = e.range.getA1Notation();
-  const value = e.range.getValue();
+  // A1 commands run in the dedicated installable trigger (SheetModes.js).
+  // Do not execute them twice or spend the simple trigger's 30-second budget.
+  if (sheetName === CONFIG.SHEETS.MAIN && notation === 'A1') return;
 
   // AA列の手動画像URL補正は、複数列貼り付け時に他のonEdit処理を止めない。
   handleFallbackImageManualEdit_(e);
 
-  const a1 = sh.getRange('A1');
   const row = e.range.getRow();
   const col = e.range.getColumn();
   const colEnd = col + e.range.getNumColumns() - 1;
@@ -59,28 +60,6 @@ function onEdit(e) {
       .getRange(seriesEditStartRow, CONFIG.COL.SERIES_KEY_AUTO, seriesEditRowCount, 1)
       .getDisplayValues();
   }
-  // 本棚シート（A1）のモード切り替え
-  if (sheetName === MAIN && notation === 'A1') {
-    switch (value) {
-      case 'Filter初期化':
-        resetAndSortFilter_();
-        a1.setValue('機能選択');
-        setDropdownNML_();
-        break;
-      case 'ISBN入力モード':
-        resetAndSortFilterISBN_();
-        break;
-      case '入力モード終了':
-        convertFormulasAndClearRange_();
-        resetAndSortFilter_();
-        a1.setValue('機能選択');
-        setDropdownNML_();
-        break;
-    }
-    if (shouldClearSearchCache) clearLibrarySearchCache_();
-    return;
-  }
-
   if (sheetName === MAIN && row >= 2) {
     markSynopsisManualOnEdit_(e);
   }
@@ -780,56 +759,37 @@ function resetAndSortFilter_() {
  */
 function resetAndSortFilterISBN_() {
   const sheet = getSheet(CONFIG.SHEETS.MAIN);
-
-  ensureSynopsisColumns_(sheet);
-
   const filter = sheet.getFilter();
   if (filter) filter.remove();
-
-  const last = getLastDataRow(sheet, CONFIG.COL.TITLE);
-  if (last < 2) {
-    highlightISBNMode_(sheet);
-    setDropdownISBN_();
-    return;
-  }
-
-  // ISBN入力モードでも、B:ABを一体でソートしてY/Z/AA/ABの行ズレを防ぐ。
-  const genreFormula = detachGenreFormulaForSort_(sheet);
-
-  try {
-    sortMainRowsByTitle_(sheet, last);
-  } finally {
-    restoreGenreFormulaAfterSort_(sheet, genreFormula);
-  }
-
+  // Entering input mode never changes book order or recalculates W's spill.
   highlightISBNMode_(sheet);
   setDropdownISBN_();
 }
 
 /**
- * ISBNや画像列の式→値変換＆クリア
- *  - ISBN、画像、著者列等をdisplayValuesで書き戻し
- *  - サブ範囲はクリア
+ * 取得済みの入力行だけを書誌の値へ確定し、補助入力範囲をクリアする。
+ * 既存の確定行、ISBN未入力のテンプレート、画像式、書式は保持する。
  */
-function convertFormulasAndClearRange_() {
-  const sh = getSheet(CONFIG.SHEETS.MAIN);
-  const last = getLastDataRow(sh, CONFIG.COL.ISBN);
-  const rows = last - 1;
-
-  sh.getRange(2, CONFIG.COL.TITLE , rows, 1).setValues(
-    sh.getRange(2, CONFIG.COL.TITLE , rows, 1).getDisplayValues());
-
-  const jRange = sh.getRange(2, CONFIG.COL.IMAGE, rows, 1);
-  jRange.copyTo(jRange, { contentsOnly: true });
-
-  sh.getRange(2, CONFIG.COL.AUTHOR, rows, 8).setValues(
-    sh.getRange(2, CONFIG.COL.AUTHOR, rows, 8).getDisplayValues());
-
-  sh.getRange(2, 2, rows, 7).clearContent();
-
-  resetSheetStyle_(sh);
-  SpreadsheetApp.flush();
-  clearLibrarySearchCache_();
+function convertFormulasAndClearRange_(validatedPlan, sheet) {
+  const sh = sheet || getSheet(CONFIG.SHEETS.MAIN);
+  const plan = validatedPlan || readLibraryInputFinishPlan_(sh);
+  if (plan.incompleteRows.length) {
+    throw new Error('書誌情報が未取得です。目録の ' + plan.incompleteRows.join(', ') + ' 行を確認してください。数式と入力欄は変更していません。');
+  }
+  plan.runs.forEach(run => {
+    // Preserve the established display-text conversion (including formatted
+    // dates/prices) and the image-specific copy behavior, but only for input rows.
+    // Read all displayed metadata before clearing its B:H dependencies.
+    const displayed = sh.getRange(run.row, CONFIG.COL.TITLE, run.count, 10).getDisplayValues();
+    const title = sh.getRange(run.row, CONFIG.COL.TITLE, run.count, 1);
+    title.setValues(displayed.map(values => [values[0]]));
+    const image = sh.getRange(run.row, CONFIG.COL.IMAGE, run.count, 1);
+    image.copyTo(image, { contentsOnly: true });
+    const metadata = sh.getRange(run.row, CONFIG.COL.AUTHOR, run.count, 8);
+    metadata.setValues(displayed.map(values => values.slice(2, 10)));
+    sh.getRange(run.row, 2, run.count, 7).clearContent();
+  });
+  return plan;
 }
 
 /**
@@ -839,7 +799,6 @@ function setDropdownNML_()  { setDropdownFromList_(DROPDOWN_VALUES.NML);  }
 function setDropdownISBN_() { setDropdownFromList_(DROPDOWN_VALUES.ISBN); }
 function setDropdownFromList_(values) {
   const cell = getSheet(CONFIG.SHEETS.MAIN).getRange('A1');
-  cell.clearDataValidations();
   const rule = SpreadsheetApp.newDataValidation().requireValueInList(values, true).build();
   cell.setDataValidation(rule);
 }
@@ -848,9 +807,7 @@ function setDropdownFromList_(values) {
  * 行全体の背景色リセット・モードごとのハイライト
  */
 function highlightISBNMode_(sheet) {
-  const r = getLastDataRow(sheet, CONFIG.COL.ISBN);
-  const c = sheet.getLastColumn();
-  sheet.getRange(1, 1, r, c).setBackground('#FFF8DC').setFontColor('#003366');
+  ensureLibraryInputModeFormat_(sheet);
 }
 function resetSheetStyle_(sheet) {
   const r = getLastDataRow(sheet, CONFIG.COL.ISBN);
