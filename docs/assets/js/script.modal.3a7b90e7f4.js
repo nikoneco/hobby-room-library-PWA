@@ -1,3 +1,209 @@
+// Similar books use category-bounded Jaccard scores. Missing categories earn no points.
+const SIMILAR_BOOK_WEIGHTS_ = { story: 40, theme: 35, mood: 25 };
+let popupSimilarSession_ = null;
+
+function similarBookIdentity_(book) {
+  if (!book) return '';
+  if (book.bookId) return 'book:' + book.bookId;
+  if (book.rowIndex !== undefined && book.rowIndex !== null) return 'row:' + book.rowIndex;
+  return 'title:' + String(book.title || '') + '|' + String(book.isbn || '');
+}
+
+function similarBookGroup_(book) {
+  if (book.seriesKeyAuto && !book.isExtraSeries) return 'series:' + book.seriesKeyAuto;
+  return similarBookIdentity_(book);
+}
+
+function similarBookGenres_(book, category) {
+  return Array.from(new Set((Array.isArray(book && book.genreMeta) ? book.genreMeta : [])
+    .filter(item => item && item.category === category && item.name && item.name !== '18禁')
+    .map(item => String(item.name).trim()).filter(Boolean)));
+}
+
+function rankSimilarBooks_(source, books, limit) {
+  const sourceGenres = {};
+  Object.keys(SIMILAR_BOOK_WEIGHTS_).forEach(category => {
+    sourceGenres[category] = similarBookGenres_(source, category);
+  });
+  const media = similarBookGenres_(source, 'media');
+  const groups = new Map();
+  (Array.isArray(books) ? books : []).forEach(book => {
+    if (!book || similarBookIdentity_(book) === similarBookIdentity_(source) ||
+        similarBookGroup_(book) === similarBookGroup_(source)) return;
+    // Genre browsing does not introduce sensitive titles from an ordinary book.
+    if (isSensitiveBook_(book) && !isSensitiveBook_(source)) return;
+    if (media.length && !similarBookGenres_(book, 'media').some(value => media.includes(value))) return;
+    let score = 0;
+    const shared = [];
+    Object.keys(SIMILAR_BOOK_WEIGHTS_).forEach(category => {
+      const left = sourceGenres[category];
+      const right = similarBookGenres_(book, category);
+      const common = left.filter(value => right.includes(value));
+      const union = new Set([...left, ...right]).size;
+      if (union) score += SIMILAR_BOOK_WEIGHTS_[category] * common.length / union;
+      common.forEach(name => shared.push({ name, category }));
+    });
+    if (score < 20) return;
+    const match = { book, score: Math.round(score), shared };
+    const key = similarBookGroup_(book);
+    const previous = groups.get(key);
+    const volume = value => Number(value.volume) > 0 ? Number(value.volume) : Number.MAX_SAFE_INTEGER;
+    if (!previous || match.score > previous.score ||
+        (match.score === previous.score && volume(book) < volume(previous.book))) groups.set(key, match);
+  });
+  return Array.from(groups.values()).sort((a, b) => b.score - a.score ||
+    String(a.book.title || '').localeCompare(String(b.book.title || ''), 'ja') ||
+    similarBookIdentity_(a.book).localeCompare(similarBookIdentity_(b.book)))
+    .slice(0, limit || 6);
+}
+
+function getSimilarBooksSession_() {
+  if (!popupSimilarSession_) popupSimilarSession_ = { states: new Map(), trail: [], booksPromise: null };
+  return popupSimilarSession_;
+}
+
+function getSimilarBooksState_(book) {
+  const session = getSimilarBooksSession_();
+  const key = similarBookIdentity_(book);
+  if (!session.states.has(key)) session.states.set(key, { open: false, status: 'idle', matches: [] });
+  return session.states.get(key);
+}
+
+function loadSimilarBookCandidates_(session) {
+  if (!session.booksPromise) {
+    session.booksPromise = new Promise((resolve, reject) => {
+      const manager = window.ShumiLibraryLocalIndex;
+      const useLocal = manager && manager.isReady() &&
+        (manager.getFreshnessState() === 'fresh' || navigator.onLine === false);
+      const runner = google.script.run.withSuccessHandler(books => {
+        if (!Array.isArray(books) || !books.length) { reject(new Error('候補データを取得できませんでした')); return; }
+        resolve(books);
+      }).withFailureHandler(reject);
+      // The remote shelf API omits genres; the existing empty search returns compact metadata.
+      if (useLocal) runner.getBookshelfBooks();
+      else runner.searchBooksSimple('');
+    }).catch(error => { session.booksPromise = null; throw error; });
+  }
+  return session.booksPromise;
+}
+
+function buildSimilarBooksHtml_(book) {
+  const state = getSimilarBooksState_(book);
+  return `<section class="popup-discovery" aria-label="似てる本">
+    <button type="button" class="popup-discovery-toggle" aria-expanded="${state.open}" aria-controls="popup-discovery-shelf">
+      ${uiIcon_('collection', 'ui-icon-inline')}<span>似てる本</span><span class="popup-discovery-sign" aria-hidden="true">${state.open ? '−' : '+'}</span>
+    </button>
+    <div id="popup-discovery-shelf" ${state.open ? '' : 'hidden'}></div>
+  </section>`;
+}
+
+function similarPopupScroll_() {
+  return ['image-popup-content', 'image-popup-info'].map(id => {
+    const element = document.getElementById(id);
+    return { id, top: element ? element.scrollTop : 0 };
+  });
+}
+
+function restoreSimilarPopupScroll_(positions) {
+  (positions || []).forEach(position => {
+    const element = document.getElementById(position.id);
+    if (element) element.scrollTop = position.top;
+  });
+  updatePopupNavPlacement_();
+}
+
+function buildSimilarBackHtml_() {
+  const trail = getSimilarBooksSession_().trail;
+  if (!trail.length) return '';
+  const previous = trail[trail.length - 1];
+  return `<button type="button" class="popup-discovery-back" title="${escapeHtml(previous.title)}">
+    ${uiIcon_('back', 'ui-icon-inline')}<span>元の本に戻る<span class="popup-discovery-origin">${escapeHtml(previous.title)}</span></span>
+  </button>`;
+}
+
+function bindSimilarBooks_(book) {
+  const session = getSimilarBooksSession_();
+  const state = getSimilarBooksState_(book);
+  const info = document.getElementById('image-popup-info');
+  const toggle = info.querySelector('.popup-discovery-toggle');
+  const back = info.querySelector('.popup-discovery-back');
+  if (back) back.onclick = () => {
+    const previous = session.trail.pop();
+    if (!previous) return;
+    showPopup(previous.data[previous.index], previous.index, previous.data, previous.seriesContext);
+    restoreSimilarPopupScroll_(previous.scroll);
+    const target = document.querySelector('[data-similar-book="' + previous.matchIndex + '"]');
+    if (target) target.focus({ preventScroll: true });
+  };
+  if (!toggle) return;
+  toggle.onclick = () => {
+    state.open = !state.open;
+    renderSimilarBooks_(book, session, state);
+    if (state.open && state.status === 'idle') requestSimilarBooks_(book, session, state);
+  };
+  renderSimilarBooks_(book, session, state);
+}
+
+function requestSimilarBooks_(book, session, state) {
+  state.status = 'loading';
+  renderSimilarBooks_(book, session, state);
+  loadSimilarBookCandidates_(session).then(books => {
+    const source = books.find(candidate => similarBookIdentity_(candidate) === similarBookIdentity_(book)) || book;
+    state.hasGenres = Object.keys(SIMILAR_BOOK_WEIGHTS_).some(category => similarBookGenres_(source, category).length);
+    state.media = similarBookGenres_(source, 'media');
+    state.matches = rankSimilarBooks_(source, books, 6);
+    state.status = 'ready';
+  }).catch(() => { state.status = 'error'; }).then(() => renderSimilarBooks_(book, session, state));
+}
+
+function renderSimilarBooks_(book, session, state) {
+  if (popupSimilarSession_ !== session || !isBookPopupOpen_() ||
+      similarBookIdentity_(popupData[popupIndex]) !== similarBookIdentity_(book)) return;
+  const container = document.getElementById('popup-discovery-shelf');
+  const toggle = document.querySelector('.popup-discovery-toggle');
+  if (!container || !toggle) return;
+  toggle.setAttribute('aria-expanded', String(state.open));
+  toggle.querySelector('.popup-discovery-sign').textContent = state.open ? '−' : '+';
+  container.hidden = !state.open;
+  if (!state.open) return;
+  if (state.status === 'loading' || state.status === 'idle') {
+    container.innerHTML = '<p class="popup-discovery-message" role="status">蔵書から、共通点のある本を探しています…</p>';
+    return;
+  }
+  if (state.status === 'error') {
+    container.innerHTML = '<p class="popup-discovery-message" role="status">似てる本を読み込めませんでした。</p><button type="button" class="popup-discovery-retry">もう一度探す</button>';
+    container.querySelector('button').onclick = () => requestSimilarBooks_(book, session, state);
+    return;
+  }
+  if (!state.matches.length) {
+    container.innerHTML = `<p class="popup-discovery-message" role="status">${state.hasGenres
+      ? '今の蔵書では、十分な共通点のある別作品が見つかりませんでした。'
+      : 'この本のジャンルが登録されると、似てる本を探せます。'}</p>`;
+    return;
+  }
+  container.innerHTML = `<p class="popup-discovery-caption" role="status">${state.media.length ? escapeHtml(state.media.join('・')) + 'の蔵書から' : '蔵書から'} · ${state.matches.length}作品</p>
+    <div class="popup-discovery-books">${state.matches.map((match, index) => `
+      <button type="button" class="popup-discovery-book" data-similar-book="${index}">
+        <span class="popup-discovery-cover"><img alt="" width="120" height="174"></span>
+        <span class="popup-discovery-title">${escapeHtml(match.book.seriesSearchTitle || match.book.title)}</span>
+        <span class="popup-discovery-score">ジャンル一致度 <strong>${match.score}</strong><span>/100</span></span>
+        <span class="popup-discovery-reason">${escapeHtml(match.shared.slice(0, 3).map(item => item.name).join('・'))} が共通</span>
+      </button>`).join('')}</div>
+    <details class="popup-discovery-method"><summary>一致度について</summary><p>ストーリー40・題材35・雰囲気25の配点で、各分類のタグの重なりを採点しています。未登録の分類は加点せず、20点以上の別作品を表示します。内容そのものの評価ではありません。</p></details>`;
+  const candidates = state.matches.map(match => match.book);
+  container.querySelectorAll('[data-similar-book]').forEach((button, index) => {
+    setupBookImageElement_(button.querySelector('img'), candidates[index], { loading: 'lazy', track: false });
+    button.onclick = () => {
+      session.trail.push({ data: popupData, index: popupIndex, seriesContext: popupSeriesContext,
+        title: book.title || '', scroll: similarPopupScroll_(), matchIndex: index, childData: candidates });
+      showPopup(candidates[index], index, candidates);
+      restoreSimilarPopupScroll_([{ id: 'image-popup-content', top: 0 }, { id: 'image-popup-info', top: 0 }]);
+      const heading = document.querySelector('.popup-book-title');
+      if (heading) { heading.tabIndex = -1; heading.focus({ preventScroll: true }); }
+    };
+  });
+}
+
 function shouldIgnoreBookOpenSurfaceClick_(target) {
   return !!(
     target &&
@@ -69,6 +275,7 @@ function setPopupModalOpen_(enabled) {
   }
 
   const restoreY = popupPageScrollLockY_;
+  popupSimilarSession_ = null;
   popupSeriesRequestGeneration_ += 1;
   body.classList.remove('modal-open');
   if (root && root.classList) root.classList.remove('modal-open');
@@ -1963,6 +2170,16 @@ function sortSeriesBooksForDisplay_(books) {
 }
 
 function showPopup(book, index, dataArr, seriesContext, options) {
+  const similarScroll = isBookPopupOpen_() && similarBookIdentity_(popupData[popupIndex]) === similarBookIdentity_(book)
+    ? similarPopupScroll_() : null;
+  const similarFocus = similarScroll && document.activeElement;
+  const similarFocusSelector = similarFocus && similarFocus.matches('.popup-discovery-book')
+    ? '[data-similar-book="' + similarFocus.dataset.similarBook + '"]'
+    : similarFocus && similarFocus.matches('.popup-discovery-toggle, .popup-discovery-back, .popup-discovery-retry')
+      ? '.' + similarFocus.className.split(' ')[0] : '';
+  const similarSession = getSimilarBooksSession_();
+  const similarTrail = similarSession.trail;
+  if (similarTrail.length && similarTrail[similarTrail.length - 1].childData !== dataArr) similarTrail.length = 0;
   popupSeriesRequestGeneration_ += 1;
   const popupRenderPerfToken = pwaPerfStart_('popup:render', {
     index,
@@ -2044,6 +2261,7 @@ function showPopup(book, index, dataArr, seriesContext, options) {
   const actionsHtml = buildPopupActionsHtml(renderBook, popupSeriesContext);
   info.innerHTML = `
     <div class="popup-book-detail">
+        ${buildSimilarBackHtml_()}
         <div class="popup-book-head">
           <div class="popup-book-title">${escapeHtml(renderBook.title || '(タイトルなし)')}</div>
           ${buildPopupBookLeadHtml_(renderBook)}
@@ -2052,6 +2270,7 @@ function showPopup(book, index, dataArr, seriesContext, options) {
       <div class="popup-summary-section"></div>
       ${buildPopupDetailLoadingHtml_(renderBook)}
       <div class="genre-chip-wrap popup" aria-label="この本の分類">${buildGenreChips(renderBook)}</div>
+      ${buildSimilarBooksHtml_(renderBook)}
       ${buildBookMemoHtml_(renderBook)}
       <details class="popup-book-bibliography">
         <summary>書誌情報</summary>
@@ -2091,6 +2310,13 @@ function showPopup(book, index, dataArr, seriesContext, options) {
 
   overlay.style.display = 'flex';
   setPopupModalOpen_(true);
+
+  bindSimilarBooks_(renderBook);
+  if (similarScroll) restoreSimilarPopupScroll_(similarScroll);
+  if (similarFocusSelector) {
+    const focusTarget = info.querySelector(similarFocusSelector);
+    if (focusTarget) focusTarget.focus({ preventScroll: true });
+  }
 
   clearPopupMotionState_(popupContent);
 

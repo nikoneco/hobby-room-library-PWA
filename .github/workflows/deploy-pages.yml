@@ -55,6 +55,9 @@ jobs:
       - name: Check client request races
         run: node tools/check-client-races.js
 
+      - name: Check similar book ranking
+        run: node tools/check-similar-books.js
+
       - name: Check client CSS
         run: node tools/check-client-css.js
 
