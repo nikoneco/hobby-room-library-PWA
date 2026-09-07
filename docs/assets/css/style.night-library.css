@@ -2024,10 +2024,9 @@ body.sandbox-redesign #searchContainer:has(#advancedToggleBtn[aria-expanded="tru
 }
 .popup-discovery {
   min-width: 0;
-  padding-block: var(--space-3, 12px);
-  border-block: 1px solid var(--lib-line);
+  padding: 0;
+  border-top: 1px solid var(--lib-line);
 }
-.popup-discovery-toggle,
 .popup-discovery-back,
 .popup-discovery-retry {
   display: inline-flex;
@@ -2045,11 +2044,17 @@ body.sandbox-redesign #searchContainer:has(#advancedToggleBtn[aria-expanded="tru
   text-align: left;
   cursor: pointer;
 }
-.popup-discovery-toggle .ui-icon,
 .popup-discovery-back .ui-icon { flex: none; margin: 0; }
-.popup-discovery-sign { margin-left: var(--space-3, 12px); font-size: 18px; }
-.popup-discovery-toggle[aria-expanded="true"] { background: var(--lib-panel); border-color: var(--lib-accent); }
-#popup-discovery-shelf[hidden] { display: none; }
+body.sandbox-redesign #image-popup-info .popup-discovery > summary {
+  display: list-item;
+  list-style: disclosure-closed inside;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--night-text);
+}
+body.sandbox-redesign #image-popup-info .popup-discovery[open] > summary { list-style-type: disclosure-open; }
 .popup-discovery-caption,
 .popup-discovery-message {
   margin: var(--space-4, 16px) 0;
@@ -2122,7 +2127,6 @@ body.sandbox-redesign #image-popup-info .popup-action-btn {
 body.sandbox-redesign #image-popup-info .popup-action-btn.primary { color: var(--night-accent-strong); }
 @media (hover: hover) {
   .popup-discovery-book:hover .popup-discovery-title { color: var(--lib-accent-2); }
-  .popup-discovery-toggle:hover,
   .popup-discovery-retry:hover { background: var(--lib-panel); border-color: var(--lib-accent); color: var(--lib-accent-2); }
 }
 @media (hover: hover) and (prefers-reduced-motion: no-preference) {
@@ -2130,11 +2134,9 @@ body.sandbox-redesign #image-popup-info .popup-action-btn.primary { color: var(-
 }
 @media (prefers-reduced-motion: no-preference) {
   .popup-discovery-cover img { transition: transform var(--duration-quick, 160ms) var(--ease-standard, ease-out); }
-  #popup-discovery-shelf:not([hidden]) { animation: discovery-reveal var(--duration-quick, 160ms) ease-out; }
-  .popup-discovery-toggle,
+  .popup-discovery[open] #popup-discovery-shelf { animation: discovery-reveal var(--duration-quick, 160ms) ease-out; }
   .popup-discovery-book,
   body.sandbox-redesign #image-popup-info .popup-action-btn { transition: transform var(--duration-quick, 160ms), background-color var(--duration-quick, 160ms); }
-  .popup-discovery-toggle:active,
   .popup-discovery-book:active,
   body.sandbox-redesign #image-popup-info .popup-action-btn:active { transform: translateY(1px); }
 }

@@ -46,9 +46,9 @@
 
 ## Similar-book discovery
 
-- The detail view places a compact `似てる本` button immediately after the genre chips. Its selection shelf opens inline, with three columns on desktop and two on mobile.
+- The detail view presents synopsis, bibliography, then similar books. `似てる本` uses a native details/summary accordion matching `書誌情報`, initially collapsed; its selection shelf opens inline, with three columns on desktop and two on mobile.
 - Covers, titles, genre agreement scores, and shared tags carry the discovery experience. Use the active night-library theme; keep the surrounding surfaces flat and the reveal short, with reduced motion respected.
-- Score category overlap with weighted Jaccard: story 40, theme 35, mood 25. Missing categories earn zero; status and media earn no points. If the source has media tags, candidates must share at least one.
+- Score story 35 and mood 25 using Jaccard overlap. Divide the theme budget of 40 equally across the source book's distinct theme tags: with two tags, each matching tag earns 20; candidate-only tags do not dilute the theme score. Missing categories earn zero; status and media earn no points. If the source has media tags, candidates must share at least one.
 - Show up to six other works scoring at least 20/100, grouped by stable series key. Exclude the source work and keep sensitive-title browsing and cover visibility rules. Explain that the score reflects registered tags, not a content assessment.
 - Each discovery hop retains the previous book, source list, selected recommendation, and scroll position. Detail hydration must preserve the open shelf and keyboard focus; closing the modal clears the discovery session.
 - Reuse fresh local PWA metadata where available. The GAS fallback uses the existing compact empty search, fetched only after opening the shelf; fetch synopsis/details only for opened books.

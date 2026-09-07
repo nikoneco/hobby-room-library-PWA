@@ -1,6 +1,6 @@
 <script>
-// Similar books use category-bounded Jaccard scores. Missing categories earn no points.
-const SIMILAR_BOOK_WEIGHTS_ = { story: 40, theme: 35, mood: 25 };
+// Themes share a source-relative budget; story/mood use Jaccard. Missing tags earn zero.
+const SIMILAR_BOOK_WEIGHTS_ = { story: 35, theme: 40, mood: 25 };
 let popupSimilarSession_ = null;
 
 function similarBookIdentity_(book) {
@@ -40,8 +40,8 @@ function rankSimilarBooks_(source, books, limit) {
       const left = sourceGenres[category];
       const right = similarBookGenres_(book, category);
       const common = left.filter(value => right.includes(value));
-      const union = new Set([...left, ...right]).size;
-      if (union) score += SIMILAR_BOOK_WEIGHTS_[category] * common.length / union;
+      const denominator = category === 'theme' ? left.length : new Set([...left, ...right]).size;
+      if (denominator) score += SIMILAR_BOOK_WEIGHTS_[category] * common.length / denominator;
       common.forEach(name => shared.push({ name, category }));
     });
     if (score < 20) return;
@@ -90,12 +90,10 @@ function loadSimilarBookCandidates_(session) {
 
 function buildSimilarBooksHtml_(book) {
   const state = getSimilarBooksState_(book);
-  return `<section class="popup-discovery" aria-label="似てる本">
-    <button type="button" class="popup-discovery-toggle" aria-expanded="${state.open}" aria-controls="popup-discovery-shelf">
-      ${uiIcon_('collection', 'ui-icon-inline')}<span>似てる本</span><span class="popup-discovery-sign" aria-hidden="true">${state.open ? '−' : '+'}</span>
-    </button>
-    <div id="popup-discovery-shelf" ${state.open ? '' : 'hidden'}></div>
-  </section>`;
+  return `<details class="popup-discovery" ${state.open ? 'open' : ''}>
+    <summary class="popup-discovery-toggle" aria-controls="popup-discovery-shelf">似てる本</summary>
+    <div id="popup-discovery-shelf"></div>
+  </details>`;
 }
 
 function similarPopupScroll_() {
@@ -126,7 +124,7 @@ function bindSimilarBooks_(book) {
   const session = getSimilarBooksSession_();
   const state = getSimilarBooksState_(book);
   const info = document.getElementById('image-popup-info');
-  const toggle = info.querySelector('.popup-discovery-toggle');
+  const disclosure = info.querySelector('.popup-discovery');
   const back = info.querySelector('.popup-discovery-back');
   if (back) back.onclick = () => {
     const previous = session.trail.pop();
@@ -136,9 +134,11 @@ function bindSimilarBooks_(book) {
     const target = document.querySelector('[data-similar-book="' + previous.matchIndex + '"]');
     if (target) target.focus({ preventScroll: true });
   };
-  if (!toggle) return;
-  toggle.onclick = () => {
-    state.open = !state.open;
+  if (!disclosure) return;
+  disclosure.ontoggle = () => {
+    // Ignore queued events from replaced detail DOM and restored open state.
+    if (!info.contains(disclosure) || popupSimilarSession_ !== session || disclosure.open === state.open) return;
+    state.open = disclosure.open;
     renderSimilarBooks_(book, session, state);
     if (state.open && state.status === 'idle') requestSimilarBooks_(book, session, state);
   };
@@ -161,11 +161,8 @@ function renderSimilarBooks_(book, session, state) {
   if (popupSimilarSession_ !== session || !isBookPopupOpen_() ||
       similarBookIdentity_(popupData[popupIndex]) !== similarBookIdentity_(book)) return;
   const container = document.getElementById('popup-discovery-shelf');
-  const toggle = document.querySelector('.popup-discovery-toggle');
-  if (!container || !toggle) return;
-  toggle.setAttribute('aria-expanded', String(state.open));
-  toggle.querySelector('.popup-discovery-sign').textContent = state.open ? '−' : '+';
-  container.hidden = !state.open;
+  const disclosure = document.querySelector('.popup-discovery');
+  if (!container || !disclosure) return;
   if (!state.open) return;
   if (state.status === 'loading' || state.status === 'idle') {
     container.innerHTML = '<p class="popup-discovery-message" role="status">蔵書から、共通点のある本を探しています…</p>';
@@ -190,7 +187,7 @@ function renderSimilarBooks_(book, session, state) {
         <span class="popup-discovery-score">ジャンル一致度 <strong>${match.score}</strong><span>/100</span></span>
         <span class="popup-discovery-reason">${escapeHtml(match.shared.slice(0, 3).map(item => item.name).join('・'))} が共通</span>
       </button>`).join('')}</div>
-    <details class="popup-discovery-method"><summary>一致度について</summary><p>ストーリー40・題材35・雰囲気25の配点で、各分類のタグの重なりを採点しています。未登録の分類は加点せず、20点以上の別作品を表示します。内容そのものの評価ではありません。</p></details>`;
+    <details class="popup-discovery-method"><summary>一致度について</summary><p>ストーリー35点・題材40点・雰囲気25点で採点しています。</p><p>題材の40点は、開いている本の題材数で均等に分けます。題材が2個なら各20点。1個共通で20点、両方共通で40点になり、候補側に別の題材があっても減点しません。</p><p>ストーリーと雰囲気は、双方に付いたタグ全体に対する共通タグの割合で採点します。未登録の分類は加点せず、20点以上の別作品を表示します。内容そのものの評価ではありません。</p></details>`;
   const candidates = state.matches.map(match => match.book);
   container.querySelectorAll('[data-similar-book]').forEach((button, index) => {
     setupBookImageElement_(button.querySelector('img'), candidates[index], { loading: 'lazy', track: false });
@@ -2276,12 +2273,12 @@ function showPopup(book, index, dataArr, seriesContext, options) {
       <div class="popup-summary-section"></div>
       ${buildPopupDetailLoadingHtml_(renderBook)}
       <div class="genre-chip-wrap popup" aria-label="この本の分類">${buildGenreChips(renderBook)}</div>
-      ${buildSimilarBooksHtml_(renderBook)}
       ${buildBookMemoHtml_(renderBook)}
       <details class="popup-book-bibliography">
         <summary>書誌情報</summary>
         ${buildPopupBibliographyHtml_(renderBook)}
       </details>
+      ${buildSimilarBooksHtml_(renderBook)}
       ${actionsHtml}
       <div class="popup-position">${popupIndex + 1} / ${popupData.length}</div>
     </div>
