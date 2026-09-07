@@ -384,4 +384,25 @@ for (const batch of [false, true]) {
   assert.equal(requests[1].args[0], 'Saved query');
 }
 
+// Late detail hydration must not replace a series panel opened in the meantime.
+{
+  const { c, read, timers } = client();
+  c.pendingBook = { bookId: 'pending', title: 'Pending book' };
+  c.pendingList = [c.pendingBook];
+  read('popupData = pendingList; popupIndex = 0;');
+  c.isBookPopupOpen_ = () => true;
+  const content = c.document.getElementById('image-popup-content');
+  content.classList.contains = name => name === 'series-mode';
+  let renders = 0;
+  c.showPopup = () => { renders += 1; };
+  c.replaceDeferredBookReference_(c.pendingBook, c.pendingBook, 0, c.pendingList, null);
+  assert.equal(renders, 0);
+  c.schedulePopupCurrentDetailRender_(c.pendingBook, 0, c.pendingList, null, 1);
+  timers[timers.length - 1].fn();
+  assert.equal(renders, 0);
+  content.classList.contains = () => false;
+  c.replaceDeferredBookReference_(c.pendingBook, c.pendingBook, 0, c.pendingList, null);
+  assert.equal(renders, 1);
+}
+
 console.log('client race, cache and detail recovery checks ok');

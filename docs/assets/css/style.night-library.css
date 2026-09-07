@@ -2122,9 +2122,11 @@ body.sandbox-redesign #image-popup-info .popup-action-btn {
 body.sandbox-redesign #image-popup-info .popup-action-btn.primary { color: var(--night-accent-strong); }
 @media (hover: hover) {
   .popup-discovery-book:hover .popup-discovery-title { color: var(--lib-accent-2); }
-  .popup-discovery-book:hover .popup-discovery-cover img { transform: translateY(-3px); }
   .popup-discovery-toggle:hover,
-  .popup-discovery-retry:hover { background: var(--lib-panel); border-color: var(--lib-accent); }
+  .popup-discovery-retry:hover { background: var(--lib-panel); border-color: var(--lib-accent); color: var(--lib-accent-2); }
+}
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .popup-discovery-book:hover .popup-discovery-cover img { transform: translateY(-3px); }
 }
 @media (prefers-reduced-motion: no-preference) {
   .popup-discovery-cover img { transition: transform var(--duration-quick, 160ms) var(--ease-standard, ease-out); }
@@ -2139,6 +2141,15 @@ body.sandbox-redesign #image-popup-info .popup-action-btn.primary { color: var(-
 @keyframes discovery-reveal {
   from { opacity: 0; transform: translateY(4px); }
   to { opacity: 1; transform: translateY(0); }
+}
+body.pwa-quiet-motion #popup-discovery-shelf,
+body.pwa-quiet-motion .popup-discovery-toggle,
+body.pwa-quiet-motion .popup-discovery-book,
+body.pwa-quiet-motion .popup-discovery-book .popup-discovery-cover img,
+body.sandbox-redesign.pwa-quiet-motion #image-popup-info .popup-action-btn {
+  animation: none;
+  transition: none;
+  transform: none;
 }
 @media (max-width: 760px) {
   .popup-discovery-books { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-5, 24px) var(--space-4, 16px); }

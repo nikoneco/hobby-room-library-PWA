@@ -577,6 +577,11 @@ function isBookPopupOpen_() {
   );
 }
 
+function isSeriesPopupOpen_() {
+  const content = document.getElementById('image-popup-content');
+  return Boolean(content && content.classList && content.classList.contains('series-mode'));
+}
+
 function shouldFetchDeferredBookDetails_(book, options) {
   const opt = options || {};
   return !!(
@@ -661,7 +666,7 @@ function schedulePopupCurrentDetailRender_(book, index, dataArr, seriesContext, 
   if (!book || !Array.isArray(dataArr) || !Number.isFinite(targetIndex)) return;
 
   window.setTimeout(function() {
-    if (!isBookPopupOpen_()) return;
+    if (!isBookPopupOpen_() || isSeriesPopupOpen_()) return;
     if (popupIndex !== targetIndex || popupData !== dataArr) return;
     showPopup(book, targetIndex, dataArr, seriesContext, {
       deferNeighborDetails: true,
@@ -954,7 +959,7 @@ function replaceDeferredBookReference_(book, merged, index, dataArr, seriesConte
     dataArr[index] = merged;
   }
 
-  if (isBookPopupOpen_() && Array.isArray(popupData) && popupData[popupIndex] === book) {
+  if (isBookPopupOpen_() && Array.isArray(popupData) && !isSeriesPopupOpen_() && popupData[popupIndex] === book) {
     popupData[popupIndex] = merged;
     showPopup(merged, popupIndex, popupData, popupSeriesContext || seriesContext);
   }
@@ -978,7 +983,7 @@ function handleDeferredBookDetailResult_(book, index, dataArr, seriesContext, op
   if (error && error.code === 'BOOK_DETAIL_STALE') {
     book.detailError = '';
     if (typeof opt.onDone === 'function') opt.onDone(null);
-    if (isBookPopupOpen_() && Array.isArray(popupData) && popupData[popupIndex] === book) {
+    if (isBookPopupOpen_() && Array.isArray(popupData) && !isSeriesPopupOpen_() && popupData[popupIndex] === book) {
       schedulePopupCurrentDetailRender_(book, popupIndex, popupData, popupSeriesContext, 1);
     }
     return;
