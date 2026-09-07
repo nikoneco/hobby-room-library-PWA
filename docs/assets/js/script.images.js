@@ -1,5 +1,7 @@
 const IMAGE_LOAD_STATS_QUERY_KEY = 'debugImageStats';
 const IMAGE_LOAD_STATS_STORAGE_KEY = 'shumiLibrary.debugImageStats';
+const BOOK_IMAGE_RESOLVED_CACHE_LIMIT = 256;
+const bookImageResolvedUrls_ = new Map();
 
 let IMAGE_LOAD_STATS = null;
 let IMAGE_LOAD_STATS_RUN_ID = 0;
@@ -365,9 +367,23 @@ function buildBookImageCandidates_(book) {
   });
 }
 
+function getBookImageLoadPlan_(book) {
+  const candidates = buildBookImageCandidates_(book);
+  // Key by the complete current policy, so edited/manual/hidden covers cannot
+  // inherit a URL from an older book record or visibility setting.
+  const key = JSON.stringify(candidates.map(item => item.url));
+  const resolvedUrl = bookImageResolvedUrls_.get(key);
+  const resolvedIndex = candidates.findIndex(item => item.url === resolvedUrl);
+  if (resolvedIndex > 0) {
+    candidates.unshift(candidates.splice(resolvedIndex, 1)[0]);
+  }
+  return { key, candidates };
+}
+
 function setupBookImageElement_(img, book, options) {
   const opt = options || {};
-  const candidates = buildBookImageCandidates_(book);
+  const plan = getBookImageLoadPlan_(book);
+  const candidates = plan.candidates;
   const track = Boolean(opt.track);
   const trackKey = opt.trackKey || '';
   const trackRunId = IMAGE_LOAD_STATS_RUN_ID;
@@ -396,6 +412,16 @@ function setupBookImageElement_(img, book, options) {
     img.classList.remove('book-image-loading');
     img.classList.add('book-image-loaded');
 
+    const current = candidates[currentIndex];
+    if (current && current.label !== 'NO_IMAGE' && img.naturalWidth > 0 &&
+        !(img.naturalWidth === 50 && img.naturalHeight === 71)) {
+      bookImageResolvedUrls_.delete(plan.key);
+      bookImageResolvedUrls_.set(plan.key, current.url);
+      if (bookImageResolvedUrls_.size > BOOK_IMAGE_RESOLVED_CACHE_LIMIT) {
+        bookImageResolvedUrls_.delete(bookImageResolvedUrls_.keys().next().value);
+      }
+    }
+
     if (track) {
       recordImageLoadResult_(trackKey, candidates[currentIndex], trackRunId);
     }
@@ -406,6 +432,10 @@ function setupBookImageElement_(img, book, options) {
   }
 
   function moveNextCandidate() {
+    const current = candidates[currentIndex];
+    if (current && bookImageResolvedUrls_.get(plan.key) === current.url) {
+      bookImageResolvedUrls_.delete(plan.key);
+    }
     const nextIndex = currentIndex + 1;
     if (nextIndex < candidates.length) {
       setCandidate(nextIndex);
@@ -446,7 +476,7 @@ function setupBookImageElement_(img, book, options) {
 function prefetchBookCoverImage_(book) {
   if (!book) return;
 
-  const candidates = buildBookImageCandidates_(book);
+  const candidates = getBookImageLoadPlan_(book).candidates;
   const first = candidates.find(item => item && item.url && item.label !== 'NO_IMAGE');
   if (!first || !first.url) return;
   if (popupImagePrefetchUrls.has(first.url)) return;

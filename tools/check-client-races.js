@@ -405,4 +405,50 @@ for (const batch of [false, true]) {
   assert.equal(renders, 1);
 }
 
-console.log('client race, cache and detail recovery checks ok');
+// A successful list fallback must be reused when a fresh detail image is opened.
+// Otherwise a stalled primary host hides a cover that was already on screen.
+{
+  const { c, read } = client();
+  const image = () => ({
+    classList: { add() {}, remove() {} }, setAttribute() {},
+    naturalWidth: 0, naturalHeight: 0
+  });
+  const book = { isbn: '9784757564510', fallbackImg: 'https://example.test/cover.jpg', fallbackImageSource: 'RakutenBooks' };
+  const list = image();
+  c.setupBookImageElement_(list, book);
+  const primary = list.src;
+  list.naturalWidth = 50; list.naturalHeight = 71; list.onload();
+  assert.equal(list.src, book.fallbackImg);
+  list.naturalWidth = 422; list.naturalHeight = 600; list.onload();
+  const detail = image();
+  c.setupBookImageElement_(detail, { ...book, img: primary, summary: 'Hydrated detail' });
+  assert.equal(detail.src, book.fallbackImg, 'Detail must start at the known good cover');
+  assert.equal(c.getBookImageLoadPlan_(book).candidates[0].url, book.fallbackImg);
+
+  // Changes in source data and sensitive visibility must still take precedence.
+  const manual = image();
+  c.setupBookImageElement_(manual, { ...book, fallbackImageSource: 'Manual', fallbackImg: 'https://example.test/manual.jpg' });
+  assert.equal(manual.src, 'https://example.test/manual.jpg');
+  const changed = image();
+  c.setupBookImageElement_(changed, { ...book, fallbackImg: 'https://example.test/new.jpg' });
+  assert.equal(changed.src, primary);
+  c.isSensitiveBook_ = b => Boolean(b.isSensitive);
+  c.isSensitiveCoverVisible_ = () => false;
+  const hidden = image();
+  c.setupBookImageElement_(hidden, { ...book, isSensitive: true });
+  assert.equal(hidden.src, read('NO_IMAGE_URL'));
+
+  // A formerly good URL can fail later; continue through the other candidates.
+  detail.onerror();
+  assert.equal(detail.src, primary);
+  const retry = image();
+  c.setupBookImageElement_(retry, book);
+  assert.equal(retry.src, primary, 'Do not retain a failed resolved URL');
+  retry.onerror(); retry.onerror();
+  retry.naturalWidth = 1024; retry.naturalHeight = 1024; retry.onload();
+  const afterPlaceholder = image();
+  c.setupBookImageElement_(afterPlaceholder, book);
+  assert.equal(afterPlaceholder.src, primary, 'NO IMAGE must not suppress future recovery');
+}
+
+console.log('client race, cache, cover reuse and detail recovery checks ok');
