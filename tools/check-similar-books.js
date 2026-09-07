@@ -20,14 +20,27 @@ assert.equal(rank([book('sparse', ['Fantasy'], [], [])])[0].score, 35);
 assert.equal(rank([book('one-theme', [], ['Travel'], [])])[0].score, 20);
 assert.equal(rank([book('both-themes', [], ['Travel', 'Magic'], [])])[0].score, 40);
 assert.equal(rank([book('extra-theme', [], ['Travel', 'School'], [])])[0].score, 20);
-assert.equal(rank([book('both-plus-extra', [], ['Travel', 'Magic', 'School'], [])])[0].score, 40);
+assert.equal(rank([book('both-plus-extra', [], ['Travel', 'Magic', 'School'], [])])[0].score, 27);
 assert.equal(rank([book('no-common-theme', [], ['School'], [])]).length, 0);
 assert.equal(rank([book('one-source-theme', [], ['Travel', 'Magic'], [])],
-  book('single-theme-source', [], ['Travel'], []))[0].score, 40);
+  book('single-theme-source', [], ['Travel'], []))[0].score, 20);
 assert.equal(rank([book('two-of-three', [], ['Travel', 'Magic'], [])],
   book('three-theme-source', [], ['Travel', 'Magic', 'School'], []))[0].score, 27);
 assert.equal(rank([book('duplicate-theme', [], ['Travel', 'Travel'], [])],
   book('duplicate-source', [], ['Travel', 'Travel', 'Magic'], []))[0].score, 20);
+// Reported regression: an additional food theme must prevent a perfect match.
+const takagi = book('からかい上手の元高木さん', ['青春'], ['学園'], ['コメディ']);
+const soma = book('食戟のソーマ', ['青春'], ['食べ物', '学園'], ['コメディ']);
+assert.equal(rank([soma], takagi)[0].score, 80);
+assert.equal(rank([takagi], soma)[0].score, 80);
+const sameThemes = book('same-themes', ['青春'], ['学園'], ['コメディ']);
+assert.equal(rank([soma, sameThemes], takagi)[0].book.bookId, 'same-themes');
+assert.equal(rank([sameThemes], takagi)[0].score, 100);
+// Theme order, repeated tags and search direction must not alter the score.
+for (const themes of [[], ['学園'], ['学園', '食べ物'], ['学園', '食べ物', '旅'], ['学園', '学園']]) {
+  const other = book('other', ['青春'], themes, ['コメディ']);
+  assert.equal(rank([other], takagi)[0].score, rank([takagi], other)[0].score);
+}
 assert.equal(rank([book('mood-only', [], [], ['Calm'])])[0].score, 25);
 assert.equal(rank([book('story-union', ['Fantasy', 'Drama'], [], ['Calm'])])[0].score, 43);
 assert.equal(rank([book('story-match', ['Fantasy'], [], []),

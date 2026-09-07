@@ -1,5 +1,5 @@
 <script>
-// Themes share a source-relative budget; story/mood use Jaccard. Missing tags earn zero.
+// Themes divide their budget by the larger tag count; story/mood use Jaccard. Missing tags earn zero.
 const SIMILAR_BOOK_WEIGHTS_ = { story: 35, theme: 40, mood: 25 };
 let popupSimilarSession_ = null;
 
@@ -40,7 +40,7 @@ function rankSimilarBooks_(source, books, limit) {
       const left = sourceGenres[category];
       const right = similarBookGenres_(book, category);
       const common = left.filter(value => right.includes(value));
-      const denominator = category === 'theme' ? left.length : new Set([...left, ...right]).size;
+      const denominator = category === 'theme' ? Math.max(left.length, right.length) : new Set([...left, ...right]).size;
       if (denominator) score += SIMILAR_BOOK_WEIGHTS_[category] * common.length / denominator;
       common.forEach(name => shared.push({ name, category }));
     });
@@ -187,7 +187,7 @@ function renderSimilarBooks_(book, session, state) {
         <span class="popup-discovery-score">ジャンル一致度 <strong>${match.score}</strong><span>/100</span></span>
         <span class="popup-discovery-reason">${escapeHtml(match.shared.slice(0, 3).map(item => item.name).join('・'))} が共通</span>
       </button>`).join('')}</div>
-    <details class="popup-discovery-method"><summary>一致度について</summary><p>ストーリー35点・題材40点・雰囲気25点で採点しています。</p><p>題材の40点は、開いている本の題材数で均等に分けます。題材が2個なら各20点。1個共通で20点、両方共通で40点になり、候補側に別の題材があっても減点しません。</p><p>ストーリーと雰囲気は、双方に付いたタグ全体に対する共通タグの割合で採点します。未登録の分類は加点せず、20点以上の別作品を表示します。内容そのものの評価ではありません。</p></details>`;
+    <details class="popup-discovery-method"><summary>一致度について</summary><p>ストーリー35点・題材40点・雰囲気25点で採点しています。</p><p>内容そのものの評価ではありません。</p></details>`;
   const candidates = state.matches.map(match => match.book);
   container.querySelectorAll('[data-similar-book]').forEach((button, index) => {
     setupBookImageElement_(button.querySelector('img'), candidates[index], { loading: 'lazy', track: false });
