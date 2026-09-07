@@ -2180,6 +2180,11 @@ body.sandbox-redesign #searchContainer.centered .quick-browse-rail {
   gap: var(--night-space-small);
   padding: var(--night-space-content) 0 0;
   margin: var(--night-space-small) 0 0;
+  border: 0;
+  border-top: 1px solid var(--night-line);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 body.sandbox-redesign #searchContainer.centered .quick-browse-rail[hidden] { display: none; }
 body.sandbox-redesign #quickBrowseRail .quick-browse-heading {
