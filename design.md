@@ -52,3 +52,11 @@
 - Show up to six other works scoring at least 20/100, grouped by stable series key. Exclude the source work and keep sensitive-title browsing and cover visibility rules. Explain that the score reflects registered tags, not a content assessment.
 - Each discovery hop retains the previous book, source list, selected recommendation, and scroll position. Detail hydration must preserve the open shelf and keyboard focus; closing the modal clears the discovery session.
 - Reuse fresh local PWA metadata where available. The GAS fallback uses the existing compact empty search, fetched only after opening the shelf; fetch synopsis/details only for opened books.
+
+## Browsing polish
+
+- Keep the existing outlined Y1LunaChord wordmark in the top brand. It is a decorative brand accent, not a font for actions or book information; do not add English labels just to reuse it.
+- Mood suggestions use readable rows with category, candidate, and count: two columns on desktop and one on mobile, with a 48px touch target.
+- Tile results use flat surfaces, larger Mincho book titles, quiet genre metadata, and a visible opening cue. Preserve list-view density.
+- Shelf strips show 96px by 144px cover areas and two-line titles; only the bounded shelf rail scrolls horizontally.
+- Only the hovered cover lifts slightly. Respect both OS reduced motion and the saved quiet-motion setting; keyboard focus remains immediate and visible.

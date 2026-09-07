@@ -2156,4 +2156,256 @@ body.sandbox-redesign.pwa-quiet-motion #image-popup-info .popup-action-btn {
   .popup-discovery-books { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-5, 24px) var(--space-4, 16px); }
   .popup-discovery-cover { height: 156px; }
 }
+/* Hallmark · browse polish · atmospheric / Workbench · existing night palette.
+ * The wordmark keeps its single brand role; book titles carry the reading hierarchy.
+ */
+body.sandbox-redesign {
+  --night-space-small: 8px;
+  --night-space-control: 12px;
+  --night-space-content: 16px;
+  --night-space-section: 24px;
+  --night-space-page: 40px;
+  --night-browse-motion: 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+body.sandbox-redesign #searchContainer.centered {
+  min-height: 0;
+  padding-block: clamp(72px, 7vw, 104px) 64px;
+}
+body.sandbox-redesign #searchContainer .search-form > .input-group > label {
+  color: var(--night-muted);
+  font-size: 13px;
+}
+body.sandbox-redesign #searchContainer.centered .quick-browse-rail {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--night-space-small);
+  padding: var(--night-space-content) 0 0;
+  margin: var(--night-space-small) 0 0;
+}
+body.sandbox-redesign #searchContainer.centered .quick-browse-rail[hidden] { display: none; }
+body.sandbox-redesign #quickBrowseRail .quick-browse-heading {
+  width: 100%;
+  justify-content: space-between;
+  gap: var(--night-space-control);
+}
+body.sandbox-redesign #quickBrowseRail .quick-browse-kicker { font-size: 13px; }
+body.sandbox-redesign #quickBrowseRefresh {
+  min-height: 44px;
+  padding: var(--night-space-small) var(--night-space-control);
+  border-color: transparent;
+  color: var(--night-muted);
+  font-size: 13px;
+}
+body.sandbox-redesign #quickBrowseChips {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 var(--night-space-content);
+  width: 100%;
+}
+body.sandbox-redesign #quickBrowseChips .quick-browse-chip {
+  display: grid;
+  grid-template-columns: 3.8em minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--night-space-small);
+  min-height: 48px;
+  width: 100%;
+  padding: var(--night-space-small) 0;
+  border: 0;
+  border-bottom: 1px solid var(--night-line);
+  border-radius: 0;
+  text-align: left;
+  background: transparent;
+  box-shadow: none;
+}
+body.sandbox-redesign #quickBrowseChips .quick-browse-chip-type {
+  padding: 0;
+  color: var(--night-muted);
+  font-size: 11px;
+}
+body.sandbox-redesign #quickBrowseChips .quick-browse-chip-value {
+  color: var(--night-text);
+  font-size: 14px;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+body.sandbox-redesign #quickBrowseChips .quick-browse-chip-count {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--night-muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+body.sandbox-redesign #searchContainer.centered .bookshelf-cta-wrap {
+  display: block;
+  margin-top: var(--night-space-section);
+  padding-top: 0;
+  border: 0;
+}
+body.sandbox-redesign #searchContainer .bookshelf-cta-card.top-shelf-btn {
+  width: 100%;
+  max-width: none;
+  min-height: 64px;
+  padding: var(--night-space-control) var(--night-space-content);
+  border: 1px solid var(--night-line-strong);
+  border-radius: var(--night-radius-control);
+  background: var(--night-bg-raised);
+  box-shadow: none;
+}
+body.sandbox-redesign #searchContainer .bookshelf-cta-subtitle { color: var(--night-muted); }
+body.sandbox-redesign #result .card-view {
+  gap: var(--night-space-page) var(--night-space-section);
+  border: 0;
+}
+body.sandbox-redesign #result .card-view .book-card {
+  padding: var(--night-space-content) 0 0;
+  border: 0;
+  border-bottom: 1px solid var(--night-line);
+  background: transparent;
+  box-shadow: none;
+  transform: none;
+}
+body.sandbox-redesign #result .card-view .book-cover {
+  height: clamp(190px, 19vw, 252px);
+  box-shadow: none;
+}
+body.sandbox-redesign #result .card-view .card-info {
+  padding-top: var(--night-space-section);
+  border: 0;
+  gap: var(--night-space-small);
+}
+body.sandbox-redesign #result .card-view .book-title {
+  font-size: clamp(17px, 1.45vw, 21px);
+  line-height: 1.55;
+  min-height: 3.1em;
+  letter-spacing: 0;
+}
+body.sandbox-redesign #result .search-series-kicker {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--night-muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+body.sandbox-redesign #result .card-view .genre-chip {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--night-muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+body.sandbox-redesign #result .card-view .genre-chip-wrap { gap: var(--night-space-control); }
+body.sandbox-redesign #result .search-series-match-count,
+body.sandbox-redesign #result .book-author-line { color: var(--night-muted); font-size: 13px; }
+body.sandbox-redesign #result .card-view .book-open-cue {
+  justify-content: space-between;
+  width: 100%;
+  min-height: 44px;
+  margin-top: var(--night-space-small);
+  padding: var(--night-space-control) 0;
+  color: var(--night-muted);
+  font-size: 12px;
+}
+body.sandbox-redesign #result .shelf-view .shelf-jump-chip,
+body.sandbox-redesign #result .shelf-view .shelf-jump-top-btn {
+  min-height: 44px;
+  border-radius: var(--night-radius-control);
+  background: transparent;
+  box-shadow: none;
+}
+body.sandbox-redesign #result .shelf-view .shelf-jump-chip.is-active {
+  border-color: var(--night-accent);
+  background: var(--night-panel);
+  color: var(--night-accent-strong);
+}
+body.sandbox-redesign #result .shelf-view .bookshelf-level-title {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--night-text);
+  font-size: 14px;
+}
+body.sandbox-redesign #result .shelf-view .bookshelf-strip {
+  gap: var(--night-space-control);
+  padding: var(--night-space-content) 4px;
+  background: transparent;
+  box-shadow: none;
+  border-bottom: 1px solid var(--night-line-strong);
+}
+body.sandbox-redesign #result .shelf-view .shelf-book {
+  flex: 0 0 104px;
+  width: 104px;
+  padding: 4px;
+  transform: none;
+}
+body.sandbox-redesign #result .shelf-view .shelf-book-cover-wrap {
+  width: 96px;
+  height: 144px;
+  background: transparent;
+  box-shadow: none;
+}
+body.sandbox-redesign #result .shelf-view .shelf-book-cover { object-fit: contain; }
+body.sandbox-redesign #result .shelf-view .shelf-book-title {
+  display: -webkit-box;
+  min-height: 3em;
+  margin-top: var(--night-space-small);
+  padding: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: normal;
+  word-break: normal;
+  overflow-wrap: anywhere;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  color: var(--night-muted);
+}
+body.sandbox-redesign #result :is(.book-card, .shelf-book):focus-visible,
+body.sandbox-redesign #quickBrowseChips .quick-browse-chip:focus-visible {
+  outline: 2px solid var(--night-accent-strong);
+  outline-offset: 3px;
+}
+@media (hover: hover) {
+  body.sandbox-redesign #result :is(.book-card, .shelf-book):hover .book-title,
+  body.sandbox-redesign #result .shelf-book:hover .shelf-book-title,
+  body.sandbox-redesign #quickBrowseChips .quick-browse-chip:hover .quick-browse-chip-value {
+    color: var(--night-accent-strong);
+  }
+  body.sandbox-redesign #quickBrowseRefresh:hover { color: var(--night-text); background: var(--night-panel); }
+}
+@media (prefers-reduced-motion: no-preference) and (hover: hover) {
+  body.sandbox-redesign:not(.pwa-quiet-motion) #result .book-cover,
+  body.sandbox-redesign:not(.pwa-quiet-motion) #result .shelf-book-cover-wrap { transition: transform var(--night-browse-motion); }
+  body.sandbox-redesign:not(.pwa-quiet-motion) #result .book-card:hover .book-cover,
+  body.sandbox-redesign:not(.pwa-quiet-motion) #result .shelf-book:hover .shelf-book-cover-wrap { transform: translateY(-3px); }
+}
+body.sandbox-redesign #result :is(.book-card, .shelf-book):active { background: var(--night-panel); }
+body.sandbox-redesign #quickBrowseChips .quick-browse-chip:active { background: var(--night-panel); }
+body.sandbox-redesign.pwa-quiet-motion #result .book-cover,
+body.sandbox-redesign.pwa-quiet-motion #result .shelf-book-cover-wrap { transform: none; transition: none; }
+@media (prefers-reduced-motion: reduce), (hover: none) {
+  body.sandbox-redesign #result .book-cover,
+  body.sandbox-redesign #result .shelf-book-cover-wrap { transform: none; transition: none; }
+}
+@media (max-width: 760px) {
+  body.sandbox-redesign #searchContainer.centered {
+    padding: 72px var(--night-space-section) var(--night-space-section);
+    gap: var(--night-space-page);
+    align-items: stretch;
+  }
+  body.sandbox-redesign #searchContainer.centered .preview-brand { width: 100%; margin: 0; }
+  body.sandbox-redesign #searchContainer.centered .search-form { width: 100%; max-width: none; }
+  body.sandbox-redesign #quickBrowseChips { grid-template-columns: minmax(0, 1fr); }
+  body.sandbox-redesign #result { padding-inline: var(--night-space-content); }
+  body.sandbox-redesign #result .card-view { gap: var(--night-space-section) var(--night-space-content); }
+  body.sandbox-redesign #result .card-view .book-cover { height: clamp(180px, 48vw, 240px); }
+  body.sandbox-redesign #result .card-view .card-info { padding-top: var(--night-space-content); }
+  body.sandbox-redesign #result .card-view .book-title { font-size: 17px; }
+  body.sandbox-redesign #result .card-view .genre-chip-wrap { gap: 4px var(--night-space-small); }
+}
 </style>
