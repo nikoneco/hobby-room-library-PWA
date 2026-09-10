@@ -805,13 +805,13 @@ vm.runInContext(`
 `, sandbox);
 assertEqual(
   vm.runInContext('__allSearchQueuedCount', sandbox),
-  55,
-  'search synopsis prefetch keeps every raw result beyond the generic 40-book queue limit'
+  40,
+  'search synopsis prefetch respects the 40-book queue limit'
 );
 assertEqual(
   vm.runInContext('__allSearchQueuedFirst + "," + __allSearchQueuedLast', sandbox),
-  '検索本 0,検索本 54',
-  'search synopsis prefetch preserves the full raw result order'
+  '検索本 0,検索本 39',
+  'bounded search synopsis prefetch preserves result order'
 );
 assert(
     clientScriptSources[clientScriptFiles.indexOf('script.images.js.html')].includes('function prefetchPopupNeighborCoverImages_') &&
@@ -1090,9 +1090,9 @@ assert(
   clientScriptSources[clientScriptFiles.indexOf('script.state.js.html')].includes('const BOOK_DETAIL_PREFETCH_BATCH_SIZE = 12') &&
     clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('function syncSearchResultBookDetailPrefetch_') &&
     clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes("kind === 'search' || kind === 'random'") &&
-    clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('Math.max(BOOK_DETAIL_PREFETCH_QUEUE_LIMIT, searchResultDetailPrefetchSource.length)') &&
+    clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('bookDetailPrefetchQueue.length >= BOOK_DETAIL_PREFETCH_QUEUE_LIMIT') &&
     clientScriptSources[clientScriptFiles.indexOf('script.shelf.js.html')].includes('syncSearchResultBookDetailPrefetch_(data, lastResultKind);'),
-  'normal and random searches queue every raw result for batched synopsis prefetch'
+  'normal and random searches retain batched synopsis prefetch with a bounded queue'
 );
 assert(
   clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('if (!canRunBackgroundBookDetailPrefetch_()) return;') &&

@@ -148,6 +148,111 @@ function client() {
   assert.equal(c.getCachedBookDetail_(book), null);
 }
 
+// Search prefetch keeps the pending queue bounded even when the result is larger than the cap.
+{
+  const { c, read, timers } = client();
+  const books = Array.from({ length: 60 }, (_, index) => ({
+    bookId: `search-${index}`,
+    detailLoaded: false
+  }));
+  c.fixtureBooks = books;
+  read('lastResult = fixtureBooks; lastResultKind = "search"');
+  c.syncSearchResultBookDetailPrefetch_(books, 'search');
+  timers.find(timer => timer.ms === read('SEARCH_RESULT_DETAIL_PREFETCH_DELAY_MS')).fn();
+  assert.equal(read('bookDetailPrefetchQueue.length'), read('BOOK_DETAIL_PREFETCH_QUEUE_LIMIT'));
+  assert.deepEqual(Array.from(read('bookDetailPrefetchQueue.map(book => book.bookId)')), books.slice(0, 40).map(book => book.bookId));
+}
+
+// Opening a series moves its books ahead of the search queue, including books outside the initial 40.
+{
+  const { c, read, timers } = client();
+  const books = Array.from({ length: 60 }, (_, index) => ({
+    bookId: `search-${index}`,
+    detailLoaded: false
+  }));
+  c.fixtureBooks = books;
+  read('lastResult = fixtureBooks; lastResultKind = "search"');
+  c.syncSearchResultBookDetailPrefetch_(books, 'search');
+  timers.find(timer => timer.ms === read('SEARCH_RESULT_DETAIL_PREFETCH_DELAY_MS')).fn();
+
+  c.isBookPopupOpen_ = () => true;
+  c.isSeriesPopupOpen_ = () => true;
+  const seriesBooks = books.slice(45, 60);
+  c.prioritizeBookDetailPrefetch_(seriesBooks, { priority: true, allowModal: true });
+  assert.deepEqual(
+    Array.from(read('bookDetailPrefetchQueue.slice(0, 15).map(book => book.bookId)')),
+    seriesBooks.map(book => book.bookId)
+  );
+  assert.equal(read('bookDetailPrefetchQueue.length'), read('BOOK_DETAIL_PREFETCH_QUEUE_LIMIT'));
+}
+
+// A series panel may continue the background lane, while a normal detail modal keeps it paused.
+{
+  const { c, read, requests } = client();
+  const books = Array.from({ length: 3 }, (_, index) => ({
+    bookId: `series-${index}`,
+    detailLoaded: false
+  }));
+  c.isBookPopupOpen_ = () => true;
+  c.isSeriesPopupOpen_ = () => true;
+  c.fixtureBooks = books;
+  read('bookDetailPrefetchQueue = fixtureBooks');
+  c.processBookDetailPrefetchQueue_();
+  assert.equal(requests.length, 1);
+
+  const paused = client();
+  paused.c.isBookPopupOpen_ = () => true;
+  paused.c.isSeriesPopupOpen_ = () => false;
+  paused.c.fixtureBooks = books.map(book => ({ ...book, detailLoaded: false }));
+  paused.read('bookDetailPrefetchQueue = fixtureBooks');
+  paused.c.processBookDetailPrefetchQueue_();
+  assert.equal(paused.requests.length, 0);
+}
+
+// Current and radius-two neighbors are removed from pending work by stable identity; an in-flight current request is reused.
+{
+  const { c, read, requests } = client();
+  const queueBooks = Array.from({ length: 9 }, (_, index) => ({
+    bookId: `volume-${index}`,
+    detailLoaded: false
+  }));
+  c.fixtureBooks = queueBooks;
+  read('bookDetailPrefetchQueue = fixtureBooks.slice(4, 5)');
+  c.processBookDetailPrefetchQueue_();
+  assert.equal(requests.length, 1);
+
+  const data = queueBooks.map(book => ({ ...book }));
+  data[4] = { bookId: 'volume-4', detailLoaded: false };
+  read('bookDetailPrefetchQueue = fixtureBooks.slice(2, 4).concat(fixtureBooks.slice(5, 7))');
+  c.fetchPopupContextBookDetails_(data[4], 4, data, null, { mode: 'all', forceCurrent: true });
+  assert.equal(requests.length, 2, 'the current volume reuses in-flight work and neighbors use one on-demand batch');
+  assert.equal(requests[0].args[0], 'volume-4');
+  assert.deepEqual(requests[1].args[0].split(','), ['volume-5', 'volume-3', 'volume-6', 'volume-2']);
+  assert.equal(
+    read('bookDetailPrefetchQueue.map(book => book.bookId).some(id => ["volume-2", "volume-3", "volume-4", "volume-5", "volume-6"].includes(id))'),
+    false
+  );
+}
+
+// A search switch invalidates the delayed old fill and leaves only the new result's bounded queue.
+{
+  const { c, read, timers } = client();
+  const oldBooks = Array.from({ length: 45 }, (_, index) => ({ bookId: `old-${index}`, detailLoaded: false }));
+  const newBooks = Array.from({ length: 45 }, (_, index) => ({ bookId: `new-${index}`, detailLoaded: false }));
+  c.oldBooks = oldBooks;
+  c.newBooks = newBooks;
+  read('lastResult = oldBooks; lastResultKind = "search"');
+  c.syncSearchResultBookDetailPrefetch_(oldBooks, 'search');
+  const oldDelay = timers.find(timer => timer.ms === read('SEARCH_RESULT_DETAIL_PREFETCH_DELAY_MS'));
+  read('lastResult = newBooks; lastResultKind = "search"');
+  c.syncSearchResultBookDetailPrefetch_(newBooks, 'search');
+  oldDelay.fn();
+  assert.equal(read('bookDetailPrefetchQueue.length'), 0);
+  timers.filter(timer => timer.ms === read('SEARCH_RESULT_DETAIL_PREFETCH_DELAY_MS')).at(-1).fn();
+  assert(read('bookDetailPrefetchQueue.every(book => book.bookId.startsWith("new-"))'));
+  assert.equal(read('bookDetailPrefetchQueue.length'), read('BOOK_DETAIL_PREFETCH_QUEUE_LIMIT'));
+}
+
 // Shelf cache can be shown immediately, but its refresh cannot replace a newer search.
 {
   const { c, read, requests, rendered, alerts } = client();

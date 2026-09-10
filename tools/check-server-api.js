@@ -939,6 +939,40 @@ assert(
   'large simple search keeps source row indexes and marks omitted details as deferred'
 );
 
+// Large advanced searches retain source identities while deferring bulky details.
+const advancedSearchResults = vm.runInContext(`(() => {
+  const rows = [], index = [];
+  for (let i = 0; i < 164; i++) {
+    const row = Array(40).fill('');
+    row[CONFIG.IDX.TITLE] = (i % 2 ? '対象作品 ' : '対象外 ') + i;
+    row[CONFIG.IDX.BOOK_UUID] = '00000000-0000-4000-8000-' + String(i).padStart(12, '0');
+    row[CONFIG.IDX.SUMMARY] = '詳細本文 ' + i;
+    rows.push(row);
+    index.push({ title: normalizeKana(row[CONFIG.IDX.TITLE]), yomi: '', author: '',
+      searchKey: normalizeKana(row[CONFIG.IDX.TITLE]), genres: {}, genreMeta: [],
+      links: { search: 'https://example.invalid/' + i } });
+  }
+  const original = getLibraryDataset_;
+  getLibraryDataset_ = () => ({ rows, index });
+  try {
+    const large = searchBooksAdvanced('対象作品');
+    const detail = getBookDetailById(large[40].bookId);
+    rows.splice(160); index.splice(160);
+    const small = searchBooksAdvanced('対象作品');
+    return { large, small, detail };
+  } finally { getLibraryDataset_ = original; }
+})()`, serverSandbox);
+assert(advancedSearchResults.large.length === 82, 'large advanced search keeps all matches');
+assert(advancedSearchResults.large.every((book, i) =>
+  book.rowIndex === i * 2 + 1 && book.bookId.endsWith(String(i * 2 + 1).padStart(12, '0')) &&
+  book.detailLoaded === false && !Object.hasOwn(book, 'summary') && !Object.hasOwn(book, 'links')),
+  'advanced compact results retain original noncontiguous row indexes and UUIDs');
+assert(advancedSearchResults.detail.summary === '詳細本文 81' && advancedSearchResults.detail.detailLoaded,
+  'a compact advanced result retrieves the correct full detail by stable ID');
+assert(advancedSearchResults.small.length === 80 && advancedSearchResults.small.every((book, i) =>
+  book.detailLoaded && book.summary === '詳細本文 ' + (i * 2 + 1) && book.links),
+  '80-match advanced search preserves inline details');
+
 // An unavailable catalogue is an error, never a successful zero-book search.
 const uiServer = vm.createContext({ console: { error() {}, warn() {}, log() {} } });
 vm.runInContext(configSource + '\n' + seriesRegistrySource + '\n' + source, uiServer);

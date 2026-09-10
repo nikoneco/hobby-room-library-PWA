@@ -113,7 +113,96 @@ function invoke(runner, method, args) {
   });
 }
 
+async function checkDownloadedIndex(writeMode, invalid) {
+  const payload = createPayload();
+  if (invalid) payload.records[0] = [];
+  let conversions = 0;
+  payload.records.map = function(callback) {
+    conversions++;
+    return Array.prototype.map.call(this, callback);
+  };
+  const scripts = [];
+  const warnings = [];
+  const readyStates = [];
+  let writeTransaction;
+  let win;
+  const db = {
+    objectStoreNames: { contains: () => true }, close() {},
+    transaction(store, mode) {
+      const tx = { objectStore() { return {
+        get() {
+          const request = {};
+          queueMicrotask(() => { request.result = null; request.onsuccess(); });
+          return request;
+        },
+        put() {
+          writeTransaction = tx;
+          if (writeMode === 'pending') return;
+          queueMicrotask(() => {
+            if (writeMode === 'success') tx.oncomplete();
+            else {
+              tx.error = new Error('simulated storage failure');
+              if (writeMode === 'abort') tx.onabort();
+              else tx.onerror();
+            }
+          });
+        }
+      }; } };
+      return tx;
+    }
+  };
+  win = {
+    indexedDB: { open() {
+      const request = {};
+      queueMicrotask(() => { request.result = db; request.onsuccess(); });
+      return request;
+    } },
+    CustomEvent: function(type) { this.type = type; },
+    addEventListener() {}, setInterval() {}, clearTimeout() {},
+    setTimeout(callback, delay) { if (!delay) queueMicrotask(callback); return 1; }
+  };
+  const doc = {
+    addEventListener() {}, visibilityState: 'visible',
+    dispatchEvent() { readyStates.push(win.ShumiLibraryLocalIndex.getFreshnessState()); },
+    createElement() { return { parentNode: { removeChild() {} } }; },
+    head: { appendChild(script) {
+      scripts.push(script);
+      const params = new URL(script.src).searchParams;
+      queueMicrotask(() => win[params.get('callback')]({
+        ok: true,
+        data: params.get('api') === 'libraryRevision' ? { revision: payload.revision } : payload
+      }));
+    } }
+  };
+  vm.runInNewContext(shimSource, {
+    window: win, document: doc, navigator: { onLine: true }, URLSearchParams,
+    console: { warn: (...args) => warnings.push(args), error() {} }
+  });
+  const manager = win.ShumiLibraryLocalIndex;
+  await manager.whenLoaded();
+  const refresh = manager.checkForUpdates();
+  await new Promise(resolve => setImmediate(resolve));
+  if (invalid) {
+    assert(await refresh === false, 'invalid downloaded index is rejected');
+    assert(!manager.isReady() && readyStates.length === 0, 'invalid records never become active');
+    assert(!writeTransaction, 'invalid downloaded index is not persisted');
+    return;
+  }
+  assert(manager.isReady() && manager.getFreshnessState() === 'fresh',
+    `valid download is usable despite ${writeMode} persistence`);
+  assert(readyStates.length === 1 && readyStates[0] === 'fresh', 'ready listeners see a fresh index');
+  assert(conversions === 1, 'downloaded records are converted once');
+  const requestCount = scripts.length;
+  const books = await invoke(win.google.script.run, 'searchBooksSimple', ['推しの子']);
+  assert(books.length === 2 && scripts.length === requestCount, 'fresh download serves local search without another request');
+  if (writeMode === 'pending') writeTransaction.oncomplete();
+  assert(await refresh === true, 'successful activation is not reported as a refresh failure');
+  if (writeMode === 'error' || writeMode === 'abort') assert(warnings.length === 1, 'persistence failure is reported separately');
+}
+
 (async function main() {
+  for (const mode of ['success', 'error', 'abort', 'pending']) await checkDownloadedIndex(mode, false);
+  await checkDownloadedIndex('success', true);
   const appendedScripts = [];
   const payload = createPayload();
   const stored = {

@@ -769,7 +769,8 @@ function canPrefetchBookDetails_() {
 }
 
 function canRunBackgroundBookDetailPrefetch_() {
-  return canPrefetchBookDetails_() && !isBookPopupOpen_();
+  clearStaleBookDetailPrefetch_();
+  return canPrefetchBookDetails_() && (!isBookPopupOpen_() || isSeriesPopupOpen_());
 }
 
 function getBookDetailPrefetchConcurrency_() {
@@ -1102,6 +1103,26 @@ function requestBookDetailsByStableIdentities_(books, onSuccess, onFailure) {
   }, onSuccess, onFailure);
 }
 
+function getBookDetailPrefetchIdentity_(book) {
+  if (!book) return '';
+  const cacheKey = getBookDetailCacheKey_(book);
+  if (cacheKey) return `key:${cacheKey}`;
+  if (book.rowIndex !== undefined && book.rowIndex !== null && book.rowIndex !== '') {
+    return `row:${book.rowIndex}`;
+  }
+  return '';
+}
+
+function clearStaleBookDetailPrefetch_() {
+  if (!searchResultDetailPrefetchSource) return;
+  if (
+    lastResult !== searchResultDetailPrefetchSource ||
+    lastResultKind !== searchResultDetailPrefetchKind
+  ) {
+    clearSearchResultBookDetailPrefetch_();
+  }
+}
+
 function fetchDeferredBookDetails_(book, index, dataArr, seriesContext, options) {
   const requestGeneration = bookDetailRequestGeneration;
   const opt = Object.assign({}, options, { detailGeneration: requestGeneration });
@@ -1171,11 +1192,13 @@ function fetchDeferredBookDetails_(book, index, dataArr, seriesContext, options)
 
 function removeBookDetailPrefetchItems_(books) {
   if (!Array.isArray(books) || !books.length || !bookDetailPrefetchQueue.length) return;
-  const targets = new Set(books.filter(Boolean));
-  if (!targets.size) return;
+  const targets = new Set(books.map(getBookDetailPrefetchIdentity_).filter(Boolean));
+  const targetObjects = new Set(books.filter(Boolean));
+  if (!targets.size && !targetObjects.size) return;
 
   bookDetailPrefetchQueue = bookDetailPrefetchQueue.filter(item => {
-    if (!targets.has(item)) return true;
+    const identity = getBookDetailPrefetchIdentity_(item);
+    if (!targetObjects.has(item) && (!identity || !targets.has(identity))) return true;
     item.detailQueued = false;
     return false;
   });
@@ -1516,31 +1539,88 @@ function scheduleBookDetailPrefetchQueue_(priority) {
   }, delay);
 }
 
+function trimBookDetailPrefetchQueue_() {
+  if (bookDetailPrefetchQueue.length <= BOOK_DETAIL_PREFETCH_QUEUE_LIMIT) return;
+  const overflow = bookDetailPrefetchQueue.splice(BOOK_DETAIL_PREFETCH_QUEUE_LIMIT);
+  overflow.forEach(item => {
+    if (item) item.detailQueued = false;
+  });
+}
+
+function enqueueBookDetailPrefetch_(book, priority) {
+  if (!book) return false;
+  const identity = getBookDetailPrefetchIdentity_(book);
+  let existingIndex = -1;
+  for (let i = 0; i < bookDetailPrefetchQueue.length; i += 1) {
+    const item = bookDetailPrefetchQueue[i];
+    if (item === book || (identity && getBookDetailPrefetchIdentity_(item) === identity)) {
+      existingIndex = i;
+      break;
+    }
+  }
+
+  if (existingIndex >= 0) {
+    const existing = bookDetailPrefetchQueue[existingIndex];
+    if (existing !== book) {
+      existing.detailQueued = false;
+      bookDetailPrefetchQueue[existingIndex] = book;
+    }
+    if (priority && existingIndex > 0) {
+      bookDetailPrefetchQueue.splice(existingIndex, 1);
+      bookDetailPrefetchQueue.unshift(book);
+    }
+    book.detailQueued = true;
+    return true;
+  }
+
+  book.detailQueued = true;
+  if (priority) {
+    bookDetailPrefetchQueue.unshift(book);
+  } else {
+    bookDetailPrefetchQueue.push(book);
+  }
+  trimBookDetailPrefetchQueue_();
+  return bookDetailPrefetchQueue.includes(book);
+}
+
+function prioritizeBookDetailPrefetch_(books, options) {
+  if (!Array.isArray(books) || !books.length || !canPrefetchBookDetails_()) return;
+
+  const opt = options || {};
+  const oldQueue = bookDetailPrefetchQueue.slice();
+  const priorityBooks = [];
+  const seen = new Set();
+  const addCandidate_ = function(book) {
+    if (!book || !shouldFetchDeferredBookDetails_(book) || getCachedBookDetail_(book)) return;
+    const identity = getBookDetailPrefetchIdentity_(book);
+    const key = identity || book;
+    if (seen.has(key)) return;
+    seen.add(key);
+    priorityBooks.push(book);
+  };
+
+  books.forEach(addCandidate_);
+  oldQueue.forEach(addCandidate_);
+
+  oldQueue.forEach(book => {
+    if (book) book.detailQueued = false;
+  });
+  bookDetailPrefetchQueue = priorityBooks.slice(0, BOOK_DETAIL_PREFETCH_QUEUE_LIMIT);
+  bookDetailPrefetchQueue.forEach(book => { book.detailQueued = true; });
+
+  if (
+    bookDetailPrefetchQueue.length &&
+    (!isBookPopupOpen_() || isSeriesPopupOpen_() || opt.allowModal)
+  ) {
+    scheduleBookDetailPrefetchQueue_(Boolean(opt.priority));
+  }
+}
+
 function queueBookDetailPrefetch_(book, priority) {
   if (!canRunBackgroundBookDetailPrefetch_()) return;
   if (!shouldFetchDeferredBookDetails_(book) || getCachedBookDetail_(book)) return;
 
-  if (!book.detailQueued) {
-    book.detailQueued = true;
-    if (priority) {
-      bookDetailPrefetchQueue.unshift(book);
-    } else {
-      bookDetailPrefetchQueue.push(book);
-    }
-  } else if (priority) {
-    bookDetailPrefetchQueue = bookDetailPrefetchQueue.filter(item => item !== book);
-    bookDetailPrefetchQueue.unshift(book);
-  }
-
-  const queueLimit = Array.isArray(searchResultDetailPrefetchSource)
-    ? Math.max(BOOK_DETAIL_PREFETCH_QUEUE_LIMIT, searchResultDetailPrefetchSource.length)
-    : BOOK_DETAIL_PREFETCH_QUEUE_LIMIT;
-  if (bookDetailPrefetchQueue.length > queueLimit) {
-    const overflow = bookDetailPrefetchQueue.splice(queueLimit);
-    overflow.forEach(item => {
-      if (item) item.detailQueued = false;
-    });
-  }
+  enqueueBookDetailPrefetch_(book, Boolean(priority));
 
   scheduleBookDetailPrefetchQueue_(Boolean(priority));
 }
@@ -1606,14 +1686,14 @@ function syncSearchResultBookDetailPrefetch_(books, resultKind) {
     }
 
     const seen = new Set();
-    books.forEach(book => {
+    books.some(book => {
       if (!shouldFetchDeferredBookDetails_(book) || getCachedBookDetail_(book)) return;
       const key = getBookDetailCacheKey_(book);
       const id = key || `row:${book.rowIndex}`;
       if (seen.has(id)) return;
       seen.add(id);
-      book.detailQueued = true;
-      bookDetailPrefetchQueue.push(book);
+      enqueueBookDetailPrefetch_(book, false);
+      return bookDetailPrefetchQueue.length >= BOOK_DETAIL_PREFETCH_QUEUE_LIMIT;
     });
 
     resumeBookDetailPrefetchQueue_();
@@ -1881,6 +1961,7 @@ function openSeriesPanel(sourceBook) {
     popupContent.classList.remove('search-result-series-mode');
     popupContent.setAttribute('aria-label', `${sourceBook.seriesSearchTitle || sourceBook.title || 'シリーズ'}のシリーズ一覧`);
   }
+  prioritizeBookDetailPrefetch_([sourceBook], { priority: true, allowModal: true });
   img.style.display = 'none';
   prevBtn.style.display = 'none';
   nextBtn.style.display = 'none';
@@ -1942,6 +2023,7 @@ function showSearchResultSeriesPanel_(group) {
     popupContent.classList.add('series-mode', 'search-result-series-mode');
     popupContent.setAttribute('aria-label', `${sourceTitle}の検索一致巻`);
   }
+  prioritizeBookDetailPrefetch_(items, { priority: true, allowModal: true });
   img.style.display = 'none';
   prevBtn.style.display = 'none';
   nextBtn.style.display = 'none';
@@ -2033,6 +2115,7 @@ function showSeriesPanel(sourceBook, seriesBooks, returnContext) {
     popupContent.classList.add('series-mode');
     popupContent.classList.remove('search-result-series-mode');
   }
+  prioritizeBookDetailPrefetch_(items, { priority: true, allowModal: true });
   prevBtn.style.display = 'none';
   nextBtn.style.display = 'none';
   clearPopupTouchHandlers_();

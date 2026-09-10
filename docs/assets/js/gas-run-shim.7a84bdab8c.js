@@ -686,6 +686,7 @@
       if (record.book.bookId) localIndexByBookId.set(String(record.book.bookId), record);
       localIndexByRowIndex.set(Number(record.book.rowIndex), record);
     });
+    if (updated) localIndexFreshnessState = 'fresh';
     dispatchLocalIndexReady_(updated);
   }
 
@@ -700,10 +701,13 @@
       quiet: true,
       perfName: 'sync:localIndex'
     });
-    convertLocalIndexPayload_(payload);
-    await writeStoredLocalIndex_(payload);
     activateLocalIndex_(payload, true);
-    localIndexFreshnessState = 'fresh';
+    // A usable fresh index must not depend on durable storage being available.
+    try {
+      await writeStoredLocalIndex_(payload);
+    } catch (error) {
+      console.warn('local index persistence failed; fresh in-memory index remains active', error);
+    }
     return true;
   }
 

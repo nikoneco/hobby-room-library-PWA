@@ -2290,16 +2290,21 @@ function searchBooksAdvanced(
     );
     const matchedRows = [];
     const matchedIndex = [];
+    const matchedRowIndexes = [];
 
     for (let i = 0; i < rows.length; i++) {
       const idx = index[i] || getDefaultSearchIndexItem_();
       if (matchesSearchCriteria_(idx, criteria)) {
         matchedRows.push(rows[i]);
         matchedIndex.push(idx);
+        matchedRowIndexes.push(i);
       }
     }
 
-    return mapRowsToBooks_(matchedRows, matchedIndex);
+    return mapRowsToBooks_(matchedRows, matchedIndex, {
+      compact: matchedRows.length > 80,
+      rowIndexes: matchedRowIndexes
+    });
   } catch (e) {
     console.error('searchBooksAdvanced error:', e);
     throw e;
