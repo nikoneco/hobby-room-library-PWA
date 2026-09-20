@@ -184,56 +184,50 @@ function getUtf8ByteLength_(value) {
   return Utilities.newBlob(String(value == null ? '' : value)).getBytes().length;
 }
 
-function normalizeUtf16Boundary_(text, start, end) {
-  let boundary = Math.max(start, Math.min(String(text || '').length, end));
-  if (
-    boundary > start &&
-    boundary < text.length &&
-    /[\uD800-\uDBFF]/.test(text.charAt(boundary - 1)) &&
-    /[\uDC00-\uDFFF]/.test(text.charAt(boundary))
-  ) {
-    boundary--;
-  }
-  return boundary;
-}
-
 function splitUtf8ByByteLimit_(value, byteLimit) {
   const text = String(value == null ? '' : value);
   const limit = Math.max(1, Number(byteLimit || CACHE_CONFIG.CHUNK_BYTE_LIMIT));
   if (!text) return [''];
+  if (Number.isNaN(limit)) throw new Error('Invalid cache chunk byte limit');
 
   const chunks = [];
   let start = 0;
+  let chunkBytes = 0;
+  let offset = 0;
 
-  while (start < text.length) {
-    let low = start + 1;
-    let high = normalizeUtf16Boundary_(text, start, Math.min(text.length, start + limit));
-    let bestEnd = start;
-
-    while (low <= high) {
-      const rawMid = Math.floor((low + high) / 2);
-      const mid = normalizeUtf16Boundary_(text, start, rawMid);
-      if (mid <= start) {
-        low = rawMid + 1;
-        continue;
-      }
-
-      if (getUtf8ByteLength_(text.slice(start, mid)) <= limit) {
-        bestEnd = mid;
-        low = mid + 1;
-      } else {
-        high = mid - 1;
-      }
+  // Scan each code point once. Binary search with a surrogate-adjusted midpoint
+  // can fail to advance, and repeatedly converting prefixes into Blobs is costly.
+  while (offset < text.length) {
+    const code = text.charCodeAt(offset);
+    let width = 1;
+    let bytes;
+    if (code < 0x80) {
+      bytes = 1;
+    } else if (code < 0x800) {
+      bytes = 2;
+    } else if (code >= 0xD800 && code <= 0xDBFF &&
+      offset + 1 < text.length &&
+      text.charCodeAt(offset + 1) >= 0xDC00 && text.charCodeAt(offset + 1) <= 0xDFFF) {
+      width = 2;
+      bytes = 4;
+    } else if (code >= 0xD800 && code <= 0xDFFF) {
+      // Preserve the GAS encoder's handling of malformed UTF-16 input.
+      bytes = getUtf8ByteLength_(text.charAt(offset));
+    } else {
+      bytes = 3;
     }
-
-    if (bestEnd <= start) {
+    if (bytes > limit) {
       throw new Error(`Cannot split cache payload within ${limit} UTF-8 bytes`);
     }
-
-    chunks.push(text.slice(start, bestEnd));
-    start = bestEnd;
+    if (chunkBytes + bytes > limit) {
+      chunks.push(text.slice(start, offset));
+      start = offset;
+      chunkBytes = 0;
+    }
+    chunkBytes += bytes;
+    offset += width;
   }
-
+  chunks.push(text.slice(start));
   return chunks;
 }
 
@@ -818,8 +812,14 @@ function getLibraryDatasetRevisionForPwa_() {
   };
 }
 
-function getLocalLibraryIndexForPwa_() {
-  return buildLocalLibraryIndexPayload_(getLibraryDataset_());
+function getLocalLibraryIndexForPwa_(perf) {
+  const dataset = getLibraryDataset_(perf);
+  const startedAt = Date.now();
+  const payload = buildLocalLibraryIndexPayload_(dataset);
+  payload.metadata.userPreferences = getWebAppUserPreferences_();
+  addWebAppPerfDuration_(perf, 'indexPayloadMs', startedAt);
+  if (perf) perf.sourceCount = payload.records.length;
+  return payload;
 }
 
 /**
@@ -948,9 +948,9 @@ function getInitialSearchData() {
  *   userPreferences: {resultViewMode: string}
  * }}
  */
-function getInitialSearchDataForPwa_() {
+function getInitialSearchDataForPwa_(perf) {
   try {
-    const dataset = getLibraryDataset_();
+    const dataset = getLibraryDataset_(perf);
     const metadata = buildLocalSearchMetadataPayload_(dataset);
 
     return {
@@ -2575,9 +2575,9 @@ function getBooksBySeriesKey(seriesKeyAuto) {
 const WEBAPP_JSONP_CALLBACK_PATTERN_ = /^[A-Za-z_$][0-9A-Za-z_$]*(?:\.[A-Za-z_$][0-9A-Za-z_$]*)*$/;
 const WEBAPP_JSONP_DEFAULT_CALLBACK_ = '__shumiLibraryJsonpCallback';
 const PUBLIC_WEBAPP_JSONP_API_HANDLERS_ = Object.freeze({
-  initial: () => getInitialSearchDataForPwa_(),
+  initial: (params, perf) => getInitialSearchDataForPwa_(perf),
   libraryRevision: () => getLibraryDatasetRevisionForPwa_(),
-  localIndex: () => getLocalLibraryIndexForPwa_(),
+  localIndex: (params, perf) => getLocalLibraryIndexForPwa_(perf),
   suggest: () => getSuggestData(),
   advancedOptions: () => getAdvancedSearchOptions(),
   previewIndex: () => [],

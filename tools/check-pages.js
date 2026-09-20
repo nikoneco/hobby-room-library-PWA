@@ -361,7 +361,8 @@ assert(
 );
 assert(pwaClient.includes("'popup.detailLoading': 'あらすじを読み込んでいます'"), 'popup loading text identifies the deferred synopsis precisely');
 assert(searchClient.includes('syncSearchDataFromLocalIndex_'), 'search UI adopts metadata and preview data from the active local index');
-assert(searchClient.includes('if (!syncSearchDataFromLocalIndex_())'), 'initial data falls back to GAS only when local metadata is unavailable');
+assert(searchClient.includes('if (settled || useLocalIndex_()) return;'), 'initial data fallback first checks for available local metadata');
+assert(searchClient.includes('window.setTimeout(fallbackToInitialData_, localIndexWaitMs)'), 'initial metadata has a bounded wait for the local index');
 assert(searchClient.includes('noteServerRevision(payload.datasetRevision)'), 'initial data revision triggers local index synchronization');
 assert(gasRunShim.includes("endPerf_(perfToken"), 'GAS JSONP shim completes API performance measures');
 assert(gasRunShim.includes("params.set('perf', '1')"), 'GAS JSONP shim requests server timings only while performance HUD is active');

@@ -2843,6 +2843,7 @@ function writeGasRunShim() {
   const LOCAL_INDEX_SCHEMA_VERSION = 6;
   const LOCAL_INDEX_CHECK_INTERVAL_MS = 15 * 60 * 1000;
   const LOCAL_INDEX_CHECK_THROTTLE_MS = 5 * 60 * 1000;
+  const LOCAL_SEARCH_REFRESH_GRACE_MS = 250;
 
   const METHOD_CONFIG = {
     getInitialSearchData: { api: 'initial', argNames: [] },
@@ -3397,7 +3398,7 @@ function writeGasRunShim() {
     return methodName === 'searchBooksAdvanced' || methodName === 'getRandomBooks' || methodName === 'getBookshelfBooks';
   }
 
-  function invokeLocal_(methodName, args, successHandler, failureHandler) {
+  function invokeLocal_(methodName, args, successHandler, failureHandler, localErrorHandler) {
     const config = METHOD_CONFIG[methodName];
     const perfToken = startPerf_('api:' + config.api, {
       method: methodName,
@@ -3423,9 +3424,93 @@ function writeGasRunShim() {
       } catch (error) {
         endPerf_(perfToken, { ok: false, local: true, code: 'LOCAL_INDEX_ERROR' });
         console.warn('local index query failed; falling back to GAS', error);
-        invokeRemoteJsonp_(methodName, args, successHandler, failureHandler);
+        if (typeof localErrorHandler === 'function') {
+          localErrorHandler(error);
+        } else {
+          invokeRemoteJsonp_(methodName, args, successHandler, failureHandler);
+        }
       }
     }, 0);
+  }
+
+  function invokeSearchWithFreshIndex_(methodName, args, successHandler, failureHandler) {
+    let settled = false;
+    let remoteStarted = false;
+    let localQueued = false;
+    let localFailed = false;
+    let graceTimer = null;
+
+    function cleanupWait_() {
+      if (graceTimer !== null) {
+        window.clearTimeout(graceTimer);
+        graceTimer = null;
+      }
+      if (document && typeof document.removeEventListener === 'function') {
+        document.removeEventListener('shumi-library-local-index-ready', onLocalIndexReady_);
+      }
+    }
+
+    function finishSuccess_(result, remote) {
+      if (settled) return;
+      settled = true;
+      cleanupWait_();
+      if (remote) notifySuccess_();
+      if (typeof successHandler === 'function') successHandler(result);
+    }
+
+    function finishFailure_(error) {
+      if (settled) return;
+      settled = true;
+      cleanupWait_();
+      notifyFailure_(error);
+      if (typeof failureHandler === 'function') failureHandler(error);
+    }
+
+    function tryLocalSearch_() {
+      if (settled || localQueued || localFailed || !canHandleLocally_(methodName, args)) return false;
+      localQueued = true;
+      invokeLocal_(methodName, args, function(result) {
+        finishSuccess_(result, false);
+      }, failureHandler, function() {
+        localQueued = false;
+        localFailed = true;
+        startRemoteSearch_();
+      });
+      return true;
+    }
+
+    function startRemoteSearch_() {
+      if (settled || remoteStarted) return;
+      if (!localFailed && tryLocalSearch_()) return;
+      remoteStarted = true;
+      invokeRemoteJsonp_(methodName, args, function(result) {
+        finishSuccess_(result, true);
+      }, function(error) {
+        finishFailure_(error);
+      }, { quiet: true });
+    }
+
+    function onLocalIndexReady_() {
+      tryLocalSearch_();
+    }
+
+    if (document && typeof document.addEventListener === 'function') {
+      document.addEventListener('shumi-library-local-index-ready', onLocalIndexReady_);
+    }
+    graceTimer = window.setTimeout(function() {
+      graceTimer = null;
+      startRemoteSearch_();
+    }, LOCAL_SEARCH_REFRESH_GRACE_MS);
+
+    // Begin or join the shared refresh only after the foreground grace timer is armed.
+    Promise.resolve(refreshLocalIndex_(true, '')).then(function() {
+      if (settled) return;
+      if (!tryLocalSearch_() && !canHandleLocally_(methodName, args)) startRemoteSearch_();
+    }).catch(function() {
+      startRemoteSearch_();
+    });
+
+    tryLocalSearch_();
   }
 
   function invokeJsonp_(methodName, args, successHandler, failureHandler) {
@@ -3440,6 +3525,19 @@ function writeGasRunShim() {
     }
     if (canHandleLocally_(methodName, args)) {
       invokeLocal_(methodName, args, successHandler, failureHandler);
+      return;
+    }
+    if (
+      navigator && navigator.onLine !== false &&
+      (methodName === 'searchBooksAdvanced' ||
+        (methodName === 'searchBooksSimple' && String(args[0] || '').trim())) &&
+      window.ShumiLibraryLocalIndex &&
+      typeof window.ShumiLibraryLocalIndex.isSupported === 'function' &&
+      window.ShumiLibraryLocalIndex.isSupported() &&
+      typeof window.ShumiLibraryLocalIndex.whenLoaded === 'function' &&
+      typeof window.ShumiLibraryLocalIndex.checkForUpdates === 'function'
+    ) {
+      invokeSearchWithFreshIndex_(methodName, args, successHandler, failureHandler);
       return;
     }
     invokeRemoteJsonp_(methodName, args, successHandler, failureHandler);
@@ -3584,6 +3682,9 @@ function writeGasRunShim() {
         }
         localIndexFreshnessState = 'checking';
         localIndexLastCheckedAt = now;
+        if (!localIndexPayload) {
+          return downloadAndActivateLocalIndex_();
+        }
 
         let revision = String(knownRevision || '').trim();
         if (!revision) {
@@ -3596,6 +3697,7 @@ function writeGasRunShim() {
 
         if (localIndexPayload && revision && revision === String(localIndexPayload.revision || '')) {
           localIndexFreshnessState = 'fresh';
+          dispatchLocalIndexReady_(false);
           return false;
         }
         return downloadAndActivateLocalIndex_();

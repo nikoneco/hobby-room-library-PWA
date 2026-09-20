@@ -247,9 +247,9 @@ assert(newBookImportSource.includes('const bookUuids = repairBookUuidsAll_(sheet
 });
 
 [
-  'getInitialSearchDataForPwa_()',
+  'getInitialSearchDataForPwa_(perf)',
   'getLibraryDatasetRevisionForPwa_()',
-  'getLocalLibraryIndexForPwa_()',
+  'getLocalLibraryIndexForPwa_(perf)',
   'getSuggestData()',
   'getAdvancedSearchOptions()',
   'countPreviewMatchesAuthoritative(',
@@ -280,6 +280,76 @@ assert(/^docs\/\*\*/m.test(claspignore), 'docs are excluded from clasp push');
 
 const serverSandbox = vm.createContext({ console, URL, encodeURIComponent, decodeURIComponent });
 vm.runInContext(`${configSource}\n${seriesRegistrySource}\n${source}`, serverSandbox, { filename: 'Webアプリ.js' });
+
+let splitBlobCalls = 0;
+const splitSandbox = vm.createContext({
+  Utilities: { newBlob(value) {
+    splitBlobCalls++;
+    return { getBytes: () => Buffer.from(String(value), 'utf8') };
+  } }
+});
+vm.runInContext(`${configSource}\n${source}`, splitSandbox);
+for (const [input, limit] of [
+  ['あ📚x', 4], // Previously the adjusted binary-search midpoint never advanced.
+  ['aあ📚𠮷é', 4],
+  ['A'.repeat(81919) + '📚あ', 81920],
+  ['あいうえお'.repeat(30000), 81920],
+  ['漢字かなカナEnglish📚'.repeat(160000), 81920],
+  ['a\uD800b\uDC00c', 4],
+  ['', 4]
+]) {
+  splitSandbox.input = input;
+  splitSandbox.limit = limit;
+  const chunks = vm.runInContext('splitUtf8ByByteLimit_(input, limit)', splitSandbox, { timeout: 5000 });
+  assert(chunks.join('') === input, 'UTF-8 cache chunks preserve the exact original string');
+  assert(chunks.every(chunk => Buffer.byteLength(chunk, 'utf8') <= limit), 'every cache chunk respects its byte limit');
+  for (let i = 1; i < chunks.length; i++) {
+    assert(!(/[\uD800-\uDBFF]$/.test(chunks[i - 1]) && /^[\uDC00-\uDFFF]/.test(chunks[i])),
+      'cache splitting never separates a surrogate pair');
+  }
+}
+assert(splitBlobCalls === 2, 'valid Unicode is split without repeated Blob conversions; only lone surrogates use the encoder');
+let undersizedLimitRejected = false;
+try {
+  vm.runInContext("splitUtf8ByByteLimit_('📚', 3)", splitSandbox, { timeout: 1000 });
+} catch (error) { undersizedLimitRejected = /Cannot split/.test(error.message); }
+assert(undersizedLimitRejected, 'a limit smaller than one code point fails without looping');
+
+const startupPerfResults = vm.runInContext(`(() => {
+  const originalDataset = getLibraryDataset_;
+  const originalIndex = buildLocalLibraryIndexPayload_;
+  const originalMetadata = buildLocalSearchMetadataPayload_;
+  const originalPreferences = getWebAppUserPreferences_;
+  getLibraryDataset_ = function(perf) {
+    if (perf) { perf.cacheStatus = 'miss-built'; perf.buildMs = 123; }
+    return { datasetRevision: 'fixture', rows: [], index: [] };
+  };
+  buildLocalLibraryIndexPayload_ = function() { return { records: [['fixture']], metadata: {} }; };
+  buildLocalSearchMetadataPayload_ = function() { return {}; };
+  getWebAppUserPreferences_ = function() { return { resultViewMode: 'list' }; };
+  try {
+    return ['initial', 'localIndex'].map(api => {
+      const perf = {};
+      const data = PUBLIC_WEBAPP_JSONP_API_HANDLERS_[api]({}, perf);
+      const withoutPerf = PUBLIC_WEBAPP_JSONP_API_HANDLERS_[api]({});
+      return { api, perf, data, unchanged: JSON.stringify(data) === JSON.stringify(withoutPerf) };
+    });
+  } finally {
+    getLibraryDataset_ = originalDataset;
+    buildLocalLibraryIndexPayload_ = originalIndex;
+    buildLocalSearchMetadataPayload_ = originalMetadata;
+    getWebAppUserPreferences_ = originalPreferences;
+  }
+})()`, serverSandbox);
+startupPerfResults.forEach(result => {
+  assert(result.perf.cacheStatus === 'miss-built' && result.perf.buildMs === 123,
+    `${result.api} exposes cold dataset build timing when requested`);
+  assert(result.unchanged, `${result.api} instrumentation preserves its normal payload`);
+});
+assert(startupPerfResults[1].perf.sourceCount === 1 && startupPerfResults[1].perf.indexPayloadMs >= 0,
+  'localIndex timing separates dataset retrieval from payload creation');
+assert(startupPerfResults[1].data.metadata.userPreferences.resultViewMode === 'list',
+  'localIndex carries the server view preference required by cold bootstrap');
 
 const invalidationOrder = vm.runInContext(`(() => {
   const originalBump = bumpLibraryDatasetRevision_;

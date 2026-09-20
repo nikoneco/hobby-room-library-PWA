@@ -162,6 +162,163 @@ function assertEqual(actual, expected, message) {
   }
 }
 
+async function checkInitialSearchDataFlow() {
+  const start = searchScriptSource.indexOf('function syncSearchDataFromLocalIndex_()');
+  const end = searchScriptSource.indexOf('function fetchSuggestData()', start);
+  assert(start >= 0 && end > start, 'search startup data functions are available to the client fixture');
+  const source = searchScriptSource.slice(start, end);
+
+  async function runFixture(mode, options = {}) {
+    let ready = false;
+    let resolveRefresh;
+    let refreshCalls = 0;
+    const initialCalls = [];
+    const eventHandlers = new Map();
+    const timeoutCallbacks = new Map();
+    let nextTimerId = 1;
+    const metadata = {
+      suggest: { titles: ['fixture title'], yomis: [], authors: [], genres: [] },
+      advancedOptions: { publishers: [], storyGenres: [], themeGenres: [], moodGenres: [], statusGenres: [], mediaGenres: [], releaseYears: [] },
+      quickBrowseCounts: {},
+      userPreferences: { resultViewMode: 'list' }
+    };
+    if (options.oldBackend) delete metadata.userPreferences;
+    const manager = {
+      isSupported: () => true,
+      isReady: () => ready,
+      whenLoaded: () => Promise.resolve(false),
+      checkForUpdates() {
+        refreshCalls += 1;
+        if (mode === 'success' || mode === 'slow') return new Promise(resolve => { resolveRefresh = resolve; });
+        return Promise.resolve(false);
+      },
+      getMetadata: () => ready ? metadata : null,
+      getPreviewIndex: () => ready ? [{ title: 'fixture title' }] : [],
+      getRevision: () => ready ? 'fixture-revision' : ''
+    };
+    const callbacks = {};
+    const runner = {
+      withSuccessHandler(handler) { callbacks.success = handler; return this; },
+      withFailureHandler(handler) { callbacks.failure = handler; return this; },
+      getInitialSearchData() { initialCalls.push('initial'); return this; }
+    };
+    const document = {
+      addEventListener(type, handler) {
+        if (!eventHandlers.has(type)) eventHandlers.set(type, []);
+        eventHandlers.get(type).push(handler);
+      },
+      removeEventListener(type, handler) {
+        eventHandlers.set(type, (eventHandlers.get(type) || []).filter(item => item !== handler));
+      },
+      dispatchEvent(event) {
+        (eventHandlers.get(event.type) || []).slice().forEach(handler => handler(event));
+      }
+    };
+    const context = {
+      window: {
+        ShumiLibraryLocalIndex: manager,
+        setTimeout(callback, delay) {
+          const id = nextTimerId++;
+          timeoutCallbacks.set(id, { callback, delay });
+          return id;
+        },
+        clearTimeout(id) { timeoutCallbacks.delete(id); }
+      },
+      document,
+      google: { script: { run: runner } },
+      Promise,
+      String,
+      Array,
+      Object,
+      Number,
+      console,
+      SUGGEST_DATA: null,
+      ADVANCED_OPTIONS: null,
+      PREVIEW_INDEX: [],
+      QUICK_BROWSE_COUNTS: null,
+      PREVIEW_INDEX_READY: false,
+      lastResult: null,
+      currentViewMode: 'card',
+      isCardView: true,
+      resultViewModeChangedLocally: false,
+      pendingBookDetailCacheRevision: '',
+      getEmptySuggestData_: () => ({ titles: [], yomis: [], authors: [], genres: [] }),
+      getEmptyAdvancedOptions_: () => metadata.advancedOptions,
+      requestBookDetailCacheRevisionSync_() {},
+      getPreferredResultViewMode_: prefs => options.localPreference || prefs.resultViewMode || 'card',
+      updateViewToggleButtons_() {},
+      populateAdvancedOptions() {},
+      renderQuickBrowseRail_() {},
+      syncSearchStatusPreviewFromForm_() {}
+    };
+    vm.createContext(context);
+    vm.runInContext(source, context);
+    context.fetchInitialSearchData();
+    for (let i = 0; i < 6; i += 1) await Promise.resolve();
+
+    if (mode === 'success') {
+      if (options.userChangesWhileWaiting) {
+        context.currentViewMode = 'shelf';
+        context.resultViewModeChangedLocally = true;
+      }
+      ready = true;
+      if (!options.promiseOnly) document.dispatchEvent({ type: 'shumi-library-local-index-ready' });
+      resolveRefresh(false);
+      for (let i = 0; i < 6; i += 1) await Promise.resolve();
+      assert(initialCalls.length === (options.oldBackend ? 1 : 0),
+        'successful cold local-index load only needs initial for older GAS preference compatibility');
+      if (!options.oldBackend) {
+        assert(context.currentViewMode === (options.userChangesWhileWaiting ? 'shelf' : options.localPreference || 'list'),
+          'cold bootstrap preserves server preference, device override, and a choice made while waiting');
+        context.currentViewMode = 'card';
+        document.dispatchEvent({ type: 'shumi-library-local-index-ready' });
+        assert(context.currentViewMode === 'card', 'later index events do not reapply stored server preferences');
+      }
+      assert(refreshCalls === 1, 'initial metadata shares one local-index refresh');
+      assert(context.PREVIEW_INDEX_READY && context.SUGGEST_DATA.titles[0] === 'fixture title',
+        'local-index metadata initializes search suggestions before persistence completion');
+      assert(timeoutCallbacks.size === 0, 'successful local metadata clears its bounded fallback timer');
+    } else if (mode === 'failure') {
+      assert(initialCalls.length === 1, 'failed cold local-index load falls back to getInitialSearchData once');
+      assert(refreshCalls === 1, 'failed initial-data fallback does not start duplicate index refreshes');
+      assert(timeoutCallbacks.size === 0, 'failed local metadata clears its bounded fallback timer');
+    } else {
+      assert(refreshCalls === 1 && initialCalls.length === 0, 'slow index keeps one refresh during the metadata grace period');
+      const [timerId, timer] = Array.from(timeoutCallbacks.entries()).find(([, item]) => item.delay === 1500);
+      assert(timer && timerId, 'cold metadata fallback is bounded at 1500ms');
+      timeoutCallbacks.delete(timerId);
+      timer.callback();
+      assert(initialCalls.length === 1, 'slow index starts initial metadata after the bounded grace period');
+
+      ready = true;
+      document.dispatchEvent({ type: 'shumi-library-local-index-ready' });
+      callbacks.success({
+        suggest: { titles: ['late initial title'], yomis: [], authors: [], genres: [] },
+        advancedOptions: metadata.advancedOptions,
+        quickBrowseCounts: {},
+        previewIndex: [{ title: 'late initial title' }],
+        userPreferences: { resultViewMode: 'card' }
+      });
+      assert(context.SUGGEST_DATA.titles[0] === 'fixture title',
+        'late initial response cannot overwrite fresh local-index metadata');
+      assert(context.currentViewMode === 'card', 'initial fallback still applies the saved result-view preference');
+    }
+  }
+
+  await runFixture('success');
+  await runFixture('success', { localPreference: 'shelf' });
+  await runFixture('success', { userChangesWhileWaiting: true });
+  await runFixture('success', { oldBackend: true });
+  await runFixture('success', { oldBackend: true, promiseOnly: true });
+  await runFixture('failure');
+  await runFixture('slow');
+}
+
+checkInitialSearchDataFlow().catch(error => {
+  console.error(error);
+  process.exitCode = 1;
+});
+
 assert(!/\son(?:click|change|input|submit|keydown)=/i.test(indexSource), 'index.html has no inline event handlers');
 ['search', 'focus-search', 'random', 'top', 'toggle-advanced', 'clear-conditions', 'reset-search'].forEach(action => {
   assert(indexSource.includes(`data-action="${action}"`), `index.html exposes data-action="${action}"`);

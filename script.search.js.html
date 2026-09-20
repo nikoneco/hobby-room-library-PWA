@@ -451,14 +451,82 @@ function fetchInitialSearchData() {
     manager.isSupported() &&
     typeof manager.whenLoaded === 'function'
   ) {
+    const localIndexWaitMs = 1500;
+    let settled = false;
+    let fallbackTimer = null;
+    let waitingForDownload = false;
+    function removeReadyListener_() {
+      if (document && typeof document.removeEventListener === 'function') {
+        document.removeEventListener('shumi-library-local-index-ready', onLocalIndexReady_);
+      }
+    }
+    function cleanup_() {
+      if (fallbackTimer !== null) {
+        window.clearTimeout(fallbackTimer);
+        fallbackTimer = null;
+      }
+      removeReadyListener_();
+    }
+    function useLocalIndex_() {
+      if (settled || !syncSearchDataFromLocalIndex_()) return false;
+      finishLocalBootstrap_();
+      return true;
+    }
+    function finishLocalBootstrap_() {
+      settled = true;
+      cleanup_();
+      if (!waitingForDownload) return;
+      const metadata = manager.getMetadata();
+      if (!metadata || !metadata.userPreferences) {
+        // Older GAS deployments do not include preferences in localIndex yet.
+        fetchInitialSearchDataRemote_();
+        return;
+      }
+      if (!resultViewModeChangedLocally) {
+        currentViewMode = getPreferredResultViewMode_(metadata.userPreferences);
+        isCardView = currentViewMode === 'card';
+        updateViewToggleButtons_();
+      }
+    }
+    function fallbackToInitialData_() {
+      if (settled || useLocalIndex_()) return;
+      settled = true;
+      cleanup_();
+      fetchInitialSearchDataRemote_();
+    }
+    function onLocalIndexReady_() {
+      if (settled || !manager.isReady()) return;
+      finishLocalBootstrap_();
+    }
+
+    // Bound boot metadata wait even if IndexedDB is slow or the index download is cold.
+    fallbackTimer = window.setTimeout(fallbackToInitialData_, localIndexWaitMs);
     manager.whenLoaded()
       .then(function() {
-        if (!syncSearchDataFromLocalIndex_()) {
-          fetchInitialSearchDataRemote_();
+        if (settled || useLocalIndex_()) return;
+        waitingForDownload = true;
+
+        if (typeof manager.checkForUpdates !== 'function') {
+          fallbackToInitialData_();
+          return;
         }
+
+        if (document && typeof document.addEventListener === 'function') {
+          document.addEventListener('shumi-library-local-index-ready', onLocalIndexReady_);
+        }
+        if (useLocalIndex_()) return;
+
+        let refresh;
+        try {
+          refresh = manager.checkForUpdates();
+        } catch (error) {
+          fallbackToInitialData_();
+          return;
+        }
+        Promise.resolve(refresh).then(fallbackToInitialData_, fallbackToInitialData_);
       })
       .catch(function() {
-        fetchInitialSearchDataRemote_();
+        fallbackToInitialData_();
       });
     return;
   }

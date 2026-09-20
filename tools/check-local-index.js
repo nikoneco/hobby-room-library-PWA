@@ -200,9 +200,361 @@ async function checkDownloadedIndex(writeMode, invalid) {
   if (writeMode === 'error' || writeMode === 'abort') assert(warnings.length === 1, 'persistence failure is reported separately');
 }
 
+function createVirtualClock() {
+  let now = 0;
+  let nextId = 1;
+  const timers = new Map();
+  return {
+    now: () => now,
+    setTimeout(callback, delay) {
+      const id = nextId++;
+      timers.set(id, { id, at: now + Math.max(0, Number(delay) || 0), callback });
+      return id;
+    },
+    clearTimeout(id) { timers.delete(id); },
+    async advance(milliseconds) {
+      const end = now + milliseconds;
+      let steps = 0;
+      while (true) {
+        const due = Array.from(timers.values())
+          .filter(timer => timer.at <= end)
+          .sort((a, b) => a.at - b.at || a.id - b.id)[0];
+        if (!due) break;
+        timers.delete(due.id);
+        now = due.at;
+        due.callback();
+        await flushMicrotasks();
+        if (++steps > 1000) throw new Error('virtual timer loop did not settle');
+      }
+      now = end;
+      await flushMicrotasks();
+    }
+  };
+}
+
+async function flushMicrotasks() {
+  for (let i = 0; i < 8; i += 1) await Promise.resolve();
+  await new Promise(resolve => setImmediate(resolve));
+}
+
+function createSearchRaceHarness(options) {
+  const opts = options || {};
+  const clock = createVirtualClock();
+  const payload = opts.payload || createPayload();
+  const stored = opts.stored || null;
+  const routes = opts.routes || {};
+  const requests = [];
+  const apiFailures = [];
+  const apiSuccesses = [];
+  const warnings = [];
+  const windowListeners = new Map();
+  const documentListeners = new Map();
+  let pendingWriteTransaction = null;
+
+  const db = {
+    objectStoreNames: { contains: () => true },
+    close() {},
+    transaction(store, mode) {
+      const tx = {
+        objectStore() {
+          return {
+            get() {
+              const request = {};
+              if (opts.readError) {
+                queueMicrotask(() => {
+                  request.error = new Error('simulated IndexedDB read failure');
+                  if (request.onerror) request.onerror();
+                });
+              } else if (opts.readDelay) {
+                clock.setTimeout(() => {
+                  request.result = stored;
+                  if (request.onsuccess) request.onsuccess();
+                }, opts.readDelay);
+              } else {
+                queueMicrotask(() => {
+                  request.result = stored;
+                  if (request.onsuccess) request.onsuccess();
+                });
+              }
+              return request;
+            },
+            put() {
+              pendingWriteTransaction = tx;
+              if (opts.writeMode === 'pending') return;
+              queueMicrotask(() => {
+                if (opts.writeMode === 'error') {
+                  tx.error = new Error('simulated IndexedDB write failure');
+                  if (tx.onerror) tx.onerror();
+                } else if (tx.oncomplete) {
+                  tx.oncomplete();
+                }
+              });
+            }
+          };
+        }
+      };
+      return tx;
+    }
+  };
+
+  const win = {
+    indexedDB: opts.noIndexedDb ? null : {
+      open() {
+        const request = {};
+        if (opts.readError) {
+          queueMicrotask(() => {
+            request.error = new Error('simulated IndexedDB open failure');
+            if (request.onerror) request.onerror();
+          });
+        } else {
+          queueMicrotask(() => {
+            request.result = db;
+            if (request.onsuccess) request.onsuccess();
+          });
+        }
+        return request;
+      }
+    },
+    CustomEvent: function(type, init) { this.type = type; this.detail = init && init.detail; },
+    addEventListener(type, handler) {
+      if (!windowListeners.has(type)) windowListeners.set(type, []);
+      windowListeners.get(type).push(handler);
+    },
+    setTimeout: clock.setTimeout,
+    clearTimeout: clock.clearTimeout,
+    setInterval() { return 1; },
+    ShumiLibraryPwa: {
+      perfStart(name, meta) { return { name, meta }; },
+      perfEnd() {},
+      handleApiFailure(error) { apiFailures.push(error); },
+      clearApiFailure() { apiSuccesses.push(true); }
+    }
+  };
+  const doc = {
+    visibilityState: 'visible',
+    addEventListener(type, handler) {
+      if (!documentListeners.has(type)) documentListeners.set(type, []);
+      documentListeners.get(type).push(handler);
+    },
+    removeEventListener(type, handler) {
+      documentListeners.set(type, (documentListeners.get(type) || []).filter(item => item !== handler));
+    },
+    dispatchEvent(event) {
+      (documentListeners.get(event.type) || []).slice().forEach(handler => handler(event));
+    },
+    createElement() {
+      return { parentNode: { removeChild() {} } };
+    },
+    head: {
+      appendChild(script) {
+        const params = new URL(script.src).searchParams;
+        const api = params.get('api');
+        const route = routes[api] || {};
+        requests.push({ api, at: clock.now() });
+        clock.setTimeout(() => {
+          if (route.error) {
+            script.onerror();
+            return;
+          }
+          const data = route.data !== undefined
+            ? route.data
+            : api === 'libraryRevision'
+              ? { version: 6, revision: payload.revision }
+              : api === 'localIndex'
+                ? payload
+                : api === 'searchSimple'
+                  ? [{ title: 'server search result' }]
+                  : [];
+          win[params.get('callback')]({ ok: true, data, error: null });
+        }, route.delay || 0);
+      }
+    }
+  };
+  const nav = { onLine: true };
+  const VirtualDate = class extends Date {
+    static now() { return 1700000000000 + clock.now(); }
+  };
+
+  vm.runInNewContext(shimSource, {
+    window: win,
+    document: doc,
+    navigator: nav,
+    URLSearchParams,
+    btoa: value => Buffer.from(String(value), 'binary').toString('base64'),
+    Promise,
+    Date: VirtualDate,
+    console: { warn: (...args) => warnings.push(args), error() {} }
+  });
+
+  return {
+    window: win,
+    document: doc,
+    clock,
+    requests,
+    apiFailures,
+    apiSuccesses,
+    warnings,
+    getPendingWriteTransaction: () => pendingWriteTransaction,
+    fireLoad() { (windowListeners.get('load') || []).forEach(handler => handler()); },
+    fireFocus() { (windowListeners.get('focus') || []).forEach(handler => handler()); },
+    invokeCounted(method, args) {
+      let callbacks = 0;
+      const promise = new Promise((resolve, reject) => {
+        win.google.script.run
+          .withSuccessHandler(value => { callbacks += 1; resolve(value); })
+          .withFailureHandler(error => { callbacks += 1; reject(error); })[method](...(args || []));
+      });
+      return { promise, callbackCount: () => callbacks };
+    }
+  };
+}
+
+async function checkFreshRevisionWinsBeforeRemoteSearch() {
+  const payload = createPayload();
+  const stored = { key: 'active', schemaVersion: 6, revision: payload.revision, payload };
+  const harness = createSearchRaceHarness({
+    payload,
+    stored,
+    routes: {
+      libraryRevision: { delay: 100 },
+      searchSimple: { delay: 2000, data: [{ title: 'server search result' }] }
+    }
+  });
+  harness.fireLoad();
+  await flushMicrotasks();
+  const search = harness.invokeCounted('searchBooksSimple', ['推しの子']);
+  await harness.clock.advance(100);
+  const result = await search.promise;
+  assert(harness.clock.now() === 100, 'matching revision returns local search at the 100ms revision callback');
+  assert(result.length === 2 && result.every(book => book.bookId), 'matching revision search preserves UUID identity');
+  assert(!harness.requests.some(request => request.api === 'searchSimple'),
+    'fresh index beats a 2000ms remote search before its grace timer expires');
+  assert(search.callbackCount() === 1, 'matching-revision local search calls its handler once');
+}
+
+async function checkDownloadedIndexWinsLateRemote(remoteFails) {
+  const payload = createPayload();
+  const harness = createSearchRaceHarness({
+    payload,
+    writeMode: 'pending',
+    routes: {
+      localIndex: { delay: 500 },
+      searchSimple: remoteFails
+        ? { delay: 2000, error: true }
+        : { delay: 2000, data: [{ title: 'late server search result' }] }
+    }
+  });
+  harness.fireLoad();
+  await flushMicrotasks();
+  const search = harness.invokeCounted('searchBooksSimple', ['推しの子']);
+  await harness.clock.advance(500);
+  const result = await search.promise;
+  assert(harness.clock.now() === 500, 'downloaded fresh index returns search before IDB persistence finishes');
+  assert(result.length === 2 && result.every(book => book.bookId), 'downloaded local result keeps stable book IDs');
+  assert(harness.requests.filter(request => request.api === 'localIndex').length === 1,
+    'empty storage downloads one local index directly');
+  assert(!harness.requests.some(request => request.api === 'libraryRevision' || request.api === 'initial'),
+    'empty-storage success skips revision and initial-data requests');
+  assert(search.callbackCount() === 1, 'local result wins exactly once while the remote search is pending');
+  assert(harness.window.ShumiLibraryLocalIndex.getFreshnessState() === 'fresh', 'downloaded index is fresh in memory');
+  assert(harness.getPendingWriteTransaction(), 'fixture keeps the index write pending after activation');
+
+  await harness.clock.advance(1750);
+  assert(search.callbackCount() === 1, 'late remote callback cannot invoke the search handler twice');
+  assert(harness.apiFailures.length === 0, 'losing remote failure cannot show an API-error banner');
+  assert(harness.apiSuccesses.length === 0, 'losing remote success has no visible success side effect');
+  const writeTransaction = harness.getPendingWriteTransaction();
+  if (writeTransaction && writeTransaction.oncomplete) writeTransaction.oncomplete();
+  await flushMicrotasks();
+  const requestCount = harness.requests.length;
+  harness.fireFocus();
+  await flushMicrotasks();
+  assert(harness.requests.length === requestCount,
+    'focusing after a fresh cold download does not immediately repeat its revision check');
+}
+
+async function checkIndexFailureFallsBackToRemote() {
+  const freshPayload = createPayload();
+  const stalePayload = createPayload();
+  stalePayload.revision = 'old-revision';
+  stalePayload.records = stalePayload.records.map(record => {
+    const copy = record.slice();
+    copy[2] = 'STALE ' + copy[2];
+    return copy;
+  });
+  const harness = createSearchRaceHarness({
+    payload: freshPayload,
+    stored: { key: 'active', schemaVersion: 6, revision: stalePayload.revision, payload: stalePayload },
+    routes: {
+      libraryRevision: { delay: 100, data: { version: 6, revision: freshPayload.revision } },
+      localIndex: { delay: 200, error: true },
+      searchSimple: { delay: 800, data: [{ title: 'server latest result' }] }
+    }
+  });
+  harness.fireLoad();
+  await flushMicrotasks();
+  const search = harness.invokeCounted('searchBooksSimple', ['推しの子']);
+  await harness.clock.advance(1050);
+  const result = await search.promise;
+  assert(harness.clock.now() === 1050, 'index failure falls back to the remote search result');
+  assert(result.length === 1 && result[0].title === 'server latest result', 'failed refresh never serves stale online records');
+  assert(search.callbackCount() === 1, 'failed refresh and remote fallback still callback once');
+  assert(harness.apiFailures.length === 0, 'quiet index-refresh failure does not raise a visible API error');
+}
+
+async function checkSlowAndUnavailableIndexedDb() {
+  const payload = createPayload();
+  const slowRead = createSearchRaceHarness({
+    payload,
+    readDelay: 600,
+    routes: {
+      localIndex: { delay: 500 },
+      searchSimple: { delay: 2000 }
+    }
+  });
+  slowRead.fireLoad();
+  await flushMicrotasks();
+  const slowSearch = slowRead.invokeCounted('searchBooksSimple', ['推しの子']);
+  await slowRead.clock.advance(1100);
+  const slowResult = await slowSearch.promise;
+  assert(slowResult.length === 2 && slowRead.clock.now() === 1100,
+    'foreground fallback starts while a slow IndexedDB read is pending and later fresh index wins');
+  assert(slowSearch.callbackCount() === 1, 'slow IndexedDB race delivers one result');
+
+  const unavailable = createSearchRaceHarness({
+    payload,
+    readError: true,
+    routes: {
+      localIndex: { delay: 100 },
+      searchSimple: { delay: 1000 }
+    }
+  });
+  unavailable.fireLoad();
+  await flushMicrotasks();
+  const unavailableSearch = unavailable.invokeCounted('searchBooksSimple', ['推しの子']);
+  await unavailable.clock.advance(100);
+  const unavailableResult = await unavailableSearch.promise;
+  assert(unavailableResult.length === 2 && unavailable.clock.now() === 100,
+    'memory index remains usable when IndexedDB cannot open or persist');
+  assert(unavailableSearch.callbackCount() === 1, 'IndexedDB failure does not strand the search callback');
+
+  const unsupported = createSearchRaceHarness({ noIndexedDb: true, payload });
+  const immediateSearch = unsupported.invokeCounted('searchBooksSimple', ['推しの子']);
+  await unsupported.clock.advance(0);
+  const immediateResult = await immediateSearch.promise;
+  assert(immediateResult[0].title === 'server search result', 'unsupported IndexedDB uses immediate remote search fallback');
+  assert(unsupported.requests[0].api === 'searchSimple' && unsupported.requests[0].at === 0,
+    'unsupported local-index API does not wait for a freshness grace period');
+}
+
 (async function main() {
   for (const mode of ['success', 'error', 'abort', 'pending']) await checkDownloadedIndex(mode, false);
   await checkDownloadedIndex('success', true);
+  await checkFreshRevisionWinsBeforeRemoteSearch();
+  await checkDownloadedIndexWinsLateRemote(false);
+  await checkDownloadedIndexWinsLateRemote(true);
+  await checkIndexFailureFallsBackToRemote();
+  await checkSlowAndUnavailableIndexedDb();
   const appendedScripts = [];
   const payload = createPayload();
   const stored = {
@@ -345,6 +697,7 @@ async function checkDownloadedIndex(writeMode, invalid) {
 
   const onlineScripts = [];
   const onlineLoadHandlers = [];
+  const onlineDocumentListeners = new Map();
   const onlineWindow = {
     indexedDB: createIndexedDb(stored),
     CustomEvent: function(type, init) { this.type = type; this.detail = init && init.detail; },
@@ -366,8 +719,16 @@ async function checkDownloadedIndex(writeMode, invalid) {
   };
   const onlineDocument = {
     visibilityState: 'visible',
-    addEventListener() {},
-    dispatchEvent() {},
+    addEventListener(type, handler) {
+      if (!onlineDocumentListeners.has(type)) onlineDocumentListeners.set(type, []);
+      onlineDocumentListeners.get(type).push(handler);
+    },
+    removeEventListener(type, handler) {
+      onlineDocumentListeners.set(type, (onlineDocumentListeners.get(type) || []).filter(item => item !== handler));
+    },
+    dispatchEvent(event) {
+      (onlineDocumentListeners.get(event.type) || []).slice().forEach(handler => handler(event));
+    },
     createElement() {
       return { parentNode: { removeChild() {} } };
     },
@@ -402,7 +763,7 @@ async function checkDownloadedIndex(writeMode, invalid) {
   assert(onlineManager.getFreshnessState() === 'checking', 'page load starts the freshness check immediately');
 
   const onlineRunner = onlineWindow.google.script.run;
-  const remoteSearchPromise = invoke(onlineRunner, 'searchBooksSimple', ['推しの子']);
+  const freshnessRacePromise = invoke(onlineRunner, 'searchBooksSimple', ['推しの子']);
   await new Promise(resolve => setImmediate(resolve));
 
   const getScriptApi = script => new URL(script.src).searchParams.get('api');
@@ -413,21 +774,20 @@ async function checkDownloadedIndex(writeMode, invalid) {
   const revisionScript = onlineScripts.find(script => getScriptApi(script) === 'libraryRevision');
   const searchScript = onlineScripts.find(script => getScriptApi(script) === 'searchSimple');
   assert(revisionScript, 'page load requests the lightweight server revision');
-  assert(searchScript, 'search during freshness confirmation bypasses the stored local index');
-
-  invokeScriptCallback(onlineWindow, searchScript, [{ title: 'サーバー最新本' }]);
-  const remoteSearch = await remoteSearchPromise;
-  assert(
-    remoteSearch.length === 1 && remoteSearch[0].title === 'サーバー最新本',
-    'freshness-gated search returns the authoritative server result'
-  );
+  assert(!searchScript, 'foreground search waits briefly before starting its remote fallback');
 
   invokeScriptCallback(onlineWindow, revisionScript, {
     version: 6,
     revision: payload.revision
   });
+  const freshSearch = await freshnessRacePromise;
+  assert(
+    freshSearch.length === 2 && freshSearch.every(book => book.bookId),
+    'matching revision returns the fresh local result before remote search starts'
+  );
   await new Promise(resolve => setImmediate(resolve));
   assert(onlineManager.getFreshnessState() === 'fresh', 'matching revision enables local queries');
+  assert(!onlineScripts.some(script => getScriptApi(script) === 'searchSimple'), 'freshness race avoids the GAS search API');
 
   const scriptCountBeforeLocalSearch = onlineScripts.length;
   const confirmedLocalSearch = await invoke(onlineRunner, 'searchBooksSimple', ['推しの子']);
