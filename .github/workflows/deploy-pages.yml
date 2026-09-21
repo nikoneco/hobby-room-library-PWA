@@ -70,6 +70,9 @@ jobs:
       - name: Check import enrichment retries
         run: node tools/check-import-retries.js
 
+      - name: Check series registry lifecycle
+        run: node tools/check-series-registry.js
+
       - name: Check spreadsheet mode transitions
         run: node tools/check-sheet-modes.js
 

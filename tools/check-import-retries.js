@@ -14,9 +14,16 @@ const empty = ok({ Items: [] });
 const kana = ok({ Items: [{ Item: { isbn, titleKana: 'テスト ノ ホン' } }] });
 
 function fixture(books, options = {}) {
-  const state = { requests: [], writes: [], sleeps: [], toasts: [], logs: [], response: empty };
+  const state = {
+    requests: [], writes: [], sleeps: [], toasts: [], logs: [], response: empty,
+    now: options.now ?? Date.UTC(2026, 8, 21, 0, 0, 0, 250)
+  };
   const properties = options.properties || new Map();
+  const FixtureDate = class extends Date {
+    static now() { return state.now; }
+  };
   const context = vm.createContext({
+    Date: FixtureDate,
     console: Object.fromEntries(['log', 'warn', 'error'].map(key => [key, (...args) => state.logs.push(args)])),
     PropertiesService: { getScriptProperties: () => ({
       getProperty: key => properties.get(key) ?? null,
@@ -28,7 +35,11 @@ function fixture(books, options = {}) {
       state.requests.push(url);
       const response = typeof state.response === 'function' ? state.response(url) : state.response;
       if (response instanceof Error) throw response;
-      return { getResponseCode: () => response.status, getContentText: () => response.body };
+      return {
+        getResponseCode: () => response.status,
+        getContentText: () => response.body,
+        getHeaders: () => response.headers || {}
+      };
     } }
   });
   vm.runInContext(source, context);
@@ -157,6 +168,123 @@ test('Kobo recovers within the rate limit retries', () => {
   assert.equal(result.error, 0);
   assert.equal(result.notFoundDone, 1);
   assert.equal(f.state.requests.length, 3);
+});
+
+test('RakutenBooks honors Retry-After seconds for HTTP 429', () => {
+  const f = fixture([]);
+  f.state.response = () => f.state.requests.length === 1
+    ? { status: 429, body: '{}', headers: { 'Retry-After': '2' } }
+    : empty;
+
+  const result = f.context.fetchRakutenBooksJson_('fixture-url');
+  assert.equal(result.Items.length, 0);
+  assert.equal(f.state.requests.length, 2);
+  assert.deepEqual(f.state.sleeps, [2000]);
+});
+
+test('RakutenBooks honors an HTTP-date Retry-After header', () => {
+  const now = Date.UTC(2026, 8, 21, 0, 0, 0, 250);
+  const retryAfter = new Date(now + 6250).toUTCString();
+  const expectedWait = Math.ceil(Date.parse(retryAfter) - now);
+  const f = fixture([], { now });
+  f.state.response = () => f.state.requests.length === 1
+    ? { status: 429, body: '{}', headers: { 'rEtRy-AfTeR': retryAfter } }
+    : empty;
+
+  const result = f.context.fetchRakutenBooksJson_('fixture-url');
+  assert.equal(result.Items.length, 0);
+  assert.equal(f.state.requests.length, 2);
+  assert.deepEqual(f.state.sleeps, [expectedWait]);
+});
+
+test('RakutenBooks uses bounded exponential backoff and stops after three HTTP 429 attempts', () => {
+  const f = fixture([]);
+  f.state.response = { status: 429, body: '{}' };
+
+  assert.throws(() => f.context.fetchRakutenBooksJson_('fixture-url'), /RakutenBooks HTTP 429/);
+  assert.equal(f.state.requests.length, 3);
+  assert.deepEqual(f.state.sleeps, [500, 1000]);
+});
+
+test('an over-budget Retry-After leaves the row unchanged and later import stages continue', () => {
+  const f = fixture([pending()]);
+  const laterStages = [];
+  let released = false;
+  f.state.response = { status: 429, body: '{}', headers: { 'Retry-After': '3600' } };
+  Object.assign(f.context, {
+    LockService: { getScriptLock: () => ({ tryLock: () => true, releaseLock: () => { released = true; } }) },
+    ensureFallbackImageColumns_() { laterStages.push('ensureFallback'); },
+    refreshSeriesKeyAutoForImport_: () => { laterStages.push('series'); return { changed: 0 }; },
+    repairBookUuidsAll_: () => { laterStages.push('uuids'); return { changed: 0 }; },
+    batchFetchSynopsisRawByLimit_: () => { laterStages.push('synopsis'); return { processed: 0 }; },
+    retryNotFoundSynopsisFromRakutenKobo_: () => { laterStages.push('kobo'); return { processed: 0, error: 0 }; },
+    batchFillFallbackImageUrlsByLimit_: () => { laterStages.push('image'); return { processed: 0 }; },
+    clearLibrarySearchCache_: () => { laterStages.push('cache'); }
+  });
+  f.context.SpreadsheetApp.flush = () => { laterStages.push('flush'); };
+
+  const result = f.context.enrichNewBooksAfterImportByLimit_(20);
+
+  assert.equal(result.yomigana.error, 1);
+  assert.equal(result.yomigana.notFound, 0);
+  assert.deepEqual(laterStages, ['ensureFallback', 'series', 'uuids', 'synopsis', 'kobo', 'image', 'flush', 'cache']);
+  assert.equal(f.state.requests.length, 1);
+  assert.deepEqual(f.state.sleeps, []);
+  assert.equal(f.state.writes.length, 0);
+  assert.equal(f.value(0, 'YOMIGANA'), '');
+  assert.equal(f.value(0, 'SUMMARY'), '既存の説明');
+  assert.equal(f.value(0, 'SUMMARY_SOURCE'), 'NOT_FOUND');
+  assert.equal(released, true);
+});
+
+test('one 20-book import shares its 10 second 429 wait budget and restores standalone retries', () => {
+  const books = Array.from({ length: 20 }, () => pending());
+  const f = fixture(books);
+  let released = false;
+  let yomiResponses = 0;
+  let standaloneResponses = 0;
+  const rateLimited = { status: 429, body: '{}', headers: { 'Retry-After': '5' } };
+  f.state.response = () => yomiResponses++ % 3 < 2 ? rateLimited : kana;
+  Object.assign(f.context, {
+    LockService: { getScriptLock: () => ({ tryLock: () => true, releaseLock: () => { released = true; } }) },
+    ensureFallbackImageColumns_() {},
+    refreshSeriesKeyAutoForImport_: () => ({ changed: 0 }),
+    repairBookUuidsAll_: () => ({ changed: 0 }),
+    batchFetchSynopsisRawByLimit_: () => {
+      let errors = 0;
+      for (let i = 0; i < 20; i++) {
+        let synopsisResponses = 0;
+        f.state.response = () => synopsisResponses++ < 2 ? rateLimited : empty;
+        try { f.context.fetchRakutenBooksJson_('synopsis-' + i); }
+        catch (error) { errors++; }
+      }
+      return { processed: 20, error: errors };
+    },
+    retryNotFoundSynopsisFromRakutenKobo_: () => ({ processed: 0, error: 0 }),
+    batchFillFallbackImageUrlsByLimit_: () => ({ processed: 0 })
+  });
+
+  const result = f.context.enrichNewBooksAfterImportByLimit_(20);
+  const rateLimitWaits = f.state.sleeps.filter(ms => ms === 5000);
+  assert.equal(rateLimitWaits.reduce((total, ms) => total + ms, 0), 10000);
+  assert.equal(result.yomigana.processed, 2);
+  assert.equal(result.yomigana.changed, 1);
+  assert.equal(result.yomigana.error, 1);
+  assert.equal(result.synopsis.processed, 20);
+  assert.equal(result.synopsis.error, 20);
+  assert.equal(f.state.requests.length, 24);
+  assert.equal(f.value(0, 'YOMIGANA'), 'てすと の ほん');
+  assert.equal(f.value(1, 'YOMIGANA'), '');
+  assert.equal(f.value(0, 'SUMMARY'), '既存の説明');
+  assert.equal(f.value(0, 'SUMMARY_SOURCE'), 'NOT_FOUND');
+  assert.equal(released, true);
+
+  // After import cleanup, a standalone call again gets its own bounded budget.
+  f.state.response = () => standaloneResponses++ < 2 ? rateLimited : empty;
+  const standaloneResult = f.context.fetchRakutenBooksJson_('standalone-url');
+  assert.equal(standaloneResult.Items.length, 0);
+  assert.equal(f.state.requests.length, 27);
+  assert.deepEqual(f.state.sleeps.slice(-2), [5000, 5000]);
 });
 
 test('Kobo skips untitled and finalized books without spending the request quota', () => {

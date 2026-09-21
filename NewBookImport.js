@@ -42,7 +42,10 @@ function enrichNewBooksAfterImportByLimit_(limit) {
     throw new Error('Another import enrichment job is already running.');
   }
 
+  let retryBudgetStarted = false;
   try {
+    beginRakutenBooks429RetryBudget_();
+    retryBudgetStarted = true;
     const batchLimit = Math.max(1, Number(limit || NEW_BOOK_IMPORT_CONFIG.DEFAULT_LIMIT));
     const sheet = getSheet(CONFIG.SHEETS.MAIN);
 
@@ -80,7 +83,11 @@ function enrichNewBooksAfterImportByLimit_(limit) {
     console.log(JSON.stringify(result));
     return result;
   } finally {
-    lock.releaseLock();
+    try {
+      if (retryBudgetStarted) endRakutenBooks429RetryBudget_();
+    } finally {
+      lock.releaseLock();
+    }
   }
 }
 
@@ -230,11 +237,98 @@ function buildYomiganaImportResult_(
 
 function refreshSeriesKeyAutoForImport_(sheet) {
   const targetSheet = sheet || getSheet(CONFIG.SHEETS.MAIN);
-  const series = refreshSeriesKeyAutoAfterDerivedChange_(targetSheet);
-  if (!isSeriesRegistryV2Active_()) return series;
+  if (!isSeriesRegistryV2Active_()) {
+    return summarizeSeriesKeyAutoPlan_(refreshSeriesKeyAutoAfterDerivedChange_(targetSheet));
+  }
 
-  const registry = syncSeriesRegistryFromCatalog_();
-  ensureSeriesRegistryExtraAliases_();
-  const converged = refreshSeriesKeyAutoAfterDerivedChange_(targetSheet);
-  return Object.assign({}, converged, { registry });
+  preflightSeriesKeyAutoClassification_(targetSheet);
+  const stats = {
+    passes: 0,
+    mastersAdded: 0,
+    aliasesAdded: 0,
+    extraAliasesAdded: 0,
+    masterCountsChanged: 0,
+    aliasCountsChanged: 0,
+    changedCatalogRows: new Set()
+  };
+  const initialExtraAliases = ensureSeriesRegistryExtraAliases_();
+  stats.extraAliasesAdded += Number(initialExtraAliases.added || 0);
+  stats.orphanMastersDeleted = Number(
+    initialExtraAliases.reconciledOrphans && initialExtraAliases.reconciledOrphans.deletedMasters || 0
+  );
+  stats.orphanAliasesDeleted = Number(
+    initialExtraAliases.reconciledOrphans && initialExtraAliases.reconciledOrphans.deletedAliases || 0
+  );
+  stats.orphanAliasesRehomed = Number(
+    initialExtraAliases.reconciledOrphans && initialExtraAliases.reconciledOrphans.rehomedAliases || 0
+  );
+  let stable = false;
+  let converged = null;
+  for (let pass = 0; pass < 3; pass++) {
+    stats.passes = pass + 1;
+    converged = refreshSeriesKeyAutoAfterDerivedChange_(targetSheet);
+    const changedIndices = Array.isArray(converged && converged.changedIndices)
+      ? converged.changedIndices
+      : [];
+    const changedStartRow = Number(converged && converged.startRow || 2);
+    changedIndices.forEach(index => stats.changedCatalogRows.add(changedStartRow + index));
+    const registrySync = syncSeriesRegistryFromCatalog_();
+    const extraAliases = ensureSeriesRegistryExtraAliases_();
+    stats.mastersAdded += Number(registrySync.added || 0);
+    stats.aliasesAdded += Number(registrySync.aliasesAdded || 0);
+    stats.extraAliasesAdded += Number(extraAliases.added || 0);
+    stats.masterCountsChanged += Number(registrySync.masterCountsChanged || 0);
+    stats.aliasCountsChanged += Number(registrySync.aliasCountsChanged || 0);
+    const rehomedOrphans = extraAliases.reconciledOrphans || {};
+    stats.orphanMastersDeleted += Number(rehomedOrphans.deletedMasters || 0);
+    stats.orphanAliasesDeleted += Number(rehomedOrphans.deletedAliases || 0);
+    stats.orphanAliasesRehomed += Number(rehomedOrphans.rehomedAliases || 0);
+    if (
+      converged.changed === 0 &&
+      Number(registrySync.added || 0) === 0 &&
+      Number(registrySync.aliasesAdded || 0) === 0 &&
+      Number(extraAliases.added || 0) === 0
+    ) {
+      stable = true;
+      break;
+    }
+  }
+
+  if (!stable) {
+    throw new Error('Series registry classification did not converge after three passes.');
+  }
+
+  const cleanup = cleanupSeriesRegistryLifecycleCore_();
+  const usage = cleanup.changed
+    ? refreshSeriesRegistryUsageCountsFromCatalog_(targetSheet)
+    : { masterCountsChanged: 0, aliasCountsChanged: 0 };
+  const registry = loadSeriesRegistryLookup_();
+  const integrity = registry
+    ? {
+        masters: registry.allMasterById.size,
+        aliases: registry.allAliasRows.length,
+        checkedBooks: registry.catalogUsage.checkedBooks,
+        unresolvedCatalogKeys: registry.catalogUsage.unresolved.length,
+        danglingAliases: registry.danglingAliasRows.length,
+        duplicateMasterIds: registry.duplicateMasterIds.size,
+        ambiguousAliasKeys: registry.ambiguousAliasKeys.size
+      }
+    : { masters: 0, aliases: 0, unresolvedCatalogKeys: 0 };
+
+  stats.masterCountsChanged += Number(usage.masterCountsChanged || 0);
+  stats.aliasCountsChanged += Number(usage.aliasCountsChanged || 0);
+  const summary = summarizeSeriesKeyAutoPlan_(converged);
+  const changedRows = [...stats.changedCatalogRows].sort((left, right) => left - right);
+  summary.changed = changedRows.length;
+  summary.changedRows = changedRows.slice(0, 100);
+  summary.truncated = changedRows.length > summary.changedRows.length;
+  delete stats.changedCatalogRows;
+  return Object.assign({}, summary, {
+    catalogXKeysChanged: summary.changed,
+    catalogBookIdsChanged: 0,
+    stable: true,
+    registry: stats,
+    cleanup,
+    integrity
+  });
 }

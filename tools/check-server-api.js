@@ -191,8 +191,9 @@ assert(
 assert(
   seriesRegistrySource.includes('function syncSeriesRegistryAfterManualKeyEdit_') &&
     seriesRegistrySource.includes("'MANUAL_X_MERGE'") &&
-    seriesRegistrySource.includes("setValue('MERGED')"),
-  'manual series-key overrides persist the generated key as an alias and retain merged master history'
+    seriesRegistrySource.includes('cleanupSeriesRegistryLifecycleCore_') &&
+    seriesRegistrySource.includes('preservedLiveSources'),
+  'manual series-key overrides preserve live source series and clean only safe orphan history'
 );
 assert(
   /function\s+enrichNewBooksAfterImportByLimit_\s*\([^)]*\)[\s\S]*?SpreadsheetApp\.flush\(\);[\s\S]*?clearLibrarySearchCache_\(\);/.test(newBookImportSource),

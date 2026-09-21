@@ -31,6 +31,7 @@ const SYNOPSIS_FETCH_CONFIG = {
   KOBO_EARLY_STOP_SCORE: 700,
   FETCH_RETRY_COUNT: 3,
   FETCH_RETRY_BASE_SLEEP_MS: 500,
+  FETCH_429_RETRY_MAX_WAIT_MS: 10000,
   MAX_RAW_LENGTH: 3000,
   MAX_EXECUTION_MS: 270000,
   USER_AGENT: 'Mozilla/5.0 (compatible; ShumiRoomLibraryBot/1.0; +GoogleAppsScript)',
@@ -42,6 +43,29 @@ const SYNOPSIS_FETCH_CONFIG = {
   RAKUTEN_REFERER: 'https://script.google.com/',
   RAKUTEN_ORIGIN: 'https://script.google.com'
 };
+
+const RAKUTEN_BOOKS_429_RETRY_STATE = {
+  importBudgetActive: false,
+  importWaitRemainingMs: 0
+};
+
+function beginRakutenBooks429RetryBudget_() {
+  RAKUTEN_BOOKS_429_RETRY_STATE.importBudgetActive = true;
+  RAKUTEN_BOOKS_429_RETRY_STATE.importWaitRemainingMs = getRakutenBooks429RetryMaxWaitMs_();
+}
+
+function endRakutenBooks429RetryBudget_() {
+  RAKUTEN_BOOKS_429_RETRY_STATE.importBudgetActive = false;
+  RAKUTEN_BOOKS_429_RETRY_STATE.importWaitRemainingMs = 0;
+}
+
+function getRakutenBooks429RetryMaxWaitMs_() {
+  const configuredMaxWaitMs = Number(SYNOPSIS_FETCH_CONFIG.FETCH_429_RETRY_MAX_WAIT_MS);
+  return Math.min(
+    10000,
+    Math.max(0, Number.isFinite(configuredMaxWaitMs) ? configuredMaxWaitMs : 10000)
+  );
+}
 
 /**
  * あらすじRAW取得：通常バッチ
@@ -725,7 +749,7 @@ function buildRakutenBooksSearchUrl_(safeIsbn, credentials) {
  * @returns {Object}
  */
 function fetchRakutenBooksJson_(url) {
-  const res = fetchUrlWithRetry_(url, buildRakutenBooksFetchOptions_());
+  const res = fetchUrlWithRetry_(url, buildRakutenBooksFetchOptions_(), null, true);
   const code = res.getResponseCode();
   const text = res.getContentText('UTF-8');
 
@@ -899,26 +923,90 @@ function fetchSynopsisCandidateListFromGoogleBooks_(isbn) {
 }
 
 /**
+ * Retry-After が秒数または HTTP-date で指定された場合に待機時間を返す。
+ * @param {GoogleAppsScript.URL_Fetch.HTTPResponse} response
+ * @returns {number|null}
+ */
+function getRetryAfterDelayMs_(response) {
+  let headers;
+  try {
+    headers = response && response.getHeaders();
+  } catch (e) {
+    return null;
+  }
+  if (!headers || typeof headers !== 'object') return null;
+
+  const headerName = Object.keys(headers).find(name => String(name).toLowerCase() === 'retry-after');
+  if (!headerName) return null;
+
+  const values = Array.isArray(headers[headerName]) ? headers[headerName] : [headers[headerName]];
+  if (!values.length || values[0] == null) return null;
+
+  const value = String(values[0]).trim();
+  if (/^\d+$/.test(value)) {
+    const seconds = Number(value);
+    return Number.isFinite(seconds) ? seconds * 1000 : Infinity;
+  }
+
+  const retryAt = Date.parse(value);
+  if (!Number.isFinite(retryAt)) return null;
+  return Math.max(0, retryAt - Date.now());
+}
+
+/**
  * UrlFetchApp.fetch() を短いリトライ付きで実行する。
- * Address unavailable 等の一時通信失敗対策。
+ * Address unavailable 等の一時通信失敗対策。HTTP 429 の再試行は呼び出し元が有効にした場合だけ行う。
  * @param {string} url
  * @param {Object=} options
  * @param {number=} retryCount
+ * @param {boolean=} retryHttp429
  * @returns {GoogleAppsScript.URL_Fetch.HTTPResponse}
  */
-function fetchUrlWithRetry_(url, options, retryCount) {
+function fetchUrlWithRetry_(url, options, retryCount, retryHttp429) {
   const max = Math.max(1, Number(retryCount || SYNOPSIS_FETCH_CONFIG.FETCH_RETRY_COUNT || 3));
   const baseSleep = Math.max(0, Number(SYNOPSIS_FETCH_CONFIG.FETCH_RETRY_BASE_SLEEP_MS || 500));
+  const retry429 = retryHttp429 === true;
+  const max429Attempts = retry429 ? Math.min(max, 3) : 0;
+  const max429WaitMs = getRakutenBooks429RetryMaxWaitMs_();
 
+  let total429WaitMs = 0;
   let lastError = null;
 
   for (let i = 0; i < max; i++) {
+    let response;
     try {
-      return UrlFetchApp.fetch(url, options || {});
+      response = UrlFetchApp.fetch(url, options || {});
     } catch (e) {
       lastError = e;
       if (i >= max - 1) break;
       Utilities.sleep(baseSleep * (i + 1));
+      continue;
+    }
+
+    if (!retry429 || response.getResponseCode() !== 429) return response;
+    if (i >= max429Attempts - 1) return response;
+
+    const retryAfterMs = getRetryAfterDelayMs_(response);
+    const backoffMs = Math.min(max429WaitMs, baseSleep * Math.pow(2, i));
+    const waitMs = Math.ceil(retryAfterMs === null ? backoffMs : retryAfterMs);
+    const perCallRemainingWaitMs = Math.max(0, max429WaitMs - total429WaitMs);
+    const sharedRemainingWaitMs = RAKUTEN_BOOKS_429_RETRY_STATE.importBudgetActive
+      ? Math.max(0, RAKUTEN_BOOKS_429_RETRY_STATE.importWaitRemainingMs)
+      : max429WaitMs;
+    const remainingWaitMs = Math.min(perCallRemainingWaitMs, sharedRemainingWaitMs);
+
+    // Keep this invocation bounded. If Retry-After cannot be honored here,
+    // return the 429 response so the existing caller records a retryable failure.
+    if (!Number.isFinite(waitMs) || waitMs > remainingWaitMs) return response;
+    if (waitMs > 0) {
+      Utilities.sleep(waitMs);
+      total429WaitMs += waitMs;
+      if (RAKUTEN_BOOKS_429_RETRY_STATE.importBudgetActive) {
+        RAKUTEN_BOOKS_429_RETRY_STATE.importWaitRemainingMs = Math.max(
+          0,
+          RAKUTEN_BOOKS_429_RETRY_STATE.importWaitRemainingMs - waitMs
+        );
+      }
     }
   }
 
