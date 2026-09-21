@@ -893,7 +893,7 @@ body.pwa-settings-open {
   line-height: 1;
 }
 
-.pwa-settings-toggle-row + .pwa-settings-toggle-row {
+.pwa-settings-row + .pwa-settings-row {
   margin-top: 8px;
 }
 
