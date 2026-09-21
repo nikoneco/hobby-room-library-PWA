@@ -163,7 +163,11 @@ async function checkDownloadedIndex(writeMode, invalid) {
   };
   const doc = {
     addEventListener() {}, visibilityState: 'visible',
-    dispatchEvent() { readyStates.push(win.ShumiLibraryLocalIndex.getFreshnessState()); },
+    dispatchEvent(event) {
+      if (event.type === 'shumi-library-local-index-ready') {
+        readyStates.push(win.ShumiLibraryLocalIndex.getFreshnessState());
+      }
+    },
     createElement() { return { parentNode: { removeChild() {} } }; },
     head: { appendChild(script) {
       scripts.push(script);
@@ -195,8 +199,22 @@ async function checkDownloadedIndex(writeMode, invalid) {
   const requestCount = scripts.length;
   const books = await invoke(win.google.script.run, 'searchBooksSimple', ['推しの子']);
   assert(books.length === 2 && scripts.length === requestCount, 'fresh download serves local search without another request');
-  if (writeMode === 'pending') writeTransaction.oncomplete();
-  assert(await refresh === true, 'successful activation is not reported as a refresh failure');
+  if (writeMode === 'pending') {
+    const settled = await Promise.race([
+      refresh,
+      new Promise(resolve => setTimeout(() => resolve('storage-pending-timeout'), 100))
+    ]);
+    assert(settled === true, 'manual refresh resolves while IndexedDB persistence is pending');
+    assert(manager.getPersistenceState() === 'saving', 'pending storage is exposed separately from acquisition success');
+    writeTransaction.oncomplete();
+    await flushMicrotasks();
+  } else {
+    assert(await refresh === true, 'successful activation is not reported as a refresh failure');
+    await flushMicrotasks();
+  }
+  if (writeMode === 'error' || writeMode === 'abort') {
+    assert(manager.getPersistenceState() === 'failed', 'persistence failure is exposed after acquisition succeeds');
+  }
   if (writeMode === 'error' || writeMode === 'abort') assert(warnings.length === 1, 'persistence failure is reported separately');
 }
 
@@ -237,6 +255,15 @@ async function flushMicrotasks() {
   await new Promise(resolve => setImmediate(resolve));
 }
 
+function appendFixtureBook(payload, title) {
+  const record = payload.records[0].slice();
+  record[0] = payload.records.length;
+  record[1] = `55555555-5555-4555-8555-${String(payload.records.length + 1).padStart(12, '0')}`;
+  record[2] = title;
+  payload.records.push(record);
+  return payload;
+}
+
 function createSearchRaceHarness(options) {
   const opts = options || {};
   const clock = createVirtualClock();
@@ -250,6 +277,8 @@ function createSearchRaceHarness(options) {
   const windowListeners = new Map();
   const documentListeners = new Map();
   let pendingWriteTransaction = null;
+  let databaseOpenCount = 0;
+  const writes = [];
 
   const db = {
     objectStoreNames: { contains: () => true },
@@ -278,7 +307,8 @@ function createSearchRaceHarness(options) {
               }
               return request;
             },
-            put() {
+            put(value) {
+              writes.push(value);
               pendingWriteTransaction = tx;
               if (opts.writeMode === 'pending') return;
               queueMicrotask(() => {
@@ -300,18 +330,20 @@ function createSearchRaceHarness(options) {
   const win = {
     indexedDB: opts.noIndexedDb ? null : {
       open() {
+        const openNumber = ++databaseOpenCount;
         const request = {};
-        if (opts.readError) {
-          queueMicrotask(() => {
+        const finishOpen = () => {
+          if (opts.readError) {
             request.error = new Error('simulated IndexedDB open failure');
             if (request.onerror) request.onerror();
-          });
-        } else {
-          queueMicrotask(() => {
+          } else {
             request.result = db;
             if (request.onsuccess) request.onsuccess();
-          });
-        }
+          }
+        };
+        const delay = opts.openDelays && Number(opts.openDelays[openNumber] || 0);
+        if (delay > 0) clock.setTimeout(finishOpen, delay);
+        else queueMicrotask(finishOpen);
         return request;
       }
     },
@@ -356,8 +388,11 @@ function createSearchRaceHarness(options) {
             script.onerror();
             return;
           }
-          const data = route.data !== undefined
-            ? route.data
+          const routeData = typeof route.data === 'function'
+            ? route.data(requests.filter(request => request.api === api).length, payload)
+            : route.data;
+          const data = routeData !== undefined
+            ? routeData
             : api === 'libraryRevision'
               ? { version: 6, revision: payload.revision }
               : api === 'localIndex'
@@ -395,6 +430,9 @@ function createSearchRaceHarness(options) {
     apiSuccesses,
     warnings,
     getPendingWriteTransaction: () => pendingWriteTransaction,
+    getWrites: () => writes.slice(),
+    getDatabaseOpenCount: () => databaseOpenCount,
+    setOnline(online) { nav.onLine = Boolean(online); },
     fireLoad() { (windowListeners.get('load') || []).forEach(handler => handler()); },
     fireFocus() { (windowListeners.get('focus') || []).forEach(handler => handler()); },
     invokeCounted(method, args) {
@@ -407,6 +445,166 @@ function createSearchRaceHarness(options) {
       return { promise, callbackCount: () => callbacks };
     }
   };
+}
+
+async function checkManualForceDownloadsSameRevision() {
+  const storedPayload = createPayload();
+  const responsePayload = appendFixtureBook(createPayload(), '同じrevisionの追加蔵書');
+  const harness = createSearchRaceHarness({
+    payload: responsePayload,
+    stored: {
+      key: 'active', schemaVersion: 6, revision: storedPayload.revision,
+      savedAt: '2026-09-20T12:00:00.000Z', payload: storedPayload
+    },
+    routes: { localIndex: { delay: 40, data: responsePayload } }
+  });
+  const manager = harness.window.ShumiLibraryLocalIndex;
+  await manager.whenLoaded();
+  const update = manager.forceRefresh();
+  await flushMicrotasks();
+  assert(harness.requests.some(request => request.api === 'localIndex'),
+    'manual refresh requests the full index without a revision check');
+  assert(!harness.requests.some(request => request.api === 'libraryRevision'),
+    'manual refresh bypasses the revision-only endpoint');
+  await harness.clock.advance(40);
+  const result = await update;
+  assert(result.success, 'manual refresh reports a valid same-revision acquisition as success');
+  assert(manager.getRevision() === storedPayload.revision, 'forced acquisition accepts the unchanged revision');
+  assert(manager.getRecordCount() === storedPayload.records.length + 1,
+    'same-revision acquisition replaces the active index with the downloaded records');
+  assert(manager.getBookByRowIndex(storedPayload.records.length).title === '同じrevisionの追加蔵書',
+    'same-revision acquisition exposes the downloaded record immediately');
+  assert(manager.getLastSuccessfulUpdateAt(), 'successful acquisition records its update time');
+}
+
+async function checkManualForceFailureAndOfflineKeepPrevious() {
+  const previous = createPayload();
+  previous.records[0][2] = '保持される旧データ';
+  const stored = {
+    key: 'active', schemaVersion: 6, revision: previous.revision,
+    savedAt: '2026-09-20T12:00:00.000Z', payload: previous
+  };
+  const failed = createSearchRaceHarness({
+    payload: createPayload(),
+    stored,
+    routes: { localIndex: { error: true } }
+  });
+  const failedManager = failed.window.ShumiLibraryLocalIndex;
+  await failedManager.whenLoaded();
+  const failedUpdate = failedManager.forceRefresh();
+  await flushMicrotasks();
+  await failed.clock.advance(0);
+  const failedResult = await failedUpdate;
+  assert(!failedResult.success && failedResult.reason === 'failed', 'download failure is reported to the manual action');
+  assert(failedManager.getBookByRowIndex(0).title === '保持される旧データ',
+    'failed acquisition keeps the previous in-memory index');
+  assert(failedManager.getLastSuccessfulUpdateAt() === stored.savedAt,
+    'failed acquisition does not advance the last update time');
+
+  const offline = createSearchRaceHarness({ payload: createPayload(), stored });
+  const offlineManager = offline.window.ShumiLibraryLocalIndex;
+  await offlineManager.whenLoaded();
+  offline.setOnline(false);
+  const offlineResult = await offlineManager.forceRefresh();
+  assert(!offlineResult.success && offlineResult.reason === 'offline', 'offline refresh is reported accurately');
+  assert(offline.requests.length === 0, 'offline refresh does not start network requests');
+  assert(offlineManager.getBookByRowIndex(0).title === '保持される旧データ',
+    'offline refresh keeps the previous in-memory index');
+}
+
+async function checkManualForceJoinsAutoRefresh() {
+  const storedPayload = createPayload();
+  const downloaded = appendFixtureBook(createPayload(), '自動確認中の強制更新');
+  const harness = createSearchRaceHarness({
+    payload: downloaded,
+    stored: { key: 'active', schemaVersion: 6, revision: storedPayload.revision, payload: storedPayload },
+    routes: {
+      libraryRevision: { delay: 60, data: { version: 6, revision: storedPayload.revision } },
+      localIndex: { delay: 25, data: downloaded }
+    }
+  });
+  harness.fireLoad();
+  await flushMicrotasks();
+  assert(harness.requests.filter(request => request.api === 'libraryRevision').length === 1,
+    'page load has one automatic revision check in flight');
+  const first = harness.window.ShumiLibraryLocalIndex.forceRefresh();
+  const duplicate = harness.window.ShumiLibraryLocalIndex.forceRefresh();
+  await flushMicrotasks();
+  await harness.clock.advance(60);
+  assert(harness.requests.filter(request => request.api === 'localIndex').length === 1,
+    'manual force joined to the auto check bypasses the matching revision result');
+  await harness.clock.advance(25);
+  const results = await Promise.all([first, duplicate]);
+  assert(results.every(result => result.success), 'both callers observe the shared forced acquisition');
+  assert(harness.requests.filter(request => request.api === 'libraryRevision').length === 1,
+    'coalesced force requests do not start another revision check');
+  assert(harness.requests.filter(request => request.api === 'localIndex').length === 1,
+    'duplicate force requests start exactly one index acquisition');
+  assert(harness.window.ShumiLibraryLocalIndex.getRecordCount() === downloaded.records.length,
+    'the shared acquisition activates the downloaded index');
+}
+
+async function checkForceRequestSurvivesRevisionFailure() {
+  const storedPayload = createPayload();
+  const downloaded = appendFixtureBook(createPayload(), 'revision失敗後の更新');
+  const harness = createSearchRaceHarness({
+    payload: downloaded,
+    stored: { key: 'active', schemaVersion: 6, revision: storedPayload.revision, payload: storedPayload },
+    routes: {
+      libraryRevision: { delay: 30, error: true },
+      localIndex: { delay: 15, data: downloaded }
+    }
+  });
+  harness.fireLoad();
+  await flushMicrotasks();
+  const update = harness.window.ShumiLibraryLocalIndex.forceRefresh();
+  await flushMicrotasks();
+  await harness.clock.advance(30);
+  assert(harness.requests.filter(request => request.api === 'localIndex').length === 1,
+    'manual force falls back to one full acquisition after an in-flight revision failure');
+  await harness.clock.advance(15);
+  const result = await update;
+  assert(result.success, 'successful full acquisition satisfies force request despite revision failure');
+  assert(harness.window.ShumiLibraryLocalIndex.getRecordCount() === downloaded.records.length,
+    'revision failure does not leave the prior index active after successful forced download');
+}
+
+async function checkOutOfOrderIndexPersistenceKeepsLatest() {
+  const storedPayload = createPayload();
+  const firstPayload = appendFixtureBook(createPayload(), '遅れて保存される古い取得');
+  const latestPayload = appendFixtureBook(createPayload(), '後の最新取得');
+  const harness = createSearchRaceHarness({
+    payload: latestPayload,
+    stored: { key: 'active', schemaVersion: 6, revision: storedPayload.revision, payload: storedPayload },
+    openDelays: { 2: 100 },
+    routes: {
+      localIndex: { delay: 5, data: requestNumber => requestNumber === 1 ? firstPayload : latestPayload }
+    }
+  });
+  const manager = harness.window.ShumiLibraryLocalIndex;
+  await manager.whenLoaded();
+  const first = manager.forceRefresh();
+  await flushMicrotasks();
+  await harness.clock.advance(5);
+  assert((await first).success, 'first index acquisition succeeds while its storage open is delayed');
+  await flushMicrotasks();
+  assert(harness.getDatabaseOpenCount() === 2, 'first persistence open is still pending');
+
+  const second = manager.forceRefresh();
+  await flushMicrotasks();
+  await harness.clock.advance(5);
+  assert((await second).success, 'newer index acquisition succeeds before the older storage open');
+  await flushMicrotasks();
+  assert(harness.getWrites().length === 1, 'newer index writes while stale persistence is delayed');
+  const writtenRecords = harness.getWrites()[0].payload.records;
+  assert(writtenRecords[writtenRecords.length - 1][2] === '後の最新取得',
+    'the first completed persistence write contains the latest acquisition');
+
+  await harness.clock.advance(95);
+  await flushMicrotasks();
+  assert(harness.getWrites().length === 1, 'delayed stale persistence is skipped after the newer acquisition');
+  assert(manager.getBookByRowIndex(latestPayload.records.length - 1).title === '後の最新取得',
+    'newer index remains active after stale storage work completes');
 }
 
 async function checkFreshRevisionWinsBeforeRemoteSearch() {
@@ -550,6 +748,11 @@ async function checkSlowAndUnavailableIndexedDb() {
 (async function main() {
   for (const mode of ['success', 'error', 'abort', 'pending']) await checkDownloadedIndex(mode, false);
   await checkDownloadedIndex('success', true);
+  await checkManualForceDownloadsSameRevision();
+  await checkManualForceFailureAndOfflineKeepPrevious();
+  await checkManualForceJoinsAutoRefresh();
+  await checkForceRequestSurvivesRevisionFailure();
+  await checkOutOfOrderIndexPersistenceKeepsLatest();
   await checkFreshRevisionWinsBeforeRemoteSearch();
   await checkDownloadedIndexWinsLateRemote(false);
   await checkDownloadedIndexWinsLateRemote(true);

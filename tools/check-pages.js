@@ -90,10 +90,21 @@ assert(index.includes('id="pwaSettingsPanel"'), 'static index includes PWA setti
 assert(index.includes('id="detailMedia"'), 'static index includes the series media filter');
 assert(index.includes('aria-label="メニューを開く"'), 'static index labels the top-right control as a menu');
 assert(index.includes('id="pwaSeriesStatusEntry"'), 'static menu includes the series status entry');
+assert(index.includes('id="pwaUpdateLocalIndex"') && index.includes('蔵書データを更新'),
+  'static menu includes the manual local-library index refresh action');
+assert(index.indexOf('id="pwaUpdateLocalIndex"') < index.indexOf('id="pwaPerfHudEnabled"'),
+  'manual refresh action appears in the Development section before its existing controls');
+assert(index.includes('id="pwaLocalIndexUpdateStatus"') && index.includes('id="pwaLocalIndexLastUpdated"'),
+  'manual refresh action exposes separate status and last-update text');
 assert(index.includes('data-action="series-status"'), 'static menu routes to the series status screen');
 assert(!index.includes('series-status-cta-card'), 'static home no longer promotes the occasional series status action');
 assert(pwaCssForMenu.includes('.pwa-settings-action-row'), 'static PWA styles the series status menu action');
 assert(pwaClientForMenu.includes("document.getElementById('pwaSeriesStatusEntry')"), 'static PWA closes the menu after selecting series status');
+assert(pwaClientForMenu.includes("document.getElementById('pwaUpdateLocalIndex')") &&
+  pwaClientForMenu.includes('indexManager.forceRefresh()'),
+  'static PWA connects the manual refresh action to the local index manager');
+assert(pwaClientForMenu.includes("shumi-library-local-index-persistence"),
+  'static PWA reports IndexedDB persistence separately from acquisition success');
 assert(shelfClientForMenu.includes('getNextSeriesStatusFilter_'), 'static series status screen includes summary filter toggling');
 assert(shelfClientForMenu.includes('aria-pressed="false"'), 'static series status filters expose pressed state');
 assert(index.includes('id="pwaLibrarianPresence"'), 'static index includes librarian presence setting');
@@ -340,6 +351,17 @@ assert(
   gasRunShim.includes("getFreshnessState: function()"),
   'Pages client exposes local-index freshness for diagnostics and regression checks'
 );
+assert(gasRunShim.includes('forceRefresh: forceRefreshLocalIndex_'),
+  'Pages client exposes an explicit full-index refresh operation');
+assert(gasRunShim.includes('localIndexForceDownloadRequested'),
+  'manual force request survives a concurrent automatic revision check');
+assert(gasRunShim.includes('acquisitionId !== localIndexLastAcquisitionId'),
+  'out-of-order IndexedDB opens cannot persist an older index over a newer acquisition');
+assert(gasRunShim.includes('getLastSuccessfulUpdateAt: function()') &&
+  gasRunShim.includes('getPersistenceState: function()'),
+  'Pages client exposes the last successful acquisition time and persistence state');
+assert(gasRunShim.includes("'shumi-library-local-index-persistence'"),
+  'Pages client notifies the menu when local persistence succeeds or fails');
 assert(gasRunShim.includes("window.addEventListener('focus'"), 'Pages client checks the local index when focus returns');
 assert(gasRunShim.includes("document.addEventListener('visibilitychange'"), 'Pages client checks the local index when visible again');
 assert(gasRunShim.includes("window.addEventListener('online'"), 'Pages client checks the local index when connectivity returns');

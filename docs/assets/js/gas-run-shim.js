@@ -295,6 +295,12 @@
   let localIndexRefreshPromise = null;
   let localIndexLastCheckedAt = 0;
   let localIndexFreshnessState = 'unchecked';
+  let localIndexRefreshPhase = 'idle';
+  let localIndexForceDownloadRequested = false;
+  let localIndexLastSuccessfulUpdateAt = '';
+  let localIndexPersistenceState = 'unknown';
+  let localIndexLastAcquisitionId = 0;
+  let localIndexCurrentDownloadAcquisitionId = 0;
 
   function normalizeKanaLocal_(value) {
     return String(value || '').toLowerCase().normalize('NFKC')
@@ -742,22 +748,24 @@
     }
   }
 
-  async function writeStoredLocalIndex_(payload) {
+  async function writeStoredLocalIndex_(payload, savedAt, acquisitionId) {
     const db = await openLocalIndexDb_();
     try {
+      if (acquisitionId && acquisitionId !== localIndexLastAcquisitionId) return false;
       await new Promise(function(resolve, reject) {
         const transaction = db.transaction(LOCAL_INDEX_STORE_NAME, 'readwrite');
         transaction.objectStore(LOCAL_INDEX_STORE_NAME).put({
           key: LOCAL_INDEX_ACTIVE_KEY,
           schemaVersion: LOCAL_INDEX_SCHEMA_VERSION,
           revision: payload.revision,
-          savedAt: new Date().toISOString(),
+          savedAt: savedAt || new Date().toISOString(),
           payload: payload
         });
         transaction.oncomplete = function() { resolve(); };
         transaction.onerror = function() { reject(transaction.error || createError_('ローカル索引を保存できません。', 'INDEXED_DB_WRITE')); };
         transaction.onabort = function() { reject(transaction.error || createError_('ローカル索引の保存が中断されました。', 'INDEXED_DB_ABORT')); };
       });
+      return true;
     } finally {
       db.close();
     }
@@ -769,12 +777,24 @@
       detail: {
         revision: localIndexPayload ? localIndexPayload.revision : '',
         count: localIndexRecords.length,
-        updated: Boolean(updated)
+        updated: Boolean(updated),
+        updatedAt: localIndexLastSuccessfulUpdateAt
       }
     }));
   }
 
-  function activateLocalIndex_(payload, updated) {
+  function dispatchLocalIndexPersistence_(status, acquisitionId) {
+    if (!document || typeof document.dispatchEvent !== 'function' || typeof window.CustomEvent !== 'function') return;
+    document.dispatchEvent(new window.CustomEvent('shumi-library-local-index-persistence', {
+      detail: {
+        status: status,
+        updatedAt: localIndexLastSuccessfulUpdateAt,
+        acquisitionId: acquisitionId
+      }
+    }));
+  }
+
+  function activateLocalIndex_(payload, updated, updatedAt) {
     const converted = convertLocalIndexPayload_(payload);
     localIndexPayload = payload;
     localIndexRecords = converted;
@@ -784,7 +804,13 @@
       if (record.book.bookId) localIndexByBookId.set(String(record.book.bookId), record);
       localIndexByRowIndex.set(Number(record.book.rowIndex), record);
     });
-    if (updated) localIndexFreshnessState = 'fresh';
+    if (updated) {
+      localIndexFreshnessState = 'fresh';
+      localIndexLastSuccessfulUpdateAt = updatedAt || new Date().toISOString();
+      localIndexLastAcquisitionId += 1;
+      localIndexCurrentDownloadAcquisitionId = localIndexLastAcquisitionId;
+      localIndexPersistenceState = 'saving';
+    }
     dispatchLocalIndexReady_(updated);
   }
 
@@ -799,13 +825,27 @@
       quiet: true,
       perfName: 'sync:localIndex'
     });
-    activateLocalIndex_(payload, true);
-    // A usable fresh index must not depend on durable storage being available.
-    try {
-      await writeStoredLocalIndex_(payload);
-    } catch (error) {
-      console.warn('local index persistence failed; fresh in-memory index remains active', error);
-    }
+    const updatedAt = new Date().toISOString();
+    activateLocalIndex_(payload, true, updatedAt);
+    const acquisitionId = localIndexLastAcquisitionId;
+    // Activation and the manual-update result do not wait for IndexedDB to finish.
+    Promise.resolve(writeStoredLocalIndex_(payload, updatedAt, acquisitionId))
+      .then(function() {
+        if (localIndexLastAcquisitionId !== acquisitionId) return;
+        localIndexPersistenceState = 'saved';
+        dispatchLocalIndexPersistence_('saved', acquisitionId);
+      })
+      .catch(function(error) {
+        if (localIndexLastAcquisitionId !== acquisitionId) return;
+        localIndexPersistenceState = 'failed';
+        console.warn('local index persistence failed; fresh in-memory index remains active', error);
+        dispatchLocalIndexPersistence_('failed', acquisitionId);
+      })
+      .finally(function() {
+        if (localIndexCurrentDownloadAcquisitionId === acquisitionId) {
+          localIndexCurrentDownloadAcquisitionId = 0;
+        }
+      });
     return true;
   }
 
@@ -819,6 +859,8 @@
           stored.payload
         ) {
           activateLocalIndex_(stored.payload, false);
+          localIndexLastSuccessfulUpdateAt = String(stored.savedAt || '');
+          localIndexPersistenceState = 'saved';
         }
         return Boolean(localIndexPayload);
       })
@@ -829,8 +871,22 @@
     return localIndexLoadPromise;
   }
 
-  function refreshLocalIndex_(force, knownRevision) {
-    if (localIndexRefreshPromise) return localIndexRefreshPromise;
+  function startLocalIndexDownload_() {
+    localIndexForceDownloadRequested = false;
+    localIndexRefreshPhase = 'downloading';
+    localIndexCurrentDownloadAcquisitionId = 0;
+    return downloadAndActivateLocalIndex_();
+  }
+
+  function refreshLocalIndex_(force, knownRevision, forceDownload) {
+    if (localIndexRefreshPromise) {
+      if (forceDownload && localIndexRefreshPhase !== 'downloading') {
+        localIndexForceDownloadRequested = true;
+      }
+      return localIndexRefreshPromise;
+    }
+    if (forceDownload) localIndexForceDownloadRequested = true;
+    localIndexRefreshPhase = 'loading';
     localIndexRefreshPromise = ensureLocalIndexLoaded_()
       .then(async function() {
         if (navigator && navigator.onLine === false) {
@@ -840,6 +896,7 @@
         const now = Date.now();
         if (
           !force &&
+          !localIndexForceDownloadRequested &&
           localIndexPayload &&
           localIndexFreshnessState === 'fresh' &&
           now - localIndexLastCheckedAt < LOCAL_INDEX_CHECK_THROTTLE_MS
@@ -847,9 +904,10 @@
           return false;
         }
         localIndexFreshnessState = 'checking';
+        localIndexRefreshPhase = 'checking';
         localIndexLastCheckedAt = now;
-        if (!localIndexPayload) {
-          return downloadAndActivateLocalIndex_();
+        if (!localIndexPayload || localIndexForceDownloadRequested) {
+          return startLocalIndexDownload_();
         }
 
         let revision = String(knownRevision || '').trim();
@@ -864,19 +922,48 @@
         if (localIndexPayload && revision && revision === String(localIndexPayload.revision || '')) {
           localIndexFreshnessState = 'fresh';
           dispatchLocalIndexReady_(false);
+          if (localIndexForceDownloadRequested) return startLocalIndexDownload_();
           return false;
         }
-        return downloadAndActivateLocalIndex_();
+        return startLocalIndexDownload_();
       })
       .catch(function(error) {
+        if (localIndexForceDownloadRequested && !(navigator && navigator.onLine === false)) {
+          console.warn('local index revision check failed; honoring manual refresh request', error);
+          return startLocalIndexDownload_().catch(function(downloadError) {
+            localIndexFreshnessState = navigator && navigator.onLine === false ? 'offline' : 'failed';
+            console.warn('local index refresh failed; previous index remains active', downloadError);
+            return false;
+          });
+        }
         localIndexFreshnessState = navigator && navigator.onLine === false ? 'offline' : 'failed';
         console.warn('local index refresh failed; previous index remains active', error);
         return false;
       })
       .finally(function() {
         localIndexRefreshPromise = null;
+        localIndexRefreshPhase = 'idle';
+        localIndexForceDownloadRequested = false;
       });
     return localIndexRefreshPromise;
+  }
+
+  function forceRefreshLocalIndex_() {
+    const previousAcquisitionId = localIndexLastAcquisitionId;
+    const inFlightAcquisitionId = localIndexRefreshPromise && localIndexRefreshPhase === 'downloading'
+      ? localIndexCurrentDownloadAcquisitionId
+      : 0;
+    return refreshLocalIndex_(true, '', true).then(function() {
+      const acquired = inFlightAcquisitionId
+        ? localIndexLastAcquisitionId === inFlightAcquisitionId
+        : localIndexLastAcquisitionId > previousAcquisitionId;
+      return {
+        success: acquired,
+        reason: acquired ? '' : (localIndexFreshnessState === 'offline' ? 'offline' : 'failed'),
+        updatedAt: localIndexLastSuccessfulUpdateAt,
+        persistence: acquired ? localIndexPersistenceState : ''
+      };
+    });
   }
 
   window.ShumiLibraryLocalIndex = {
@@ -905,8 +992,11 @@
         : null;
     },
     getFreshnessState: function() { return localIndexFreshnessState; },
+    getLastSuccessfulUpdateAt: function() { return localIndexLastSuccessfulUpdateAt; },
+    getPersistenceState: function() { return localIndexPersistenceState; },
     noteServerRevision: function(revision) { return refreshLocalIndex_(true, revision); },
-    checkForUpdates: function() { return refreshLocalIndex_(true, ''); }
+    checkForUpdates: function() { return refreshLocalIndex_(true, ''); },
+    forceRefresh: forceRefreshLocalIndex_
   };
 
   if (window.indexedDB) ensureLocalIndexLoaded_();

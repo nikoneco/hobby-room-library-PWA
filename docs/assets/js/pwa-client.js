@@ -909,6 +909,103 @@
     state.render();
   }
 
+  function bindLocalIndexRefresh_() {
+    const button = document.getElementById('pwaUpdateLocalIndex');
+    const status = document.getElementById('pwaLocalIndexUpdateStatus');
+    const lastUpdated = document.getElementById('pwaLocalIndexLastUpdated');
+    if (!button || !status || !lastUpdated) return;
+
+    let mode = 'idle';
+    let failureReason = '';
+    function manager_() {
+      return window.ShumiLibraryLocalIndex || null;
+    }
+    function render_() {
+      const manager = manager_();
+      const updatedAt = manager && typeof manager.getLastSuccessfulUpdateAt === 'function'
+        ? manager.getLastSuccessfulUpdateAt()
+        : '';
+      if (updatedAt) {
+        const date = new Date(updatedAt);
+        lastUpdated.textContent = Number.isNaN(date.getTime())
+          ? '最終更新: 時刻を確認できません'
+          : '最終更新: ' + date.toLocaleString('ja-JP', {
+            year: 'numeric', month: '2-digit', day: '2-digit',
+            hour: '2-digit', minute: '2-digit'
+          });
+      } else {
+        lastUpdated.textContent = '最終更新: 記録なし';
+      }
+
+      if (mode === 'updating') {
+        status.textContent = '蔵書データを取得しています…';
+      } else if (mode === 'failed') {
+        status.textContent = failureReason === 'offline'
+          ? 'オフラインです。前のデータを保持しています。'
+          : '更新できませんでした。前のデータを保持しています。';
+      } else if (mode === 'success') {
+        const persistence = manager && typeof manager.getPersistenceState === 'function'
+          ? manager.getPersistenceState()
+          : 'unknown';
+        status.textContent = persistence === 'saving'
+          ? '更新しました。端末への保存を確認中です。'
+          : persistence === 'failed'
+            ? '更新しましたが、端末への保存に失敗しました。'
+            : '蔵書データを更新しました。';
+      } else {
+        status.textContent = '端末の蔵書データを再取得します';
+      }
+    }
+
+    document.addEventListener('shumi-library-local-index-ready', function(event) {
+      if (event && event.detail && event.detail.updated && mode !== 'updating') mode = 'success';
+      render_();
+    });
+    document.addEventListener('shumi-library-local-index-persistence', function() {
+      render_();
+    });
+    const manager = manager_();
+    if (manager && typeof manager.whenLoaded === 'function') {
+      Promise.resolve(manager.whenLoaded()).then(render_).catch(render_);
+    } else {
+      render_();
+    }
+
+    button.addEventListener('click', function() {
+      if (button.disabled) return;
+      const indexManager = manager_();
+      if (!indexManager || typeof indexManager.forceRefresh !== 'function') {
+        mode = 'failed';
+        failureReason = 'failed';
+        render_();
+        return;
+      }
+
+      mode = 'updating';
+      failureReason = '';
+      button.disabled = true;
+      button.setAttribute('aria-busy', 'true');
+      render_();
+      Promise.resolve(indexManager.forceRefresh()).then(function(result) {
+        if (result && result.success) {
+          mode = 'success';
+          failureReason = '';
+        } else {
+          mode = 'failed';
+          failureReason = result && result.reason || 'failed';
+        }
+        render_();
+      }).catch(function() {
+        mode = 'failed';
+        failureReason = 'failed';
+        render_();
+      }).finally(function() {
+        button.disabled = false;
+        button.setAttribute('aria-busy', 'false');
+      });
+    });
+  }
+
   function bindSettingsPanel_() {
     const panel = document.getElementById('pwaSettingsPanel');
     const backdrop = document.getElementById('pwaSettingsBackdrop');
@@ -918,6 +1015,7 @@
 
     moveSensitiveToggleToSettings_();
     bindFailureTests_();
+    bindLocalIndexRefresh_();
     applyTheme_(getStoredTheme_());
     applyPlaySettings_();
 

@@ -238,6 +238,14 @@ function buildStaticIndex() {
     </fieldset>
     <div class="pwa-settings-section pwa-dev-settings" aria-label="開発">
       <p class="pwa-settings-section-title">開発</p>
+      <button id="pwaUpdateLocalIndex" type="button" class="pwa-settings-row pwa-settings-action-row" aria-describedby="pwaLocalIndexUpdateStatus pwaLocalIndexLastUpdated">
+        <span>
+          <span class="pwa-settings-row-title">蔵書データを更新</span>
+          <span id="pwaLocalIndexUpdateStatus" class="pwa-settings-row-note" role="status" aria-live="polite">状態を確認しています</span>
+          <span id="pwaLocalIndexLastUpdated" class="pwa-settings-row-note">最終更新: 未確認</span>
+        </span>
+        <span class="pwa-settings-action-arrow" aria-hidden="true">›</span>
+      </button>
       <label class="pwa-settings-row pwa-settings-toggle-row">
         <span>
           <span class="pwa-settings-row-title">性能HUD</span>
@@ -3129,6 +3137,12 @@ function writeGasRunShim() {
   let localIndexRefreshPromise = null;
   let localIndexLastCheckedAt = 0;
   let localIndexFreshnessState = 'unchecked';
+  let localIndexRefreshPhase = 'idle';
+  let localIndexForceDownloadRequested = false;
+  let localIndexLastSuccessfulUpdateAt = '';
+  let localIndexPersistenceState = 'unknown';
+  let localIndexLastAcquisitionId = 0;
+  let localIndexCurrentDownloadAcquisitionId = 0;
 
   function normalizeKanaLocal_(value) {
     return String(value || '').toLowerCase().normalize('NFKC')
@@ -3576,22 +3590,24 @@ function writeGasRunShim() {
     }
   }
 
-  async function writeStoredLocalIndex_(payload) {
+  async function writeStoredLocalIndex_(payload, savedAt, acquisitionId) {
     const db = await openLocalIndexDb_();
     try {
+      if (acquisitionId && acquisitionId !== localIndexLastAcquisitionId) return false;
       await new Promise(function(resolve, reject) {
         const transaction = db.transaction(LOCAL_INDEX_STORE_NAME, 'readwrite');
         transaction.objectStore(LOCAL_INDEX_STORE_NAME).put({
           key: LOCAL_INDEX_ACTIVE_KEY,
           schemaVersion: LOCAL_INDEX_SCHEMA_VERSION,
           revision: payload.revision,
-          savedAt: new Date().toISOString(),
+          savedAt: savedAt || new Date().toISOString(),
           payload: payload
         });
         transaction.oncomplete = function() { resolve(); };
         transaction.onerror = function() { reject(transaction.error || createError_('ローカル索引を保存できません。', 'INDEXED_DB_WRITE')); };
         transaction.onabort = function() { reject(transaction.error || createError_('ローカル索引の保存が中断されました。', 'INDEXED_DB_ABORT')); };
       });
+      return true;
     } finally {
       db.close();
     }
@@ -3603,12 +3619,24 @@ function writeGasRunShim() {
       detail: {
         revision: localIndexPayload ? localIndexPayload.revision : '',
         count: localIndexRecords.length,
-        updated: Boolean(updated)
+        updated: Boolean(updated),
+        updatedAt: localIndexLastSuccessfulUpdateAt
       }
     }));
   }
 
-  function activateLocalIndex_(payload, updated) {
+  function dispatchLocalIndexPersistence_(status, acquisitionId) {
+    if (!document || typeof document.dispatchEvent !== 'function' || typeof window.CustomEvent !== 'function') return;
+    document.dispatchEvent(new window.CustomEvent('shumi-library-local-index-persistence', {
+      detail: {
+        status: status,
+        updatedAt: localIndexLastSuccessfulUpdateAt,
+        acquisitionId: acquisitionId
+      }
+    }));
+  }
+
+  function activateLocalIndex_(payload, updated, updatedAt) {
     const converted = convertLocalIndexPayload_(payload);
     localIndexPayload = payload;
     localIndexRecords = converted;
@@ -3618,7 +3646,13 @@ function writeGasRunShim() {
       if (record.book.bookId) localIndexByBookId.set(String(record.book.bookId), record);
       localIndexByRowIndex.set(Number(record.book.rowIndex), record);
     });
-    if (updated) localIndexFreshnessState = 'fresh';
+    if (updated) {
+      localIndexFreshnessState = 'fresh';
+      localIndexLastSuccessfulUpdateAt = updatedAt || new Date().toISOString();
+      localIndexLastAcquisitionId += 1;
+      localIndexCurrentDownloadAcquisitionId = localIndexLastAcquisitionId;
+      localIndexPersistenceState = 'saving';
+    }
     dispatchLocalIndexReady_(updated);
   }
 
@@ -3633,13 +3667,27 @@ function writeGasRunShim() {
       quiet: true,
       perfName: 'sync:localIndex'
     });
-    activateLocalIndex_(payload, true);
-    // A usable fresh index must not depend on durable storage being available.
-    try {
-      await writeStoredLocalIndex_(payload);
-    } catch (error) {
-      console.warn('local index persistence failed; fresh in-memory index remains active', error);
-    }
+    const updatedAt = new Date().toISOString();
+    activateLocalIndex_(payload, true, updatedAt);
+    const acquisitionId = localIndexLastAcquisitionId;
+    // Activation and the manual-update result do not wait for IndexedDB to finish.
+    Promise.resolve(writeStoredLocalIndex_(payload, updatedAt, acquisitionId))
+      .then(function() {
+        if (localIndexLastAcquisitionId !== acquisitionId) return;
+        localIndexPersistenceState = 'saved';
+        dispatchLocalIndexPersistence_('saved', acquisitionId);
+      })
+      .catch(function(error) {
+        if (localIndexLastAcquisitionId !== acquisitionId) return;
+        localIndexPersistenceState = 'failed';
+        console.warn('local index persistence failed; fresh in-memory index remains active', error);
+        dispatchLocalIndexPersistence_('failed', acquisitionId);
+      })
+      .finally(function() {
+        if (localIndexCurrentDownloadAcquisitionId === acquisitionId) {
+          localIndexCurrentDownloadAcquisitionId = 0;
+        }
+      });
     return true;
   }
 
@@ -3653,6 +3701,8 @@ function writeGasRunShim() {
           stored.payload
         ) {
           activateLocalIndex_(stored.payload, false);
+          localIndexLastSuccessfulUpdateAt = String(stored.savedAt || '');
+          localIndexPersistenceState = 'saved';
         }
         return Boolean(localIndexPayload);
       })
@@ -3663,8 +3713,22 @@ function writeGasRunShim() {
     return localIndexLoadPromise;
   }
 
-  function refreshLocalIndex_(force, knownRevision) {
-    if (localIndexRefreshPromise) return localIndexRefreshPromise;
+  function startLocalIndexDownload_() {
+    localIndexForceDownloadRequested = false;
+    localIndexRefreshPhase = 'downloading';
+    localIndexCurrentDownloadAcquisitionId = 0;
+    return downloadAndActivateLocalIndex_();
+  }
+
+  function refreshLocalIndex_(force, knownRevision, forceDownload) {
+    if (localIndexRefreshPromise) {
+      if (forceDownload && localIndexRefreshPhase !== 'downloading') {
+        localIndexForceDownloadRequested = true;
+      }
+      return localIndexRefreshPromise;
+    }
+    if (forceDownload) localIndexForceDownloadRequested = true;
+    localIndexRefreshPhase = 'loading';
     localIndexRefreshPromise = ensureLocalIndexLoaded_()
       .then(async function() {
         if (navigator && navigator.onLine === false) {
@@ -3674,6 +3738,7 @@ function writeGasRunShim() {
         const now = Date.now();
         if (
           !force &&
+          !localIndexForceDownloadRequested &&
           localIndexPayload &&
           localIndexFreshnessState === 'fresh' &&
           now - localIndexLastCheckedAt < LOCAL_INDEX_CHECK_THROTTLE_MS
@@ -3681,9 +3746,10 @@ function writeGasRunShim() {
           return false;
         }
         localIndexFreshnessState = 'checking';
+        localIndexRefreshPhase = 'checking';
         localIndexLastCheckedAt = now;
-        if (!localIndexPayload) {
-          return downloadAndActivateLocalIndex_();
+        if (!localIndexPayload || localIndexForceDownloadRequested) {
+          return startLocalIndexDownload_();
         }
 
         let revision = String(knownRevision || '').trim();
@@ -3698,19 +3764,48 @@ function writeGasRunShim() {
         if (localIndexPayload && revision && revision === String(localIndexPayload.revision || '')) {
           localIndexFreshnessState = 'fresh';
           dispatchLocalIndexReady_(false);
+          if (localIndexForceDownloadRequested) return startLocalIndexDownload_();
           return false;
         }
-        return downloadAndActivateLocalIndex_();
+        return startLocalIndexDownload_();
       })
       .catch(function(error) {
+        if (localIndexForceDownloadRequested && !(navigator && navigator.onLine === false)) {
+          console.warn('local index revision check failed; honoring manual refresh request', error);
+          return startLocalIndexDownload_().catch(function(downloadError) {
+            localIndexFreshnessState = navigator && navigator.onLine === false ? 'offline' : 'failed';
+            console.warn('local index refresh failed; previous index remains active', downloadError);
+            return false;
+          });
+        }
         localIndexFreshnessState = navigator && navigator.onLine === false ? 'offline' : 'failed';
         console.warn('local index refresh failed; previous index remains active', error);
         return false;
       })
       .finally(function() {
         localIndexRefreshPromise = null;
+        localIndexRefreshPhase = 'idle';
+        localIndexForceDownloadRequested = false;
       });
     return localIndexRefreshPromise;
+  }
+
+  function forceRefreshLocalIndex_() {
+    const previousAcquisitionId = localIndexLastAcquisitionId;
+    const inFlightAcquisitionId = localIndexRefreshPromise && localIndexRefreshPhase === 'downloading'
+      ? localIndexCurrentDownloadAcquisitionId
+      : 0;
+    return refreshLocalIndex_(true, '', true).then(function() {
+      const acquired = inFlightAcquisitionId
+        ? localIndexLastAcquisitionId === inFlightAcquisitionId
+        : localIndexLastAcquisitionId > previousAcquisitionId;
+      return {
+        success: acquired,
+        reason: acquired ? '' : (localIndexFreshnessState === 'offline' ? 'offline' : 'failed'),
+        updatedAt: localIndexLastSuccessfulUpdateAt,
+        persistence: acquired ? localIndexPersistenceState : ''
+      };
+    });
   }
 
   window.ShumiLibraryLocalIndex = {
@@ -3739,8 +3834,11 @@ function writeGasRunShim() {
         : null;
     },
     getFreshnessState: function() { return localIndexFreshnessState; },
+    getLastSuccessfulUpdateAt: function() { return localIndexLastSuccessfulUpdateAt; },
+    getPersistenceState: function() { return localIndexPersistenceState; },
     noteServerRevision: function(revision) { return refreshLocalIndex_(true, revision); },
-    checkForUpdates: function() { return refreshLocalIndex_(true, ''); }
+    checkForUpdates: function() { return refreshLocalIndex_(true, ''); },
+    forceRefresh: forceRefreshLocalIndex_
   };
 
   if (window.indexedDB) ensureLocalIndexLoaded_();
@@ -4710,6 +4808,103 @@ function writePwaClient() {
     state.render();
   }
 
+  function bindLocalIndexRefresh_() {
+    const button = document.getElementById('pwaUpdateLocalIndex');
+    const status = document.getElementById('pwaLocalIndexUpdateStatus');
+    const lastUpdated = document.getElementById('pwaLocalIndexLastUpdated');
+    if (!button || !status || !lastUpdated) return;
+
+    let mode = 'idle';
+    let failureReason = '';
+    function manager_() {
+      return window.ShumiLibraryLocalIndex || null;
+    }
+    function render_() {
+      const manager = manager_();
+      const updatedAt = manager && typeof manager.getLastSuccessfulUpdateAt === 'function'
+        ? manager.getLastSuccessfulUpdateAt()
+        : '';
+      if (updatedAt) {
+        const date = new Date(updatedAt);
+        lastUpdated.textContent = Number.isNaN(date.getTime())
+          ? '最終更新: 時刻を確認できません'
+          : '最終更新: ' + date.toLocaleString('ja-JP', {
+            year: 'numeric', month: '2-digit', day: '2-digit',
+            hour: '2-digit', minute: '2-digit'
+          });
+      } else {
+        lastUpdated.textContent = '最終更新: 記録なし';
+      }
+
+      if (mode === 'updating') {
+        status.textContent = '蔵書データを取得しています…';
+      } else if (mode === 'failed') {
+        status.textContent = failureReason === 'offline'
+          ? 'オフラインです。前のデータを保持しています。'
+          : '更新できませんでした。前のデータを保持しています。';
+      } else if (mode === 'success') {
+        const persistence = manager && typeof manager.getPersistenceState === 'function'
+          ? manager.getPersistenceState()
+          : 'unknown';
+        status.textContent = persistence === 'saving'
+          ? '更新しました。端末への保存を確認中です。'
+          : persistence === 'failed'
+            ? '更新しましたが、端末への保存に失敗しました。'
+            : '蔵書データを更新しました。';
+      } else {
+        status.textContent = '端末の蔵書データを再取得します';
+      }
+    }
+
+    document.addEventListener('shumi-library-local-index-ready', function(event) {
+      if (event && event.detail && event.detail.updated && mode !== 'updating') mode = 'success';
+      render_();
+    });
+    document.addEventListener('shumi-library-local-index-persistence', function() {
+      render_();
+    });
+    const manager = manager_();
+    if (manager && typeof manager.whenLoaded === 'function') {
+      Promise.resolve(manager.whenLoaded()).then(render_).catch(render_);
+    } else {
+      render_();
+    }
+
+    button.addEventListener('click', function() {
+      if (button.disabled) return;
+      const indexManager = manager_();
+      if (!indexManager || typeof indexManager.forceRefresh !== 'function') {
+        mode = 'failed';
+        failureReason = 'failed';
+        render_();
+        return;
+      }
+
+      mode = 'updating';
+      failureReason = '';
+      button.disabled = true;
+      button.setAttribute('aria-busy', 'true');
+      render_();
+      Promise.resolve(indexManager.forceRefresh()).then(function(result) {
+        if (result && result.success) {
+          mode = 'success';
+          failureReason = '';
+        } else {
+          mode = 'failed';
+          failureReason = result && result.reason || 'failed';
+        }
+        render_();
+      }).catch(function() {
+        mode = 'failed';
+        failureReason = 'failed';
+        render_();
+      }).finally(function() {
+        button.disabled = false;
+        button.setAttribute('aria-busy', 'false');
+      });
+    });
+  }
+
   function bindSettingsPanel_() {
     const panel = document.getElementById('pwaSettingsPanel');
     const backdrop = document.getElementById('pwaSettingsBackdrop');
@@ -4719,6 +4914,7 @@ function writePwaClient() {
 
     moveSensitiveToggleToSettings_();
     bindFailureTests_();
+    bindLocalIndexRefresh_();
     applyTheme_(getStoredTheme_());
     applyPlaySettings_();
 

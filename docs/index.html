@@ -98,6 +98,14 @@
     </fieldset>
     <div class="pwa-settings-section pwa-dev-settings" aria-label="開発">
       <p class="pwa-settings-section-title">開発</p>
+      <button id="pwaUpdateLocalIndex" type="button" class="pwa-settings-row pwa-settings-action-row" aria-describedby="pwaLocalIndexUpdateStatus pwaLocalIndexLastUpdated">
+        <span>
+          <span class="pwa-settings-row-title">蔵書データを更新</span>
+          <span id="pwaLocalIndexUpdateStatus" class="pwa-settings-row-note" role="status" aria-live="polite">状態を確認しています</span>
+          <span id="pwaLocalIndexLastUpdated" class="pwa-settings-row-note">最終更新: 未確認</span>
+        </span>
+        <span class="pwa-settings-action-arrow" aria-hidden="true">›</span>
+      </button>
       <label class="pwa-settings-row pwa-settings-toggle-row">
         <span>
           <span class="pwa-settings-row-title">性能HUD</span>
@@ -421,7 +429,7 @@
     <img id="cover-fullscreen-img" src="" alt="表紙の拡大画像">
     <div id="cover-fullscreen-caption"></div>
   </div>
-  <script src="./assets/js/gas-run-shim.344774392f.js"></script>
+  <script src="./assets/js/gas-run-shim.135848207f.js"></script>
   <script src="./assets/js/pwa-client.js"></script>
   <script src="./assets/js/script.state.9b4bc9a55e.js"></script>
   <script src="./assets/js/script.images.7c22f19eaa.js"></script>
