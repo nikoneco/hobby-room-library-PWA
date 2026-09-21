@@ -240,7 +240,8 @@ function buildStaticIndex() {
       <p class="pwa-settings-section-title">開発</p>
       <button id="pwaUpdateLocalIndex" type="button" class="pwa-settings-row pwa-settings-action-row" aria-describedby="pwaLocalIndexUpdateStatus pwaLocalIndexLastUpdated">
         <span>
-          <span class="pwa-settings-row-title">蔵書データを更新</span>
+          <span class="pwa-settings-row-title">キャッシュを強制更新</span>
+          <span class="pwa-settings-row-note">通常は自動更新されます</span>
           <span id="pwaLocalIndexUpdateStatus" class="pwa-settings-row-note" role="status" aria-live="polite">状態を確認しています</span>
           <span id="pwaLocalIndexLastUpdated" class="pwa-settings-row-note">最終更新: 未確認</span>
         </span>
@@ -4852,7 +4853,7 @@ function writePwaClient() {
             ? '更新しましたが、端末への保存に失敗しました。'
             : '蔵書データを更新しました。';
       } else {
-        status.textContent = '端末の蔵書データを再取得します';
+        status.textContent = '表示が古いときにデータを再取得します';
       }
     }
 

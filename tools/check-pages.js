@@ -90,7 +90,7 @@ assert(index.includes('id="pwaSettingsPanel"'), 'static index includes PWA setti
 assert(index.includes('id="detailMedia"'), 'static index includes the series media filter');
 assert(index.includes('aria-label="メニューを開く"'), 'static index labels the top-right control as a menu');
 assert(index.includes('id="pwaSeriesStatusEntry"'), 'static menu includes the series status entry');
-assert(index.includes('id="pwaUpdateLocalIndex"') && index.includes('蔵書データを更新'),
+assert(index.includes('id="pwaUpdateLocalIndex"') && index.includes('キャッシュを強制更新') && index.includes('通常は自動更新されます'),
   'static menu includes the manual local-library index refresh action');
 assert(index.indexOf('id="pwaUpdateLocalIndex"') < index.indexOf('id="pwaPerfHudEnabled"'),
   'manual refresh action appears in the Development section before its existing controls');
