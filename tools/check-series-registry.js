@@ -64,6 +64,7 @@ class FakeRange {
   }
 
   getValues() {
+    if (typeof this.sheet.beforeRead === 'function') this.sheet.beforeRead(this);
     return Array.from({ length: this.height }, (_, y) =>
       Array.from({ length: this.width }, (_, x) =>
         this.sheet.rows[this.row + y - 1]?.[this.column + x - 1] ?? ''
@@ -87,6 +88,7 @@ class FakeRange {
 
   setValues(values) {
     assert.equal(values.length, this.height, 'setValues height matches range');
+    if (typeof this.sheet.beforeWrite === 'function') this.sheet.beforeWrite(this, values);
     values.forEach((row, y) => {
       assert.equal(row.length, this.width, 'setValues width matches range');
       const targetRow = this.row + y - 1;
@@ -98,6 +100,7 @@ class FakeRange {
       });
     });
     this.sheet.writes += 1;
+    if (typeof this.sheet.afterWrite === 'function') this.sheet.afterWrite(this, values);
     return this;
   }
 
@@ -258,6 +261,51 @@ function rowsWithoutHeaders(sheet) {
   return sheet.rows.slice(1).filter(row => row.some(value => String(value ?? '') !== ''));
 }
 
+function metadataMergeHoldRows(fixture) {
+  return rowsWithoutHeaders(fixture.reviewSheet).filter(row =>
+    String(row[4] || '').startsWith('METADATA_MERGE_HOLD:')
+  );
+}
+
+function makePendingManualMergeFixture(options = {}) {
+  const masters = [
+    makeMaster('source-automatic', {
+      canonical: 'automatic',
+      count: 0,
+      genres: options.sourceGenres || ['物語', '', '', '', ''],
+      media: options.sourceMedia || ['', '']
+    }),
+    makeMaster('target-series', {
+      canonical: 'target',
+      count: 1,
+      genres: options.targetGenres || ['ギャグ', '', '', '', ''],
+      media: options.targetMedia || ['', '']
+    }),
+    makeMaster('other-series', { canonical: 'other', count: 1 })
+  ];
+  const aliases = [
+    makeAlias('automatic', 'source-automatic'),
+    makeAlias('target', 'target-series', { count: 1 }),
+    makeAlias('other', 'other-series', { count: 1 })
+  ];
+  if (options.includeOrdinaryOrphan) {
+    masters.push(makeMaster('unrelated-orphan', { canonical: 'unrelated' }));
+    aliases.push(makeAlias('unrelated', 'unrelated-orphan'));
+  }
+  return makeFixture({
+    masters,
+    aliases,
+    books: [
+      makeBook('automatic', 'target', { uuid: '307908e3-c9e3-4e91-9750-68d30a9e84a6' }),
+      makeBook('other', 'other', { uuid: '323908e3-c9e3-4e91-9750-68d30a9e84a7' })
+    ]
+  });
+}
+
+function triggerManualXEdit(fixture, row) {
+  return fixture.context.onEdit({ range: fixture.catalogSheet.getRange(row, 24, 1, 1) });
+}
+
 function testActualReferencesOverrideCachedCountsAndCleanupIsIdempotent() {
   const fixture = makeFixture({
     masters: [
@@ -345,8 +393,16 @@ function makeOrphanExtraConflictFixture(options = {}) {
   const targetId = 'target-extra-live';
   return makeFixture({
     masters: [
-      makeMaster(sourceId, { name: 'art', canonical: 'art', media: ['', '画集'], count: 0 }),
-      makeMaster(targetId, { name: 'art', canonical: '__extra__art', media: ['画集', ''], count: 0 })
+      makeMaster(sourceId, {
+        name: 'art', canonical: 'art',
+        genres: options.sourceGenres || ['物語', '', '', '', ''],
+        media: options.sourceMedia || ['', '画集'], count: 0
+      }),
+      makeMaster(targetId, {
+        name: 'art', canonical: '__extra__art',
+        genres: options.targetGenres || ['', '', '', '', ''],
+        media: options.targetMedia || ['画集', ''], count: 0
+      })
     ],
     aliases: [
       makeAlias('art', sourceId, { count: 42 }),
@@ -371,6 +427,8 @@ function testImportRehomesOnlySafeZeroReferenceExtraOwner() {
   const alias = rowsWithoutHeaders(aliasSheet).find(row => row[0] === 'art');
   assert.equal(alias[1], 'target-extra-live');
   assert.deepEqual(rowsWithoutHeaders(masterSheet).map(row => row[0]), ['target-extra-live']);
+  assert.deepEqual(rowsWithoutHeaders(masterSheet)[0].slice(2, 7), ['物語', '', '', '', '']);
+  assert.deepEqual(rowsWithoutHeaders(masterSheet)[0].slice(11, 13), ['画集', ''], 'existing media is not duplicated across L/M');
   const writesAfterFirstRun = snapshotWrites(fixture);
   const again = context.refreshSeriesKeyAutoForImport_(catalogSheet);
   assert.equal(again.changed, 0);
@@ -478,7 +536,7 @@ function testExternalReferenceProtectsOrphanAndUnresolvedBookBlocksCleanup() {
   });
   const before = snapshotWrites(unresolved);
   const unresolvedResult = unresolved.context.cleanupSeriesRegistryLifecycleCore_();
-  assert.ok(unresolvedResult.blockers.includes('unresolved catalog series keys'));
+  assert.ok(unresolvedResult.blockers.some(blocker => blocker.includes('unresolved catalog series keys')));
   assert.equal(snapshotWrites(unresolved), before);
   assert.equal(rowsWithoutHeaders(unresolved.masterSheet).length, 1);
 }
@@ -547,8 +605,12 @@ function testGeneratedNameEquivalenceHandlesKanaCaseAndExtraPrefix() {
 function testManualMergeDeletesOnlyUnreferencedSourceAndKeepsLiveSource() {
   const safe = makeFixture({
     masters: [
-      makeMaster('target', { canonical: 'target', count: 1 }),
-      makeMaster('orphan-source', { canonical: 'automatic', count: 77 })
+      makeMaster('target', { canonical: 'target', count: 1, media: ['', ''] }),
+      makeMaster('orphan-source', {
+        canonical: 'automatic', count: 77,
+        genres: ['物語', '', '', '', ''],
+        media: ['', '電子書籍']
+      })
     ],
     aliases: [makeAlias('target', 'target'), makeAlias('automatic', 'orphan-source', { count: 42 })],
     books: [makeBook('automatic', 'target')]
@@ -558,6 +620,8 @@ function testManualMergeDeletesOnlyUnreferencedSourceAndKeepsLiveSource() {
   assert.equal(merged.cleanup.deletedMasters, 1);
   assert.equal(rowsWithoutHeaders(safe.masterSheet).some(row => row[0] === 'orphan-source'), false);
   assert.equal(rowsWithoutHeaders(safe.aliasSheet).find(row => row[0] === 'automatic')[1], 'target');
+  assert.deepEqual(rowsWithoutHeaders(safe.masterSheet)[0].slice(2, 7), ['物語', '', '', '', '']);
+  assert.deepEqual(rowsWithoutHeaders(safe.masterSheet)[0].slice(11, 13), ['', '電子書籍']);
 
   const live = makeFixture({
     masters: [makeMaster('target', { canonical: 'target' }), makeMaster('live-source', { canonical: 'automatic' })],
@@ -652,6 +716,349 @@ function testA1OnEditReturnsBeforeRegistryReads() {
   assert.deepEqual(fixture.lockCounts(), { acquired: 0, released: 0 });
 }
 
+function testTitledBlankSeriesKeyOnEditFailsClosedWithoutDeletingRegistry() {
+  const seriesId = 'series-blank-x';
+  const uuid = '307908e3-c9e3-4e91-9750-68d30a9e84a6';
+  const fixture = makeFixture({
+    masters: [makeMaster(seriesId, { canonical: 'retained', count: 1 })],
+    aliases: [makeAlias('retained', seriesId, { count: 1 })],
+    books: [makeBook('Retained book', 'retained', { uuid })]
+  });
+  fixture.catalogSheet.rows[1][23] = '';
+  const before = snapshotWrites(fixture);
+  const usage = fixture.context.loadSeriesRegistryLookup_().catalogUsage;
+  assert.equal(usage.unresolved.length, 1);
+  assert.equal(usage.unresolved[0].reason, 'TITLE_WITHOUT_SERIES_KEY');
+  assert.throws(
+    () => fixture.context.onEdit({ range: fixture.catalogSheet.getRange(2, 24, 1, 1) }),
+    /Series registry merge preflight failed: unresolved catalog series keys.*row 2: titled book has blank series_key_auto/
+  );
+  assert.equal(snapshotWrites(fixture), before, 'blank X aborts before registry count or lifecycle writes');
+  assert.equal(fixture.catalogSheet.rows[1][8], 'Retained book');
+  assert.equal(fixture.catalogSheet.rows[1][23], '');
+  assert.equal(rowsWithoutHeaders(fixture.masterSheet)[0][0], seriesId);
+  assert.equal(rowsWithoutHeaders(fixture.aliasSheet)[0][1], seriesId);
+}
+
+function testImportRepairsBlankExtraKeyToTheExistingSeriesId() {
+  const seriesId = 'extra-existing-id';
+  const fixture = makeFixture({
+    masters: [makeMaster(seriesId, {
+      name: 'art', canonical: '__extra__art', media: ['画集', ''], count: 0
+    })],
+    aliases: [makeAlias('__extra__art', seriesId)],
+    books: [makeBook('art', '', {
+      uuid: '307908e3-c9e3-4e91-9750-68d30a9e84a6'
+    })]
+  });
+  const result = fixture.context.refreshSeriesKeyAutoForImport_(fixture.catalogSheet);
+  assert.equal(fixture.catalogSheet.rows[1][23], '__extra__art');
+  assert.equal(result.registry.mastersAdded, 0);
+  assert.equal(result.cleanup.deletedMasters, 0);
+  assert.deepEqual(rowsWithoutHeaders(fixture.masterSheet).map(row => row[0]), [seriesId]);
+  assert.equal(rowsWithoutHeaders(fixture.aliasSheet)[0][1], seriesId);
+  assert.deepEqual(rowsWithoutHeaders(fixture.masterSheet)[0].slice(11, 13), ['画集', '']);
+}
+
+function testBlankTitleWithNormalAndExtraOwnersFailsClosedAsAmbiguous() {
+  const fixture = makeFixture({
+    masters: [
+      makeMaster('normal-art', { canonical: 'art' }),
+      makeMaster('extra-art', { canonical: '__extra__art', media: ['画集', ''] })
+    ],
+    aliases: [makeAlias('art', 'normal-art'), makeAlias('__extra__art', 'extra-art')],
+    books: [makeBook('art', '', { uuid: '307908e3-c9e3-4e91-9750-68d30a9e84a6' })]
+  });
+  const before = snapshotWrites(fixture);
+  assert.throws(
+    () => fixture.context.refreshSeriesKeyAutoForImport_(fixture.catalogSheet),
+    /Ambiguous series classification for title: art/
+  );
+  assert.equal(snapshotWrites(fixture), before);
+  assert.deepEqual(rowsWithoutHeaders(fixture.masterSheet).map(row => row[0]), ['normal-art', 'extra-art']);
+}
+
+function testEmptyTitleRowsDoNotBlockUnrelatedOrphanDeletion() {
+  const fixture = makeFixture({
+    masters: [
+      makeMaster('live', { canonical: 'live', count: 1 }),
+      makeMaster('orphan', { canonical: 'orphan', count: 0 })
+    ],
+    aliases: [makeAlias('live', 'live', { count: 1 }), makeAlias('orphan', 'orphan')],
+    books: [makeBook('', ''), makeBook('Live book', 'live')]
+  });
+  const usage = fixture.context.loadSeriesRegistryLookup_().catalogUsage;
+  assert.equal(usage.unresolved.length, 0, 'blank rows and deleted titles are not unresolved books');
+  const result = fixture.context.cleanupSeriesRegistryLifecycleCore_();
+  assert.equal(result.deletedMasters, 1);
+  assert.equal(rowsWithoutHeaders(fixture.masterSheet).some(row => row[0] === 'orphan'), false);
+  assert.equal(rowsWithoutHeaders(fixture.masterSheet).some(row => row[0] === 'live'), true);
+}
+
+function testLifecycleRehomeTransfersMissingGenreAndMediaSlots() {
+  const fixture = makeFixture({
+    masters: [
+      makeMaster('source', {
+        canonical: 'sample',
+        genres: ['物語', '', '', '', ''],
+        media: ['', '電子書籍']
+      }),
+      makeMaster('target-extra', {
+        canonical: '__extra__sample',
+        genres: ['', '', '', '', ''],
+        media: ['', '']
+      })
+    ],
+    aliases: [makeAlias('sample', 'source'), makeAlias('__extra__sample', 'target-extra')],
+    books: [makeBook('sample', '__extra__sample', { genre: '画集' })]
+  });
+  const result = fixture.context.cleanupSeriesRegistryLifecycleCore_();
+  assert.equal(result.deletedMasters, 1);
+  assert.equal(result.rehomedAliases, 1);
+  assert.equal(result.metadataSlotsMerged, 2);
+  const target = rowsWithoutHeaders(fixture.masterSheet)[0];
+  assert.equal(target[0], 'target-extra');
+  assert.deepEqual(target.slice(2, 7), ['物語', '', '', '', '']);
+  assert.deepEqual(target.slice(11, 13), ['', '電子書籍']);
+}
+
+function testMetadataConflictPreservesMergeSourceButAllowsPlainOrphanDeletion() {
+  const fixture = makeFixture({
+    masters: [
+      makeMaster('source-conflict', { canonical: 'art', genres: ['物語', '', '', '', ''] }),
+      makeMaster('target-extra', { canonical: '__extra__art', genres: ['ギャグ', '', '', '', ''] }),
+      makeMaster('unrelated-orphan', { canonical: 'unrelated' })
+    ],
+    aliases: [
+      makeAlias('art', 'source-conflict'),
+      makeAlias('__extra__art', 'target-extra'),
+      makeAlias('unrelated', 'unrelated-orphan')
+    ],
+    books: [makeBook('art', '__extra__art')]
+  });
+  const result = fixture.context.cleanupSeriesRegistryLifecycleCore_();
+  assert.equal(result.deletedMasters, 1, 'a plain orphan without a destination still follows lifecycle cleanup');
+  assert.equal(rowsWithoutHeaders(fixture.masterSheet).some(row => row[0] === 'source-conflict'), true);
+  assert.equal(rowsWithoutHeaders(fixture.aliasSheet).some(row => row[0] === 'art' && row[1] === 'source-conflict'), true);
+  assert.equal(rowsWithoutHeaders(fixture.masterSheet).find(row => row[0] === 'target-extra')[2], 'ギャグ');
+  assert.ok(result.metadataBlockers.some(blocker => blocker.includes('column C')));
+}
+
+function testConflictingMetadataFromMultipleSourcesBlocksAllLifecycleRehomes() {
+  const fixture = makeFixture({
+    masters: [
+      makeMaster('source-art', { canonical: 'art', genres: ['物語', '', '', '', ''] }),
+      makeMaster('source-artist', { canonical: 'artist', genres: ['ギャグ', '', '', '', ''] }),
+      makeMaster('target-extra', { canonical: '__extra__art' })
+    ],
+    aliases: [
+      makeAlias('art', 'source-art'),
+      makeAlias('artist', 'source-artist'),
+      makeAlias('__extra__art', 'target-extra'),
+      makeAlias('__extra__artist', 'target-extra')
+    ],
+    books: [makeBook('art', '__extra__art')]
+  });
+  const before = snapshotWrites(fixture);
+  const masterWritesBefore = fixture.masterSheet.writes;
+  const aliasWritesBefore = fixture.aliasSheet.writes;
+  const result = fixture.context.cleanupSeriesRegistryLifecycleCore_();
+  assert.equal(snapshotWrites(fixture), before + 1, 'only the verified review hold batch is written');
+  assert.equal(fixture.masterSheet.writes, masterWritesBefore);
+  assert.equal(fixture.aliasSheet.writes, aliasWritesBefore);
+  assert.equal(result.deletedMasters, 0);
+  assert.equal(result.rehomedAliases, 0);
+  assert.ok(result.metadataBlockers.some(blocker => blocker.includes('column C')));
+  assert.equal(metadataMergeHoldRows(fixture).length, 2);
+  assert.deepEqual(
+    rowsWithoutHeaders(fixture.aliasSheet).filter(row => ['art', 'artist'].includes(row[0])).map(row => row[1]),
+    ['source-art', 'source-artist']
+  );
+}
+
+function testMetadataReadbackFailureKeepsLifecycleSourceAndAlias() {
+  const fixture = makeFixture({
+    masters: [
+      makeMaster('source', {
+        canonical: 'sample',
+        genres: ['物語', '', '', '', ''],
+        media: ['', '電子書籍']
+      }),
+      makeMaster('target-extra', { canonical: '__extra__sample' })
+    ],
+    aliases: [makeAlias('sample', 'source'), makeAlias('__extra__sample', 'target-extra')],
+    books: [makeBook('sample', '__extra__sample')]
+  });
+  let destinationMetadataWritten = false;
+  fixture.masterSheet.afterWrite = range => {
+    if (range.row === 3 && range.column >= 3 && range.column <= 13) {
+      destinationMetadataWritten = true;
+    }
+  };
+  fixture.masterSheet.beforeRead = range => {
+    if (destinationMetadataWritten && range.row === 3 && range.column === 3) {
+      throw new Error('simulated readback failure');
+    }
+  };
+  const result = fixture.context.cleanupSeriesRegistryLifecycleCore_();
+  assert.equal(result.deletedMasters, 0);
+  assert.equal(result.rehomedAliases, 0);
+  assert.equal(result.metadataSlotsMerged, 0);
+  assert.equal(result.metadataSlotsWritten, 2, 'destination fills are reported when readback fails');
+  assert.ok(result.metadataBlockers.some(blocker => blocker.includes('readback failed')));
+  assert.equal(rowsWithoutHeaders(fixture.masterSheet).some(row => row[0] === 'source'), true);
+  assert.equal(rowsWithoutHeaders(fixture.aliasSheet).find(row => row[0] === 'sample')[1], 'source');
+  assert.equal(fixture.masterSheet.rows[2][2], '物語');
+}
+
+function testMetadataSnapshotChangeBlocksBeforeAnyMergeWrite() {
+  const fixture = makeFixture({
+    masters: [
+      makeMaster('source', { canonical: 'sample', genres: ['物語', '', '', '', ''] }),
+      makeMaster('target-extra', { canonical: '__extra__sample' })
+    ],
+    aliases: [makeAlias('sample', 'source'), makeAlias('__extra__sample', 'target-extra')],
+    books: [makeBook('sample', '__extra__sample')]
+  });
+  const registry = fixture.context.loadSeriesRegistryLookup_();
+  const plan = fixture.context.buildSeriesRegistryMetadataMergePlan_(registry, [{
+    sourceSeriesId: 'source',
+    destinationSeriesId: 'target-extra'
+  }]);
+  assert.equal(plan.blockers.length, 0);
+
+  const writesBeforeApply = snapshotWrites(fixture);
+  fixture.masterSheet.rows[2][2] = 'manual concurrent edit';
+  const result = fixture.context.applySeriesRegistryMetadataMergePlan_(registry, plan);
+  assert.equal(result.ok, false);
+  assert.ok(result.blockers.some(blocker => blocker.includes('metadata changed before merge for series target-extra')));
+  assert.equal(snapshotWrites(fixture), writesBeforeApply, 'stale metadata is detected before any merge writes');
+  assert.equal(fixture.masterSheet.rows[1][2], '物語', 'source metadata remains intact');
+  assert.equal(fixture.masterSheet.rows[2][2], 'manual concurrent edit', 'concurrent destination edit is preserved');
+  assert.equal(rowsWithoutHeaders(fixture.aliasSheet).find(row => row[0] === 'sample')[1], 'source');
+}
+
+function testFailedOnEditMetadataMergeHoldSurvivesLaterOnEditAndIsDeduped() {
+  const fixture = makePendingManualMergeFixture();
+  assert.throws(
+    () => triggerManualXEdit(fixture, 2),
+    /Manual series metadata merge blocked: metadata conflict at series target-series column C/
+  );
+  assert.equal(metadataMergeHoldRows(fixture).length, 1);
+  assert.equal(metadataMergeHoldRows(fixture)[0][1], 'source-automatic');
+  assert.equal(metadataMergeHoldRows(fixture)[0][3], 'target-series');
+
+  triggerManualXEdit(fixture, 3);
+  assert.equal(rowsWithoutHeaders(fixture.masterSheet).some(row => row[0] === 'source-automatic'), true);
+  assert.equal(rowsWithoutHeaders(fixture.aliasSheet).find(row => row[0] === 'automatic')[1], 'source-automatic');
+  assert.equal(metadataMergeHoldRows(fixture).length, 1, 'later unrelated edit does not duplicate the durable hold');
+
+  triggerManualXEdit(fixture, 2);
+  assert.equal(rowsWithoutHeaders(fixture.masterSheet).some(row => row[0] === 'source-automatic'), true);
+  assert.equal(rowsWithoutHeaders(fixture.aliasSheet).some(row => row[0] === 'automatic'), true);
+  assert.equal(metadataMergeHoldRows(fixture).length, 1, 'repeated edit keeps one hold row');
+}
+
+function testManualMetadataReadbackFailureHoldSurvivesLaterCleanup() {
+  const fixture = makePendingManualMergeFixture({
+    targetGenres: ['', '', '', '', ''],
+    sourceMedia: ['', '電子書籍']
+  });
+  let destinationMetadataWritten = false;
+  fixture.masterSheet.afterWrite = range => {
+    if (range.row === 3 && range.column === 3) destinationMetadataWritten = true;
+  };
+  fixture.masterSheet.beforeRead = range => {
+    if (destinationMetadataWritten && range.row === 3 && range.column === 3) {
+      throw new Error('simulated manual readback failure');
+    }
+  };
+  assert.throws(
+    () => triggerManualXEdit(fixture, 2),
+    /Manual series metadata merge blocked: metadata readback failed/
+  );
+  assert.equal(metadataMergeHoldRows(fixture).length, 1);
+  fixture.masterSheet.beforeRead = null;
+  const cleanup = fixture.context.cleanupSeriesRegistryLifecycleCore_();
+  assert.equal(cleanup.deletedMasters, 0);
+  assert.equal(rowsWithoutHeaders(fixture.masterSheet).some(row => row[0] === 'source-automatic'), true);
+  assert.equal(rowsWithoutHeaders(fixture.aliasSheet).find(row => row[0] === 'automatic')[1], 'source-automatic');
+  assert.equal(metadataMergeHoldRows(fixture).length, 1);
+}
+
+function testManualMetadataWriteFailureHoldSurvivesLaterCleanup() {
+  const fixture = makePendingManualMergeFixture({
+    targetGenres: ['', '', '', '', ''],
+    sourceMedia: ['', '電子書籍']
+  });
+  fixture.masterSheet.beforeWrite = range => {
+    if (range.row === 3 && range.column === 13) throw new Error('simulated manual write failure');
+  };
+  assert.throws(
+    () => triggerManualXEdit(fixture, 2),
+    /Manual series metadata merge blocked: metadata write failed/
+  );
+  assert.equal(fixture.masterSheet.rows[2][2], '物語', 'the first destination fill may remain after a later write failure');
+  assert.equal(metadataMergeHoldRows(fixture).length, 1);
+  fixture.masterSheet.beforeWrite = null;
+  const cleanup = fixture.context.cleanupSeriesRegistryLifecycleCore_();
+  assert.equal(cleanup.deletedMasters, 0);
+  assert.equal(rowsWithoutHeaders(fixture.masterSheet).some(row => row[0] === 'source-automatic'), true);
+  assert.equal(rowsWithoutHeaders(fixture.aliasSheet).find(row => row[0] === 'automatic')[1], 'source-automatic');
+  assert.equal(metadataMergeHoldRows(fixture).length, 1);
+}
+
+function testReviewHoldWriteFailureUsesCatalogEvidenceOnLaterCleanup() {
+  const fixture = makePendingManualMergeFixture({ includeOrdinaryOrphan: true });
+  fixture.reviewSheet.beforeWrite = () => { throw new Error('simulated review hold append failure'); };
+  assert.throws(
+    () => triggerManualXEdit(fixture, 2),
+    /Unable to persist metadata merge safety hold; no alias or master deletion was performed/
+  );
+  assert.equal(metadataMergeHoldRows(fixture).length, 0);
+  assert.equal(rowsWithoutHeaders(fixture.masterSheet).some(row => row[0] === 'source-automatic'), true);
+
+  fixture.reviewSheet.beforeWrite = null;
+  const cleanup = fixture.context.cleanupSeriesRegistryLifecycleCore_();
+  assert.equal(cleanup.protectedByPendingManualMerge, 1);
+  assert.equal(cleanup.pendingManualMerges[0].sourceSeriesId, 'source-automatic');
+  assert.equal(cleanup.pendingManualMerges[0].destinationSeriesId, 'target-series');
+  assert.equal(cleanup.deletedMasters, 1, 'unrelated orphan without a matching catalog title is still deleted');
+  assert.equal(rowsWithoutHeaders(fixture.masterSheet).some(row => row[0] === 'source-automatic'), true);
+  assert.equal(rowsWithoutHeaders(fixture.aliasSheet).find(row => row[0] === 'automatic')[1], 'source-automatic');
+  assert.equal(metadataMergeHoldRows(fixture).length, 0);
+}
+
+function testManualMergeDetectsConflictingMetadataFromMultipleSources() {
+  const fixture = makeFixture({
+    masters: [
+      makeMaster('target', { canonical: 'target', count: 2 }),
+      makeMaster('source-one', { canonical: 'automatic', genres: ['物語', '', '', '', ''] }),
+      makeMaster('source-two', { canonical: 'different', genres: ['ギャグ', '', '', '', ''] })
+    ],
+    aliases: [
+      makeAlias('target', 'target', { count: 2 }),
+      makeAlias('automatic', 'source-one'),
+      makeAlias('different', 'source-two')
+    ],
+    books: [
+      makeBook('automatic', 'target', { uuid: '307908e3-c9e3-4e91-9750-68d30a9e84a6' }),
+      makeBook('different', 'target', { uuid: '323908e3-c9e3-4e91-9750-68d30a9e84a7' })
+    ]
+  });
+  const before = snapshotWrites(fixture);
+  assert.throws(
+    () => fixture.context.syncSeriesRegistryAfterManualKeyEdit_(fixture.catalogSheet, 2, 2),
+    /Manual series metadata merge blocked: metadata conflict at series target column C/
+  );
+  assert.equal(snapshotWrites(fixture), before + 1, 'failed manual merge persists one review-hold batch');
+  assert.equal(metadataMergeHoldRows(fixture).length, 2);
+  assert.equal(rowsWithoutHeaders(fixture.masterSheet).some(row => row[0] === 'source-one'), true);
+  assert.equal(rowsWithoutHeaders(fixture.masterSheet).some(row => row[0] === 'source-two'), true);
+  assert.equal(rowsWithoutHeaders(fixture.aliasSheet).find(row => row[0] === 'automatic')[1], 'source-one');
+  assert.equal(rowsWithoutHeaders(fixture.aliasSheet).find(row => row[0] === 'different')[1], 'source-two');
+}
+
 const tests = [
   testActualReferencesOverrideCachedCountsAndCleanupIsIdempotent,
   testReviewPipeSeparatedReferencesKeepAndDeactivateHistory,
@@ -668,7 +1075,21 @@ const tests = [
   testManualMergeDeletesOnlyUnreferencedSourceAndKeepsLiveSource,
   testMediaEditMColumnRunsInsideRegistryLockAndPromotesSameId,
   testTitleEditPreflightsInactiveAliasOwnerBeforeChangingX,
-  testA1OnEditReturnsBeforeRegistryReads
+  testA1OnEditReturnsBeforeRegistryReads,
+  testTitledBlankSeriesKeyOnEditFailsClosedWithoutDeletingRegistry,
+  testImportRepairsBlankExtraKeyToTheExistingSeriesId,
+  testBlankTitleWithNormalAndExtraOwnersFailsClosedAsAmbiguous,
+  testEmptyTitleRowsDoNotBlockUnrelatedOrphanDeletion,
+  testLifecycleRehomeTransfersMissingGenreAndMediaSlots,
+  testMetadataConflictPreservesMergeSourceButAllowsPlainOrphanDeletion,
+  testConflictingMetadataFromMultipleSourcesBlocksAllLifecycleRehomes,
+  testMetadataReadbackFailureKeepsLifecycleSourceAndAlias,
+  testMetadataSnapshotChangeBlocksBeforeAnyMergeWrite,
+  testFailedOnEditMetadataMergeHoldSurvivesLaterOnEditAndIsDeduped,
+  testManualMetadataReadbackFailureHoldSurvivesLaterCleanup,
+  testManualMetadataWriteFailureHoldSurvivesLaterCleanup,
+  testReviewHoldWriteFailureUsesCatalogEvidenceOnLaterCleanup,
+  testManualMergeDetectsConflictingMetadataFromMultipleSources
 ];
 
 tests.forEach(test => test());

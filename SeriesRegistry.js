@@ -50,7 +50,8 @@ const SERIES_REGISTRY_CONFIG_ = Object.freeze({
     '理由',
     '状態',
     '更新日時'
-  ]
+  ],
+  METADATA_MERGE_HOLD_REASON_PREFIX: 'METADATA_MERGE_HOLD:'
 });
 
 const SERIES_REGISTRY_MEDIA_EXTRA_VALUES_ = Object.freeze([
@@ -662,6 +663,8 @@ function readSeriesRegistryCatalogUsage_(lookup, catalogSheet) {
     keyCounts: new Map(),
     checkedBooks: 0,
     unresolved: [],
+    blankKeyRows: [],
+    pendingManualMergePairs: [],
     complete: false
   };
   if (!lookup || typeof CONFIG === 'undefined' || !CONFIG.SHEETS || !CONFIG.COL) return result;
@@ -674,10 +677,27 @@ function readSeriesRegistryCatalogUsage_(lookup, catalogSheet) {
   const keys = sheet
     .getRange(2, CONFIG.COL.SERIES_KEY_AUTO, lastRow - 1, 1)
     .getDisplayValues();
+  const titles = sheet
+    .getRange(2, CONFIG.COL.TITLE, lastRow - 1, 1)
+    .getDisplayValues();
+  const resolvedCatalogRows = [];
   result.checkedBooks = keys.length;
   keys.forEach((row, index) => {
     const key = normalizeSeriesAliasKey_(row[0]);
-    if (!key) return;
+    const title = String(titles[index] ? titles[index][0] || '' : '').trim();
+    if (!key) {
+      if (title) {
+        const unresolved = {
+          row: index + 2,
+          key: '',
+          reason: 'TITLE_WITHOUT_SERIES_KEY',
+          title
+        };
+        result.unresolved.push(unresolved);
+        result.blankKeyRows.push(unresolved);
+      }
+      return;
+    }
     result.keyCounts.set(key, (result.keyCounts.get(key) || 0) + 1);
     let seriesId = '';
     if (!(lookup.ambiguousAliasKeys && lookup.ambiguousAliasKeys.has(key))) {
@@ -690,14 +710,69 @@ function readSeriesRegistryCatalogUsage_(lookup, catalogSheet) {
       seriesId = lookup.uniqueSeriesIdBySignature.get(signature) || '';
     }
     if (!seriesId) {
-      result.unresolved.push({ row: index + 2, key });
+      result.unresolved.push({
+        row: index + 2,
+        key,
+        reason: 'SERIES_KEY_NOT_RESOLVED'
+      });
       return;
     }
     result.refsBySeriesId.set(
       seriesId,
       (result.refsBySeriesId.get(seriesId) || 0) + 1
     );
+    if (title) {
+      const autoKeys = [
+        typeof generateSeriesKeyAuto === 'function' ? generateSeriesKeyAuto(title) : '',
+        typeof extractSeriesLookupKeyFromTitle_ === 'function'
+          ? extractSeriesLookupKeyFromTitle_(title)
+          : ''
+      ];
+      const baseSignatures = new Set(autoKeys
+        .map(autoKey => normalizeSeriesAliasKey_(autoKey))
+        .filter(Boolean)
+        .map(autoKey => buildSeriesRegistryBaseSignature_(autoKey))
+        .filter(Boolean));
+      if (baseSignatures.size) {
+        resolvedCatalogRows.push({ row: index + 2, title, destinationSeriesId: seriesId, baseSignatures });
+      }
+    }
   });
+  const sourceIdsByBaseSignature = new Map();
+  if (lookup.allAliasRowsBySeriesId instanceof Map) {
+    lookup.allAliasRowsBySeriesId.forEach((aliases, seriesId) => {
+      (aliases || []).forEach(alias => {
+        const signature = buildSeriesRegistryBaseSignature_(alias.aliasKey);
+        if (!signature) return;
+        if (!sourceIdsByBaseSignature.has(signature)) sourceIdsByBaseSignature.set(signature, new Set());
+        sourceIdsByBaseSignature.get(signature).add(seriesId);
+      });
+    });
+  }
+  const pendingPairsByIds = new Map();
+  resolvedCatalogRows.forEach(row => {
+    row.baseSignatures.forEach(signature => {
+      const sourceIds = sourceIdsByBaseSignature.get(signature) || new Set();
+      sourceIds.forEach(sourceSeriesId => {
+        if (sourceSeriesId === row.destinationSeriesId) return;
+        if ((result.refsBySeriesId.get(sourceSeriesId) || 0) > 0) return;
+        const pairKey = `${sourceSeriesId}\u0000${row.destinationSeriesId}`;
+        let pair = pendingPairsByIds.get(pairKey);
+        if (!pair) {
+          pair = {
+            sourceSeriesId,
+            destinationSeriesId: row.destinationSeriesId,
+            rows: [],
+            titles: []
+          };
+          pendingPairsByIds.set(pairKey, pair);
+        }
+        if (!pair.rows.includes(row.row)) pair.rows.push(row.row);
+        if (!pair.titles.includes(row.title)) pair.titles.push(row.title);
+      });
+    });
+  });
+  result.pendingManualMergePairs = [...pendingPairsByIds.values()];
   result.complete = true;
   return result;
 }
@@ -751,6 +826,19 @@ function buildSeriesRegistryExtraLookup_(lookup) {
   const ambiguousBaseKeys = new Set();
   const exactSeriesIdByKey = new Map();
   const exactIsExtraByKey = new Map();
+  const pendingBlankTitleBases = new Set();
+  (usage.blankKeyRows || []).forEach(item => {
+    const title = String(item && item.title || '').trim();
+    if (!title) return;
+    const generated = typeof generateSeriesKeyAuto === 'function'
+      ? normalizeSeriesAliasKey_(generateSeriesKeyAuto(title))
+      : '';
+    const extracted = typeof extractSeriesLookupKeyFromTitle_ === 'function'
+      ? normalizeSeriesAliasKey_(extractSeriesLookupKeyFromTitle_(title))
+      : '';
+    if (generated) pendingBlankTitleBases.add(stripExtraSeriesPrefix_(generated));
+    if (extracted) pendingBlankTitleBases.add(stripExtraSeriesPrefix_(extracted));
+  });
   const addOwner = (map, key, seriesId) => {
     if (!map.has(key)) map.set(key, new Set());
     map.get(key).add(seriesId);
@@ -758,7 +846,9 @@ function buildSeriesRegistryExtraLookup_(lookup) {
 
   registry.aliasByKey.forEach((alias, aliasKey) => {
     const master = registry.masterById.get(alias.seriesId);
-    if (!master || !(usage.refsBySeriesId.get(alias.seriesId) > 0)) return;
+    const hasLiveCatalogReference = usage.refsBySeriesId.get(alias.seriesId) > 0;
+    const hasPendingBlankTitleMatch = pendingBlankTitleBases.has(stripExtraSeriesPrefix_(aliasKey));
+    if (!master || (!hasLiveCatalogReference && !hasPendingBlankTitleMatch)) return;
     const isExtra = Boolean(master.isExtra || hasExtraSeriesPrefix_(aliasKey));
     exactSeriesIdByKey.set(aliasKey, alias.seriesId);
     exactIsExtraByKey.set(aliasKey, isExtra);
@@ -862,6 +952,304 @@ function getSeriesRegistryIntegrityBlockers_(registry) {
   return blockers;
 }
 
+function readSeriesRegistryMergeMetadataSnapshot_(registry, master) {
+  const sheet = registry.masterSheet;
+  const row = master.row;
+  const genreRange = sheet.getRange(row, 3, 1, 5);
+  const genreValues = genreRange.getValues()[0];
+  const genreFormulas = genreRange.getFormulas()[0];
+  let mediaValues = ['', ''];
+  let mediaFormulas = ['', ''];
+  if (registry.masterColumnCount > SERIES_REGISTRY_CONFIG_.LEGACY_MASTER_HEADERS.length) {
+    const mediaRange = sheet.getRange(row, 12, 1, 2);
+    mediaValues = mediaRange.getValues()[0];
+    mediaFormulas = mediaRange.getFormulas()[0];
+  }
+  return {
+    seriesId: String(sheet.getRange(row, 1).getDisplayValue() || '').trim(),
+    row,
+    genres: genreValues,
+    genreFormulas,
+    media: mediaValues,
+    mediaFormulas
+  };
+}
+
+function seriesRegistryMergeValueEquals_(left, right) {
+  if (left instanceof Date || right instanceof Date) {
+    return left instanceof Date && right instanceof Date && left.getTime() === right.getTime();
+  }
+  if (left === right) return true;
+  if (left == null || right == null) {
+    return (left == null || left === '') && (right == null || right === '');
+  }
+  return typeof left === typeof right && String(left) === String(right);
+}
+
+function seriesRegistryMergeText_(value) {
+  return String(value == null ? '' : value).normalize('NFKC').trim();
+}
+
+function seriesRegistryMergeSlotIsEmpty_(value, formula) {
+  return !formula && !seriesRegistryMergeText_(value);
+}
+
+function seriesRegistryMergeSnapshotEquals_(left, right) {
+  if (!left || !right || left.seriesId !== right.seriesId) return false;
+  const equalSlots = (leftValues, rightValues, leftFormulas, rightFormulas) =>
+    leftValues.length === rightValues.length && leftValues.every((value, index) =>
+      seriesRegistryMergeValueEquals_(value, rightValues[index]) &&
+      String(leftFormulas[index] || '') === String(rightFormulas[index] || '')
+    );
+  return equalSlots(left.genres, right.genres, left.genreFormulas, right.genreFormulas) &&
+    equalSlots(left.media, right.media, left.mediaFormulas, right.mediaFormulas);
+}
+
+function buildSeriesRegistryMetadataMergePlan_(registry, sourceTargetPairs) {
+  const plan = {
+    pairs: [],
+    blockers: [],
+    blockedSourceIds: new Set(),
+    sourceIds: new Set(),
+    snapshotsById: new Map(),
+    destinations: new Map(),
+    changedSlots: 0
+  };
+  if (!registry) {
+    plan.blockers.push('registry unavailable for metadata merge');
+    return plan;
+  }
+
+  const seenPairs = new Set();
+  (Array.isArray(sourceTargetPairs) ? sourceTargetPairs : []).forEach(pair => {
+    const sourceSeriesId = String(pair && (pair.sourceSeriesId || pair.sourceId) || '').trim();
+    const destinationSeriesId = String(pair && (pair.destinationSeriesId || pair.targetSeriesId || pair.destinationId) || '').trim();
+    if (!sourceSeriesId || !destinationSeriesId || sourceSeriesId === destinationSeriesId) return;
+    const pairKey = `${sourceSeriesId}\u0000${destinationSeriesId}`;
+    if (seenPairs.has(pairKey)) return;
+    seenPairs.add(pairKey);
+    plan.pairs.push({ sourceSeriesId, destinationSeriesId });
+    plan.sourceIds.add(sourceSeriesId);
+  });
+  if (!plan.pairs.length) return plan;
+
+  const addBlocker = (reason, sourceIds) => {
+    if (!plan.blockers.includes(reason)) plan.blockers.push(reason);
+    (sourceIds || []).forEach(seriesId => {
+      const id = String(seriesId || '').trim();
+      if (id) plan.blockedSourceIds.add(id);
+    });
+  };
+  const allIds = new Set();
+  const sourceTargets = new Map();
+  const destinationIds = new Set();
+  plan.pairs.forEach(pair => {
+    allIds.add(pair.sourceSeriesId);
+    allIds.add(pair.destinationSeriesId);
+    destinationIds.add(pair.destinationSeriesId);
+    if (!sourceTargets.has(pair.sourceSeriesId)) sourceTargets.set(pair.sourceSeriesId, new Set());
+    sourceTargets.get(pair.sourceSeriesId).add(pair.destinationSeriesId);
+  });
+
+  allIds.forEach(seriesId => {
+    const master = registry.allMasterById.get(seriesId);
+    if (!master) {
+      addBlocker(`metadata merge master is missing: ${seriesId}`, plan.sourceIds);
+      return;
+    }
+    try {
+      const snapshot = readSeriesRegistryMergeMetadataSnapshot_(registry, master);
+      if (snapshot.seriesId !== seriesId) {
+        addBlocker(`metadata row changed for series ${seriesId}`, plan.sourceIds);
+        return;
+      }
+      plan.snapshotsById.set(seriesId, snapshot);
+    } catch (error) {
+      addBlocker(`metadata read failed for series ${seriesId}: ${String(error && error.message || error)}`, plan.sourceIds);
+    }
+  });
+  if (plan.blockers.length) {
+    plan.sourceIds.forEach(seriesId => plan.blockedSourceIds.add(seriesId));
+    return plan;
+  }
+
+  sourceTargets.forEach((targets, sourceSeriesId) => {
+    if (targets.size > 1) {
+      addBlocker(
+        `metadata source ${sourceSeriesId} has multiple destinations: ${[...targets].join(', ')}`,
+        [sourceSeriesId]
+      );
+    }
+    if (destinationIds.has(sourceSeriesId)) {
+      addBlocker(`metadata merge chain is ambiguous at series ${sourceSeriesId}`, [sourceSeriesId]);
+    }
+  });
+
+  sourceTargets.forEach((targets, sourceSeriesId) => {
+    const source = plan.snapshotsById.get(sourceSeriesId);
+    if (!source) return;
+    const formulaColumns = [
+      ...source.genreFormulas.map((formula, index) => formula ? String.fromCharCode(67 + index) : ''),
+      ...source.mediaFormulas.map((formula, index) => formula ? (index === 0 ? 'L' : 'M') : '')
+    ].filter(Boolean);
+    if (formulaColumns.length) {
+      addBlocker(
+        `metadata source ${sourceSeriesId} contains formulas that cannot be safely transferred (${formulaColumns.join(', ')})`,
+        [sourceSeriesId]
+      );
+    }
+  });
+
+  plan.pairs.forEach(pair => {
+    const source = plan.snapshotsById.get(pair.sourceSeriesId);
+    const target = plan.snapshotsById.get(pair.destinationSeriesId);
+    if (!source || !target) return;
+    let destination = plan.destinations.get(pair.destinationSeriesId);
+    if (!destination) {
+      destination = {
+        seriesId: pair.destinationSeriesId,
+        row: target.row,
+        expected: {
+          seriesId: target.seriesId,
+          row: target.row,
+          genres: target.genres.slice(),
+          genreFormulas: target.genreFormulas.slice(),
+          media: target.media.slice(),
+          mediaFormulas: target.mediaFormulas.slice()
+        },
+        changedSlots: [],
+        sourceIds: new Set()
+      };
+      plan.destinations.set(pair.destinationSeriesId, destination);
+    }
+    destination.sourceIds.add(pair.sourceSeriesId);
+
+    source.genres.forEach((sourceValue, index) => {
+      const sourceText = seriesRegistryMergeText_(sourceValue);
+      if (!sourceText) return;
+      const destinationValue = destination.expected.genres[index];
+      const destinationFormula = destination.expected.genreFormulas[index];
+      const destinationText = seriesRegistryMergeText_(destinationValue);
+      const column = String.fromCharCode(67 + index);
+      if (destinationText) {
+        if (sourceText !== destinationText) {
+          addBlocker(
+            `metadata conflict at series ${pair.destinationSeriesId} column ${column}: source ${pair.sourceSeriesId} has "${sourceText}" while destination has "${destinationText}"`,
+            [...destination.sourceIds]
+          );
+        }
+        return;
+      }
+      if (destinationFormula) {
+        addBlocker(
+          `metadata conflict at series ${pair.destinationSeriesId} column ${column}: destination formula prevents transfer from ${pair.sourceSeriesId}`,
+          [...destination.sourceIds]
+        );
+        return;
+      }
+      destination.expected.genres[index] = sourceValue;
+      destination.changedSlots.push({ column: 3 + index, value: sourceValue });
+      plan.changedSlots += 1;
+    });
+
+    source.media.forEach((sourceValue, index) => {
+      const sourceText = normalizeSeriesRegistryMedia_(sourceValue);
+      if (!sourceText) return;
+      const alreadyPresent = destination.expected.media.some(value =>
+        normalizeSeriesRegistryMedia_(value) === sourceText
+      );
+      if (alreadyPresent) return;
+      const destinationValue = destination.expected.media[index];
+      const destinationFormula = destination.expected.mediaFormulas[index];
+      const destinationText = normalizeSeriesRegistryMedia_(destinationValue);
+      const column = index === 0 ? 'L' : 'M';
+      if (destinationText || destinationFormula) {
+        addBlocker(
+          `metadata conflict at series ${pair.destinationSeriesId} column ${column}: source ${pair.sourceSeriesId} has "${sourceText}" while destination has "${destinationText || 'a formula'}"`,
+          [...destination.sourceIds]
+        );
+        return;
+      }
+      destination.expected.media[index] = sourceValue;
+      destination.changedSlots.push({ column: 12 + index, value: sourceValue });
+      plan.changedSlots += 1;
+    });
+  });
+
+  if (plan.blockers.length) {
+    plan.sourceIds.forEach(seriesId => plan.blockedSourceIds.add(seriesId));
+  }
+  return plan;
+}
+
+function applySeriesRegistryMetadataMergePlan_(registry, plan) {
+  if (!plan || !plan.pairs.length) return { ok: true, changed: false, blockers: [] };
+  const blockers = (plan.blockers || []).slice();
+  if (blockers.length) {
+    return { ok: false, changed: false, blockers, sourceIds: plan.sourceIds };
+  }
+  const addBlocker = reason => {
+    if (!blockers.includes(reason)) blockers.push(reason);
+  };
+  try {
+    plan.snapshotsById.forEach((expected, seriesId) => {
+      const master = registry.allMasterById.get(seriesId);
+      const current = master && readSeriesRegistryMergeMetadataSnapshot_(registry, master);
+      if (!current || !seriesRegistryMergeSnapshotEquals_(expected, current)) {
+        addBlocker(`metadata changed before merge for series ${seriesId}`);
+      }
+    });
+  } catch (error) {
+    addBlocker(`metadata pre-write check failed: ${String(error && error.message || error)}`);
+  }
+  if (blockers.length) {
+    return { ok: false, changed: false, blockers, sourceIds: plan.sourceIds };
+  }
+
+  let wrote = false;
+  let slotsWritten = 0;
+  try {
+    plan.destinations.forEach(destination => {
+      destination.changedSlots.forEach(slot => {
+        registry.masterSheet.getRange(destination.row, slot.column).setValue(slot.value);
+        wrote = true;
+        slotsWritten += 1;
+      });
+    });
+    if (wrote) SpreadsheetApp.flush();
+  } catch (error) {
+    addBlocker(`metadata write failed before source deletion: ${String(error && error.message || error)}`);
+    return { ok: false, changed: wrote, slotsWritten, blockers, sourceIds: plan.sourceIds };
+  }
+
+  try {
+    plan.destinations.forEach(destination => {
+      const master = registry.allMasterById.get(destination.seriesId);
+      const actual = master && readSeriesRegistryMergeMetadataSnapshot_(registry, master);
+      if (!actual || !seriesRegistryMergeSnapshotEquals_(destination.expected, actual)) {
+        addBlocker(`metadata readback mismatch before source deletion for series ${destination.seriesId}`);
+      }
+    });
+    plan.sourceIds.forEach(seriesId => {
+      const expected = plan.snapshotsById.get(seriesId);
+      const master = registry.allMasterById.get(seriesId);
+      const actual = master && readSeriesRegistryMergeMetadataSnapshot_(registry, master);
+      if (!actual || !seriesRegistryMergeSnapshotEquals_(expected, actual)) {
+        addBlocker(`metadata source changed before deletion for series ${seriesId}`);
+      }
+    });
+  } catch (error) {
+    addBlocker(`metadata readback failed before source deletion: ${String(error && error.message || error)}`);
+  }
+  return {
+    ok: blockers.length === 0,
+    changed: wrote,
+    slotsWritten,
+    blockers,
+    sourceIds: plan.sourceIds
+  };
+}
+
 function reconcileSafeOrphanExtraAliasConflicts_(registry, extraAliasPlan) {
   if (!extraAliasPlan || !extraAliasPlan.conflicts.length) return { changed: false };
   const review = readSeriesRegistryReviewReferenceIds_(registry);
@@ -873,7 +1261,19 @@ function reconcileSafeOrphanExtraAliasConflicts_(registry, extraAliasPlan) {
     externalScanComplete: external.complete
   });
   if (lifecyclePlan.blockers.length) {
-    return { changed: false, blockers: lifecyclePlan.blockers };
+    const unresolved = registry.catalogUsage && registry.catalogUsage.unresolved || [];
+    const catalogRepairable = Boolean(
+      unresolved.length &&
+      unresolved.every(item => item.reason === 'TITLE_WITHOUT_SERIES_KEY') &&
+      lifecyclePlan.blockers.every(blocker =>
+        String(blocker).indexOf('unresolved catalog series keys') === 0
+      )
+    );
+    return {
+      changed: false,
+      blockers: lifecyclePlan.blockers,
+      catalogRepairable
+    };
   }
 
   const sourceTargetById = new Map();
@@ -921,6 +1321,30 @@ function reconcileSafeOrphanExtraAliasConflicts_(registry, extraAliasPlan) {
     )
   );
   const masterRows = [...sourceIds].map(seriesId => registry.allMasterById.get(seriesId).row);
+  const metadataPlan = buildSeriesRegistryMetadataMergePlan_(
+    registry,
+    [...sourceTargetById].map(([sourceSeriesId, destinationSeriesId]) => ({
+      sourceSeriesId,
+      destinationSeriesId
+    }))
+  );
+  if (metadataPlan.blockers.length) {
+    persistSeriesRegistryMetadataMergeHolds_(
+      registry,
+      metadataPlan.pairs,
+      metadataPlan.blockers
+    );
+    return { changed: false, blockers: metadataPlan.blockers };
+  }
+  const metadataMerge = applySeriesRegistryMetadataMergePlan_(registry, metadataPlan);
+  if (!metadataMerge.ok) {
+    persistSeriesRegistryMetadataMergeHolds_(
+      registry,
+      metadataPlan.pairs,
+      metadataMerge.blockers
+    );
+    return { changed: false, blockers: metadataMerge.blockers };
+  }
   const timestamp = new Date();
   rehomes.forEach(item => {
     registry.aliasSheet.getRange(item.row, 2).setValue(item.destinationSeriesId);
@@ -933,7 +1357,8 @@ function reconcileSafeOrphanExtraAliasConflicts_(registry, extraAliasPlan) {
     changed: true,
     deletedMasters,
     deletedAliases,
-    rehomedAliases: rehomes.length
+    rehomedAliases: rehomes.length,
+    metadataSlotsMerged: metadataPlan.changedSlots
   };
 }
 
@@ -947,7 +1372,18 @@ function ensureSeriesRegistryExtraAliases_() {
   if (plan.conflicts.length) {
     const reconciled = reconcileSafeOrphanExtraAliasConflicts_(registry, plan);
     if (!reconciled.changed) {
-      throw new Error(`Series extra alias conflict: ${plan.conflicts[0].aliasKey}`);
+      const detail = (reconciled.blockers || [])[0];
+      if (reconciled.catalogRepairable) {
+        return {
+          added: 0,
+          conflicts: plan.conflicts.length,
+          reconciliationDeferred: reconciled.blockers.slice()
+        };
+      }
+      throw new Error(
+        `Series extra alias conflict: ${plan.conflicts[0].aliasKey}` +
+        (detail ? `; ${detail}` : '')
+      );
     }
     registry = loadSeriesRegistryLookup_();
     blockers = getSeriesRegistryIntegrityBlockers_(registry);
@@ -1040,6 +1476,21 @@ function buildSeriesRegistryBaseSignature_(key) {
   return normalizeKana(stripExtraSeriesPrefix_(key));
 }
 
+function describeSeriesRegistryUnresolvedCatalogKeys_(unresolved) {
+  const rows = Array.isArray(unresolved) ? unresolved : [];
+  const examples = rows.slice(0, 3).map(item => {
+    const row = Number(item && item.row) || '?';
+    if (item && item.reason === 'TITLE_WITHOUT_SERIES_KEY') {
+      return `row ${row}: titled book has blank series_key_auto`;
+    }
+    const key = String(item && item.key || '').slice(0, 48);
+    return `row ${row}: ${key ? `key "${key}" does not resolve` : 'series_key_auto does not resolve'}`;
+  });
+  const remaining = rows.length - examples.length;
+  return `unresolved catalog series keys (${rows.length}): ${examples.join('; ')}` +
+    (remaining > 0 ? `; and ${remaining} more` : '');
+}
+
 function buildSeriesRegistryLifecyclePlan_(registry, referenceScans) {
   const scans = referenceScans || {};
   const usage = registry && registry.catalogUsage || { refsBySeriesId: new Map(), unresolved: [] };
@@ -1053,6 +1504,8 @@ function buildSeriesRegistryLifecyclePlan_(registry, referenceScans) {
   const protectedByReview = [];
   const protectedByExternal = [];
   const protectedByAmbiguousSignature = [];
+  const protectedByPendingManualMerge = [];
+  const pendingManualMerges = [];
   const deactivateSeriesIds = [];
   const deleteSeriesIds = [];
   const deleteAliasRows = [];
@@ -1083,7 +1536,9 @@ function buildSeriesRegistryLifecyclePlan_(registry, referenceScans) {
       }
     }
   }
-  if (usage.unresolved && usage.unresolved.length) blockers.push('unresolved catalog series keys');
+  if (usage.unresolved && usage.unresolved.length) {
+    blockers.push(describeSeriesRegistryUnresolvedCatalogKeys_(usage.unresolved));
+  }
 
   if (registry) {
     registry.masterById.forEach((master, seriesId) => {
@@ -1105,6 +1560,8 @@ function buildSeriesRegistryLifecyclePlan_(registry, referenceScans) {
       protectedByReview,
       protectedByExternal,
       protectedByAmbiguousSignature,
+      protectedByPendingManualMerge,
+      pendingManualMerges,
       deactivateSeriesIds
     };
   }
@@ -1149,7 +1606,8 @@ function buildSeriesRegistryLifecyclePlan_(registry, referenceScans) {
       return;
     }
 
-    deleteIdSet.add(seriesId);
+    const candidateRehomes = [];
+    const candidateDeleteAliasRows = [];
     aliases.forEach(alias => {
       if (!hasExtraSeriesPrefix_(alias.aliasKey)) {
         const baseSignature = buildSeriesRegistryBaseSignature_(alias.aliasKey);
@@ -1157,7 +1615,7 @@ function buildSeriesRegistryLifecyclePlan_(registry, referenceScans) {
         if (destinations.size === 1) {
           const destinationSeriesId = [...destinations][0];
           if (destinationSeriesId !== seriesId) {
-            rehomeAliases.push({
+            candidateRehomes.push({
               row: alias.row,
               aliasKey: alias.aliasKey,
               sourceSeriesId: seriesId,
@@ -1167,8 +1625,27 @@ function buildSeriesRegistryLifecyclePlan_(registry, referenceScans) {
           }
         }
       }
-      deleteAliasRows.push(alias.row);
+      candidateDeleteAliasRows.push(alias.row);
     });
+    const pendingPairs = (usage.pendingManualMergePairs || []).filter(pair =>
+      pair.sourceSeriesId === seriesId
+    );
+    const pendingMergesCovered = pendingPairs.every(pair => candidateRehomes.some(item =>
+      item.destinationSeriesId === pair.destinationSeriesId
+    ));
+    if (pendingPairs.length && !pendingMergesCovered) {
+      protectedByPendingManualMerge.push(seriesId);
+      pendingPairs.forEach(pair => {
+        if (!pendingManualMerges.some(existing =>
+          existing.sourceSeriesId === pair.sourceSeriesId &&
+          existing.destinationSeriesId === pair.destinationSeriesId
+        )) pendingManualMerges.push(pair);
+      });
+      return;
+    }
+    deleteIdSet.add(seriesId);
+    rehomeAliases.push(...candidateRehomes);
+    deleteAliasRows.push(...candidateDeleteAliasRows);
   });
 
   deleteSeriesIds.push(...deleteIdSet);
@@ -1181,6 +1658,8 @@ function buildSeriesRegistryLifecyclePlan_(registry, referenceScans) {
     protectedByReview,
     protectedByExternal,
     protectedByAmbiguousSignature,
+    protectedByPendingManualMerge,
+    pendingManualMerges,
     deactivateSeriesIds
   };
 }
@@ -1207,6 +1686,18 @@ function deleteSeriesRegistryRows_(sheet, rowNumbers) {
   return rows.length;
 }
 
+function preserveSeriesRegistryLifecycleSources_(registry, plan, sourceIds) {
+  const ids = new Set(Array.from(sourceIds || []).map(id => String(id || '').trim()).filter(Boolean));
+  if (!ids.size) return;
+  const aliasRows = new Set();
+  ids.forEach(seriesId => {
+    (registry.allAliasRowsBySeriesId.get(seriesId) || []).forEach(alias => aliasRows.add(alias.row));
+  });
+  plan.deleteSeriesIds = (plan.deleteSeriesIds || []).filter(seriesId => !ids.has(seriesId));
+  plan.rehomeAliases = (plan.rehomeAliases || []).filter(item => !ids.has(item.sourceSeriesId));
+  plan.deleteAliasRows = (plan.deleteAliasRows || []).filter(row => !aliasRows.has(row));
+}
+
 function summarizeSeriesRegistryLifecyclePlan_(plan) {
   const value = plan || {};
   return {
@@ -1218,7 +1709,17 @@ function summarizeSeriesRegistryLifecyclePlan_(plan) {
     protectedByReview: (value.protectedByReview || []).length,
     protectedByExternal: (value.protectedByExternal || []).length,
     protectedByAmbiguousSignature: (value.protectedByAmbiguousSignature || []).length,
-    blockers: (value.blockers || []).slice(0, 10)
+    protectedByPendingManualMerge: (value.protectedByPendingManualMerge || []).length,
+    pendingManualMerges: (value.pendingManualMerges || []).slice(0, 10).map(pair => ({
+      sourceSeriesId: pair.sourceSeriesId,
+      destinationSeriesId: pair.destinationSeriesId,
+      rows: (pair.rows || []).slice(0, 5),
+      titles: (pair.titles || []).slice(0, 3)
+    })),
+    blockers: (value.blockers || []).slice(0, 10),
+    metadataBlockers: (value.metadataBlockers || []).slice(0, 10),
+    metadataSlotsMerged: Number(value.metadataSlotsMerged || 0),
+    metadataSlotsWritten: Number(value.metadataSlotsWritten || 0)
   };
 }
 
@@ -1247,6 +1748,11 @@ function cleanupSeriesRegistryLifecycleCore_() {
     externalReferencedIds: external.references,
     externalScanComplete: external.complete
   });
+  if (plan.blockers.length) {
+    return Object.assign({ active: true, changed: false }, summarizeSeriesRegistryLifecyclePlan_(plan));
+  }
+
+  const metadataBlockers = [];
   const extraAliasPlan = buildSeriesRegistryExtraAliasPlan_(registry);
   if (extraAliasPlan.conflicts.length) {
     plan.blockers.push(`extra alias conflict: ${extraAliasPlan.conflicts[0].aliasKey}`);
@@ -1254,14 +1760,54 @@ function cleanupSeriesRegistryLifecycleCore_() {
     plan.deleteAliasRows = [];
     plan.rehomeAliases = [];
     plan.deactivateSeriesIds = [];
+    return Object.assign({ active: true, changed: false }, summarizeSeriesRegistryLifecyclePlan_(plan));
   }
+
+  let metadataMerge = { ok: true, changed: false, slotsWritten: 0, blockers: [] };
+  const metadataPlan = buildSeriesRegistryMetadataMergePlan_(
+    registry,
+    plan.rehomeAliases.map(item => ({
+      sourceSeriesId: item.sourceSeriesId,
+      destinationSeriesId: item.destinationSeriesId
+    }))
+  );
+  if (metadataPlan.blockers.length) {
+    persistSeriesRegistryMetadataMergeHolds_(
+      registry,
+      metadataPlan.pairs,
+      metadataPlan.blockers
+    );
+    metadataMerge = {
+      ok: false,
+      changed: false,
+      slotsWritten: 0,
+      blockers: metadataPlan.blockers
+    };
+    metadataBlockers.push(...metadataPlan.blockers);
+    preserveSeriesRegistryLifecycleSources_(registry, plan, metadataPlan.sourceIds);
+  } else if (metadataPlan.pairs.length) {
+    metadataMerge = applySeriesRegistryMetadataMergePlan_(registry, metadataPlan);
+    if (!metadataMerge.ok) {
+      persistSeriesRegistryMetadataMergeHolds_(
+        registry,
+        metadataPlan.pairs,
+        metadataMerge.blockers
+      );
+      metadataBlockers.push(...metadataMerge.blockers);
+      preserveSeriesRegistryLifecycleSources_(registry, plan, metadataPlan.sourceIds);
+    }
+  }
+  plan.metadataBlockers = metadataBlockers;
+  plan.metadataSlotsMerged = metadataMerge.ok ? metadataPlan.changedSlots : 0;
+  plan.metadataSlotsWritten = metadataMerge.slotsWritten || 0;
   const summary = summarizeSeriesRegistryLifecyclePlan_(plan);
-  if (plan.blockers.length || (
-    !plan.deleteSeriesIds.length &&
-    !plan.rehomeAliases.length &&
-    !plan.deactivateSeriesIds.length
-  )) {
-    return Object.assign({ active: true, changed: false }, summary);
+  const hasLifecycleActions = Boolean(
+    plan.deleteSeriesIds.length ||
+    plan.rehomeAliases.length ||
+    plan.deactivateSeriesIds.length
+  );
+  if (!hasLifecycleActions) {
+    return Object.assign({ active: true, changed: metadataMerge.changed }, summary);
   }
 
   const aliasSheet = registry.aliasSheet;
@@ -1284,7 +1830,9 @@ function cleanupSeriesRegistryLifecycleCore_() {
   const deletedMasters = deleteSeriesRegistryRows_(masterSheet, masterRows);
   return Object.assign({ active: true, changed: true }, summary, {
     deletedAliases,
-    deletedMasters
+    deletedMasters,
+    metadataSlotsMerged: metadataMerge.ok ? metadataPlan.changedSlots : 0,
+    metadataSlotsWritten: metadataMerge.slotsWritten || 0
   });
 }
 
@@ -1355,6 +1903,90 @@ function appendSeriesReviewRow_(candidateKey, candidateSeriesId, comparisonKey, 
     new Date()
   ]], 7, true);
   return true;
+}
+
+function persistSeriesRegistryMetadataMergeHolds_(registry, sourceTargetPairs, blockers) {
+  const pairs = [];
+  const seen = new Set();
+  (Array.isArray(sourceTargetPairs) ? sourceTargetPairs : []).forEach(pair => {
+    const sourceSeriesId = String(pair && (pair.sourceSeriesId || pair.sourceId) || '').trim();
+    const destinationSeriesId = String(
+      pair && (pair.destinationSeriesId || pair.targetSeriesId || pair.destinationId) || ''
+    ).trim();
+    if (!sourceSeriesId || !destinationSeriesId || sourceSeriesId === destinationSeriesId) return;
+    const key = `${sourceSeriesId}\u0000${destinationSeriesId}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    pairs.push({ sourceSeriesId, destinationSeriesId, key });
+  });
+  if (!pairs.length) {
+    throw new Error('Unable to persist metadata merge safety hold: no source/destination pairs were available.');
+  }
+
+  const spreadsheet = SpreadsheetApp.getActive();
+  const reviewSheet = spreadsheet && spreadsheet.getSheetByName(SERIES_REGISTRY_CONFIG_.REVIEW_SHEET);
+  if (!reviewSheet) {
+    throw new Error('Unable to persist metadata merge safety hold: review sheet is missing.');
+  }
+  const readHoldPairs = () => {
+    const lastRow = Math.max(1, Number(reviewSheet.getLastRow()) || 1);
+    if (lastRow < 2) return new Set();
+    const rows = reviewSheet.getRange(2, 2, lastRow - 1, 4).getDisplayValues();
+    const result = new Set();
+    rows.forEach(row => {
+      const sourceSeriesId = String(row[0] || '').trim();
+      const destinationSeriesId = String(row[2] || '').trim();
+      const reason = String(row[3] || '').trim();
+      if (
+        sourceSeriesId && destinationSeriesId &&
+        reason.startsWith(SERIES_REGISTRY_CONFIG_.METADATA_MERGE_HOLD_REASON_PREFIX)
+      ) result.add(`${sourceSeriesId}\u0000${destinationSeriesId}`);
+    });
+    return result;
+  };
+
+  try {
+    const existing = readHoldPairs();
+    const rowsToAppend = pairs.filter(pair => !existing.has(pair.key)).map(pair => {
+      const source = registry && registry.allMasterById.get(pair.sourceSeriesId);
+      const destination = registry && registry.allMasterById.get(pair.destinationSeriesId);
+      const detail = (Array.isArray(blockers) ? blockers : [])
+        .slice(0, 3)
+        .map(reason => String(reason || '').trim())
+        .filter(Boolean)
+        .join('; ')
+        .slice(0, 900);
+      const reason = `${SERIES_REGISTRY_CONFIG_.METADATA_MERGE_HOLD_REASON_PREFIX} ${detail || 'metadata transfer requires review'}`;
+      return [
+        source && source.canonicalKey || '',
+        pair.sourceSeriesId,
+        destination && destination.canonicalKey || '',
+        pair.destinationSeriesId,
+        reason,
+        '要確認',
+        new Date()
+      ];
+    });
+    if (rowsToAppend.length) {
+      appendSeriesRegistryRows_(
+        reviewSheet,
+        rowsToAppend,
+        SERIES_REGISTRY_CONFIG_.REVIEW_HEADERS.length,
+        true
+      );
+      SpreadsheetApp.flush();
+    }
+    const verified = readHoldPairs();
+    const missing = pairs.filter(pair => !verified.has(pair.key));
+    if (missing.length) {
+      throw new Error(`review hold readback did not confirm ${missing.length} source/destination pair(s)`);
+    }
+    return { added: rowsToAppend.length, verified: pairs.length };
+  } catch (error) {
+    throw new Error(
+      `Unable to persist metadata merge safety hold; no alias or master deletion was performed: ${String(error && error.message || error)}`
+    );
+  }
 }
 
 function appendSeriesMasterRow_(
@@ -1886,6 +2518,16 @@ function syncSeriesRegistryAfterManualKeyEdit_(sheet, startRow, rowCount) {
     loadSeriesRegistryExtraLookup_()
   );
 
+  const initialRegistry = loadSeriesRegistryLookup_();
+  const blankKeyRows = initialRegistry && initialRegistry.catalogUsage
+    ? initialRegistry.catalogUsage.blankKeyRows || []
+    : [];
+  if (blankKeyRows.length) {
+    throw new Error(
+      `Series registry merge preflight failed: ${describeSeriesRegistryUnresolvedCatalogKeys_(blankKeyRows)}`
+    );
+  }
+
   // Xの変更先だけを先に確定し、後段のalias移動は全行の競合を検査してから行う。
   syncSeriesRegistryFromCatalog_();
   const registry = loadSeriesRegistryLookup_();
@@ -1985,6 +2627,31 @@ function syncSeriesRegistryAfterManualKeyEdit_(sheet, startRow, rowCount) {
     });
   });
 
+  const metadataPlan = buildSeriesRegistryMetadataMergePlan_(
+    registry,
+    [...targetBySourceSeriesId].map(([sourceSeriesId, targetSeriesId]) => ({
+      sourceSeriesId,
+      destinationSeriesId: targetSeriesId
+    }))
+  );
+  if (metadataPlan.blockers.length) {
+    persistSeriesRegistryMetadataMergeHolds_(
+      registry,
+      metadataPlan.pairs,
+      metadataPlan.blockers
+    );
+    throw new Error(`Manual series metadata merge blocked: ${metadataPlan.blockers[0]}`);
+  }
+  const metadataMerge = applySeriesRegistryMetadataMergePlan_(registry, metadataPlan);
+  if (!metadataMerge.ok) {
+    persistSeriesRegistryMetadataMergeHolds_(
+      registry,
+      metadataPlan.pairs,
+      metadataMerge.blockers
+    );
+    throw new Error(`Manual series metadata merge blocked: ${metadataMerge.blockers[0]}`);
+  }
+
   if (newAliasesByKey.size) {
     ensureSeriesRegistryRowCapacity_(
       registry.aliasSheet,
@@ -2022,6 +2689,7 @@ function syncSeriesRegistryAfterManualKeyEdit_(sheet, startRow, rowCount) {
     aliasesMerged: aliasRowsToRehome.length + newAliasesByKey.size,
     preservedLiveSources: skippedLiveSources.size,
     preservedProtectedSources: skippedProtectedSources.size,
+    metadataSlotsMerged: metadataPlan.changedSlots,
     masterCountsChanged: finalUsage.masterCountsChanged,
     aliasCountsChanged: finalUsage.aliasCountsChanged,
     cleanup
