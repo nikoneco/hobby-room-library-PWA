@@ -1241,7 +1241,7 @@ function testInstalledBusyEditQueuesAndRecoversWithoutAnActiveSpreadsheet() {
   assert.equal(fixture.masterSheet.rows[1][7], 0);
   assert.ok(cache >= 2, 'cache is invalidated without acquiring the registry lock');
   fixture.context.SpreadsheetApp.getActive = () => { throw Error('retry must not use active spreadsheet'); };
-  fixture.context.SpreadsheetApp.getActiveSpreadsheet = fixture.context.SpreadsheetApp.getActive;
+  fixture.context.SpreadsheetApp.getActiveSpreadsheet = () => fixture.spreadsheet;
   retryQueuedEdits(fixture);
   assert.equal(fixture.context.readLibraryEditQueue_()[0].data.attempts, 1);
   fixture.setLockAvailable(true);
@@ -1544,7 +1544,19 @@ function testManualClearPlanRejectsMovedBookBeforeWriting() {
   assert.equal(fixture.catalogSheet.rows[2][23], '');
 }
 
+function testRetryRejectsAParentThatDoesNotMatchSavedSource() {
+  const fixture = makeFixture({ books: [makeBook('One', 'group', { uuid: editUuid(1) })] });
+  fixture.setLockAvailable(false);
+  triggerManualXEdit(fixture, 2);
+  const before = snapshotWrites(fixture);
+  fixture.context.SpreadsheetApp.getActiveSpreadsheet = () => ({ getId: () => 'another-source' });
+  assert.throws(() => retryQueuedEdits(fixture), /saved bound spreadsheet/);
+  assert.equal(snapshotWrites(fixture), before);
+  assert.equal(fixture.context.readLibraryEditQueue_().length, 1);
+}
+
 const tests = [
+  testRetryRejectsAParentThatDoesNotMatchSavedSource,
   testUnresolvableDraftCannotExhaustOtherQueuedEdits,
   testManualClearPlanRejectsMovedBookBeforeWriting,
   testScheduledAttemptIsCheckpointedBeforeHeavyWork,

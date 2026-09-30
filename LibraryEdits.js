@@ -12,7 +12,7 @@ const LIBRARY_EDIT_CONFIG_ = Object.freeze({
   MAX_RETRIES: 8
 });
 
-// Execution-local context. Time triggers must open the saved bound source;
+// Execution-local context. Time triggers must verify the saved bound source;
 // registry helpers must not infer a spreadsheet from an active browser tab.
 let libraryEditSpreadsheet_ = null;
 function getLibrarySpreadsheet_() {
@@ -200,7 +200,12 @@ function retryLibraryEdits_(e) {
   if (!records.some(record => Number(record.data.attempts || 0) < LIBRARY_EDIT_CONFIG_.MAX_RETRIES)) return { pending: records.length };
   const source = PropertiesService.getScriptProperties().getProperty(LIBRARY_EDIT_CONFIG_.SOURCE_PROPERTY);
   if (!source) throw new Error('Library edit source has not been configured.');
-  const spreadsheet = SpreadsheetApp.openById(source);
+  // Bound triggers can use their parent with the current-document scope.
+  // openById would require access to all spreadsheets, even for this parent.
+  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  if (!spreadsheet || spreadsheet.getId() !== source) {
+    throw new Error('Library edit retry does not match the saved bound spreadsheet.');
+  }
   ensureLibraryEditRetry_();
   try { return processLibraryEditQueue_(spreadsheet, true); }
   catch (error) { console.error('library edit retry deferred:', String(error)); return { pending: readLibraryEditQueue_().length, error: String(error) }; }
