@@ -35,6 +35,9 @@ function onEdit(e) {
     editedSheet.getName() === CONFIG.SHEETS.MAIN &&
     e.range.getA1Notation() === 'A1'
   ) return;
+  // 手入力の意思は registry のロック待ちより先に保存する。同期が待機失敗しても
+  // import / ジャンル更新が手入力Xを自動値で上書きしないようにする。
+  markSeriesKeyManualOnEdit_(e);
   if (!shouldRunSeriesRegistryOnEditLocked_(e)) return onEditBody_(e);
   return withSeriesRegistryScriptLock_(() => onEditBody_(e), 10000);
 }
@@ -116,6 +119,20 @@ function onEditBody_(e) {
       seriesKeyRefreshError = error;
       console.error('series registry refresh failed after alias edit:', error);
     }
+  } else if (touchesMainSeriesKey) {
+    // タイトルとXの同時貼り付けも、明示的なX編集を優先する。
+    try {
+      const seriesKeyStartRow = Math.max(row, 2);
+      const seriesKeyRowCount = rowEnd - seriesKeyStartRow + 1;
+      if (seriesRegistryActive) {
+        syncSeriesRegistryAfterManualKeyEdit_(sh, seriesKeyStartRow, seriesKeyRowCount);
+      } else {
+        updateSeriesKeyAutoForEditedRange_(sh, e.range);
+      }
+    } catch (error) {
+      seriesKeyRefreshError = error;
+      console.error('series registry sync failed after manual series-key edit:', error);
+    }
   } else if (touchesMainTitle) {
     if (!seriesRegistryActive) {
       updateSeriesKeyAutoForEditedRange_(sh, e.range);
@@ -155,20 +172,6 @@ function onEditBody_(e) {
         seriesKeyRefreshError = error;
         console.error('series registry title-link refresh failed:', error);
       }
-    }
-  } else if (seriesRegistryActive && touchesMainSeriesKey) {
-    try {
-      const seriesKeyStartRow = Math.max(row, 2);
-      preflightSeriesKeyAutoRange_(sh, seriesKeyStartRow, rowEnd - seriesKeyStartRow + 1);
-      ensureSeriesRegistryExtraAliases_();
-      syncSeriesRegistryAfterManualKeyEdit_(
-        sh,
-        seriesKeyStartRow,
-        rowEnd - seriesKeyStartRow + 1
-      );
-    } catch (error) {
-      seriesKeyRefreshError = error;
-      console.error('series registry sync failed after manual series-key edit:', error);
     }
   }
 
@@ -401,7 +404,91 @@ function loadSeriesRegistryExtraLookup_() {
   return buildSeriesRegistryExtraLookup_(registry);
 }
 
-function buildSeriesKeyAutoRepairPlan_(titles, genres, currentKeys, extraLookup) {
+// この行だけに適用する手入力指定。既存の人間向けメモはそのまま保持する。
+const SERIES_KEY_MANUAL_NOTE_MARKER_ = '[library.series-key:v1:MANUAL]';
+const SERIES_KEY_AUTO_RESET_NOTE_MARKER_ = '[library.series-key:v1:AUTO_RESET_PENDING]';
+
+function hasSeriesKeyManualNote_(note) {
+  return String(note || '').split(/\r?\n/).includes(SERIES_KEY_MANUAL_NOTE_MARKER_);
+}
+
+function hasSeriesKeyAutoResetNote_(note) {
+  return String(note || '').split(/\r?\n/).includes(SERIES_KEY_AUTO_RESET_NOTE_MARKER_);
+}
+
+function buildSeriesKeyManualNote_(note, manual) {
+  const existing = hasSeriesKeyAutoResetNote_(note)
+    ? String(note || '').split(/\r?\n/).filter(line => line !== SERIES_KEY_AUTO_RESET_NOTE_MARKER_).join('\n')
+    : String(note || '');
+  if (manual) {
+    if (hasSeriesKeyManualNote_(existing)) return existing;
+    return existing + (existing && !/\n$/.test(existing) ? '\n' : '') + SERIES_KEY_MANUAL_NOTE_MARKER_;
+  }
+  if (!hasSeriesKeyManualNote_(existing)) return existing;
+  return existing.split(/\r?\n/).filter(line => line !== SERIES_KEY_MANUAL_NOTE_MARKER_).join('\n');
+}
+
+function buildSeriesKeyAutoResetNote_(note) {
+  const existing = buildSeriesKeyManualNote_(note, false);
+  return existing + (existing && !/\n$/.test(existing) ? '\n' : '') + SERIES_KEY_AUTO_RESET_NOTE_MARKER_;
+}
+
+function markSeriesKeyManualOnEdit_(e) {
+  if (!e || !e.range) return { changed: 0 };
+  const range = e.range;
+  const sheet = range.getSheet();
+  const endRow = range.getRow() + range.getNumRows() - 1;
+  const endCol = range.getColumn() + range.getNumColumns() - 1;
+  if (sheet.getName() !== CONFIG.SHEETS.MAIN || endRow < 2 ||
+      range.getColumn() > CONFIG.COL.SERIES_KEY_AUTO || endCol < CONFIG.COL.SERIES_KEY_AUTO) {
+    return { changed: 0 };
+  }
+  const startRow = Math.max(range.getRow(), 2);
+  const target = sheet.getRange(startRow, CONFIG.COL.SERIES_KEY_AUTO, endRow - startRow + 1, 1);
+  const keys = target.getValues();
+  const notes = target.getNotes();
+  let changed = 0;
+  const nextNotes = notes.map((row, index) => {
+    const next = String(keys[index][0] || '').trim()
+      ? buildSeriesKeyManualNote_(row[0], true)
+      : buildSeriesKeyAutoResetNote_(row[0]);
+    if (next !== row[0]) changed++;
+    return [next];
+  });
+  if (changed) {
+    target.setNotes(nextNotes);
+    SpreadsheetApp.flush();
+  }
+  return { changed };
+}
+
+// 既に人間が確認した行だけを移行するための私有ヘルパー。キー差分から推測しない。
+// 全行の期待値を先に照合し、不一致が1行でもあれば note を一切書かない。
+function markKnownManualSeriesKeyRows_(sheet, expectedRows) {
+  if (!sheet || sheet.getName() !== CONFIG.SHEETS.MAIN || !Array.isArray(expectedRows) ||
+      expectedRows.length > 100) throw new Error('Known manual series-key rows require a bounded catalog target.');
+  const seen = new Set();
+  const plan = expectedRows.map(item => {
+    const row = Number(item && item.row);
+    const key = String(item && item.key || '');
+    if (!Number.isInteger(row) || row < 2 || row > sheet.getMaxRows() || !key.trim() || seen.has(row)) {
+      throw new Error('Invalid known manual series-key row.');
+    }
+    seen.add(row);
+    const range = sheet.getRange(row, CONFIG.COL.SERIES_KEY_AUTO, 1, 1);
+    if (String(range.getValue() || '') !== key) throw new Error(`Known manual series-key changed at row ${row}`);
+    const note = range.getNote();
+    return { range, note, next: buildSeriesKeyManualNote_(note, true) };
+  });
+  let changed = 0;
+  plan.forEach(item => {
+    if (item.note !== item.next) { item.range.setNote(item.next); changed++; }
+  });
+  if (changed) SpreadsheetApp.flush();
+  return { checked: plan.length, changed };
+}
+
+function buildSeriesKeyAutoRepairPlan_(titles, genres, currentKeys, extraLookup, manualNotes) {
   const titleValues = Array.isArray(titles) ? titles : [];
   const genreValues = Array.isArray(genres) ? genres : [];
   const keyValues = Array.isArray(currentKeys) ? currentKeys : [];
@@ -418,6 +505,13 @@ function buildSeriesKeyAutoRepairPlan_(titles, genres, currentKeys, extraLookup)
     const title = String(Array.isArray(titleRow) ? titleRow[0] || '' : titleRow || '');
     const genresRaw = Array.isArray(genreRow) ? genreRow[0] || '' : genreRow || '';
     const currentKey = String(Array.isArray(keyRow) ? keyRow[0] || '' : keyRow || '');
+    const noteRow = Array.isArray(manualNotes) ? manualNotes[index] : '';
+    const note = Array.isArray(noteRow) ? noteRow[0] : noteRow;
+    if (currentKey.trim() && hasSeriesKeyManualNote_(note)) {
+      values.push([currentKey]);
+      if (hasExtraSeriesPrefix_(currentKey)) extraCount++;
+      continue;
+    }
     const baseKey = title ? generateSeriesKeyAuto(title) : '';
     const lookupKey = extractSeriesLookupKeyFromTitle_(title);
     const normalizedBaseKey = normalizeSeriesAliasKey_(baseKey);
@@ -443,10 +537,15 @@ function buildSeriesKeyAutoRepairPlan_(titles, genres, currentKeys, extraLookup)
     if (!lookup) {
       isExtra = isExtraBookByGenres_(genresRaw);
     } else if (hasAmbiguousBase) {
-      if (!currentOwnerIsValid) {
+      // 明示クリアがロック待ちで中断されても、次回importで同じ自動ownerへ戻す。
+      // 意図の記録がない一般の曖昧な空欄は、引き続き停止させる。
+      const resetOwnerKey = !currentKey.trim() && hasSeriesKeyAutoResetNote_(note)
+        ? [normalizedBaseKey, normalizedLookupKey].find(key => lookup.exactSeriesIdByKey.has(key))
+        : '';
+      if (!currentOwnerIsValid && !resetOwnerKey) {
         throw new Error(`Ambiguous series classification for title: ${title}`);
       }
-      isExtra = Boolean(lookup.exactIsExtraByKey && lookup.exactIsExtraByKey.get(normalizedCurrentKey));
+      isExtra = Boolean(lookup.exactIsExtraByKey && lookup.exactIsExtraByKey.get(resetOwnerKey || normalizedCurrentKey));
     } else {
       isExtra = (
         lookup.get(normalizedBaseKey) === true ||
@@ -464,6 +563,7 @@ function buildSeriesKeyAutoRepairPlan_(titles, genres, currentKeys, extraLookup)
 
   return {
     values,
+    currentKeys: keyValues,
     changedIndices,
     changed: changedIndices.length,
     extraCount
@@ -479,6 +579,7 @@ function writeSeriesKeyAutoRepairPlan_(sheet, startRow, plan) {
     : [];
   const updatedRanges = [];
   if (!changedIndices.length) return updatedRanges;
+  const appliedIndices = [];
 
   let runStart = changedIndices[0];
   let runEnd = runStart;
@@ -486,13 +587,39 @@ function writeSeriesKeyAutoRepairPlan_(sheet, startRow, plan) {
   const writeRun = function(firstIndex, lastIndex) {
     const rowCount = lastIndex - firstIndex + 1;
     const firstRow = startRow + firstIndex;
-    sheet
-      .getRange(firstRow, CONFIG.COL.SERIES_KEY_AUTO, rowCount, 1)
-      .setValues(plan.values.slice(firstIndex, lastIndex + 1));
-    updatedRanges.push({
-      startRow: firstRow,
-      endRow: firstRow + rowCount - 1
-    });
+    const range = sheet.getRange(firstRow, CONFIG.COL.SERIES_KEY_AUTO, rowCount, 1);
+    const latestKeys = range.getValues();
+    const latestNotes = range.getNotes();
+    let safeStart = null;
+    const writeSafeRun = endIndex => {
+      if (safeStart == null) return;
+      sheet.getRange(startRow + safeStart, CONFIG.COL.SERIES_KEY_AUTO, endIndex - safeStart + 1, 1)
+        .setValues(plan.values.slice(safeStart, endIndex + 1));
+      for (let index = safeStart; index <= endIndex; index++) {
+        appliedIndices.push(index);
+        if (!hasSeriesKeyAutoResetNote_(latestNotes[index - firstIndex][0])) continue;
+        const cell = sheet.getRange(startRow + index, CONFIG.COL.SERIES_KEY_AUTO);
+        const note = cell.getNote();
+        if (hasSeriesKeyAutoResetNote_(note) && !hasSeriesKeyManualNote_(note) &&
+            String(cell.getValue() || '') === plan.values[index][0]) {
+          cell.setNote(buildSeriesKeyManualNote_(note, false));
+        }
+      }
+      updatedRanges.push({ startRow: startRow + safeStart, endRow: startRow + endIndex });
+      safeStart = null;
+    };
+    for (let index = firstIndex; index <= lastIndex; index++) {
+      const latestKey = String(latestKeys[index - firstIndex][0] || '');
+      const expected = plan.currentKeys && plan.currentKeys[index];
+      const changedAfterPlan = expected && String(expected[0] || '') !== latestKey;
+      const nowManual = latestKey.trim() && hasSeriesKeyManualNote_(latestNotes[index - firstIndex][0]);
+      if (changedAfterPlan || nowManual) {
+        writeSafeRun(index - 1);
+        plan.values[index] = [latestKey];
+        markSeriesKeyAutoDirty_();
+      } else if (safeStart == null) safeStart = index;
+    }
+    writeSafeRun(lastIndex);
   };
 
   for (let index = 1; index < changedIndices.length; index++) {
@@ -506,6 +633,8 @@ function writeSeriesKeyAutoRepairPlan_(sheet, startRow, plan) {
     runEnd = current;
   }
   writeRun(runStart, runEnd);
+  plan.changedIndices = appliedIndices;
+  plan.changed = appliedIndices.length;
   return updatedRanges;
 }
 
@@ -527,10 +656,9 @@ function buildSeriesKeyAutoSheetPlan_(sheet, startRow, rowCount, extraLookup) {
   const genres = sheet
     .getRange(startRow, CONFIG.COL.GENRE, rowCount, 1)
     .getDisplayValues();
-  const currentKeys = sheet
-    .getRange(startRow, CONFIG.COL.SERIES_KEY_AUTO, rowCount, 1)
-    .getValues();
-  const plan = buildSeriesKeyAutoRepairPlan_(titles, genres, currentKeys, extraLookup);
+  const keyRange = sheet.getRange(startRow, CONFIG.COL.SERIES_KEY_AUTO, rowCount, 1);
+  const currentKeys = keyRange.getValues();
+  const plan = buildSeriesKeyAutoRepairPlan_(titles, genres, currentKeys, extraLookup, keyRange.getNotes());
   plan.checked = rowCount;
   plan.startRow = startRow;
   return plan;
@@ -568,7 +696,9 @@ function preflightSeriesRegistryTitleKeyLinks_(sheet, startRow, rowCount, oldKey
     rowCount,
     buildSeriesRegistryExtraLookup_(registry)
   );
+  const manualNotes = sheet.getRange(startRow, CONFIG.COL.SERIES_KEY_AUTO, rowCount, 1).getNotes();
   for (let index = 0; index < rowCount; index++) {
+    if (hasSeriesKeyManualNote_(manualNotes[index][0])) continue;
     const oldKey = normalizeSeriesAliasKey_(oldKeys && oldKeys[index] ? oldKeys[index][0] : '');
     const nextKey = normalizeSeriesAliasKey_(automaticPlan.values[index] ? automaticPlan.values[index][0] : '');
     if (!nextKey || oldKey === nextKey) continue;

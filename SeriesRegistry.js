@@ -214,8 +214,16 @@ function appendSeriesRegistryRows_(sheet, rows, columnCount, copyPreviousTemplat
   const target = sheet.getRange(startRow, 1, values.length, columnCount);
   if (copyPreviousTemplate && startRow > 2) {
     const template = sheet.getRange(startRow - 1, 1, 1, columnCount);
-    template.copyTo(target, SpreadsheetApp.CopyPasteType.PASTE_FORMAT, false);
-    template.copyTo(target, SpreadsheetApp.CopyPasteType.PASTE_DATA_VALIDATION, false);
+    // copyTo はフィルターが空白を除外していると、まだ値のない追加行で失敗する。
+    // Range の書式/入力規則を明示的に設定し、既存フィルターを触らずに追加する。
+    const repeatTemplate = values => Array.from({ length: rows.length }, () => values[0].slice());
+    target.setBackgrounds(repeatTemplate(template.getBackgrounds()));
+    target.setTextStyles(repeatTemplate(template.getTextStyles()));
+    target.setNumberFormats(repeatTemplate(template.getNumberFormats()));
+    target.setHorizontalAlignments(repeatTemplate(template.getHorizontalAlignments()));
+    target.setVerticalAlignments(repeatTemplate(template.getVerticalAlignments()));
+    target.setWrapStrategies(repeatTemplate(template.getWrapStrategies()));
+    target.setDataValidations(repeatTemplate(template.getDataValidations()));
   }
   target.setValues(values);
   return startRow;
@@ -665,6 +673,7 @@ function readSeriesRegistryCatalogUsage_(lookup, catalogSheet) {
     unresolved: [],
     blankKeyRows: [],
     pendingManualMergePairs: [],
+    explicitManualOverrideSourceIds: new Set(),
     complete: false
   };
   if (!lookup || typeof CONFIG === 'undefined' || !CONFIG.SHEETS || !CONFIG.COL) return result;
@@ -680,11 +689,20 @@ function readSeriesRegistryCatalogUsage_(lookup, catalogSheet) {
   const titles = sheet
     .getRange(2, CONFIG.COL.TITLE, lastRow - 1, 1)
     .getDisplayValues();
+  const manualNotes = sheet.getRange(2, CONFIG.COL.SERIES_KEY_AUTO, lastRow - 1, 1).getNotes();
+  const manualOverrideBaseSignatures = new Set();
   const resolvedCatalogRows = [];
   result.checkedBooks = keys.length;
   keys.forEach((row, index) => {
     const key = normalizeSeriesAliasKey_(row[0]);
     const title = String(titles[index] ? titles[index][0] || '' : '').trim();
+    const explicitManualOverride = Boolean(key && hasSeriesKeyManualNote_(manualNotes[index][0]));
+    if (explicitManualOverride && title) {
+      [generateSeriesKeyAuto(title), extractSeriesLookupKeyFromTitle_(title)].forEach(autoKey => {
+        const signature = buildSeriesRegistryBaseSignature_(autoKey);
+        if (signature) manualOverrideBaseSignatures.add(signature);
+      });
+    }
     if (!key) {
       if (title) {
         const unresolved = {
@@ -721,7 +739,7 @@ function readSeriesRegistryCatalogUsage_(lookup, catalogSheet) {
       seriesId,
       (result.refsBySeriesId.get(seriesId) || 0) + 1
     );
-    if (title) {
+    if (title && !explicitManualOverride) {
       const autoKeys = [
         typeof generateSeriesKeyAuto === 'function' ? generateSeriesKeyAuto(title) : '',
         typeof extractSeriesLookupKeyFromTitle_ === 'function'
@@ -749,6 +767,12 @@ function readSeriesRegistryCatalogUsage_(lookup, catalogSheet) {
       });
     });
   }
+  // 行単位の手入力は、タイトル由来のシリーズを統合・削除する根拠にしない。
+  // 通常→資料系の同じbaseでも、自動ownerとその分類/IDを残し、Xクリアで戻せる。
+  manualOverrideBaseSignatures.forEach(signature => {
+    (sourceIdsByBaseSignature.get(signature) || new Set()).forEach(seriesId =>
+      result.explicitManualOverrideSourceIds.add(seriesId));
+  });
   const pendingPairsByIds = new Map();
   resolvedCatalogRows.forEach(row => {
     row.baseSignatures.forEach(signature => {
@@ -1505,6 +1529,7 @@ function buildSeriesRegistryLifecyclePlan_(registry, referenceScans) {
   const protectedByExternal = [];
   const protectedByAmbiguousSignature = [];
   const protectedByPendingManualMerge = [];
+  const protectedByManualOverride = [];
   const pendingManualMerges = [];
   const deactivateSeriesIds = [];
   const deleteSeriesIds = [];
@@ -1561,6 +1586,7 @@ function buildSeriesRegistryLifecyclePlan_(registry, referenceScans) {
       protectedByExternal,
       protectedByAmbiguousSignature,
       protectedByPendingManualMerge,
+      protectedByManualOverride,
       pendingManualMerges,
       deactivateSeriesIds
     };
@@ -1584,6 +1610,10 @@ function buildSeriesRegistryLifecyclePlan_(registry, referenceScans) {
   candidateIds.forEach(seriesId => {
     const master = registry.allMasterById.get(seriesId);
     if (!master || !supportedStatuses.has(master.status)) return;
+    if (usage.explicitManualOverrideSourceIds && usage.explicitManualOverrideSourceIds.has(seriesId)) {
+      protectedByManualOverride.push(seriesId);
+      return;
+    }
     if (reviewReferences.has(seriesId)) {
       protectedByReview.push(seriesId);
       if (master.status !== 'MERGED' && master.status !== 'INACTIVE') {
@@ -1659,6 +1689,7 @@ function buildSeriesRegistryLifecyclePlan_(registry, referenceScans) {
     protectedByExternal,
     protectedByAmbiguousSignature,
     protectedByPendingManualMerge,
+    protectedByManualOverride,
     pendingManualMerges,
     deactivateSeriesIds
   };
@@ -1710,6 +1741,7 @@ function summarizeSeriesRegistryLifecyclePlan_(plan) {
     protectedByExternal: (value.protectedByExternal || []).length,
     protectedByAmbiguousSignature: (value.protectedByAmbiguousSignature || []).length,
     protectedByPendingManualMerge: (value.protectedByPendingManualMerge || []).length,
+    protectedByManualOverride: (value.protectedByManualOverride || []).length,
     pendingManualMerges: (value.pendingManualMerges || []).slice(0, 10).map(pair => ({
       sourceSeriesId: pair.sourceSeriesId,
       destinationSeriesId: pair.destinationSeriesId,
@@ -2257,6 +2289,10 @@ function syncSeriesRegistryAfterTitleEdit_(sheet, startRow, rowCount, oldKeys) {
   for (let index = 0; index < rowCount; index++) {
     const oldKey = String(oldKeys && oldKeys[index] ? oldKeys[index][0] || '' : '');
     const newKey = String(currentKeys[index] ? currentKeys[index][0] || '' : '');
+    const keyCell = sheet.getRange(startRow + index, CONFIG.COL.SERIES_KEY_AUTO);
+    // 古いタイトルイベントは、後から入った行単位の手入力にaliasを結び直さない。
+    if (hasSeriesKeyManualNote_(keyCell.getNote()) ||
+        String(keyCell.getDisplayValue() || '') !== newKey) continue;
     if (!newKey || normalizeSeriesAliasKey_(oldKey) === normalizeSeriesAliasKey_(newKey)) {
       if (newKey) ensureSeriesRegistryAlias_(newKey, { source: 'TITLE_EDIT_EXISTING' });
       continue;
@@ -2267,7 +2303,10 @@ function syncSeriesRegistryAfterTitleEdit_(sheet, startRow, rowCount, oldKeys) {
       currentTitles[index] ? currentTitles[index][0] : ''
     );
     if (result && result.matchedBy === 'CONFLICT') {
-      sheet.getRange(startRow + index, CONFIG.COL.SERIES_KEY_AUTO).setValue(oldKey);
+      // 照合中にXが編集された場合も、以前のキーへ巻き戻さない。
+      if (hasSeriesKeyManualNote_(keyCell.getNote()) ||
+          String(keyCell.getDisplayValue() || '') !== newKey) continue;
+      keyCell.setValue(oldKey);
       conflicts += 1;
       conflictRows.push(startRow + index);
     } else if (result && result.matchedBy === 'NEW_SERIES') created += 1;
@@ -2495,207 +2534,52 @@ function refreshSeriesRegistryUsageCountsFromCatalog_(catalogSheet) {
 }
 
 /**
- * X列の手修正を、元の自動判定キーから修正先series_idへの明示aliasとして保存する。
- * これにより、後日タイトル編集でX列を再生成しても同じシリーズへ戻る。
+ * X列の明示編集はこの行の指定として登録する。元シリーズのaliasや分類を移さず、
+ * 指定キーの安全な登録と蔵書数更新だけを行う。空にした行は自動判定へ戻す。
  */
 function syncSeriesRegistryAfterManualKeyEdit_(sheet, startRow, rowCount) {
   if (!isSeriesRegistryV2Active_() || rowCount <= 0) {
-    return { active: false, aliasesMerged: 0, masterCountsChanged: 0 };
+    return { active: false, keysRegistered: 0, masterCountsChanged: 0 };
   }
-  const manualKeys = sheet
-    .getRange(startRow, CONFIG.COL.SERIES_KEY_AUTO, rowCount, 1)
-    .getDisplayValues();
-  const titles = sheet
-    .getRange(startRow, CONFIG.COL.TITLE, rowCount, 1)
-    .getValues();
-  const genres = sheet
-    .getRange(startRow, CONFIG.COL.GENRE, rowCount, 1)
-    .getDisplayValues();
-  const automaticPlan = buildSeriesKeyAutoRepairPlan_(
-    titles,
-    genres,
-    manualKeys,
-    loadSeriesRegistryExtraLookup_()
-  );
-
-  const initialRegistry = loadSeriesRegistryLookup_();
-  const blankKeyRows = initialRegistry && initialRegistry.catalogUsage
-    ? initialRegistry.catalogUsage.blankKeyRows || []
-    : [];
-  if (blankKeyRows.length) {
-    throw new Error(
-      `Series registry merge preflight failed: ${describeSeriesRegistryUnresolvedCatalogKeys_(blankKeyRows)}`
-    );
-  }
-
-  // Xの変更先だけを先に確定し、後段のalias移動は全行の競合を検査してから行う。
-  syncSeriesRegistryFromCatalog_();
   const registry = loadSeriesRegistryLookup_();
-  if (!registry) return { active: true, aliasesMerged: 0, masterCountsChanged: 0 };
-
-  const review = readSeriesRegistryReviewReferenceIds_(registry);
-  const external = readSeriesRegistryExternalReferenceIds_(registry);
-  const preflight = buildSeriesRegistryLifecyclePlan_(registry, {
-    reviewReferencedIds: review.references,
-    reviewScanComplete: review.complete,
-    externalReferencedIds: external.references,
-    externalScanComplete: external.complete
+  const blockers = getSeriesRegistryIntegrityBlockers_(registry);
+  if (blockers.length) throw new Error('Series registry integrity check failed: ' + blockers[0]);
+  const keyRange = sheet.getRange(startRow, CONFIG.COL.SERIES_KEY_AUTO, rowCount, 1);
+  const currentKeys = keyRange.getValues();
+  const notes = keyRange.getNotes();
+  const titles = sheet.getRange(startRow, CONFIG.COL.TITLE, rowCount, 1).getValues();
+  const genres = sheet.getRange(startRow, CONFIG.COL.GENRE, rowCount, 1).getDisplayValues();
+  const lookup = buildSeriesRegistryExtraLookup_(registry);
+  // Xクリアという明示イベントでは、タイトル由来のexact ownerを分類の出発点にできる。
+  // 通常/資料系の同baseがある場合も、人間の手入力で元ownerを削除していないので戻せる。
+  const classificationKeys = currentKeys.map((row, index) => {
+    if (String(row[0] || '').trim()) return row;
+    const title = titles[index][0];
+    const candidates = [generateSeriesKeyAuto(title), extractSeriesLookupKeyFromTitle_(title)];
+    return [candidates.find(key => lookup.exactSeriesIdByKey.has(normalizeSeriesAliasKey_(key))) || ''];
   });
-  if (preflight.blockers.length) {
-    throw new Error(`Series registry merge preflight failed: ${preflight.blockers[0]}`);
-  }
-
-  const timestamp = new Date();
-  const targetBySourceSeriesId = new Map();
-  const newAliasesByKey = new Map();
-  const skippedLiveSources = new Set();
-  const skippedProtectedSources = new Set();
-  manualKeys.forEach((row, index) => {
-    const manualKey = normalizeSeriesAliasKey_(row[0]);
-    const automaticKey = normalizeSeriesAliasKey_(
-      automaticPlan.values[index] ? automaticPlan.values[index][0] : ''
-    );
-    if (!manualKey || !automaticKey || manualKey === automaticKey) return;
-
-    const target = resolveSeriesRegistryKey_(manualKey, registry);
-    if (!target) return;
-    const existing = registry.aliasByKey.get(automaticKey);
-    if (existing && existing.seriesId === target.seriesId) return;
-    const exactOwners = registry.allAliasOwnersByKey.get(automaticKey);
-    if (exactOwners && (!existing || exactOwners.size !== 1)) return;
-
-    const automaticResolved = existing
-      ? { seriesId: existing.seriesId }
-      : resolveSeriesRegistryKey_(automaticKey, registry);
-    if (automaticResolved && automaticResolved.seriesId !== target.seriesId) {
-      const sourceSeriesId = automaticResolved.seriesId;
-      const actualReferences = registry.catalogUsage.refsBySeriesId.get(sourceSeriesId) || 0;
-      if (actualReferences > 0) {
-        skippedLiveSources.add(sourceSeriesId);
-        return;
-      }
-      if (review.references.has(sourceSeriesId) || external.references.has(sourceSeriesId)) {
-        skippedProtectedSources.add(sourceSeriesId);
-        return;
-      }
-      const previousTarget = targetBySourceSeriesId.get(sourceSeriesId);
-      if (previousTarget && previousTarget !== target.seriesId) {
-        throw new Error(`Manual series merge has multiple targets for ${sourceSeriesId}`);
-      }
-      targetBySourceSeriesId.set(sourceSeriesId, target.seriesId);
-      return;
+  const plan = buildSeriesKeyAutoRepairPlan_(titles, genres, classificationKeys, lookup, notes);
+  plan.currentKeys = currentKeys;
+  plan.startRow = startRow;
+  plan.checked = rowCount;
+  plan.changedIndices = plan.values.reduce((indices, row, index) => {
+    if (String(currentKeys[index][0] || '') !== row[0]) indices.push(index);
+    return indices;
+  }, []);
+  plan.changed = plan.changedIndices.length;
+  const keys = new Set(plan.values.map(row => normalizeSeriesAliasKey_(row[0])).filter(Boolean));
+  // 全対象を先に検証する。曖昧/非active ownerに属するキーは新規作成しない。
+  keys.forEach(key => {
+    const resolved = resolveSeriesRegistryKey_(key, registry);
+    if (!resolved || (resolved.matchedBy === 'UNIQUE_SIGNATURE' && !registry.aliasByKey.has(key))) {
+      assertSeriesRegistryAliasAdditionAllowed_(key, resolved ? resolved.seriesId : '', registry);
     }
-    if (automaticResolved && automaticResolved.seriesId === target.seriesId) {
-      if (!existing) newAliasesByKey.set(automaticKey, target.seriesId);
-      return;
-    }
-    if (registry.allAliasOwnersByKey.has(automaticKey)) return;
-    const signature = buildSeriesAliasSignature_(automaticKey);
-    const owners = registry.signatureOwners.get(signature);
-    if (owners && owners.size > 1) return;
-    const plannedTarget = newAliasesByKey.get(automaticKey);
-    if (plannedTarget && plannedTarget !== target.seriesId) {
-      throw new Error(`Manual series alias has multiple targets: ${automaticKey}`);
-    }
-    newAliasesByKey.set(automaticKey, target.seriesId);
   });
-
-  const aliasRowsToRehome = [];
-  targetBySourceSeriesId.forEach((targetSeriesId, sourceSeriesId) => {
-    const aliases = registry.allAliasRowsBySeriesId.get(sourceSeriesId) || [];
-    aliases.forEach(alias => {
-      const owners = registry.aliasOwnersByKey.get(alias.aliasKey);
-      if (!owners || owners.size !== 1 || !owners.has(sourceSeriesId)) {
-        throw new Error(`Manual series merge alias conflict: ${alias.aliasKey}`);
-      }
-      const signatureOwners = registry.allSignatureOwners.get(alias.signature);
-      if (signatureOwners && [...signatureOwners].some(ownerId =>
-        ownerId !== sourceSeriesId && ownerId !== targetSeriesId
-      )) {
-        throw new Error(`Manual series merge signature conflict: ${alias.aliasKey}`);
-      }
-      const targetAlias = registry.aliasByKey.get(alias.aliasKey);
-      if (targetAlias && targetAlias.seriesId !== sourceSeriesId) {
-        throw new Error(`Manual series merge target already owns alias: ${alias.aliasKey}`);
-      }
-      aliasRowsToRehome.push({
-        row: alias.row,
-        aliasKey: alias.aliasKey,
-        sourceSeriesId,
-        targetSeriesId
-      });
-    });
-  });
-
-  const metadataPlan = buildSeriesRegistryMetadataMergePlan_(
-    registry,
-    [...targetBySourceSeriesId].map(([sourceSeriesId, targetSeriesId]) => ({
-      sourceSeriesId,
-      destinationSeriesId: targetSeriesId
-    }))
-  );
-  if (metadataPlan.blockers.length) {
-    persistSeriesRegistryMetadataMergeHolds_(
-      registry,
-      metadataPlan.pairs,
-      metadataPlan.blockers
-    );
-    throw new Error(`Manual series metadata merge blocked: ${metadataPlan.blockers[0]}`);
-  }
-  const metadataMerge = applySeriesRegistryMetadataMergePlan_(registry, metadataPlan);
-  if (!metadataMerge.ok) {
-    persistSeriesRegistryMetadataMergeHolds_(
-      registry,
-      metadataPlan.pairs,
-      metadataMerge.blockers
-    );
-    throw new Error(`Manual series metadata merge blocked: ${metadataMerge.blockers[0]}`);
-  }
-
-  if (newAliasesByKey.size) {
-    ensureSeriesRegistryRowCapacity_(
-      registry.aliasSheet,
-      getNextSeriesRegistryRow_(registry.aliasSheet),
-      newAliasesByKey.size
-    );
-  }
-  aliasRowsToRehome.forEach(item => {
-    registry.aliasSheet.getRange(item.row, 2).setValue(item.targetSeriesId);
-    registry.aliasSheet.getRange(item.row, 3).setValue('MANUAL_X_MERGE');
-    registry.aliasSheet.getRange(item.row, 6).setValue(timestamp);
-  });
-  if (newAliasesByKey.size) {
-    appendSeriesRegistryRows_(
-      registry.aliasSheet,
-      [...newAliasesByKey].map(([aliasKey, seriesId]) => [
-        aliasKey,
-        seriesId,
-        'MANUAL_X_MERGE',
-        buildSeriesAliasSignature_(aliasKey),
-        0,
-        timestamp
-      ]),
-      6,
-      true
-    );
-  }
+  keys.forEach(key => ensureSeriesRegistryAlias_(key, { source: 'MANUAL_X_ROW', count: 0 }));
+  writeSeriesKeyAutoRepairPlan_(sheet, startRow, plan);
   const usage = refreshSeriesRegistryUsageCountsFromCatalog_(sheet);
-  const cleanup = cleanupSeriesRegistryLifecycleCore_();
-  const finalUsage = cleanup.changed
-    ? refreshSeriesRegistryUsageCountsFromCatalog_(sheet)
-    : usage;
-  return {
-    active: true,
-    aliasesMerged: aliasRowsToRehome.length + newAliasesByKey.size,
-    preservedLiveSources: skippedLiveSources.size,
-    preservedProtectedSources: skippedProtectedSources.size,
-    metadataSlotsMerged: metadataPlan.changedSlots,
-    masterCountsChanged: finalUsage.masterCountsChanged,
-    aliasCountsChanged: finalUsage.aliasCountsChanged,
-    cleanup
-  };
+  return Object.assign({ active: true, keysRegistered: keys.size, changed: plan.changed }, usage);
 }
-
 function activateSeriesRegistryV2_() {
   const spreadsheet = SpreadsheetApp.getActive();
   const masterSheet = spreadsheet.getSheetByName(SERIES_REGISTRY_CONFIG_.MASTER_SHEET);

@@ -178,7 +178,7 @@ assert(
   'editing the generated series-key column also repairs the row UUID'
 );
 assert(
-  onEditSource.includes('seriesRegistryActive && touchesMainSeriesKey') &&
+  onEditSource.includes('else if (touchesMainSeriesKey)') &&
     onEditSource.includes('syncSeriesRegistryAfterManualKeyEdit_('),
   'manual series-key edits synchronize the stable V2 registry'
 );
@@ -190,10 +190,10 @@ assert(
 );
 assert(
   seriesRegistrySource.includes('function syncSeriesRegistryAfterManualKeyEdit_') &&
-    seriesRegistrySource.includes("'MANUAL_X_MERGE'") &&
-    seriesRegistrySource.includes('cleanupSeriesRegistryLifecycleCore_') &&
-    seriesRegistrySource.includes('preservedLiveSources'),
-  'manual series-key overrides preserve live source series and clean only safe orphan history'
+    seriesRegistrySource.includes("'MANUAL_X_ROW'") &&
+    !seriesRegistrySource.includes("'MANUAL_X_MERGE'") &&
+    sheetCodeSource.includes('markSeriesKeyManualOnEdit_(e);'),
+  'manual series-key edits persist row overrides before registry synchronization and do not globally merge aliases'
 );
 assert(
   /function\s+enrichNewBooksAfterImportByLimit_\s*\([^)]*\)[\s\S]*?SpreadsheetApp\.flush\(\);[\s\S]*?clearLibrarySearchCache_\(\);/.test(newBookImportSource),
@@ -948,6 +948,8 @@ const seriesKeyWrites = [];
 uuidSandbox.__seriesKeyWriteSheet = {
   getRange(row, column, rowCount, columnCount) {
     return {
+      getValues() { return Array.from({ length: rowCount }, () => ['']); },
+      getNotes() { return Array.from({ length: rowCount }, () => ['']); },
       setValues(values) {
         seriesKeyWrites.push({ row, column, rowCount, columnCount, values });
       }
