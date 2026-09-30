@@ -8,7 +8,7 @@ const EXPECTED_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzAfn1SJqf
 const PUBLIC_FORBIDDEN_PATTERNS = [
   { pattern: /docs\.google\.com\/spreadsheets/i, label: 'Google Spreadsheet URL' },
   { pattern: /spreadsheets\/d\//i, label: 'Google Spreadsheet URL path' },
-  { pattern: /SpreadsheetApp\.openById/i, label: 'Spreadsheet ID access by literal ID' },
+  { pattern: /SpreadsheetApp\s*\.\s*openById\s*\(\s*['"`]/i, label: 'Spreadsheet ID access by literal ID' },
   { pattern: /openByUrl/i, label: 'Spreadsheet URL access' },
   { pattern: /"scriptId"\s*:/i, label: 'Apps Script scriptId JSON field' }
 ];
@@ -36,6 +36,10 @@ function isTextFile(filePath) {
 }
 
 assert(GAS_WEB_APP_URL_PATTERN.test(EXPECTED_WEB_APP_URL), 'PWA web app URL has the expected GAS /exec shape');
+const literalIdPattern = PUBLIC_FORBIDDEN_PATTERNS[2].pattern;
+assert(literalIdPattern.test("SpreadsheetApp.openById('private-id')"), 'literal spreadsheet IDs remain forbidden');
+assert(literalIdPattern.test('SpreadsheetApp . openById ( `private-id` )'), 'spaced/template literal IDs remain forbidden');
+assert(!literalIdPattern.test('SpreadsheetApp.openById(source)'), 'saved runtime source IDs are permitted');
 
 const buildPages = fs.readFileSync(path.join(root, 'tools', 'build-pages.js'), 'utf8');
 const shim = readIfExists(path.join('docs', 'assets', 'js', 'gas-run-shim.js'));
