@@ -301,6 +301,10 @@ function chooseSeriesRegistryDisplayName_(titles, fallbackKey) {
   return unique[0];
 }
 
+function buildManualSeriesRegistryDisplayName_(key) {
+  return String(key || '').trim().replace(/^__extra__/i, '').trim();
+}
+
 function buildGenreCategoryLookup_(rows) {
   const lookup = new Map();
   (Array.isArray(rows) ? rows : []).forEach(row => {
@@ -506,7 +510,7 @@ function isSeriesRegistryV2Active_() {
       SERIES_REGISTRY_CONFIG_.ACTIVE_PROPERTY
     ) === '1') return true;
 
-    const spreadsheet = SpreadsheetApp.getActive();
+    const spreadsheet = getLibrarySpreadsheet_();
     const masterSheet = spreadsheet.getSheetByName(SERIES_REGISTRY_CONFIG_.MASTER_SHEET);
     const aliasSheet = spreadsheet.getSheetByName(SERIES_REGISTRY_CONFIG_.ALIAS_SHEET);
     const mainSheet = spreadsheet.getSheetByName(CONFIG.SHEETS.MAIN);
@@ -521,7 +525,7 @@ function isSeriesRegistryV2Active_() {
 
 function loadSeriesRegistryLookup_() {
   if (!isSeriesRegistryV2Active_()) return null;
-  const spreadsheet = SpreadsheetApp.getActive();
+  const spreadsheet = getLibrarySpreadsheet_();
   const masterSheet = spreadsheet.getSheetByName(SERIES_REGISTRY_CONFIG_.MASTER_SHEET);
   const aliasSheet = spreadsheet.getSheetByName(SERIES_REGISTRY_CONFIG_.ALIAS_SHEET);
   if (!masterSheet || !aliasSheet) return null;
@@ -1443,7 +1447,7 @@ function ensureSeriesRegistryExtraAliases_() {
 
 function readSeriesRegistryReviewReferenceIds_(registry) {
   const references = new Set();
-  const spreadsheet = SpreadsheetApp.getActive();
+  const spreadsheet = getLibrarySpreadsheet_();
   const reviewSheet = spreadsheet.getSheetByName(SERIES_REGISTRY_CONFIG_.REVIEW_SHEET);
   if (!reviewSheet) return { complete: false, references, rows: 0 };
   const lastRow = Math.max(1, Number(reviewSheet.getLastRow()) || 1);
@@ -1458,7 +1462,7 @@ function readSeriesRegistryReviewReferenceIds_(registry) {
 
 function readSeriesRegistryExternalReferenceIds_(registry) {
   const references = new Set();
-  const spreadsheet = SpreadsheetApp.getActive();
+  const spreadsheet = getLibrarySpreadsheet_();
   if (!spreadsheet || typeof spreadsheet.getSheets !== 'function') {
     return { complete: false, references, sheetsScanned: 0 };
   }
@@ -1921,7 +1925,7 @@ function assertSeriesRegistryAliasAdditionAllowed_(rawKey, seriesId, registry) {
 }
 
 function appendSeriesReviewRow_(candidateKey, candidateSeriesId, comparisonKey, comparisonSeriesId, reason) {
-  const reviewSheet = SpreadsheetApp.getActive().getSheetByName(
+  const reviewSheet = getLibrarySpreadsheet_().getSheetByName(
     SERIES_REGISTRY_CONFIG_.REVIEW_SHEET
   );
   if (!reviewSheet) return false;
@@ -1955,7 +1959,7 @@ function persistSeriesRegistryMetadataMergeHolds_(registry, sourceTargetPairs, b
     throw new Error('Unable to persist metadata merge safety hold: no source/destination pairs were available.');
   }
 
-  const spreadsheet = SpreadsheetApp.getActive();
+  const spreadsheet = getLibrarySpreadsheet_();
   const reviewSheet = spreadsheet && spreadsheet.getSheetByName(SERIES_REGISTRY_CONFIG_.REVIEW_SHEET);
   if (!reviewSheet) {
     throw new Error('Unable to persist metadata merge safety hold: review sheet is missing.');
@@ -2028,13 +2032,14 @@ function appendSeriesMasterRow_(
   count,
   timestamp,
   displayName,
-  mediaSlots
+  mediaSlots,
+  preserveDisplayName
 ) {
   const seriesId = `series_${Utilities.getUuid()}`;
   const masterColumnCount = getSeriesRegistryMasterColumnCount_(masterSheet);
   appendSeriesRegistryRows_(masterSheet, [buildSeriesRegistryMasterRow_(
     seriesId,
-    buildSeriesRegistryDisplayName_(displayName, canonicalKey),
+    preserveDisplayName ? displayName : buildSeriesRegistryDisplayName_(displayName, canonicalKey),
     genreSlots,
     Number(count || 0),
     'ACTIVE',
@@ -2077,14 +2082,17 @@ function ensureSeriesRegistryAlias_(rawKey, options) {
   }
   assertSeriesRegistryAliasAdditionAllowed_(key, '', registry);
 
+  const manualName = options && options.source === 'MANUAL_X_ROW'
+    ? buildManualSeriesRegistryDisplayName_(rawKey) : '';
   const seriesId = appendSeriesMasterRow_(
     registry.masterSheet,
     key,
     [],
     options && options.count || 1,
     new Date(),
-    options && options.displayName || '',
-    options && options.media || []
+    manualName || options && options.displayName || '',
+    options && options.media || [],
+    Boolean(manualName)
   );
   appendSeriesAliasRow_(
     registry.aliasSheet,
@@ -2097,7 +2105,7 @@ function ensureSeriesRegistryAlias_(rawKey, options) {
   return {
     seriesId,
     canonicalKey: key,
-    displayName: buildSeriesRegistryDisplayName_(
+    displayName: manualName || buildSeriesRegistryDisplayName_(
       options && options.displayName || '',
       key
     ),
@@ -2281,6 +2289,7 @@ function syncSeriesRegistryAfterTitleEdit_(sheet, startRow, rowCount, oldKeys) {
   const currentTitles = sheet
     .getRange(startRow, CONFIG.COL.TITLE, rowCount, 1)
     .getDisplayValues();
+  const currentUuids = sheet.getRange(startRow, CONFIG.COL.BOOK_UUID, rowCount, 1).getDisplayValues();
   let linked = 0;
   let created = 0;
   let conflicts = 0;
@@ -2290,6 +2299,13 @@ function syncSeriesRegistryAfterTitleEdit_(sheet, startRow, rowCount, oldKeys) {
     const oldKey = String(oldKeys && oldKeys[index] ? oldKeys[index][0] || '' : '');
     const newKey = String(currentKeys[index] ? currentKeys[index][0] || '' : '');
     const keyCell = sheet.getRange(startRow + index, CONFIG.COL.SERIES_KEY_AUTO);
+    const assertCurrentIdentity = () => {
+      if (String(sheet.getRange(startRow + index, CONFIG.COL.TITLE).getDisplayValue() || '') !== currentTitles[index][0] ||
+          normalizeBookUuid_(sheet.getRange(startRow + index, CONFIG.COL.BOOK_UUID).getValue()) !== normalizeBookUuid_(currentUuids[index][0])) {
+        throw new Error('Title edit identity changed during synchronization.');
+      }
+    };
+    assertCurrentIdentity();
     // 古いタイトルイベントは、後から入った行単位の手入力にaliasを結び直さない。
     if (hasSeriesKeyManualNote_(keyCell.getNote()) ||
         String(keyCell.getDisplayValue() || '') !== newKey) continue;
@@ -2304,6 +2320,7 @@ function syncSeriesRegistryAfterTitleEdit_(sheet, startRow, rowCount, oldKeys) {
     );
     if (result && result.matchedBy === 'CONFLICT') {
       // 照合中にXが編集された場合も、以前のキーへ巻き戻さない。
+      assertCurrentIdentity();
       if (hasSeriesKeyManualNote_(keyCell.getNote()) ||
           String(keyCell.getDisplayValue() || '') !== newKey) continue;
       keyCell.setValue(oldKey);
@@ -2326,13 +2343,17 @@ function syncSeriesRegistryFromCatalog_() {
   const titles = sheet
     .getRange(2, CONFIG.COL.TITLE, lastRow - 1, 1)
     .getDisplayValues();
+  const manualNotes = sheet.getRange(2, CONFIG.COL.SERIES_KEY_AUTO, lastRow - 1, 1).getNotes();
   const counts = new Map();
   keys.forEach((row, index) => {
     const key = normalizeSeriesAliasKey_(row[0]);
     if (!key) return;
-    if (!counts.has(key)) counts.set(key, { count: 0, titles: [] });
+    if (!counts.has(key)) counts.set(key, { count: 0, titles: [], manualName: '' });
     const item = counts.get(key);
     item.count += 1;
+    if (!item.manualName && hasSeriesKeyManualNote_(manualNotes[index][0])) {
+      item.manualName = String(row[0] || '').trim();
+    }
     const title = String(titles[index] ? titles[index][0] || '' : '').trim();
     if (title) item.titles.push(title);
   });
@@ -2397,7 +2418,11 @@ function syncSeriesRegistryFromCatalog_() {
     }
 
     const seriesId = `series_${Utilities.getUuid()}`;
-    const displayName = chooseSeriesRegistryDisplayName_(item.titles, key);
+    // A new manually grouped series uses the chosen group name, even when its
+    // individual books have different titles. Existing curated names stay put.
+    const displayName = item.manualName
+      ? buildManualSeriesRegistryDisplayName_(item.manualName)
+      : chooseSeriesRegistryDisplayName_(item.titles, key);
     const group = { seriesId, canonicalKey: key, displayName, titles: item.titles.slice(), count };
     newMasterBySignature.set(signature, group);
     newMasterRows.push(buildSeriesRegistryMasterRow_(
@@ -2560,6 +2585,8 @@ function syncSeriesRegistryAfterManualKeyEdit_(sheet, startRow, rowCount) {
   });
   const plan = buildSeriesKeyAutoRepairPlan_(titles, genres, classificationKeys, lookup, notes);
   plan.currentKeys = currentKeys;
+  plan.currentTitles = titles;
+  plan.currentUuids = sheet.getRange(startRow, CONFIG.COL.BOOK_UUID, rowCount, 1).getValues();
   plan.startRow = startRow;
   plan.checked = rowCount;
   plan.changedIndices = plan.values.reduce((indices, row, index) => {
@@ -2575,13 +2602,16 @@ function syncSeriesRegistryAfterManualKeyEdit_(sheet, startRow, rowCount) {
       assertSeriesRegistryAliasAdditionAllowed_(key, resolved ? resolved.seriesId : '', registry);
     }
   });
-  keys.forEach(key => ensureSeriesRegistryAlias_(key, { source: 'MANUAL_X_ROW', count: 0 }));
+  keys.forEach(key => ensureSeriesRegistryAlias_(
+    plan.values.find(row => normalizeSeriesAliasKey_(row[0]) === key)[0],
+    { source: 'MANUAL_X_ROW', count: 0 }
+  ));
   writeSeriesKeyAutoRepairPlan_(sheet, startRow, plan);
   const usage = refreshSeriesRegistryUsageCountsFromCatalog_(sheet);
   return Object.assign({ active: true, keysRegistered: keys.size, changed: plan.changed }, usage);
 }
 function activateSeriesRegistryV2_() {
-  const spreadsheet = SpreadsheetApp.getActive();
+  const spreadsheet = getLibrarySpreadsheet_();
   const masterSheet = spreadsheet.getSheetByName(SERIES_REGISTRY_CONFIG_.MASTER_SHEET);
   const aliasSheet = spreadsheet.getSheetByName(SERIES_REGISTRY_CONFIG_.ALIAS_SHEET);
   if (!masterSheet || !aliasSheet) {

@@ -7,39 +7,13 @@
 /**
  * onEditトリガー：A1セル等の編集イベントをモード分岐
  */
-function shouldRunSeriesRegistryOnEditLocked_(e) {
-  if (!e || !e.range || !isSeriesRegistryV2Active_()) return false;
-  const sheet = e.range.getSheet();
-  const sheetName = sheet.getName();
-  const row = e.range.getRow();
-  const rowEnd = row + e.range.getNumRows() - 1;
-  const col = e.range.getColumn();
-  const colEnd = col + e.range.getNumColumns() - 1;
-  if (rowEnd < 2) return false;
-  if (sheetName === CONFIG.SHEETS.MAIN) {
-    return (
-      (col <= CONFIG.COL.TITLE && colEnd >= CONFIG.COL.TITLE) ||
-      (col <= CONFIG.COL.SERIES_KEY_AUTO && colEnd >= CONFIG.COL.SERIES_KEY_AUTO)
-    );
-  }
-  if (sheetName === SERIES_REGISTRY_CONFIG_.MASTER_SHEET) {
-    return col <= SERIES_REGISTRY_CONFIG_.MASTER_HEADERS.length && colEnd >= 1;
-  }
-  return sheetName === SERIES_REGISTRY_CONFIG_.ALIAS_SHEET && col <= 4 && colEnd >= 1;
-}
-
 function onEdit(e) {
-  if (!e || !e.range) return onEditBody_(e);
-  const editedSheet = e.range.getSheet();
-  if (
-    editedSheet.getName() === CONFIG.SHEETS.MAIN &&
-    e.range.getA1Notation() === 'A1'
-  ) return;
-  // 手入力の意思は registry のロック待ちより先に保存する。同期が待機失敗しても
-  // import / ジャンル更新が手入力Xを自動値で上書きしないようにする。
-  markSeriesKeyManualOnEdit_(e);
-  if (!shouldRunSeriesRegistryOnEditLocked_(e)) return onEditBody_(e);
-  return withSeriesRegistryScriptLock_(() => onEditBody_(e), 10000);
+  if (!e || !e.range) return;
+  if (e.range.getSheet().getName() === CONFIG.SHEETS.MAIN &&
+      e.range.getA1Notation() === 'A1') return;
+  // The 30-second simple trigger only captures intent and invalidates caches.
+  // Registry scans/writes run in the existing installable edit trigger.
+  return captureLibraryEdit_(e, true);
 }
 
 function onEditBody_(e) {
@@ -53,7 +27,7 @@ function onEditBody_(e) {
   if (sheetName === CONFIG.SHEETS.MAIN && notation === 'A1') return;
 
   // AA列の手動画像URL補正は、複数列貼り付け時に他のonEdit処理を止めない。
-  handleFallbackImageManualEdit_(e);
+  if (!e.libraryDeferred) handleFallbackImageManualEdit_(e);
 
   const row = e.range.getRow();
   const col = e.range.getColumn();
@@ -91,11 +65,11 @@ function onEditBody_(e) {
     seriesEditStartRow = Math.max(row, 2);
     const seriesEditEndRow = Math.max(seriesEditStartRow, rowEnd);
     seriesEditRowCount = seriesEditEndRow - seriesEditStartRow + 1;
-    oldSeriesKeys = sh
+    oldSeriesKeys = e.libraryOldSeriesKeys || sh
       .getRange(seriesEditStartRow, CONFIG.COL.SERIES_KEY_AUTO, seriesEditRowCount, 1)
       .getDisplayValues();
   }
-  if (sheetName === MAIN && row >= 2) {
+  if (!e.libraryDeferred && sheetName === MAIN && row >= 2) {
     markSynopsisManualOnEdit_(e);
   }
 
@@ -590,6 +564,8 @@ function writeSeriesKeyAutoRepairPlan_(sheet, startRow, plan) {
     const range = sheet.getRange(firstRow, CONFIG.COL.SERIES_KEY_AUTO, rowCount, 1);
     const latestKeys = range.getValues();
     const latestNotes = range.getNotes();
+    const latestTitles = plan.currentTitles ? sheet.getRange(firstRow, CONFIG.COL.TITLE, rowCount, 1).getValues() : null;
+    const latestUuids = plan.currentUuids ? sheet.getRange(firstRow, CONFIG.COL.BOOK_UUID, rowCount, 1).getValues() : null;
     let safeStart = null;
     const writeSafeRun = endIndex => {
       if (safeStart == null) return;
@@ -612,7 +588,10 @@ function writeSeriesKeyAutoRepairPlan_(sheet, startRow, plan) {
       const latestKey = String(latestKeys[index - firstIndex][0] || '');
       const expected = plan.currentKeys && plan.currentKeys[index];
       const changedAfterPlan = expected && String(expected[0] || '') !== latestKey;
+      const changedIdentity = (latestTitles && String(latestTitles[index - firstIndex][0] || '') !== String(plan.currentTitles[index][0] || '')) ||
+        (latestUuids && normalizeBookUuid_(latestUuids[index - firstIndex][0]) !== normalizeBookUuid_(plan.currentUuids[index][0]));
       const nowManual = latestKey.trim() && hasSeriesKeyManualNote_(latestNotes[index - firstIndex][0]);
+      if (changedIdentity) throw new Error('Series key source identity changed before write.');
       if (changedAfterPlan || nowManual) {
         writeSafeRun(index - 1);
         plan.values[index] = [latestKey];
@@ -659,6 +638,8 @@ function buildSeriesKeyAutoSheetPlan_(sheet, startRow, rowCount, extraLookup) {
   const keyRange = sheet.getRange(startRow, CONFIG.COL.SERIES_KEY_AUTO, rowCount, 1);
   const currentKeys = keyRange.getValues();
   const plan = buildSeriesKeyAutoRepairPlan_(titles, genres, currentKeys, extraLookup, keyRange.getNotes());
+  plan.currentTitles = titles;
+  plan.currentUuids = sheet.getRange(startRow, CONFIG.COL.BOOK_UUID, rowCount, 1).getValues();
   plan.checked = rowCount;
   plan.startRow = startRow;
   return plan;
@@ -1079,7 +1060,7 @@ function resetSheetStyle_(sheet) {
  * ユーティリティ：シート取得・最終データ行取得
  */
 function getSheet(name) {
-  const s = SpreadsheetApp.getActive().getSheetByName(name);
+  const s = getLibrarySpreadsheet_().getSheetByName(name);
   if (!s) throw new Error(`Sheet "${name}" not found`);
   return s;
 }

@@ -192,7 +192,7 @@ assert(
   seriesRegistrySource.includes('function syncSeriesRegistryAfterManualKeyEdit_') &&
     seriesRegistrySource.includes("'MANUAL_X_ROW'") &&
     !seriesRegistrySource.includes("'MANUAL_X_MERGE'") &&
-    sheetCodeSource.includes('markSeriesKeyManualOnEdit_(e);'),
+    fs.readFileSync(path.join(root, 'LibraryEdits.js'), 'utf8').includes('markSeriesKeyManualOnEdit_(e);'),
   'manual series-key edits persist row overrides before registry synchronization and do not globally merge aliases'
 );
 assert(

@@ -23,6 +23,8 @@ function setupLibraryModeControls_() {
     trigger.getTriggerSourceId() === ss.getId() &&
     trigger.getEventType() === ScriptApp.EventType.ON_EDIT);
   if (!existing.length) ScriptApp.newTrigger(LIBRARY_MODE_HANDLER_).forSpreadsheet(ss).onEdit().create();
+  rememberLibraryEditSource_(ss);
+  ensureLibraryEditRetry_();
   ensureLibraryInputModeFormat_(getSheet(CONFIG.SHEETS.MAIN));
   ss.toast('A1の操作を有効にしました。', '図書館', 5);
   return { installed: existing.length === 0, handler: LIBRARY_MODE_HANDLER_ };
@@ -31,10 +33,12 @@ function setupLibraryModeControls_() {
 function handleLibraryModeEdit_(e) {
   if (!e || !e.range || !e.triggerUid) return;
   const sheet = e.range.getSheet();
-  if (sheet.getName() !== CONFIG.SHEETS.MAIN || e.range.getA1Notation() !== 'A1') return;
-  const command = String(e.value || '');
-  if (!LIBRARY_MODE_COMMANDS_.includes(command)) return;
-  return runLibraryModeCommand_(sheet, command);
+  if (sheet.getName() === CONFIG.SHEETS.MAIN && e.range.getA1Notation() === 'A1') {
+    const command = String(e.value || '');
+    if (!LIBRARY_MODE_COMMANDS_.includes(command)) return;
+    return runLibraryModeCommand_(sheet, command);
+  }
+  return handleInstalledLibraryEdit_(e);
 }
 
 function startLibraryInputFromMenu_() { return runLibraryModeFromMenu_('ISBN入力モード'); }

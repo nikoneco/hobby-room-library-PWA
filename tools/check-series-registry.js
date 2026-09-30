@@ -14,7 +14,7 @@ const aliasHeaders = [
 const reviewHeaders = [
   '候補キー', '候補series_id', '比較対象キー', '比較対象series_id', '理由', '状態', '更新日時'
 ];
-const files = ['config.js', 'コード.js', 'SeriesRegistry.js', 'NewBookImport.js'];
+const files = ['config.js', 'コード.js', 'LibraryEdits.js', 'SheetModes.js', 'SeriesRegistry.js', 'NewBookImport.js'];
 
 function pad(row, width) {
   return Array.from({ length: width }, (_, index) => row[index] == null ? '' : row[index]);
@@ -246,6 +246,8 @@ function makeFixture(options = {}) {
   let lockAcquires = 0;
   let lockReleases = 0;
   let lockAvailable = true;
+  const triggers = [];
+  let triggerId = 0;
   const spreadsheet = {
     getSheetByName: name => sheets.get(name) || null,
     getSheets: () => [...sheets.values()],
@@ -261,18 +263,34 @@ function makeFixture(options = {}) {
     SpreadsheetApp: {
       getActive: () => spreadsheet,
       getActiveSpreadsheet: () => spreadsheet,
+      openById: id => { assert.equal(id, spreadsheet.getId()); return spreadsheet; },
       flush() {},
       CopyPasteType: { PASTE_FORMAT: 'format', PASTE_DATA_VALIDATION: 'validation' }
     },
     PropertiesService: {
       getScriptProperties: () => ({
         getProperty: key => properties.get(key) || null,
+        getProperties: () => Object.fromEntries(properties),
         setProperty: (key, value) => properties.set(key, value),
         deleteProperty: key => properties.delete(key)
       })
     },
     Utilities: { getUuid: () => `00000000-0000-4000-8000-${String(++uuid).padStart(12, '0')}`, sleep() {} },
+    ScriptApp: {
+      EventType: { ON_EDIT: 'ON_EDIT' },
+      getProjectTriggers: () => triggers.slice(),
+      deleteTrigger: trigger => triggers.splice(triggers.indexOf(trigger), 1),
+      newTrigger: handler => {
+        const trigger = { getHandlerFunction: () => handler, getUniqueId: () => String(++triggerId),
+          getTriggerSourceId: () => spreadsheet.getId(), getEventType: () => 'ON_EDIT' };
+        const builder = { timeBased: () => builder, after: () => builder,
+          forSpreadsheet: () => builder, onEdit: () => builder,
+          create: () => { const id = String(++triggerId); trigger.getUniqueId = () => id; triggers.push(trigger); return trigger; } };
+        return builder;
+      }
+    },
     LockService: {
+      getUserLock: () => ({ tryLock: () => true, releaseLock() {} }),
       getScriptLock: () => ({
         hasLock: () => locked,
         tryLock: () => { lockAcquires += 1; if (locked || !lockAvailable) return false; locked = true; return true; },
@@ -292,6 +310,9 @@ function makeFixture(options = {}) {
     aliasSheet,
     catalogSheet,
     reviewSheet,
+    spreadsheet,
+    properties,
+    triggers,
     uuidCount: () => uuid,
     setLockAvailable: available => { lockAvailable = available; },
     lockCounts: () => ({ acquired: lockAcquires, released: lockReleases })
@@ -349,7 +370,13 @@ function makePendingManualMergeFixture(options = {}) {
 }
 
 function triggerManualXEdit(fixture, row) {
-  return fixture.context.onEdit({ range: fixture.catalogSheet.getRange(row, 24, 1, 1) });
+  return triggerLibraryEdit(fixture, { range: fixture.catalogSheet.getRange(row, 24, 1, 1) });
+}
+
+function triggerLibraryEdit(fixture, event) {
+  fixture.context.onEdit(event);
+  if (event.range.getSheet().getName() === '目録' && event.range.getA1Notation() === 'A1') return;
+  return fixture.context.handleLibraryModeEdit_({ ...event, triggerUid: 'installed' });
 }
 
 function testActualReferencesOverrideCachedCountsAndCleanupIsIdempotent() {
@@ -663,7 +690,7 @@ function testMediaEditMColumnRunsInsideRegistryLockAndPromotesSameId() {
   });
   const masterRange = fixture.masterSheet.getRange(2, 13, 1, 1);
   fixture.masterSheet.rows[1][12] = '画集';
-  fixture.context.onEdit({ range: masterRange });
+  triggerLibraryEdit(fixture, { range: masterRange });
   assert.equal(fixture.catalogSheet.rows[1][23], '__extra__ぶるーろっく');
   assert.equal(rowsWithoutHeaders(fixture.masterSheet)[0][0], id);
   assert.deepEqual(rowsWithoutHeaders(fixture.masterSheet)[0].slice(2, 7), ['物語', '題材', '', '', '']);
@@ -673,7 +700,7 @@ function testMediaEditMColumnRunsInsideRegistryLockAndPromotesSameId() {
 
   const editTitle = nextTitle => {
     fixture.catalogSheet.rows[1][8] = nextTitle;
-    fixture.context.onEdit({ range: fixture.catalogSheet.getRange(2, 9, 1, 1) });
+    triggerLibraryEdit(fixture, { range: fixture.catalogSheet.getRange(2, 9, 1, 1) });
   };
   editTitle('ブルーロック改 第1巻');
   const firstCanonical = fixture.masterSheet.rows[1][10];
@@ -710,7 +737,7 @@ function testTitleEditPreflightsInactiveAliasOwnerBeforeChangingX() {
   onEdit.catalogSheet.rows[1][8] = 'new';
   const before = snapshotWrites(onEdit);
   assert.throws(
-    () => onEdit.context.onEdit({ range: onEdit.catalogSheet.getRange(2, 9, 1, 1) }),
+    () => triggerLibraryEdit(onEdit, { range: onEdit.catalogSheet.getRange(2, 9, 1, 1) }),
     /inactive or different master/
   );
   assert.equal(onEdit.catalogSheet.rows[1][23], 'old');
@@ -726,7 +753,7 @@ function testA1OnEditReturnsBeforeRegistryReads() {
     getSheet: () => ({ getName: () => '目録' }),
     getA1Notation: () => 'A1'
   };
-  assert.doesNotThrow(() => fixture.context.onEdit({ range }));
+  assert.doesNotThrow(() => triggerLibraryEdit(fixture, { range }));
   assert.deepEqual(fixture.lockCounts(), { acquired: 0, released: 0 });
 }
 
@@ -986,10 +1013,10 @@ function testManualXEqualToAutoSurvivesTitleAndClassificationChanges() {
   triggerManualXEdit(fixture, 2);
   assert.equal(fixture.context.hasSeriesKeyManualNote_(fixture.catalogSheet.getRange(2, 24).getNote()), true);
   fixture.catalogSheet.rows[1][8] = 'Different title 2';
-  fixture.context.onEdit({ range: fixture.catalogSheet.getRange(2, 9) });
+  triggerLibraryEdit(fixture, { range: fixture.catalogSheet.getRange(2, 9) });
   assert.equal(fixture.catalogSheet.rows[1][23], 'automatic');
   fixture.masterSheet.rows[1][11] = '設定資料集';
-  fixture.context.onEdit({ range: fixture.masterSheet.getRange(2, 12) });
+  triggerLibraryEdit(fixture, { range: fixture.masterSheet.getRange(2, 12) });
   assert.equal(fixture.catalogSheet.rows[1][23], 'automatic');
   assert.equal(fixture.catalogSheet.rows[1][21], '307908e3-c9e3-4e91-9750-68d30a9e84a6');
   assert.equal(rowsWithoutHeaders(fixture.aliasSheet).some(row => row[0] === 'different title'), false);
@@ -1003,7 +1030,7 @@ function testManualXMultiColumnPasteAndClearRestoreAutomatic() {
     manualRows: [3]
   });
   fixture.catalogSheet.notes.set('3:24', '残すメモ\n[library.series-key:v1:MANUAL]');
-  fixture.context.onEdit({ range: fixture.catalogSheet.getRange(2, 9, 2, 16) });
+  triggerLibraryEdit(fixture, { range: fixture.catalogSheet.getRange(2, 9, 2, 16) });
   assert.equal(fixture.catalogSheet.rows[1][23], ' TaRget ', 'handwritten X is retained exactly');
   assert.equal(fixture.catalogSheet.rows[2][23], 'automatic');
   assert.equal(fixture.catalogSheet.getRange(3, 24).getNote(), '残すメモ');
@@ -1018,14 +1045,14 @@ function testManualXIsCapturedBeforeLockFailureAndClearIsDurable() {
     manualRows: []
   });
   fixture.setLockAvailable(false);
-  assert.throws(() => triggerManualXEdit(fixture, 2), /being updated by another operation/);
+  assert.equal(triggerManualXEdit(fixture, 2).busy, true);
   assert.equal(fixture.context.hasSeriesKeyManualNote_(fixture.catalogSheet.getRange(2, 24).getNote()), true);
   fixture.setLockAvailable(true);
   fixture.context.refreshSeriesKeyAutoForImport_(fixture.catalogSheet);
   assert.equal(fixture.catalogSheet.rows[1][23], ' TaRget ');
   fixture.catalogSheet.rows[1][23] = '';
   fixture.setLockAvailable(false);
-  assert.throws(() => triggerManualXEdit(fixture, 2), /being updated by another operation/);
+  assert.equal(triggerManualXEdit(fixture, 2).busy, true);
   assert.equal(fixture.context.hasSeriesKeyManualNote_(fixture.catalogSheet.getRange(2, 24).getNote()), false);
   fixture.setLockAvailable(true);
   fixture.context.refreshSeriesKeyAutoForImport_(fixture.catalogSheet);
@@ -1129,7 +1156,7 @@ function testLaterManualXSkipsTitleAliasLinksAndRollback() {
       }
       return original(...args);
     };
-    fixture.context.onEdit({ range: fixture.catalogSheet.getRange(2, 9) });
+    triggerLibraryEdit(fixture, { range: fixture.catalogSheet.getRange(2, 9) });
     assert.equal(fixture.catalogSheet.rows[1][23], manualKey);
     assert.equal(rowsWithoutHeaders(fixture.aliasSheet).some(row => row[0] === manualKey && row[1] === 'source'), false);
     triggerManualXEdit(fixture, 2);
@@ -1170,7 +1197,7 @@ function testExplicitClearPendingRecoversAmbiguousBaseAfterLockFailure() {
   fixture.catalogSheet.notes.set('2:24', '残すメモ\n[library.series-key:v1:MANUAL]');
   fixture.catalogSheet.rows[1][23] = '';
   fixture.setLockAvailable(false);
-  assert.throws(() => triggerManualXEdit(fixture, 2), /being updated by another operation/);
+  assert.equal(triggerManualXEdit(fixture, 2).busy, true);
   assert.equal(fixture.context.hasSeriesKeyManualNote_(fixture.catalogSheet.getRange(2, 24).getNote()), false);
   assert.equal(fixture.context.hasSeriesKeyAutoResetNote_(fixture.catalogSheet.getRange(2, 24).getNote()), true);
   fixture.setLockAvailable(true);
@@ -1180,7 +1207,363 @@ function testExplicitClearPendingRecoversAmbiguousBaseAfterLockFailure() {
   assert.equal(fixture.context.resolveSeriesRegistryKey_('same').seriesId, 'normal');
 }
 
+const editUuid = index => `123e4567-e89b-42d3-a456-${String(index).padStart(12, '0')}`;
+function retryQueuedEdits(fixture) {
+  const trigger = fixture.triggers.find(trigger => trigger.getHandlerFunction() === 'retryLibraryEdits_');
+  assert.ok(trigger, 'one-shot retry is installed');
+  return fixture.context.retryLibraryEdits_({ triggerUid: trigger.getUniqueId() });
+}
+
+function testSimpleTriggerDoesNoRegistryScanOrLockWait() {
+  const fixture = makeFixture({ books: [makeBook('one', 'Manual selection', { uuid: editUuid(1) })] });
+  let cache = 0;
+  fixture.context.clearLibrarySearchCache_ = () => cache++;
+  fixture.context.isSeriesRegistryV2Active_ = () => { throw Error('simple trigger registry read'); };
+  fixture.context.ensureBookUuidsForEditedRange_ = () => { throw Error('simple trigger full UUID scan'); };
+  fixture.context.onEdit({ range: fixture.catalogSheet.getRange(2, 24), value: 'Manual selection' });
+  assert.equal(fixture.context.hasSeriesKeyManualNote_(fixture.catalogSheet.getRange(2, 24).getNote()), true);
+  assert.equal(cache, 1);
+  assert.deepEqual(fixture.lockCounts(), { acquired: 0, released: 0 });
+  assert.equal(fixture.context.readLibraryEditQueue_().length, 0, 'installed handler owns durable sync capture');
+  assert.equal(fixture.catalogSheet.writes, 0);
+}
+
+function testInstalledBusyEditQueuesAndRecoversWithoutAnActiveSpreadsheet() {
+  const fixture = makeFixture({
+    masters: [makeMaster('chosen', { canonical: 'chosen', count: 0 })], aliases: [makeAlias('chosen', 'chosen')],
+    books: [makeBook('A varied title', 'chosen', { uuid: editUuid(1) })]
+  });
+  let cache = 0;
+  fixture.context.clearLibrarySearchCache_ = () => cache++;
+  fixture.setLockAvailable(false);
+  assert.equal(triggerManualXEdit(fixture, 2).busy, true);
+  assert.equal(fixture.context.readLibraryEditQueue_().length, 1);
+  assert.equal(fixture.masterSheet.rows[1][7], 0);
+  assert.ok(cache >= 2, 'cache is invalidated without acquiring the registry lock');
+  fixture.context.SpreadsheetApp.getActive = () => { throw Error('retry must not use active spreadsheet'); };
+  fixture.context.SpreadsheetApp.getActiveSpreadsheet = fixture.context.SpreadsheetApp.getActive;
+  retryQueuedEdits(fixture);
+  assert.equal(fixture.context.readLibraryEditQueue_()[0].data.attempts, 1);
+  fixture.setLockAvailable(true);
+  assert.equal(retryQueuedEdits(fixture).pending, 0);
+  assert.equal(fixture.masterSheet.rows[1][7], 1);
+  retryQueuedEdits(fixture); // The final empty successor removes itself.
+  assert.equal(fixture.triggers.length, 0);
+  assert.equal(fixture.catalogSheet.rows[1][23], 'chosen');
+}
+
+function testNewEnqueueSurvivesSuccessfulSnapshotConsumption() {
+  const fixture = makeFixture({ books: [
+    makeBook('One title', 'Group A', { uuid: editUuid(1) }),
+    makeBook('Two title', 'Group B', { uuid: editUuid(2) })
+  ] });
+  fixture.setLockAvailable(false);
+  triggerManualXEdit(fixture, 2);
+  fixture.setLockAvailable(true);
+  const original = fixture.context.syncSeriesRegistryAfterManualKeyEdit_;
+  let captured = false;
+  fixture.context.syncSeriesRegistryAfterManualKeyEdit_ = (...args) => {
+    if (!captured) {
+      captured = true;
+      fixture.context.captureLibraryEdit_({ range: fixture.catalogSheet.getRange(3, 24) });
+    }
+    return original(...args);
+  };
+  assert.equal(retryQueuedEdits(fixture).pending, 1);
+  assert.equal(fixture.context.readLibraryEditQueue_()[0].data.rows[0].uuid, editUuid(2));
+  assert.equal(retryQueuedEdits(fixture).pending, 0);
+  assert.notEqual(fixture.context.resolveSeriesRegistryKey_('Group A').seriesId,
+    fixture.context.resolveSeriesRegistryKey_('Group B').seriesId);
+}
+
+function testQueuedTitlesFollowUuidThroughSortAndUseEarliestOldKey() {
+  const fixture = makeFixture({
+    masters: [makeMaster('old-owner', { canonical: 'old' }), makeMaster('other-owner', { canonical: 'other' })],
+    aliases: [makeAlias('old', 'old-owner'), makeAlias('other', 'other-owner')],
+    books: [makeBook('First correction 1', 'old', { uuid: editUuid(1) }), makeBook('Other title', 'other', { uuid: editUuid(2) })]
+  });
+  fixture.setLockAvailable(false);
+  triggerLibraryEdit(fixture, { range: fixture.catalogSheet.getRange(2, 9) });
+  fixture.catalogSheet.rows[1][8] = 'Latest correction 2';
+  triggerLibraryEdit(fixture, { range: fixture.catalogSheet.getRange(2, 9) });
+  [fixture.catalogSheet.rows[1], fixture.catalogSheet.rows[2]] = [fixture.catalogSheet.rows[2], fixture.catalogSheet.rows[1]];
+  fixture.setLockAvailable(true);
+  assert.equal(retryQueuedEdits(fixture).pending, 0);
+  assert.equal(fixture.catalogSheet.rows[2][23], 'latest correction');
+  assert.equal(fixture.catalogSheet.rows[1][23], 'other');
+  assert.equal(fixture.context.resolveSeriesRegistryKey_('latest correction').seriesId, 'old-owner');
+  assert.equal(fixture.context.resolveSeriesRegistryKey_('old').seriesId, 'old-owner');
+  assert.equal(fixture.context.resolveSeriesRegistryKey_('first correction'), null, 'stale title text is never replayed');
+}
+
+function testQueuedTitleReadsLaterManualNoteInsteadOfReplayingTitleIntent() {
+  const fixture = makeFixture({
+    masters: [makeMaster('old-owner', { canonical: 'old' }), makeMaster('new-owner', { canonical: 'manual' })],
+    aliases: [makeAlias('old', 'old-owner'), makeAlias('manual', 'new-owner')],
+    books: [makeBook('Rename 1', 'old', { uuid: editUuid(1) })]
+  });
+  fixture.setLockAvailable(false);
+  triggerLibraryEdit(fixture, { range: fixture.catalogSheet.getRange(2, 9) });
+  fixture.catalogSheet.rows[1][23] = 'manual';
+  fixture.context.markSeriesKeyManualOnEdit_({ range: fixture.catalogSheet.getRange(2, 24) });
+  fixture.setLockAvailable(true);
+  retryQueuedEdits(fixture);
+  assert.equal(fixture.catalogSheet.rows[1][23], 'manual');
+  assert.equal(fixture.context.resolveSeriesRegistryKey_('rename'), null);
+  assert.equal(fixture.context.resolveSeriesRegistryKey_('old').seriesId, 'old-owner');
+}
+
+function testQueuedMultiColumnManualPasteAndClearUseLatestNotes() {
+  const fixture = makeFixture({
+    masters: [makeMaster('auto', { canonical: 'automatic' }), makeMaster('target', { canonical: 'target' })],
+    aliases: [makeAlias('automatic', 'auto'), makeAlias('target', 'target')],
+    books: [makeBook('Different title', ' TaRget ', { uuid: editUuid(1) }), makeBook('automatic 2', '', { uuid: editUuid(2) })],
+    manualRows: [3]
+  });
+  fixture.catalogSheet.notes.set('3:24', '残すメモ\n[library.series-key:v1:MANUAL]');
+  fixture.setLockAvailable(false);
+  const event = { range: fixture.catalogSheet.getRange(2, 9, 2, 16) };
+  assert.equal(triggerLibraryEdit(fixture, event).busy, true);
+  assert.equal(fixture.context.hasSeriesKeyManualNote_(fixture.catalogSheet.getRange(2, 24).getNote()), true);
+  fixture.setLockAvailable(true);
+  retryQueuedEdits(fixture);
+  // A late duplicate simple event has no cell value for this multi-cell edit.
+  fixture.context.onEdit(event);
+  assert.equal(fixture.catalogSheet.rows[1][23], ' TaRget ');
+  assert.equal(fixture.catalogSheet.rows[2][23], 'automatic');
+  assert.equal(fixture.catalogSheet.getRange(3, 24).getNote(), '残すメモ');
+  assert.equal(fixture.context.resolveSeriesRegistryKey_('different title'), null);
+}
+
+function testLateSingleCellClearEventCannotMarkDerivedXAsManual() {
+  const fixture = makeFixture({
+    masters: [makeMaster('auto', { canonical: 'automatic' })], aliases: [makeAlias('automatic', 'auto')],
+    books: [makeBook('automatic 1', '', { uuid: editUuid(1) })], manualRows: [2]
+  });
+  const event = { range: fixture.catalogSheet.getRange(2, 24), oldValue: 'manual' };
+  fixture.context.handleLibraryModeEdit_({ ...event, triggerUid: 'installed' });
+  fixture.context.onEdit(event);
+  assert.equal(fixture.catalogSheet.rows[1][23], 'automatic');
+  assert.equal(fixture.context.hasSeriesKeyManualNote_(fixture.catalogSheet.getRange(2, 24).getNote()), false);
+  assert.equal(fixture.context.readLibraryEditQueue_().length, 0);
+}
+
+function testQueuedBlankUuidAllocationIsUniqueAndRecoverableAfterPartialFailure() {
+  const fixture = makeFixture({ books: [makeBook('Unique title', 'Manual group'), makeBook('Other', 'other', { uuid: editUuid(2) })] });
+  fixture.setLockAvailable(false);
+  triggerManualXEdit(fixture, 2);
+  [fixture.catalogSheet.rows[1], fixture.catalogSheet.rows[2]] = [fixture.catalogSheet.rows[2], fixture.catalogSheet.rows[1]];
+  fixture.catalogSheet.notes.delete('2:24');
+  fixture.catalogSheet.notes.set('3:24', '[library.series-key:v1:MANUAL]');
+  fixture.setLockAvailable(true);
+  const original = fixture.context.syncSeriesRegistryAfterManualKeyEdit_;
+  let fail = true;
+  fixture.context.syncSeriesRegistryAfterManualKeyEdit_ = (...args) => {
+    if (fail) { fail = false; throw Error('simulated service failure after UUID binding'); }
+    return original(...args);
+  };
+  retryQueuedEdits(fixture);
+  const uuid = fixture.catalogSheet.rows[2][21];
+  assert.equal(fixture.context.isValidBookUuid_(uuid), true);
+  assert.notEqual(uuid, editUuid(2));
+  assert.equal(fixture.context.readLibraryEditQueue_()[0].bindings[0], uuid);
+  retryQueuedEdits(fixture);
+  assert.equal(fixture.context.readLibraryEditQueue_().length, 0);
+  assert.equal(fixture.catalogSheet.rows[2][21], uuid, 'retry never reallocates an established UUID');
+  assert.equal(fixture.catalogSheet.rows[1][21], editUuid(2));
+}
+
+function testAmbiguousBlankUuidRowsFailClosedAndRetainQueue() {
+  const fixture = makeFixture({ books: [makeBook('Same title', 'group'), makeBook('Same title', 'group')] });
+  const before = snapshotWrites(fixture);
+  assert.throws(() => triggerManualXEdit(fixture, 2), /UUID is missing or ambiguous/);
+  assert.equal(snapshotWrites(fixture), before);
+  assert.equal(fixture.context.readLibraryEditQueue_().length, 1);
+}
+
+function testDuplicateValidUuidCannotRebindToAnotherBook() {
+  const fixture = makeFixture({ books: [makeBook('One', 'group', { uuid: editUuid(1) }), makeBook('Two', 'group', { uuid: editUuid(1) })] });
+  const before = snapshotWrites(fixture);
+  assert.throws(() => triggerManualXEdit(fixture, 2), /UUID is missing or ambiguous/);
+  assert.equal(snapshotWrites(fixture), before);
+  assert.equal(fixture.context.readLibraryEditQueue_().length, 1);
+}
+
+function testBulkEditDrainsAtMostFourIdentitiesAndRetainsRemainingTokens() {
+  const fixture = makeFixture({ books: Array.from({ length: 9 }, (_, index) =>
+    makeBook('Title ' + index, 'Manual group', { uuid: editUuid(index + 1) })) });
+  const result = triggerLibraryEdit(fixture, { range: fixture.catalogSheet.getRange(2, 24, 9, 1) });
+  assert.equal(result.processed, 4);
+  assert.equal(result.pending, 2);
+  assert.deepEqual(Array.from(fixture.context.readLibraryEditQueue_(), record => record.data.rows.length), [4, 1]);
+  retryQueuedEdits(fixture);
+  assert.equal(fixture.context.readLibraryEditQueue_().length, 1);
+  retryQueuedEdits(fixture);
+  assert.equal(fixture.context.readLibraryEditQueue_().length, 0);
+  assert.equal(fixture.catalogSheet.rows.slice(1).every(row => row[23] === 'Manual group'), true);
+}
+
+function testBusyRetryStopsAfterBoundedAttemptsWithoutDroppingIntent() {
+  const fixture = makeFixture({ books: [makeBook('One', 'group', { uuid: editUuid(1) })] });
+  fixture.setLockAvailable(false);
+  triggerManualXEdit(fixture, 2);
+  for (let index = 0; index < 9; index++) retryQueuedEdits(fixture);
+  assert.equal(fixture.triggers.length, 0);
+  assert.equal(fixture.context.readLibraryEditQueue_().length, 1);
+  assert.equal(fixture.context.readLibraryEditQueue_()[0].data.attempts, 8);
+  fixture.setLockAvailable(true);
+  triggerManualXEdit(fixture, 2); // A later installed edit can resume retained work.
+  while (fixture.context.readLibraryEditQueue_().length) retryQueuedEdits(fixture);
+  assert.equal(fixture.catalogSheet.rows[1][23], 'group');
+}
+
+function testLargeEditPayloadUsesBoundedPropertiesAndImmutableParts() {
+  const title = '大きなタイトル'.repeat(1500);
+  const key = '長い手入力キー'.repeat(1500);
+  const fixture = makeFixture({ books: [makeBook(title, key, { uuid: editUuid(1) })] });
+  fixture.context.captureLibraryEdit_({ range: fixture.catalogSheet.getRange(2, 9) });
+  const queue = fixture.context.readLibraryEditQueue_();
+  assert.equal(queue.length, 1);
+  assert.equal(queue[0].data.rows[0].title, undefined, 'stable UUID capture stores no stale title payload');
+  assert.equal(queue[0].data.rows[0].oldKey, key);
+  assert.ok(queue[0].keys.length > 1);
+  const originals = new Map(fixture.properties);
+  fixture.context.bumpLibraryEditAttempts_(queue);
+  [...originals].forEach(([property, value]) => assert.equal(fixture.properties.get(property), value));
+  [...fixture.properties.values()].forEach(value => assert.ok(Buffer.byteLength(value, 'utf8') <= 7500));
+}
+
+function testSetupAndRepeatedCapturesInstallOnlyOneRetry() {
+  const fixture = makeFixture({ books: [makeBook('One', 'group', { uuid: editUuid(1) })] });
+  fixture.context.SpreadsheetApp.getUi = () => ({});
+  fixture.context.ensureLibraryInputModeFormat_ = () => {};
+  assert.equal(fixture.context.setupLibraryModeControls_().installed, true);
+  assert.equal(fixture.context.setupLibraryModeControls_().installed, false);
+  fixture.setLockAvailable(false);
+  triggerManualXEdit(fixture, 2);
+  triggerManualXEdit(fixture, 2);
+  assert.equal(fixture.triggers.filter(trigger => trigger.getHandlerFunction() === 'handleLibraryModeEdit_').length, 1);
+  assert.equal(fixture.triggers.filter(trigger => trigger.getHandlerFunction() === 'retryLibraryEdits_').length, 1);
+  assert.equal(fixture.properties.get('library.edit.source.v1'), fixture.spreadsheet.getId());
+}
+
+function testManualGroupNewNameUsesChosenKeyAndKeepsExistingCuratedName() {
+  const fixture = makeFixture({ books: [
+    makeBook('別々の書名の一冊目', '人間が決めたシリーズ 2'), makeBook('まったく別の書名', '人間が決めたシリーズ 2')
+  ], manualRows: [2, 3] });
+  fixture.context.syncSeriesRegistryFromCatalog_();
+  const master = rowsWithoutHeaders(fixture.masterSheet)[0];
+  assert.equal(master[1], '人間が決めたシリーズ 2');
+  const id = master[0];
+  master[1] = '編集済みの表示名';
+  fixture.context.syncSeriesRegistryFromCatalog_();
+  assert.equal(fixture.context.resolveSeriesRegistryKey_('人間が決めたシリーズ 2').seriesId, id);
+  assert.equal(master[1], '編集済みの表示名');
+  const direct = makeFixture({ books: [makeBook('Varied title', 'Human Group 2', { uuid: editUuid(1) })] });
+  triggerManualXEdit(direct, 2);
+  assert.equal(rowsWithoutHeaders(direct.masterSheet)[0][1], 'Human Group 2');
+}
+
+function testTitleConflictCannotRollBackAnotherUuidAfterAConcurrentSort() {
+  const fixture = makeFixture({
+    masters: [makeMaster('old', { canonical: 'old' }), makeMaster('target', { canonical: 'target' })],
+    aliases: [makeAlias('old', 'old'), makeAlias('target', 'target')],
+    books: [makeBook('target 1', 'target', { uuid: editUuid(1) }), makeBook('other', 'other', { uuid: editUuid(2) })]
+  });
+  const original = fixture.context.linkSeriesKeyAfterTitleEdit_;
+  fixture.context.linkSeriesKeyAfterTitleEdit_ = (...args) => {
+    const result = original(...args);
+    [fixture.catalogSheet.rows[1], fixture.catalogSheet.rows[2]] = [fixture.catalogSheet.rows[2], fixture.catalogSheet.rows[1]];
+    return result;
+  };
+  assert.throws(() => fixture.context.syncSeriesRegistryAfterTitleEdit_(fixture.catalogSheet, 2, 1, [['old']]), /identity changed/);
+  assert.equal(fixture.catalogSheet.rows[1][23], 'other');
+  assert.equal(fixture.catalogSheet.rows[2][23], 'target');
+}
+
+function testScheduledAttemptIsCheckpointedBeforeHeavyWork() {
+  const fixture = makeFixture({ books: [makeBook('One', 'group', { uuid: editUuid(1) })] });
+  fixture.setLockAvailable(false);
+  triggerManualXEdit(fixture, 2);
+  fixture.setLockAvailable(true);
+  fixture.context.syncSeriesRegistryAfterManualKeyEdit_ = () => {
+    assert.equal(fixture.context.readLibraryEditQueue_()[0].data.attempts, 1,
+      'execution termination after this point cannot leave an uncounted retry');
+    throw Error('heavy service failed');
+  };
+  retryQueuedEdits(fixture);
+  assert.equal(fixture.context.readLibraryEditQueue_()[0].data.attempts, 1, 'failure does not count the same attempt twice');
+}
+
+function testUnresolvableDraftCannotExhaustOtherQueuedEdits() {
+  const fixture = makeFixture({
+    masters: [makeMaster('old-owner', { canonical: 'old' })],
+    aliases: [makeAlias('old', 'old-owner')],
+    books: [makeBook('New draft', ''), makeBook('Good final 1', 'old', { uuid: editUuid(2) })]
+  });
+  fixture.setLockAvailable(false);
+  triggerLibraryEdit(fixture, { range: fixture.catalogSheet.getRange(2, 9, 2, 1) });
+  fixture.catalogSheet.rows[1][8] = 'New final';
+  triggerLibraryEdit(fixture, { range: fixture.catalogSheet.getRange(2, 9) });
+  triggerLibraryEdit(fixture, { range: fixture.catalogSheet.getRange(3, 9) });
+  fixture.setLockAvailable(true);
+  const result = retryQueuedEdits(fixture);
+  assert.equal(result.processed, 3, 'valid work succeeds despite an obsolete unbound draft in a bulk record');
+  assert.equal(result.pending, 1);
+  assert.equal(fixture.catalogSheet.rows[1][23], 'new final');
+  assert.equal(fixture.catalogSheet.rows[2][23], 'good final');
+  assert.equal(fixture.context.resolveSeriesRegistryKey_('good final').seriesId, 'old-owner');
+  for (let index = 0; index < 8; index++) retryQueuedEdits(fixture);
+  assert.equal(fixture.triggers.length, 0);
+  assert.equal(fixture.context.readLibraryEditQueue_()[0].data.attempts, 8);
+  fixture.catalogSheet.rows[2][8] = 'Good next 2';
+  const next = triggerLibraryEdit(fixture, { range: fixture.catalogSheet.getRange(3, 9) });
+  assert.equal(next.processed, 1, 'an exhausted unrelated draft cannot block later installed edits');
+  assert.equal(fixture.catalogSheet.rows[2][23], 'good next');
+}
+
+function testManualClearPlanRejectsMovedBookBeforeWriting() {
+  const fixture = makeFixture({ books: [
+    makeBook('First title 1', '', { uuid: editUuid(1) }),
+    makeBook('Second title 1', '', { uuid: editUuid(2) })
+  ] });
+  const original = fixture.context.ensureSeriesRegistryAlias_;
+  let swapped = false;
+  fixture.context.ensureSeriesRegistryAlias_ = (...args) => {
+    const result = original(...args);
+    if (!swapped) {
+      swapped = true;
+      [fixture.catalogSheet.rows[1], fixture.catalogSheet.rows[2]] =
+        [fixture.catalogSheet.rows[2], fixture.catalogSheet.rows[1]];
+    }
+    return result;
+  };
+  assert.throws(() => fixture.context.syncSeriesRegistryAfterManualKeyEdit_(fixture.catalogSheet, 2, 2), /identity changed/);
+  assert.equal(fixture.catalogSheet.rows[1][21], editUuid(2));
+  assert.equal(fixture.catalogSheet.rows[1][23], '');
+  assert.equal(fixture.catalogSheet.rows[2][23], '');
+}
+
 const tests = [
+  testUnresolvableDraftCannotExhaustOtherQueuedEdits,
+  testManualClearPlanRejectsMovedBookBeforeWriting,
+  testScheduledAttemptIsCheckpointedBeforeHeavyWork,
+  testSimpleTriggerDoesNoRegistryScanOrLockWait,
+  testInstalledBusyEditQueuesAndRecoversWithoutAnActiveSpreadsheet,
+  testNewEnqueueSurvivesSuccessfulSnapshotConsumption,
+  testQueuedTitlesFollowUuidThroughSortAndUseEarliestOldKey,
+  testQueuedTitleReadsLaterManualNoteInsteadOfReplayingTitleIntent,
+  testQueuedMultiColumnManualPasteAndClearUseLatestNotes,
+  testLateSingleCellClearEventCannotMarkDerivedXAsManual,
+  testQueuedBlankUuidAllocationIsUniqueAndRecoverableAfterPartialFailure,
+  testAmbiguousBlankUuidRowsFailClosedAndRetainQueue,
+  testDuplicateValidUuidCannotRebindToAnotherBook,
+  testBulkEditDrainsAtMostFourIdentitiesAndRetainsRemainingTokens,
+  testBusyRetryStopsAfterBoundedAttemptsWithoutDroppingIntent,
+  testLargeEditPayloadUsesBoundedPropertiesAndImmutableParts,
+  testSetupAndRepeatedCapturesInstallOnlyOneRetry,
+  testManualGroupNewNameUsesChosenKeyAndKeepsExistingCuratedName,
+  testTitleConflictCannotRollBackAnotherUuidAfterAConcurrentSort,
   testLaterManualXSkipsTitleAliasLinksAndRollback,
   testTitleConflictRollbackRechecksLatestManualX,
   testExplicitClearPendingRecoversAmbiguousBaseAfterLockFailure,
