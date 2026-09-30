@@ -1395,6 +1395,7 @@ function keywordMixedMatch_(query, idx) {
   const q = normalizeKana(query || '');
   if (!q) return true;
   if (idx && idx.searchKey && idx.searchKey.includes(q)) return true;
+  if (idx && normalizeKana(idx.seriesSearchTitle || '').includes(q)) return true;
   return titleYomiMixedMatch_(q, idx && idx.title, idx && idx.yomi);
 }
 

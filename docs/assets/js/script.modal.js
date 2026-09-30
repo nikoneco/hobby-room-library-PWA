@@ -1999,8 +1999,72 @@ function openSeriesPanel(sourceBook) {
     });
 }
 
+function isCompleteSearchResultSeries_(group, books) {
+  if (!Array.isArray(books) || !books.length) return false;
+  const source = group.representativeBook || group.books[0];
+  const key = String(group.key || source.seriesKeyAuto || '').trim();
+  const expected = Math.max(group.books.length, Number(group.ownedCount) || Number(source.seriesCount) || 0);
+  if (books.length < expected) return false;
+  const identities = new Set();
+  return books.every(book => {
+    if (!book || String(book.seriesKeyAuto || '').trim() !== key || !String(book.title || '').trim()) return false;
+    const identity = book.bookId ? `id:${book.bookId}`
+      : Number.isFinite(book.rowIndex) && book.rowIndex >= 0 ? `row:${book.rowIndex}` : '';
+    if (!identity || identities.has(identity)) return false;
+    identities.add(identity);
+    return true;
+  });
+}
+
 function showSearchResultSeriesPanel_(group) {
-  if (!group || !Array.isArray(group.books) || group.books.length < 2) return;
+  if (!group || !Array.isArray(group.books) || !group.books.length) return;
+  if (Array.isArray(group.seriesBooks)) {
+    renderSearchResultSeriesPanel_(group, group.seriesBooks);
+    return;
+  }
+  const sourceBook = group.representativeBook || group.books[0];
+  const requestGeneration = ++popupSeriesRequestGeneration_;
+  const overlay = document.getElementById('image-popup-overlay');
+  const popupContent = document.getElementById('image-popup-content');
+  const info = document.getElementById('image-popup-info');
+  if (!document.body.classList.contains('modal-open')) popupReturnScrollY = window.scrollY || 0;
+  overlay.style.display = 'flex';
+  setPopupModalOpen_(true);
+  popupContent.classList.add('series-mode', 'search-result-series-mode');
+  popupContent.setAttribute('aria-label', `${group.title || sourceBook.seriesSearchTitle || 'シリーズ'}のシリーズ一覧`);
+  ['image-popup-img', 'popup-prev', 'popup-next'].forEach(id => { document.getElementById(id).style.display = 'none'; });
+  clearPopupTouchHandlers_();
+  info.innerHTML = '<div class="series-panel"><div class="series-panel-title">シリーズ一覧を読み込み中...</div></div>';
+  const closePanel = function() {
+    overlay.style.display = 'none';
+    setPopupModalOpen_(false);
+    popupContent.classList.remove('series-mode', 'search-result-series-mode');
+    setShelfPopupPerformanceMode_(false);
+    document.onkeydown = null;
+    resumeBookDetailPrefetchQueue_();
+    window.requestAnimationFrame(() => window.scrollTo({ top: popupReturnScrollY || 0, behavior: 'auto' }));
+  };
+  document.getElementById('image-popup-close').onclick = closePanel;
+  overlay.onclick = e => { if (e.target === overlay) closePanel(); };
+  document.onkeydown = e => { if (e.key === 'Escape') closePanel(); };
+  focusPopupIfNeeded_();
+  const showFailure = function() {
+    if (requestGeneration !== popupSeriesRequestGeneration_) return;
+    info.innerHTML = '<div class="series-panel"><div class="series-panel-title">シリーズ一覧を取得できませんでした</div><button type="button" id="series-panel-retry" class="popup-action-btn">もう一度読み込む</button></div>';
+    document.getElementById('series-panel-retry').onclick = () => showSearchResultSeriesPanel_(group);
+    focusPopupIfNeeded_();
+  };
+  runBookDetailRequest_(function(success, failure) {
+    google.script.run.withSuccessHandler(success).withFailureHandler(failure).getBooksBySeriesKey(group.key || sourceBook.seriesKeyAuto);
+  }, function(books) {
+    if (requestGeneration !== popupSeriesRequestGeneration_) return;
+    if (!isCompleteSearchResultSeries_(group, books)) { showFailure(); return; }
+    renderSearchResultSeriesPanel_(group, books);
+  }, showFailure);
+}
+
+function renderSearchResultSeriesPanel_(group, seriesBooks) {
+  if (!group || !Array.isArray(group.books) || !group.books.length) return;
   popupSeriesRequestGeneration_ += 1;
 
   const overlay = document.getElementById('image-popup-overlay');
@@ -2010,8 +2074,9 @@ function showSearchResultSeriesPanel_(group) {
   const closeBtn = document.getElementById('image-popup-close');
   const prevBtn = document.getElementById('popup-prev');
   const nextBtn = document.getElementById('popup-next');
-  const items = group.books;
-  const sourceBook = group.representativeBook || items[0];
+  const items = sortSeriesBooksForDisplay_(Array.isArray(seriesBooks) ? seriesBooks : []);
+  group.seriesBooks = items;
+  const sourceBook = group.representativeBook || group.books[0];
   const sourceTitle = group.title || sourceBook.seriesSearchTitle || sourceBook.title || 'シリーズ';
 
   if (!document.body.classList.contains('modal-open')) {
@@ -2021,7 +2086,7 @@ function showSearchResultSeriesPanel_(group) {
   setPopupModalOpen_(true);
   if (popupContent) {
     popupContent.classList.add('series-mode', 'search-result-series-mode');
-    popupContent.setAttribute('aria-label', `${sourceTitle}の検索一致巻`);
+    popupContent.setAttribute('aria-label', `${sourceTitle}のシリーズ一覧`);
   }
   prioritizeBookDetailPrefetch_(items, { priority: true, allowModal: true });
   img.style.display = 'none';
@@ -2032,8 +2097,8 @@ function showSearchResultSeriesPanel_(group) {
   info.innerHTML = `
     <div class="series-panel search-result-series-panel">
       <div class="series-panel-title">${escapeHtml(sourceTitle)}</div>
-      <div class="series-panel-subtitle">検索一致 ${items.length}冊</div>
-      <div class="search-result-series-list" role="group" aria-label="${escapeHtml(sourceTitle)}の検索一致巻"></div>
+      <div class="series-panel-subtitle">所蔵 ${items.length}冊・検索一致 ${group.books.length}冊</div>
+      <div class="search-result-series-list" role="group" aria-label="${escapeHtml(sourceTitle)}のシリーズ全巻"></div>
     </div>
   `;
 

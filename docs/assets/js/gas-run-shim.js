@@ -371,6 +371,7 @@
     const q = normalizeKanaLocal_(query);
     if (!q) return true;
     if (item && item.searchKey && item.searchKey.includes(q)) return true;
+    if (item && normalizeKanaLocal_(item.seriesSearchTitle || '').includes(q)) return true;
     return titleYomiMixedMatchLocal_(q, item && item.title, item && item.yomi);
   }
 
@@ -516,6 +517,7 @@
           yomi: String(record[22] || ''),
           author: String(record[23] || ''),
           searchKey: String(record[24] || ''),
+          seriesSearchTitle: String(record[14] || ''),
           publisher: String(record[25] || ''),
           releasedYm: Number(record[26] || 0),
           isSensitive: Boolean(record[20]),

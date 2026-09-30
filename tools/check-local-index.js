@@ -55,7 +55,7 @@ function createPayload() {
       ],
       [
         2, '33333333-3333-4333-8333-333333333333', '葬送のフリーレン 1', '山田鐘人', '小学館', 'B', '2-1', '2020/08', '少年サンデー',
-        '9784098501809', 'そうそうのふりーれん', 'ファンタジー,連載中', '葬送のフリーレン', 1, '葬送のフリーレン', false, 1, 1,
+        '9784098501809', 'そうそうのふりーれん', 'ファンタジー,連載中', '葬送のフリーレン', 1, '別名シリーズ', false, 1, 1,
         '', '', false,
         '葬送のふりーれん1', 'そうそうのふりーれん', '山田鐘人', '葬送のふりーれん1 そうそうのふりーれん 山田鐘人', '小学館', 202008,
         ['ファンタジー'], [], [], ['連載中'], ['漫画', '小説']
@@ -844,6 +844,11 @@ async function checkSlowAndUnavailableIndexedDb() {
   assert(simple.every(book => book.detailLoaded === false), 'local search defers full book details');
   const punctuatedSimple = await invoke(runner, 'searchBooksSimple', ['【推しの子】']);
   assert(punctuatedSimple.length === 2, 'local search shares the server punctuation-normalization contract');
+  const namedSeries = await invoke(runner, 'searchBooksSimple', ['別名シリーズ']);
+  assert(namedSeries.length === 1 && namedSeries[0].title === '葬送のフリーレン 1',
+    'local keyword search finds a curated series name absent from individual book titles');
+  const namedSeriesAdvanced = await invoke(runner, 'searchBooksAdvanced', ['別名シリーズ']);
+  assert(namedSeriesAdvanced.length === 1, 'advanced keyword search also matches curated series names');
 
   const advancedArgs = ['', '', '', '', '小学館', '', '', '', '', '', '', '', ''];
   const advanced = await invoke(runner, 'searchBooksAdvanced', advancedArgs);
@@ -896,7 +901,7 @@ async function checkSlowAndUnavailableIndexedDb() {
   assert(random.length === 2, 'random search returns the requested local count');
   assert(new Set(random.map(book => book.rowIndex)).size === 2, 'random search does not duplicate books');
   assert(appendedScripts.length === 0, 'local queries do not inject JSONP scripts even while offline');
-  assert(perfEntries.filter(entry => entry.meta && entry.meta.local).length === 12, 'local queries record local performance entries');
+  assert(perfEntries.filter(entry => entry.meta && entry.meta.local).length === 14, 'local queries record local performance entries');
 
   const onlineScripts = [];
   const onlineLoadHandlers = [];

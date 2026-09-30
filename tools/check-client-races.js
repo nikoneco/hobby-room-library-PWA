@@ -457,6 +457,61 @@ for (const batch of [false, true]) {
   assert.equal(rendered[0][0], 'Current response');
 }
 
+// A single matched book in a nine-book series must expand just like three matches.
+{
+  const { c, requests, rendered } = client();
+  c.clearPopupTouchHandlers_ = () => {};
+  c.focusPopupIfNeeded_ = () => {};
+  c.renderSearchResultSeriesPanel_ = (group, books) => { group.seriesBooks = books; rendered.push(books.map(book => book.title)); };
+  const titles = ['クビキリサイクル : 青色サヴァンと戯言遣い', 'クビシメロマンチスト : 人間失格・零崎人識',
+    'クビツリハイスクール : 戯言遣いの弟子', 'サイコロジカル. 下 (曳かれ者の小唄)', 'サイコロジカル. 上 (兎吊木垓輔の戯言殺し)',
+    'ネコソギラジカル. 下 (青色サヴァンと戯言遣い)', 'ネコソギラジカル. 上 (十三階段)',
+    'ネコソギラジカル. 中 (赤き征裁vs.橙なる種)', 'ヒトクイマジカル : 殺戮奇術の匂宮兄妹'];
+  const books = titles.map((title, i) => ({ title, bookId: 'zaregoto-book-' + i, seriesKeyAuto: 'zaregoto-fixture', seriesSearchTitle: '戯言シリーズ', seriesCount: 9 }));
+  for (const query of titles.concat(['ネコソギ', 'ヒトクイ'])) {
+    const matched = books.filter(book => book.title.includes(query));
+    const presentation = c.buildSearchResultPresentation_(matched);
+    assert.equal(presentation.entries.length, 1);
+    assert.equal(presentation.entries[0].kind, 'series');
+    assert.equal(presentation.entries[0].ownedCount, 9);
+    assert.equal(presentation.entries[0].matchCount, matched.length);
+    c.showSearchResultSeriesPanel_(presentation.entries[0]);
+    const request = requests.at(-1);
+    assert.equal(request.method, 'getBooksBySeriesKey');
+    assert.equal(request.args[0], 'zaregoto-fixture');
+    request.ok(books);
+    assert.equal(rendered.at(-1).length, 9);
+    assert.deepEqual(rendered.at(-1).slice().sort(), titles.slice().sort());
+    const requestCount = requests.length;
+    c.showSearchResultSeriesPanel_(presentation.entries[0]);
+    assert.equal(requests.length, requestCount, 'returning to a loaded series uses the same complete list');
+  }
+  const group = c.buildSearchResultPresentation_([books[8]]).entries[0];
+  c.showSearchResultSeriesPanel_(group);
+  c.setPopupModalOpen_(false);
+  const renderCount = rendered.length;
+  requests.at(-1).ok(books);
+  assert.equal(rendered.length, renderCount, 'closed series ignores late responses');
+  c.showSearchResultSeriesPanel_(group);
+  c.showSearchResultSeriesPanel_(group);
+  requests.at(-2).ok([{ title: 'Stale response' }]);
+  requests.at(-1).ok(books);
+  assert.equal(rendered.length, renderCount + 1, 'replacement series ignores stale responses');
+  assert.equal(rendered.at(-1).length, 9);
+  for (const invalid of [null, [], books.slice(0, 1), books.map(() => books[0]), books.map(book => ({ ...book, seriesKeyAuto: 'wrong-series' }))]) {
+    const retryGroup = c.buildSearchResultPresentation_([books[8]]).entries[0];
+    const beforeRender = rendered.length;
+    c.showSearchResultSeriesPanel_(retryGroup);
+    requests.at(-1).ok(invalid);
+    assert.equal(rendered.length, beforeRender, 'partial or invalid series response is never rendered as complete');
+    assert.equal(retryGroup.seriesBooks, undefined, 'partial or invalid series response is not cached');
+    assert(c.document.getElementById('image-popup-info').innerHTML.includes('シリーズ一覧を取得できませんでした'));
+    c.document.getElementById('series-panel-retry').onclick();
+    requests.at(-1).ok(books);
+    assert.equal(rendered.at(-1).length, 9, 'retry recovers the complete series');
+  }
+}
+
 // A failed search is visibly distinct from an empty result and preserves the query for retry.
 {
   const { c, requests } = client();

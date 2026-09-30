@@ -1156,17 +1156,17 @@ assertEqual(sandbox.getSearchStatusCountText_(), '1シリーズ・7冊', 'search
     ? modalSource.slice(searchSeriesStart, nextSeriesFunction)
     : '';
   assert(
-    searchSeriesSource.includes('const items = group.books;') &&
+    searchSeriesSource.includes('sortSeriesBooksForDisplay_(Array.isArray(seriesBooks)') &&
       searchSeriesSource.includes("kind: 'search-result'") &&
       searchSeriesSource.includes('showPopup(book, idx, items') &&
       searchSeriesSource.includes('setupBookImageElement_') &&
-      !searchSeriesSource.includes('getBooksBySeriesKey'),
-    'search-result series popup uses only matched books and never expands through the full-series API'
+      searchSeriesSource.includes('getBooksBySeriesKey(group.key || sourceBook.seriesKeyAuto)'),
+    'search-result series popup expands by stable series key and preserves the return context'
   );
   assert(
     modalSource.includes("seriesContext.kind === 'search-result'") &&
       modalSource.includes('showSearchResultSeriesPanel_(seriesContext.group);'),
-    'book detail returns to the filtered search-result series popup'
+    'book detail returns to the full series popup opened from search'
   );
 }
 assert(

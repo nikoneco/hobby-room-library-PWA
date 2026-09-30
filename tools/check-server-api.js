@@ -1092,5 +1092,8 @@ assert(namedSeriesResult.payload.records.slice(0, 2).every(row => row[14] === '�
   'public local-index records preserve the curated series heading');
 assert(namedSeriesResult.index.slice(2).every(item => item.seriesSearchTitle === '従来作品'),
   'unresolved legacy groups retain the derived title fallback');
+namedSeriesServer.__namedSeriesIndex = namedSeriesResult.index;
+assert(vm.runInContext("__namedSeriesIndex.filter(item => keywordMixedMatch_('戯言シリーズ', item)).length", namedSeriesServer) === 2,
+  'server keyword search includes curated names absent from individual book titles');
 
 console.log('server api checks ok');

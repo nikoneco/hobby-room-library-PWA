@@ -1207,7 +1207,8 @@ function buildSearchResultPresentation_(books) {
   let seriesGroupCount = 0;
   const presentationEntries = entries.map(entry => {
     if (entry.kind !== 'series-candidate') return entry;
-    if (entry.books.length < 2) {
+    const ownedCount = entry.books.reduce((count, book) => Math.max(count, Number(book.seriesCount) || 0), entry.books.length);
+    if (ownedCount < 2) {
       return {
         kind: 'book',
         book: entry.books[0],
@@ -1219,6 +1220,7 @@ function buildSearchResultPresentation_(books) {
     entry.kind = 'series';
     entry.title = getSearchResultSeriesTitle_(entry);
     entry.matchCount = entry.books.length;
+    entry.ownedCount = ownedCount;
     entry.genreMeta = getSearchResultSeriesGenreMeta_(entry);
     return entry;
   });
@@ -1243,7 +1245,7 @@ function createSearchResultSeriesCard_(group, viewMode, displayIndex) {
   card.className = viewMode === 'list'
     ? 'book-card list search-series-card'
     : 'book-card search-series-card';
-  card.setAttribute('aria-label', `${title}。検索に一致した${matchCount}冊を見る`);
+  card.setAttribute('aria-label', `${title}。シリーズの所蔵${group.ownedCount || matchCount}冊を見る。検索一致${matchCount}冊`);
   setBookRevealIndex_(card, displayIndex);
   card.onclick = function() {
     showSearchResultSeriesPanel_(group);
@@ -1265,8 +1267,8 @@ function createSearchResultSeriesCard_(group, viewMode, displayIndex) {
     <div class="search-series-kicker">${uiIcon_('collection', 'ui-icon-inline')}<span>シリーズ</span></div>
     <div class="book-title">${escapeHtml(title)}</div>
     <div class="genre-chip-wrap search-series-genres">${buildGenreChips({ genreMeta }, { limit: 3, interactive: false })}</div>
-    <div class="search-series-match-count">検索一致 ${matchCount}冊</div>
-    <div class="book-open-cue${viewMode === 'list' ? ' list-open-cue' : ''}" aria-hidden="true"><span>一致した巻を見る</span>${uiIcon_('chevronDown', 'book-open-cue-icon')}</div>
+    <div class="search-series-match-count">所蔵 ${group.ownedCount || matchCount}冊・検索一致 ${matchCount}冊</div>
+    <div class="book-open-cue${viewMode === 'list' ? ' list-open-cue' : ''}" aria-hidden="true"><span>シリーズ全体を見る</span>${uiIcon_('chevronDown', 'book-open-cue-icon')}</div>
   `;
 
   if (viewMode === 'list') {
