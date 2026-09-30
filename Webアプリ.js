@@ -1499,6 +1499,7 @@ function buildLibraryDataset_() {
   const genreMaster = getGenreMasterData_();
   const publisherOptions = getPublisherOptions_();
   const seriesRegistry = loadSeriesRegistryLookup_();
+  const seriesRegistryDisplayNames = new Map();
 
   const index = [];
   const titleSet = new Set();
@@ -1516,6 +1517,9 @@ function buildLibraryDataset_() {
     const seriesKeyAuto = resolvedSeries
       ? resolvedSeries.seriesId
       : rawSeriesKeyAuto;
+    if (resolvedSeries && String(resolvedSeries.displayName || '').trim()) {
+      seriesRegistryDisplayNames.set(seriesKeyAuto, String(resolvedSeries.displayName).trim());
+    }
     const volume = extractVolumeNumber(title);
     const publisher = row[CONFIG.IDX.PUBLISHER] || '';
     const released = row[CONFIG.IDX.RELEASED] || '';
@@ -1626,7 +1630,7 @@ function buildLibraryDataset_() {
   seriesGroupMap.forEach((group, key) => {
     seriesMetaMap.set(key, {
       count: group.indices.length,
-      searchTitle: chooseSeriesSearchTitle_(group.titles)
+      searchTitle: seriesRegistryDisplayNames.get(key) || chooseSeriesSearchTitle_(group.titles)
     });
   });
 

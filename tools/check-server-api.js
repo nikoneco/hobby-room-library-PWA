@@ -53,7 +53,7 @@ assert(
   'documented public API registry does not contain duplicate names'
 );
 assert(source.includes('buildQuickBrowseCountsPayload_'), 'PWA initial data includes quick browse counts');
-assert(configSource.includes("LIBRARY_DATASET_KEY: 'library_dataset_v27'"), 'library cache key invalidates pre-media datasets');
+assert(configSource.includes("LIBRARY_DATASET_KEY: 'library_dataset_v28'"), 'library cache key invalidates datasets without curated series names');
 assert(source.includes('SHELF_DATASET_KEY'), 'server defines a separate bookshelf dataset cache key');
 assert(configSource.includes("SHELF_DATASET_KEY: 'library_shelf_dataset_v4'"), 'bookshelf cache key invalidates datasets without stable book IDs');
 assert(source.includes('getBookshelfLiteDataset_'), 'server has a lightweight bookshelf dataset path');
@@ -1064,5 +1064,33 @@ const hintSheet = raw => ({
 assert(uiServer.getMainLastDataRowHintForWebApp_(hintSheet('20')) === 20, 'validated last-row hint remains usable');
 const uiBrowseCounts = uiServer.buildQuickBrowseCountsPayload_({ index: [{ genres: { media: ['漫画'] }, isSensitive: false }, { genres: { media: ['漫画'] }, isSensitive: true }] });
 assert(uiBrowseCounts.media['漫画'] === 1, 'browse count uses the same sensitive exclusion as genre search');
+
+// Curated registry names must survive heterogeneous titles and local-index export.
+const namedSeriesServer = vm.createContext({ console, URL, encodeURIComponent });
+vm.runInContext(configSource + '\n' + source, namedSeriesServer);
+const namedSeriesResult = vm.runInContext(`(() => {
+  const rows = ['クビキリサイクル', 'ネコソギラジカル. 上 (十三階段)', '従来作品 1', '従来作品 2'].map((title, i) => {
+    const row = Array(40).fill('');
+    row[CONFIG.IDX.TITLE] = title;
+    row[CONFIG.IDX.SERIES_KEY_AUTO] = i < 2 ? '戯言シリーズ' : '従来作品';
+    row[CONFIG.IDX.BOOK_UUID] = '00000000-0000-4000-8000-' + String(i).padStart(12, '0');
+    return row;
+  });
+  loadMainBookData_ = () => rows;
+  getGenreMasterData_ = () => ({ genreToCategory: {}, options: { story: [], theme: [], mood: [], status: [], media: [] } });
+  getPublisherOptions_ = () => [];
+  loadSeriesRegistryLookup_ = () => ({});
+  resolveSeriesRegistryKey_ = key => key === '戯言シリーズ'
+    ? { seriesId: 'stable-manual-series-id', displayName: '戯言シリーズ', media: [] } : null;
+  const dataset = buildLibraryDataset_();
+  dataset.datasetRevision = 'curated-series-fixture';
+  return { index: dataset.index, payload: buildLocalLibraryIndexPayload_(dataset) };
+})()`, namedSeriesServer);
+assert(namedSeriesResult.index.slice(0, 2).every(item => item.seriesSearchTitle === '戯言シリーズ' && item.seriesKeyAuto === 'stable-manual-series-id' && item.seriesCount === 2),
+  'curated names label heterogeneous manual groups without changing IDs or counts');
+assert(namedSeriesResult.payload.records.slice(0, 2).every(row => row[14] === '戯言シリーズ' && row[12] === 'stable-manual-series-id'),
+  'public local-index records preserve the curated series heading');
+assert(namedSeriesResult.index.slice(2).every(item => item.seriesSearchTitle === '従来作品'),
+  'unresolved legacy groups retain the derived title fallback');
 
 console.log('server api checks ok');
