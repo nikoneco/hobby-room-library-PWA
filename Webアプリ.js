@@ -709,7 +709,9 @@ function buildPreviewIndexPayload_(dataset) {
     title: String(item && item.title || ''),
     yomi: String(item && item.yomi || ''),
     author: String(item && item.author || ''),
+    contributors: Array.isArray(item && item.contributors) ? item.contributors : [],
     searchKey: String(item && item.searchKey || ''),
+    seriesSearchTitle: String(item && item.seriesSearchTitle || ''),
     publisher: String(item && item.publisher || ''),
     releasedYm: Number(item && item.releasedYm || 0),
     isSensitive: isSensitiveIndexItem_(item),
@@ -915,6 +917,7 @@ function getInitialSearchData() {
       suggest: buildSuggestDataPayload_(dataset),
       advancedOptions: buildAdvancedSearchOptionsPayload_(dataset),
       previewIndex: buildPreviewIndexPayload_(dataset),
+      previewIndexReady: true,
       datasetRevision: getDatasetSnapshotRevision_(dataset),
       userPreferences: getWebAppUserPreferences_()
     };
@@ -924,6 +927,7 @@ function getInitialSearchData() {
       suggest: buildEmptySuggestData_(),
       advancedOptions: buildEmptyAdvancedSearchOptions_(),
       previewIndex: [],
+      previewIndexReady: false,
       datasetRevision: getLibraryDatasetRevision_(),
       userPreferences: getWebAppUserPreferences_()
     };
@@ -933,7 +937,7 @@ function getInitialSearchData() {
 /**
  * PWA(JSONP)向け初期表示用データを返す。
  * 件数プレビュー用インデックスは全件分の転送が重いため、PWAでは初期ロードから外す。
- * 入力中の件数確認は countPreview API で必要時だけ行う。
+ * 入力中の件数確認は端末内索引を使い、未取得時だけ countPreview API を使う。
  *
  * @returns {{
  *   suggest: {titles: string[], yomis: string[], authors: string[], genres: string[]},
@@ -1007,7 +1011,7 @@ function getPreviewIndex() {
     return buildPreviewIndexPayload_(dataset);
   } catch (e) {
     console.error('getPreviewIndex error:', e);
-    return [];
+    throw e;
   }
 }
 
@@ -1043,7 +1047,7 @@ function countPreviewMatchesAuthoritative(
     return count;
   } catch (e) {
     console.error('countPreviewMatchesAuthoritative error:', e);
-    return 0;
+    throw e;
   }
 }
 
@@ -1146,6 +1150,7 @@ function mapRowsToBooks_(rows, indexData, options) {
       bookId   : normalizeBookUuid_(row[CONFIG.IDX.BOOK_UUID]),
       title    : row[CONFIG.IDX.TITLE]     || '',
       author   : row[CONFIG.IDX.AUTHOR]    || '',
+      contributors: parseBookContributors_(row[CONFIG.IDX.AUTHOR]),
       publisher: row[CONFIG.IDX.PUBLISHER] || '',
       shelf    : row[CONFIG.IDX.SHELF]     || '',
       location : row[CONFIG.IDX.LOCATION]  || '',
@@ -1249,6 +1254,11 @@ function mapRowsToShelfBooks_(rows, indexData, rowOffset) {
       bookId: normalizeBookUuid_(row[CONFIG.IDX.BOOK_UUID]),
       detailLoaded: false,
       title: row[CONFIG.IDX.TITLE] || '',
+      author: row[CONFIG.IDX.AUTHOR] || '',
+      contributors: parseBookContributors_(row[CONFIG.IDX.AUTHOR]),
+      volume: idx && typeof idx.volume === 'number' && Number.isFinite(idx.volume)
+        ? idx.volume
+        : extractVolumeNumber(row[CONFIG.IDX.TITLE]),
       isbn,
       shelf: row[CONFIG.IDX.SHELF] || '',
       location: row[CONFIG.IDX.LOCATION] || '',
@@ -1287,6 +1297,9 @@ function isBookshelfLiteDatasetValid_(dataset) {
     dataset.books.every(book =>
       book &&
       typeof book.title === 'string' &&
+      typeof book.author === 'string' &&
+      Array.isArray(book.contributors) && book.contributors.every(name => typeof name === 'string') &&
+      typeof book.volume === 'number' && Number.isFinite(book.volume) &&
       typeof book.shelf === 'string' &&
       typeof book.location === 'string' &&
       typeof book.fallbackImg === 'string' &&
@@ -1444,7 +1457,8 @@ function matchesSearchCriteria_(idx, criteria) {
   const keywordMatch = !c.nKeyword || keywordMixedMatch_(c.nKeyword, item);
   const titleMatch = !c.nTitle || titleYomiMixedMatch_(c.nTitle, item.title, item.yomi);
   const yomiMatch = !c.nYomi || titleYomiMixedMatch_(c.nYomi, item.title, item.yomi);
-  const authorMatch = !c.nAuthor || (item.author && item.author.includes(c.nAuthor));
+  const authorMatch = !c.nAuthor || (item.author && item.author.includes(c.nAuthor)) ||
+    (Array.isArray(item.contributors) && item.contributors.some(name => name.includes(c.nAuthor)));
   const publisherMatch = !c.selectedPublisher || item.publisher === c.selectedPublisher;
   const storyMatch = !c.selectedStory || (item.genres.story || []).includes(c.selectedStory);
   const themeMatch = !c.selectedTheme || (item.genres.theme || []).includes(c.selectedTheme);
@@ -1566,6 +1580,7 @@ function buildLibraryDataset_() {
     const title = row[CONFIG.IDX.TITLE] || '';
     const yomi = row[CONFIG.IDX.YOMIGANA] || '';
     const author = row[CONFIG.IDX.AUTHOR] || '';
+    const contributors = parseBookContributors_(author);
     const rawSeriesKeyAuto = row[CONFIG.IDX.SERIES_KEY_AUTO] || '';
     const resolvedSeries = resolveSeriesRegistryKey_(rawSeriesKeyAuto, seriesRegistry);
     const seriesKeyAuto = resolvedSeries
@@ -1642,6 +1657,7 @@ function buildLibraryDataset_() {
       title: normalizedTitle,
       yomi: normalizedYomi,
       author: normalizedAuthor,
+      contributors: contributors.map(normalizeKana),
       searchKey: buildSearchKey_(title, yomi, author),
       publisher: String(publisher).trim(),
       genresRaw: rawGenres,
@@ -1662,7 +1678,7 @@ function buildLibraryDataset_() {
 
     if (title) titleSet.add(title);
     if (yomi) yomiSet.add(yomi);
-    if (author) authorSet.add(author);
+    contributors.forEach(name => authorSet.add(name));
   });
 
   applySeriesOrdersToIndex_(rows, index, loadSeriesOrderValues_(), seriesRegistry);

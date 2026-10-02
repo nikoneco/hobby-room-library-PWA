@@ -3146,7 +3146,7 @@ function writeGasRunShim() {
   let localIndexCurrentDownloadAcquisitionId = 0;
 
   function normalizeKanaLocal_(value) {
-    return String(value || '').toLowerCase().normalize('NFKC')
+    return String(value || '').normalize('NFKC').toLowerCase()
       .replace(/[\u30a1-\u30f6]/g, function(match) {
         return String.fromCharCode(match.charCodeAt(0) - 0x60);
       })
@@ -3155,6 +3155,17 @@ function writeGasRunShim() {
 
   function isKanaCharLocal_(char) {
     return /^[\u3041-\u3096\u30fc]$/.test(char || '');
+  }
+
+  function parseBookContributorsLocal_(value) {
+    const seen = new Set();
+    return String(value == null ? '' : value).split('|').map(function(name) { return name.trim(); }).filter(function(name) {
+      if (!name) return false;
+      const key = normalizeKanaLocal_(name) || name;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
   }
 
   function splitMixedSearchQueryLocal_(query) {
@@ -3220,7 +3231,10 @@ function writeGasRunShim() {
 
   function normalizeReleasedYmLocal_(year, month, isFrom) {
     if (!year) return 0;
-    return Number(year) * 100 + Number(month || (isFrom ? '01' : '12'));
+    const value = (year + '-' + (month || (isFrom ? '01' : '12'))).trim().normalize('NFKC');
+    const match = value.match(/^(\\d{4})-(\\d{2})$/);
+    if (!match || Number(match[2]) < 1 || Number(match[2]) > 12) return 0;
+    return Number(match[1]) * 100 + Number(match[2]);
   }
 
   function buildAdvancedCriteriaLocal_(args) {
@@ -3280,7 +3294,8 @@ function writeGasRunShim() {
       (!criteria.keyword || keywordMixedMatchLocal_(criteria.keyword, item)) &&
       (!criteria.title || titleYomiMixedMatchLocal_(criteria.title, item.title, item.yomi)) &&
       (!criteria.yomi || titleYomiMixedMatchLocal_(criteria.yomi, item.title, item.yomi)) &&
-      (!criteria.author || (item.author && item.author.includes(criteria.author))) &&
+      (!criteria.author || (item.author && item.author.includes(criteria.author)) ||
+        (Array.isArray(item.contributors) && item.contributors.some(function(name) { return name.includes(criteria.author); }))) &&
       (!criteria.publisher || item.publisher === criteria.publisher) &&
       (!criteria.story || genres.story.includes(criteria.story)) &&
       (!criteria.theme || genres.theme.includes(criteria.theme)) &&
@@ -3337,6 +3352,7 @@ function writeGasRunShim() {
           detailLoaded: false,
           title: String(record[2] || ''),
           author: String(record[3] || ''),
+          contributors: parseBookContributorsLocal_(record[3]),
           publisher: String(record[4] || ''),
           shelf: String(record[5] || ''),
           location: String(record[6] || ''),
@@ -3361,6 +3377,7 @@ function writeGasRunShim() {
           title: String(record[21] || ''),
           yomi: String(record[22] || ''),
           author: String(record[23] || ''),
+          contributors: parseBookContributorsLocal_(record[3]).map(normalizeKanaLocal_),
           searchKey: String(record[24] || ''),
           seriesSearchTitle: String(record[14] || ''),
           publisher: String(record[25] || ''),
@@ -3375,6 +3392,7 @@ function writeGasRunShim() {
   function cloneLocalBook_(record) {
     const book = record.book;
     return Object.assign({}, book, {
+      contributors: Array.isArray(book.contributors) ? book.contributors.slice() : [],
       genreMeta: Array.isArray(book.genreMeta)
         ? book.genreMeta.map(function(item) { return Object.assign({}, item); })
         : []
@@ -3645,6 +3663,15 @@ function writeGasRunShim() {
     const converted = convertLocalIndexPayload_(payload);
     localIndexPayload = payload;
     localIndexRecords = converted;
+    // Saved schema7 indexes already contain raw K-column text. Rebuild person suggestions
+    // from it, so an older joined metadata.authors cache cannot hide individual names.
+    localIndexPayload = Object.assign({}, payload, {
+      metadata: Object.assign({}, payload.metadata, {
+        suggest: Object.assign({}, payload.metadata.suggest, {
+          authors: Array.from(new Set(converted.flatMap(function(record) { return record.book.contributors; })))
+        })
+      })
+    });
     localIndexByBookId = new Map();
     localIndexByRowIndex = new Map();
     converted.forEach(function(record) {
@@ -3817,6 +3844,14 @@ function writeGasRunShim() {
     isSupported: function() { return Boolean(window.indexedDB); },
     isReady: function() { return Boolean(localIndexPayload); },
     whenLoaded: function() { return ensureLocalIndexLoaded_(); },
+    whenReadyForSearch: function() { return refreshLocalIndex_(false, ''); },
+    countMatches: function(args) {
+      if (!canHandleLocally_('searchBooksAdvanced', args || [])) return null;
+      const criteria = buildAdvancedCriteriaLocal_(args || []);
+      return localIndexRecords.reduce(function(count, record) {
+        return count + (matchesAdvancedCriteriaLocal_(record.index, criteria) ? 1 : 0);
+      }, 0);
+    },
     getRevision: function() { return localIndexPayload ? String(localIndexPayload.revision || '') : ''; },
     getRecordCount: function() { return localIndexRecords.length; },
     getSuggestionTitles: function() {
@@ -3950,7 +3985,9 @@ function writePwaClient() {
     'status.beforeSearch': '棚を探す前',
     'status.previewPending': '棚札を確かめています',
     'status.conditions': '探す手がかり',
-    'status.previewReady': data => data && Number.isFinite(data.count) ? 'この手がかりなら' + data.count + '冊' : '候補が見えています',
+    'status.previewReady': data => data && Number.isFinite(data.count) ? 'この条件で' + data.count + '冊を見る' : '候補が見えています',
+    'status.previewEmpty': 'この条件に合う本はありません',
+    'status.previewUnavailable': '件数を確認できませんでした',
     'status.note.random': data => data && Number.isFinite(data.count) ? '今夜の気配で、この' + data.count + '冊を手前に出しました。' : '今夜目が合う本を手前に出しました。',
     'status.note.shelf': data => data && Number.isFinite(data.count) ? '棚位置を確かめたい時は、この' + data.count + '冊の眺めが近道です。' : '棚位置を確かめるなら、この眺めが近道です。',
     'status.note.result': data => data && data.sourceMode === 'advanced' ? '細かい手がかりに合う本だけ、棚の前へ寄せています。' : '見つかった本だけ、棚の前へ寄せています。',
@@ -3962,7 +3999,7 @@ function writePwaClient() {
     'spinner.label.shelf': '棚の灯りをともしています',
     'spinner.label.browse': '選んだ入口を辿っています',
     'spinner.label.refine': '棚を並べ直しています',
-    'spinner.detail.search': 'タイトル・作者・読みを静かに照合しています',
+    'spinner.detail.search': 'タイトル・著者・関係者・読みを静かに照合しています',
     'spinner.detail.advanced': 'ジャンルや発売日の札を一枚ずつ確かめています',
     'spinner.detail.random': '今夜目が合う本を少しだけ選んでいます',
     'spinner.detail.shelf': '蔵書全体と棚マップをゆっくり広げています',
@@ -5148,7 +5185,7 @@ function writePwaFiles() {
       {
         name: '検索を開く',
         short_name: '検索',
-        description: 'タイトル、読み仮名、作者から蔵書を検索する',
+        description: 'タイトル、読み仮名、著者・関係者から蔵書を検索する',
         url: './?launch=search',
         icons: [
           {

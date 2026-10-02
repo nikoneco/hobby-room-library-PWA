@@ -111,7 +111,7 @@ function datasetChecks(expectedRows) {
   assert.equal(payload.version, 7); assert.equal(payload.columns[32], 'seriesOrder');
   assert(payload.records.every(record => record.length === 33));
   const shim = vm.createContext({ LOCAL_INDEX_SCHEMA_VERSION: 7, createError_: (message, code) => Object.assign(new Error(message), { code }) });
-  vm.runInContext(functionSource(shimSource, 'buildGenreMetaLocal_') + '\n' + functionSource(shimSource, 'convertLocalIndexPayload_'), shim);
+  vm.runInContext(functionSource(shimSource, 'normalizeKanaLocal_') + '\n' + functionSource(shimSource, 'parseBookContributorsLocal_') + '\n' + functionSource(shimSource, 'buildGenreMetaLocal_') + '\n' + functionSource(shimSource, 'convertLocalIndexPayload_'), shim);
   const converted = plain(shim.convertLocalIndexPayload_(payload));
   for (const [i, record] of converted.entries()) {
     const common = Object.fromEntries(Object.keys(record.book).map(key => [key, typeof record.book[key] === 'string' ? String(compact[i][key] || '') : compact[i][key]]));

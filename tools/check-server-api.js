@@ -53,9 +53,9 @@ assert(
   'documented public API registry does not contain duplicate names'
 );
 assert(source.includes('buildQuickBrowseCountsPayload_'), 'PWA initial data includes quick browse counts');
-assert(configSource.includes("LIBRARY_DATASET_KEY: 'library_dataset_v29'"), 'library cache key invalidates datasets without series order metadata');
+assert(configSource.includes("LIBRARY_DATASET_KEY: 'library_dataset_v30'"), 'library cache key invalidates datasets without individual contributor suggestions');
 assert(source.includes('SHELF_DATASET_KEY'), 'server defines a separate bookshelf dataset cache key');
-assert(configSource.includes("SHELF_DATASET_KEY: 'library_shelf_dataset_v4'"), 'bookshelf cache key invalidates datasets without stable book IDs');
+assert(configSource.includes("SHELF_DATASET_KEY: 'library_shelf_dataset_v5'"), 'bookshelf cache key invalidates datasets without cover bibliography');
 assert(source.includes('getBookshelfLiteDataset_'), 'server has a lightweight bookshelf dataset path');
 assert(source.includes('buildBookshelfLiteDataset_'), 'server can build bookshelf data without full search index');
 assert(source.includes('fallbackImg: normalizeBookFallbackImageUrl_(row[CONFIG.IDX.FALLBACK_IMAGE_URL])'), 'lightweight bookshelf records preserve the fallback cover URL');

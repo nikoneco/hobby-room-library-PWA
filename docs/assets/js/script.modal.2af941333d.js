@@ -624,6 +624,10 @@ function hydratePopupBookFromLocalIndex_(book) {
     book.genreMeta = localBook.genreMeta.map(item => Object.assign({}, item));
   }
 
+  if (!Array.isArray(book.contributors) && Array.isArray(localBook.contributors)) {
+    book.contributors = localBook.contributors.slice();
+  }
+
   if (book.isExtraSeries === undefined && localBook.isExtraSeries !== undefined) {
     book.isExtraSeries = Boolean(localBook.isExtraSeries);
   }
@@ -636,6 +640,17 @@ function createPopupDeferredRenderBook_(book) {
 
   return {
     title: book.title || '',
+    author: book.author || '',
+    contributors: parseBookContributors_(Array.isArray(book.contributors)
+      ? book.contributors.join('|')
+      : book.author),
+    volume: typeof book.volume === 'number' && Number.isFinite(book.volume) ? book.volume : 0,
+    ownedMaxVolume: book.ownedMaxVolume || 0,
+    publisher: book.publisher || '',
+    released: book.released || '',
+    brand: book.brand || '',
+    price: book.price || '',
+    yomi: book.yomi || '',
     bookId: book.bookId || '',
     rowIndex: book.rowIndex,
     isbn: book.isbn || '',
@@ -650,6 +665,7 @@ function createPopupDeferredRenderBook_(book) {
       ? book.genreMeta.map(item => Object.assign({}, item))
       : [],
     seriesKeyAuto: book.seriesKeyAuto || '',
+    seriesOrder: typeof book.seriesOrder === 'number' && Number.isFinite(book.seriesOrder) ? book.seriesOrder : null,
     seriesCount: Number(book.seriesCount || 0),
     seriesSearchTitle: book.seriesSearchTitle || '',
     isExtraSeries: Boolean(book.isExtraSeries),
@@ -1114,6 +1130,7 @@ function getBookDetailPrefetchIdentity_(book) {
   if (book.rowIndex !== undefined && book.rowIndex !== null && book.rowIndex !== '') {
     return `row:${book.rowIndex}`;
   }
+
   return '';
 }
 

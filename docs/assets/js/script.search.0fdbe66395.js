@@ -29,6 +29,7 @@ let searchStatusState = {
   previewCount: null,
   previewReady: false,
   previewPending: false,
+  previewUnavailable: false,
   removingChipKey: '',
   message: '',
   sourceMode: '',
@@ -87,11 +88,31 @@ function hiraToKana(str) {
 }
 
 function normalizeKana(str) {
-  return (str || '').toLowerCase().normalize("NFKC")
+  return String(str || '').normalize("NFKC").toLowerCase()
     .replace(/[\u30a1-\u30f6]/g, function(match) {
       return String.fromCharCode(match.charCodeAt(0) - 0x60);
     })
     .replace(/[\s【】「」『』（）()・:：\-–—~～・,，.。！？!?[\]{}]/g, '');
+}
+
+// K列はパイプで明示された人物だけを分ける。旧データの句読点などは名前の一部。
+function parseBookContributors_(value) {
+  const seen = new Set();
+  return String(value == null ? '' : value).split('|').map(name => name.trim()).filter(name => {
+    if (!name) return false;
+    const key = normalizeKana(name) || name;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function normalizeContributorSuggestions_(data) {
+  const source = data || getEmptySuggestData_();
+  return Object.assign({}, source, {
+    authors: Array.from(new Set((Array.isArray(source.authors) ? source.authors : [])
+      .flatMap(parseBookContributors_)))
+  });
 }
 
 function titleYomiMixedMatch_(query, title, yomi) {
@@ -177,6 +198,7 @@ function keywordMixedMatch_(query, idx) {
   const q = normalizeKana(query || '');
   if (!q) return true;
   if (idx && idx.searchKey && idx.searchKey.includes(q)) return true;
+  if (idx && normalizeKana(idx.seriesSearchTitle || '').includes(q)) return true;
   return titleYomiMixedMatch_(q, idx && idx.title, idx && idx.yomi);
 }
 
@@ -292,7 +314,8 @@ function matchesSearchCriteria_(idx, criteria) {
   const keywordMatch = !c.nKeyword || keywordMixedMatch_(c.nKeyword, item);
   const titleMatch = !c.nTitle || titleYomiMixedMatch_(c.nTitle, item.title, item.yomi);
   const yomiMatch = !c.nYomi || titleYomiMixedMatch_(c.nYomi, item.title, item.yomi);
-  const authorMatch = !c.nAuthor || (item.author && item.author.includes(c.nAuthor));
+  const authorMatch = !c.nAuthor || (item.author && item.author.includes(c.nAuthor)) ||
+    (Array.isArray(item.contributors) && item.contributors.some(name => name.includes(c.nAuthor)));
   const publisherMatch = !c.selectedPublisher || item.publisher === c.selectedPublisher;
   const storyMatch = !c.selectedStory || (item.genres.story || []).includes(c.selectedStory);
   const themeMatch = !c.selectedTheme || (item.genres.theme || []).includes(c.selectedTheme);
@@ -367,7 +390,7 @@ function syncSearchDataFromLocalIndex_() {
   const localPreview = typeof manager.getPreviewIndex === 'function'
     ? manager.getPreviewIndex()
     : [];
-  SUGGEST_DATA = metadata.suggest || getEmptySuggestData_();
+  SUGGEST_DATA = normalizeContributorSuggestions_(metadata.suggest);
   ADVANCED_OPTIONS = metadata.advancedOptions || getEmptyAdvancedOptions_();
   QUICK_BROWSE_COUNTS = metadata.quickBrowseCounts && typeof metadata.quickBrowseCounts === 'object'
     ? metadata.quickBrowseCounts
@@ -379,7 +402,7 @@ function syncSearchDataFromLocalIndex_() {
   }
   populateAdvancedOptions();
   renderQuickBrowseRail_();
-  if (!lastResult) {
+  if (!lastResult || ['normal', 'advanced', 'preview'].includes(searchStatusState.mode)) {
     syncSearchStatusPreviewFromForm_();
   }
   return true;
@@ -392,13 +415,13 @@ function syncPreviewIndexFromLocal_() {
 function applyInitialSearchData_(data) {
   const payload = data || {};
 
-  SUGGEST_DATA = payload.suggest || getEmptySuggestData_();
+  SUGGEST_DATA = normalizeContributorSuggestions_(payload.suggest);
   ADVANCED_OPTIONS = payload.advancedOptions || getEmptyAdvancedOptions_();
   PREVIEW_INDEX = Array.isArray(payload.previewIndex) ? payload.previewIndex : [];
   QUICK_BROWSE_COUNTS = payload.quickBrowseCounts && typeof payload.quickBrowseCounts === 'object'
     ? payload.quickBrowseCounts
     : null;
-  PREVIEW_INDEX_READY = true;
+  PREVIEW_INDEX_READY = !isPwaShell_() && Array.isArray(payload.previewIndex) && payload.previewIndexReady !== false;
   requestBookDetailCacheRevisionSync_(payload.datasetRevision);
 
   const localIndexManager = window.ShumiLibraryLocalIndex;
@@ -536,7 +559,7 @@ function fetchInitialSearchData() {
 function fetchSuggestData() {
   google.script.run
     .withSuccessHandler(function(data) {
-      SUGGEST_DATA = data || getEmptySuggestData_();
+      SUGGEST_DATA = normalizeContributorSuggestions_(data);
     })
     .withFailureHandler(function(err) {
       console.error('getSuggestData failed:', err);
@@ -936,7 +959,7 @@ function syncExtraFilterLabel_() {
   const summary = more && more.querySelector('summary');
   if (!summary) return;
   const count = getExtraFilterCount_();
-  summary.textContent = 'タイトル・作者・出版社・発売日' + (count ? `（${count}条件）` : '');
+  summary.textContent = 'タイトル・著者・関係者・出版社・発売日' + (count ? `（${count}条件）` : '');
 }
 
 function closeAdvancedSearchPanel_() {
@@ -1198,7 +1221,7 @@ function normalizeBookMetadataSearchValue_(field, value) {
 
 function applyBookMetadataSearch_(field, value) {
   const config = {
-    detailAuthor: '作者',
+    detailAuthor: '著者・関係者',
     detailPublisher: '出版社'
   }[String(field || '')];
   const normalizedValue = normalizeBookMetadataSearchValue_(field, value);
@@ -1385,7 +1408,10 @@ function buildReleasedChipLabel_(params) {
 
 function normalizeReleasedYmClient_(year, month, isFrom) {
   if (!year) return 0;
-  return Number(year) * 100 + Number(month || (isFrom ? '01' : '12'));
+  const value = `${year}-${month || (isFrom ? '01' : '12')}`.trim().normalize('NFKC');
+  const match = value.match(/^(\d{4})-(\d{2})$/);
+  if (!match || Number(match[2]) < 1 || Number(match[2]) > 12) return 0;
+  return Number(match[1]) * 100 + Number(match[2]);
 }
 
 function toggleMonthEnabled_(yearId, monthId) {
@@ -1512,7 +1538,7 @@ function buildSearchStatusChips_(mode, params) {
     chips.push({
       key: 'detailAuthor',
       value: params.detailAuthor,
-      labelPrefix: '作者',
+      labelPrefix: '著者・関係者',
       label: params.detailAuthor,
       className: '',
       removable: true
@@ -1640,16 +1666,19 @@ function getSearchStatusCountText_() {
     return getPwaLibrarianText_('status.previewPending', '候補を確認中');
   }
 
-  if (isPwaShell_() && hasConditions) {
-    return getPwaLibrarianText_('status.conditions', '検索条件');
-  }
-
   if (searchStatusState.previewReady && Number.isFinite(searchStatusState.previewCount)) {
+    if (searchStatusState.previewCount === 0) {
+      return getPwaLibrarianText_('status.previewEmpty', 'この条件に合う本はありません');
+    }
     return getPwaLibrarianText_(
       'status.previewReady',
-      `この条件なら${searchStatusState.previewCount}冊`,
+      `この条件で${searchStatusState.previewCount}冊を見る`,
       { count: searchStatusState.previewCount }
     );
+  }
+
+  if (searchStatusState.previewUnavailable) {
+    return getPwaLibrarianText_('status.previewUnavailable', '件数を確認できませんでした');
   }
 
   return getPwaLibrarianText_('status.beforeSearch', '検索前');
@@ -1789,7 +1818,8 @@ function showSearchStatusPreview_(mode, params, previewCount, previewReady) {
   searchStatusState.chips = buildSearchStatusChips_(mode, params || {});
   searchStatusState.previewCount = Number.isFinite(previewCount) ? Number(previewCount) : null;
   searchStatusState.previewReady = Boolean(previewReady);
-  searchStatusState.previewPending = !isPwaShell_() && !searchStatusState.previewReady && searchStatusState.chips.length > 0;
+  searchStatusState.previewPending = !searchStatusState.previewReady && searchStatusState.chips.length > 0;
+  searchStatusState.previewUnavailable = false;
   searchStatusState.removingChipKey = '';
   searchStatusState.message = '';
   searchStatusState.sourceMode = mode || 'preview';
@@ -1798,6 +1828,7 @@ function showSearchStatusPreview_(mode, params, previewCount, previewReady) {
 }
 
 function showSearchStatusResult_(mode, resultCount, params) {
+  cancelPreviewCountRequest_();
   searchStatusState.visible = true;
   searchStatusState.mode = mode === 'random' || mode === 'shelf' ? mode : 'result';
   searchStatusState.resultCount = Array.isArray(resultCount) ? resultCount.length : Number(resultCount) || 0;
@@ -1816,6 +1847,7 @@ function showSearchStatusResult_(mode, resultCount, params) {
 }
 
 function showSearchStatusNotice_(message) {
+  cancelPreviewCountRequest_();
   searchStatusState.visible = true;
   searchStatusState.mode = 'notice';
   searchStatusState.resultCount = 0;
@@ -1842,6 +1874,7 @@ function getLibrarianNoticeText_(message) {
 }
 
 function hideSearchStatus_() {
+  cancelPreviewCountRequest_();
   searchStatusState.visible = false;
   searchStatusState.mode = 'none';
   searchStatusState.resultCount = 0;
@@ -1857,9 +1890,13 @@ function hideSearchStatus_() {
 }
 
 function countPreviewMatches_(params) {
-  if (!Array.isArray(PREVIEW_INDEX) || !PREVIEW_INDEX.length) {
-    return null;
+  if (isPwaShell_()) {
+    const manager = window.ShumiLibraryLocalIndex;
+    return manager && typeof manager.countMatches === 'function'
+      ? manager.countMatches(buildPreviewCountArgs_(params))
+      : null;
   }
+  if (!PREVIEW_INDEX_READY || !Array.isArray(PREVIEW_INDEX)) return null;
 
   const criteria = buildClientSearchCriteria_(params);
   let count = 0;
@@ -1875,54 +1912,77 @@ function countPreviewMatches_(params) {
 
 
 function buildPreviewCountRequestKey_(params, mode) {
-  return JSON.stringify({ mode: mode || '', params: params || {} });
+  return JSON.stringify({ mode: mode || '', params: normalizeSearchParams_(params) });
+}
+
+function buildPreviewCountArgs_(params) {
+  const p = normalizeSearchParams_(params);
+  return [p.keyword, p.detailTitle, p.detailYomi, p.detailAuthor, p.detailPublisher,
+    p.detailStory, p.detailTheme, p.detailMood, p.detailStatus, p.detailReleasedFromYear,
+    p.detailReleasedFromMonth, p.detailReleasedToYear, p.detailReleasedToMonth, p.detailMedia];
+}
+
+function cancelPreviewCountRequest_() {
+  PREVIEW_COUNT_REQUEST_SEQ++;
+  if (PREVIEW_COUNT_DEBOUNCE_TIMER !== null) clearTimeout(PREVIEW_COUNT_DEBOUNCE_TIMER);
+  PREVIEW_COUNT_DEBOUNCE_TIMER = null;
 }
 
 function requestAuthoritativePreviewCount_(mode, params) {
-  if (PREVIEW_COUNT_DEBOUNCE_TIMER) {
-    clearTimeout(PREVIEW_COUNT_DEBOUNCE_TIMER);
-  }
-
-  const requestSeq = ++PREVIEW_COUNT_REQUEST_SEQ;
+  cancelPreviewCountRequest_();
+  const requestSeq = PREVIEW_COUNT_REQUEST_SEQ;
   const requestKey = buildPreviewCountRequestKey_(params, mode);
 
-  searchStatusState.previewPending = true;
-  searchStatusState.previewReady = false;
-  renderSearchStatus_();
+  function isCurrent_() {
+    if (requestSeq !== PREVIEW_COUNT_REQUEST_SEQ) return false;
+    const currentParams = getEffectiveSearchParams_();
+    const currentMode = isAdvancedOpen() || hasAnyAdvancedCondition_(currentParams) ? 'advanced' : 'normal';
+    return buildPreviewCountRequestKey_(currentParams, currentMode) === requestKey;
+  }
+  function finish_(count) {
+    if (!isCurrent_()) return;
+    if (typeof count !== 'number' || !Number.isInteger(count) || count < 0) {
+      fail_(new Error('Invalid preview count'));
+      return;
+    }
+    showSearchStatusPreview_(mode, params, count, true);
+  }
+  function fail_(err) {
+    if (!isCurrent_()) return;
+    console.warn('countPreviewMatchesAuthoritative failed:', err);
+    searchStatusState.previewCount = null;
+    searchStatusState.previewReady = false;
+    searchStatusState.previewPending = false;
+    searchStatusState.previewUnavailable = true;
+    renderSearchStatus_();
+  }
+  function requestRemote_() {
+    if (!isCurrent_()) return;
+    google.script.run.withSuccessHandler(finish_).withFailureHandler(fail_)
+      .countPreviewMatchesAuthoritative(...buildPreviewCountArgs_(params));
+  }
+  function useLocal_() {
+    if (!isCurrent_()) return true;
+    const count = countPreviewMatches_(params);
+    if (count === null) return false;
+    finish_(count);
+    return true;
+  }
 
   PREVIEW_COUNT_DEBOUNCE_TIMER = setTimeout(function() {
-    google.script.run
-      .withSuccessHandler(function(count) {
-        if (requestSeq !== PREVIEW_COUNT_REQUEST_SEQ) return;
-
-        const currentParams = getEffectiveSearchParams_();
-        const currentMode = isAdvancedOpen() || hasAnyAdvancedCondition_(currentParams) ? 'advanced' : 'normal';
-        const currentKey = buildPreviewCountRequestKey_(currentParams, currentMode);
-        if (currentKey !== requestKey) return;
-
-        showSearchStatusPreview_(currentMode, currentParams, Number(count) || 0, true);
-      })
-      .withFailureHandler(function(err) {
-        if (requestSeq !== PREVIEW_COUNT_REQUEST_SEQ) return;
-        console.error('countPreviewMatchesAuthoritative failed:', err);
-      })
-      .countPreviewMatchesAuthoritative(
-        params.keyword,
-        params.detailTitle,
-        params.detailYomi,
-        params.detailAuthor,
-        params.detailPublisher,
-        params.detailStory,
-        params.detailTheme,
-        params.detailMood,
-        params.detailStatus,
-        params.detailReleasedFromYear,
-        params.detailReleasedFromMonth,
-        params.detailReleasedToYear,
-        params.detailReleasedToMonth,
-        params.detailMedia
-      );
-  }, 120);
+    PREVIEW_COUNT_DEBOUNCE_TIMER = null;
+    try {
+      if (useLocal_()) return;
+      const manager = window.ShumiLibraryLocalIndex;
+      if (isPwaShell_() && manager && typeof manager.whenReadyForSearch === 'function') {
+        Promise.resolve(manager.whenReadyForSearch()).then(function() {
+          try { if (!useLocal_()) requestRemote_(); } catch (err) { fail_(err); }
+        }, requestRemote_);
+      } else {
+        requestRemote_();
+      }
+    } catch (err) { fail_(err); }
+  }, 250);
 }
 
 function syncSearchStatusPreviewFromForm_() {
@@ -1931,33 +1991,13 @@ function syncSearchStatusPreviewFromForm_() {
   const mode = isAdvancedOpen() || hasAnyAdvancedCondition_(params) ? 'advanced' : 'normal';
 
   if (!hasAnySearchCondition_(params)) {
-    PREVIEW_COUNT_REQUEST_SEQ++;
-    if (PREVIEW_COUNT_DEBOUNCE_TIMER) {
-      clearTimeout(PREVIEW_COUNT_DEBOUNCE_TIMER);
-      PREVIEW_COUNT_DEBOUNCE_TIMER = null;
-    }
+    cancelPreviewCountRequest_();
     showSearchStatusPreview_('normal', {}, null, false);
     return;
   }
 
-  if (!PREVIEW_INDEX_READY) {
-    showSearchStatusPreview_(mode, params, null, false);
-    return;
-  }
-
-  const count = countPreviewMatches_(params);
-  showSearchStatusPreview_(mode, params, count, Number.isFinite(count));
-
-  const hasTextCondition = Boolean(
-    params.keyword ||
-    params.detailTitle ||
-    params.detailYomi ||
-    params.detailAuthor
-  );
-
-  if (hasTextCondition && !isPwaShell_()) {
-    requestAuthoritativePreviewCount_(mode, params);
-  }
+  showSearchStatusPreview_(mode, params, null, false);
+  requestAuthoritativePreviewCount_(mode, params);
 }
 
 function hasAnySearchCondition_(params) {
@@ -1979,6 +2019,7 @@ function hasAnyAdvancedCondition_(params) {
 }
 
 function beginResultRequest_() {
+  cancelPreviewCountRequest_();
   resultRequestGeneration += 1;
   cancelShelfJump_();
   searchStatusState.removingChipKey = '';
@@ -2321,6 +2362,11 @@ function sanitizeBookshelfCacheBook_(book) {
     bookId: book.bookId || '',
     detailLoaded: false,
     title: book.title || '',
+    author: book.author || '',
+    contributors: parseBookContributors_(Array.isArray(book.contributors)
+      ? book.contributors.join('|')
+      : book.author),
+    volume: typeof book.volume === 'number' && Number.isFinite(book.volume) ? book.volume : 0,
     isbn: book.isbn || '',
     shelf: book.shelf || '',
     location: book.location || '',
@@ -2445,10 +2491,14 @@ function restoreBookshelfScroll_() {
 
 function areBookshelfSnapshotsEqual_(previous, next) {
   if (!Array.isArray(previous) || !Array.isArray(next) || previous.length !== next.length) return false;
-  const fields = ['rowIndex', 'bookId', 'title', 'isbn', 'shelf', 'location', 'isSensitive', 'fallbackImg', 'fallbackImageSource'];
+  const fields = ['rowIndex', 'bookId', 'title', 'author', 'volume', 'isbn', 'shelf', 'location', 'isSensitive', 'fallbackImg', 'fallbackImageSource'];
+  const contributorsKey = book => JSON.stringify(Array.isArray(book.contributors)
+    ? book.contributors
+    : parseBookContributors_(book.author));
   return previous.every((book, index) => {
     const other = next[index];
-    return book && other && fields.every(field => String(book[field] ?? '') === String(other[field] ?? ''));
+    return book && other && fields.every(field => String(book[field] ?? '') === String(other[field] ?? '')) &&
+      contributorsKey(book) === contributorsKey(other);
   });
 }
 
@@ -2594,7 +2644,7 @@ function resetSearch() {
 const SPINNER_DEFAULT_LABEL_ = '検索中...';
 const SPINNER_KIND_CLASSES_ = ['search', 'advanced', 'random', 'shelf', 'browse', 'refine'];
 const SPINNER_DETAIL_BY_KIND_ = {
-  search: 'タイトル・作者・読みから候補を集めています',
+  search: 'タイトル・著者・関係者・読みから候補を集めています',
   advanced: 'ジャンルや発売日の条件を照らし合わせています',
   random: '今の気分に合う寄り道を作っています',
   shelf: '蔵書全体と棚マップを並べています',

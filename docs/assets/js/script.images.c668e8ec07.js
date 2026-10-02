@@ -2,6 +2,7 @@ const IMAGE_LOAD_STATS_QUERY_KEY = 'debugImageStats';
 const IMAGE_LOAD_STATS_STORAGE_KEY = 'shumiLibrary.debugImageStats';
 const BOOK_IMAGE_RESOLVED_CACHE_LIMIT = 256;
 const bookImageResolvedUrls_ = new Map();
+const bookGeneratedCoverUrls_ = new Map();
 
 let IMAGE_LOAD_STATS = null;
 let IMAGE_LOAD_STATS_RUN_ID = 0;
@@ -305,6 +306,116 @@ function logImageLoadStats_() {
   return output;
 }
 
+function normalizeGeneratedCoverText_(value) {
+  // Keep XML-valid characters, including Japanese and emoji; lone surrogates
+  // must not make encodeURIComponent throw for imported catalogue text.
+  return Array.from(String(value == null ? '' : value).slice(0, 1200))
+    .map(character => {
+      const point = character.codePointAt(0);
+      return (point < 32 || (point >= 0xd800 && point <= 0xdfff) ||
+        point === 0xfffe || point === 0xffff) ? ' ' : character;
+    }).join('').replace(/\s+/g, ' ').trim();
+}
+
+function escapeGeneratedCoverText_(value) {
+  return String(value).replace(/[&<>"']/g, character => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;'
+  })[character]);
+}
+
+function wrapGeneratedCoverText_(text, unitsPerLine, maxLines) {
+  // Conservative em-width budget avoids dependence on canvas or downloaded fonts.
+  const characters = Array.from(text);
+  const width = character => /[\u0020-\u007e]/.test(character)
+    ? (/[MW@%]/.test(character) ? 0.9 : 0.65) : 1.08;
+  const lines = [];
+  let line = '';
+  let used = 0;
+  for (let index = 0; index < characters.length; index += 1) {
+    const character = characters[index];
+    const size = width(character);
+    if (used + size > unitsPerLine && line) {
+      if (lines.length === maxLines - 1) {
+        // Reserve space for ellipsis instead of overflowing the final line.
+        while (line && used > unitsPerLine - 1.1) {
+          const last = Array.from(line).pop();
+          line = line.slice(0, -last.length);
+          used -= width(last);
+        }
+        lines.push(line.trimEnd() + '…');
+        return lines;
+      }
+      lines.push(line.trim());
+      line = '';
+      used = 0;
+    }
+    line += character;
+    used += size;
+  }
+  if (line.trim()) lines.push(line.trim());
+  return lines;
+}
+
+function getGeneratedCoverVolumeLabel_(book, title) {
+  const volume = Number(book && book.volume);
+  if (!Number.isSafeInteger(volume) || volume <= 0) return '';
+  const normalized = title.normalize('NFKC');
+  // Preserve the full original title. Only suppress a duplicate known volume;
+  // never infer volume from a title or the book's position in a series.
+  // Typography varies (#1, Volume01, 〈1〉, ×01, 1(...)). A known number
+  // already present in the title is enough to omit the optional extra label.
+  const numbers = normalized.match(/\d+/g) || [];
+  if (numbers.some(number => Number(number) === volume)) return '';
+  return String(volume) + '巻';
+}
+
+function buildGeneratedBookCoverUrl_(book) {
+  try {
+    const title = normalizeGeneratedCoverText_(book && book.title) || '書名未登録';
+    // Raw author text remains authoritative (spaces are not name separators).
+    const author = normalizeGeneratedCoverText_(book && book.author) ||
+      (Array.isArray(book && book.contributors)
+        ? book.contributors.map(normalizeGeneratedCoverText_).filter(Boolean).join(' / ') : '');
+    const volume = getGeneratedCoverVolumeLabel_(book, title);
+    const key = JSON.stringify([title, author, volume]);
+    if (bookGeneratedCoverUrls_.has(key)) return bookGeneratedCoverUrls_.get(key);
+    const palettes = [
+      ['#4b5750', '#cbbd9b'], ['#5a4c40', '#d2b58b'],
+      ['#45545c', '#c6bea9'], ['#61544c', '#d8c3a1']
+    ];
+    let hash = 0;
+    for (const character of title) hash = (Math.imul(hash, 31) + character.codePointAt(0)) | 0;
+    const palette = palettes[(hash >>> 0) % palettes.length];
+    const titleLines = wrapGeneratedCoverText_(title, 10, 7);
+    const authorLines = wrapGeneratedCoverText_(author, 14, 4);
+    const textLines = (lines, y, step) => lines.map((line, index) =>
+      '<tspan x="49" y="' + (y + index * step) + '">' + escapeGeneratedCoverText_(line) + '</tspan>').join('');
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="300" height="430" viewBox="0 0 300 430">' +
+      '<defs><pattern id="cloth" width="5" height="5" patternUnits="userSpaceOnUse">' +
+      '<path d="M0 0H5M0 0V5" stroke="#fff" stroke-opacity=".04" stroke-width=".7"/></pattern></defs>' +
+      '<rect width="300" height="430" rx="3" fill="' + palette[0] + '"/>' +
+      '<rect width="300" height="430" fill="url(#cloth)"/>' +
+      '<path d="M14 0V430" stroke="#000" stroke-opacity=".22" stroke-width="5"/>' +
+      '<rect x="34" y="32" width="244" height="365" rx="1" fill="#eee6d5"/>' +
+      '<path d="M49 90H263M49 302H263" stroke="' + palette[1] + '"/>' +
+      '<g fill="#625949" font-family="sans-serif" font-size="12" letter-spacing="2">' +
+      '<text x="49" y="66">LIBRARY</text></g>' +
+      (volume ? '<text x="263" y="66" text-anchor="end" fill="#625949" font-family="sans-serif" font-size="16">' + escapeGeneratedCoverText_(volume) + '</text>' : '') +
+      '<text fill="#302d26" font-family="serif" font-size="21" font-weight="600">' + textLines(titleLines, 123, 27) + '</text>' +
+      '<text fill="#575246" font-family="sans-serif" font-size="15">' + textLines(authorLines, 326, 18) + '</text>' +
+      '<text x="156" y="416" text-anchor="middle" fill="#eee6d5" fill-opacity=".68" font-family="sans-serif" font-size="10">書誌から作成</text></svg>';
+    const url = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+    bookGeneratedCoverUrls_.set(key, url);
+    if (bookGeneratedCoverUrls_.size > BOOK_IMAGE_RESOLVED_CACHE_LIMIT) {
+      bookGeneratedCoverUrls_.delete(bookGeneratedCoverUrls_.keys().next().value);
+    }
+    return url;
+  } catch (error) {
+    // A malformed record or unavailable API must still reach a finite fallback.
+    return NO_IMAGE_URL;
+  }
+}
+
 function buildBookImageCandidates_(book) {
   if (isSensitiveBook_(book) && !isSensitiveCoverVisible_()) {
     return [{
@@ -352,15 +463,23 @@ function buildBookImageCandidates_(book) {
     });
   }
 
+  const generatedCoverUrl = buildGeneratedBookCoverUrl_(book);
+  candidates.push({
+    url: generatedCoverUrl,
+    label: 'NO_IMAGE',
+    detail: generatedCoverUrl === NO_IMAGE_URL ? 'NO_IMAGE' : 'GeneratedCover',
+    generated: generatedCoverUrl !== NO_IMAGE_URL
+  });
   candidates.push({
     url: NO_IMAGE_URL,
     label: 'NO_IMAGE',
-    detail: 'NO_IMAGE'
+    detail: 'GeneratedCoverUnavailable'
   });
 
   const seen = {};
   return candidates.filter(item => {
     if (!item || !item.url) return false;
+    if (item.label !== 'NO_IMAGE' && item.url === NO_IMAGE_URL) return false;
     if (seen[item.url]) return false;
     seen[item.url] = true;
     return true;
@@ -395,6 +514,7 @@ function setupBookImageElement_(img, book, options) {
   let settled = false;
 
   img.classList.remove('book-image-loaded');
+  img.classList.remove('book-image-generated-cover');
   img.classList.add('book-image-loading');
   img.loading = loading;
   img.decoding = 'async';
@@ -403,6 +523,8 @@ function setupBookImageElement_(img, book, options) {
   function setCandidate(index) {
     if (index < 0 || index >= candidates.length) return;
     currentIndex = index;
+    img.classList.remove('book-image-generated-cover');
+    if (candidates[currentIndex].generated) img.classList.add('book-image-generated-cover');
     img.src = candidates[currentIndex].url;
   }
 

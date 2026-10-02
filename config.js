@@ -75,8 +75,8 @@ const NO_IMAGE_URL = "https://i.imgur.com/Q80wBRc.jpeg";
 
 /* ====== Webアプリ検索キャッシュ設定 ====== */
 const CACHE_CONFIG = {
-    LIBRARY_DATASET_KEY: 'library_dataset_v29',
-  SHELF_DATASET_KEY: 'library_shelf_dataset_v4',
+    LIBRARY_DATASET_KEY: 'library_dataset_v30',
+  SHELF_DATASET_KEY: 'library_shelf_dataset_v5',
   DATASET_REVISION_PROPERTY: 'library_dataset_revision_v1',
   TTL_SECONDS: 60 * 60,     // 1時間
   CHUNK_BYTE_LIMIT: 80 * 1024,
@@ -133,6 +133,18 @@ function normalizeKana(str) {
     )
     .replace(/[\s【】「」『』（）()・:：\-–—~～・,，.。！？!?[\]{}]/g, '')
     .toLowerCase();
+}
+
+/** K列「著者/関係者」は明示されたパイプだけを人物の区切りとして扱う。 */
+function parseBookContributors_(value) {
+  const seen = new Set();
+  return String(value == null ? '' : value).split('|').map(name => name.trim()).filter(name => {
+    if (!name) return false;
+    const key = normalizeKana(name) || name;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 /**

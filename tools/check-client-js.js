@@ -166,7 +166,7 @@ async function checkInitialSearchDataFlow() {
   const start = searchScriptSource.indexOf('function syncSearchDataFromLocalIndex_()');
   const end = searchScriptSource.indexOf('function fetchSuggestData()', start);
   assert(start >= 0 && end > start, 'search startup data functions are available to the client fixture');
-  const source = searchScriptSource.slice(start, end);
+  const source = searchScriptSource.slice(searchScriptSource.indexOf('function normalizeKana('), searchScriptSource.indexOf('function titleYomiMixedMatch_(')) + searchScriptSource.slice(start, end);
 
   async function runFixture(mode, options = {}) {
     let ready = false;
@@ -237,6 +237,8 @@ async function checkInitialSearchDataFlow() {
       PREVIEW_INDEX: [],
       QUICK_BROWSE_COUNTS: null,
       PREVIEW_INDEX_READY: false,
+      searchStatusState: { mode: 'none' },
+      isPwaShell_: () => true,
       lastResult: null,
       currentViewMode: 'card',
       isCardView: true,
@@ -473,6 +475,8 @@ assertEqual(
         rowIndex: 4,
         title: '【推しの子】 04',
         author: '赤坂アカ×横槍メンゴ',
+        contributors: ['赤坂アカ×横槍メンゴ'],
+        volume: 4,
         publisher: '集英社',
         genre: 'ミステリー／サスペンス,芸能界,完結(全巻保有)',
         genreMeta: [
@@ -505,6 +509,9 @@ assertEqual(
   assertEqual(deferredRenderBook.bookId, lightweightBook.bookId, 'deferred popup preserves stable book ID');
   assertEqual(deferredRenderBook.genreMeta.length, 3, 'deferred popup rendering preserves immediate genres');
   assertEqual(deferredRenderBook.detailLoaded, false, 'deferred popup still waits for synopsis details');
+  assertEqual(deferredRenderBook.author, hydratedBook.author, 'deferred popup keeps known author for fallback cover');
+  assertEqual(deferredRenderBook.contributors[0], hydratedBook.contributors[0], 'deferred popup keeps known people');
+  assertEqual(deferredRenderBook.volume, 4, 'deferred popup keeps known volume');
 
   if (originalLocalIndexManager === undefined) {
     delete sandbox.window.ShumiLibraryLocalIndex;
@@ -1373,12 +1380,16 @@ const cachedShelfBook = sandbox.sanitizeBookshelfCacheBook_({
   location: '1',
   isSensitive: true,
   summary: '保存しない',
-  author: '保存しない'
+  author: '保存する著者 | 関係者',
+  contributors: ['保存する著者', '関係者'],
+  volume: 4
 });
 assertEqual(cachedShelfBook.detailLoaded, false, 'bookshelf cache keeps details deferred');
 assertEqual(cachedShelfBook.title, '棚の本', 'bookshelf cache keeps title');
 assert(!('summary' in cachedShelfBook), 'bookshelf cache excludes summaries');
-assert(!('author' in cachedShelfBook), 'bookshelf cache excludes detail fields');
+assertEqual(cachedShelfBook.author, '保存する著者 | 関係者', 'bookshelf cache preserves raw author needed by fallback cover');
+assertEqual(cachedShelfBook.contributors.length, 2, 'bookshelf cache preserves contributor names');
+assertEqual(cachedShelfBook.volume, 4, 'bookshelf cache preserves known volume');
 
 sandbox.writeBookshelfCache_([cachedShelfBook]);
 const shelfCache = sandbox.readBookshelfCache_();
@@ -1487,7 +1498,7 @@ assertEqual(spinnerElements['spinner-overlay'].style.display, 'flex', 'showSpinn
 assertEqual(spinnerElements['spinner-label'].textContent, '本棚を探しています', 'showSpinner sets label');
 assertEqual(
   spinnerElements['spinner-detail'].textContent,
-  'タイトル・作者・読みから候補を集めています',
+  'タイトル・著者・関係者・読みから候補を集めています',
   'showSpinner sets default detail for kind'
 );
 assert(spinnerElements['spinner-overlay'].classList.contains('spinner-kind-search'), 'showSpinner sets kind class');
