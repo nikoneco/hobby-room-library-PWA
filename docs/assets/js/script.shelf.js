@@ -1191,6 +1191,7 @@ function buildSearchResultPresentation_(books) {
       group = {
         kind: 'series-candidate',
         key,
+        seriesCountRevision: book.seriesCountRevision === undefined ? String(currentDatasetRevision || '') : book.seriesCountRevision,
         books: [],
         originalIndexes: [],
         representativeBook: book,
@@ -1297,6 +1298,9 @@ function syncSearchResultPresentationStats_(stats) {
 }
 
 function showResult(data) {
+  (Array.isArray(data) ? data : []).forEach(book => {
+    if (book && book.seriesCountRevision === undefined) book.seriesCountRevision = String(currentDatasetRevision || '');
+  });
   hideSpinner();
   if (typeof syncMobileAppDockState_ === 'function') syncMobileAppDockState_();
 

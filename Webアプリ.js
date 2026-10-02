@@ -2620,18 +2620,20 @@ function getBookDetailsByIds(bookIds) {
  * @param {string} seriesKeyAuto
  * @returns {Object[]}
  */
-function getBooksBySeriesKey(seriesKeyAuto) {
+function getBooksBySeriesKey(seriesKeyAuto, perf) {
   try {
     const key = String(seriesKeyAuto || '').trim();
     if (!key) return [];
 
-    const dataset = getLibraryDataset_();
+    const dataset = getLibraryDataset_(perf);
     const rows = dataset.rows || [];
     const index = dataset.index || [];
 
     const matchedRows = [];
     const matchedIndex = [];
     const matchedRowIndexes = [];
+    const filterStartedAt = Date.now();
+    if (perf) perf.sourceCount = rows.length;
 
     for (let i = 0; i < index.length; i++) {
       const idx = index[i] || {};
@@ -2642,7 +2644,12 @@ function getBooksBySeriesKey(seriesKeyAuto) {
       matchedRowIndexes.push(i);
     }
 
-    return mapRowsToBooks_(matchedRows, matchedIndex, { rowIndexes: matchedRowIndexes });
+    addWebAppPerfDuration_(perf, 'filterMs', filterStartedAt);
+    const mapStartedAt = Date.now();
+    const books = mapRowsToBooks_(matchedRows, matchedIndex, { rowIndexes: matchedRowIndexes });
+    addWebAppPerfDuration_(perf, 'mapMs', mapStartedAt);
+    if (perf) perf.resultCount = books.length;
+    return books;
   } catch (e) {
     console.error('getBooksBySeriesKey error:', e);
     throw e;
@@ -2699,7 +2706,7 @@ const PUBLIC_WEBAPP_JSONP_API_HANDLERS_ = Object.freeze({
   bookDetail: params => getBookDetailByRowIndex(params.rowIndex),
   bookDetails: params => getBookDetailsByRowIndexes(params.rowIndexes || params.rowIndexesCsv || ''),
   seriesStatus: () => getSeriesInventoryStatus(),
-  series: params => getBooksBySeriesKey(params.seriesKeyAuto || params.seriesKey || '')
+  series: (params, perf) => getBooksBySeriesKey(params.seriesKeyAuto || params.seriesKey || '', perf)
 });
 
 /**

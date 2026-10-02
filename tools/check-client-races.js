@@ -451,8 +451,8 @@ for (const batch of [false, true]) {
   assert.equal(rendered.length, 0);
   c.openSeriesPanel(book);
   c.openSeriesPanel(book);
-  requests[1].ok([{ title: 'Replaced response' }]);
-  requests[2].ok([{ title: 'Current response' }]);
+  assert.equal(requests.length, 2, 'rapid opens of the same series share the request');
+  requests[1].ok([{ title: 'Current response', seriesKeyAuto: 'series', bookId: 'current' }]);
   assert.equal(rendered.length, 1);
   assert.equal(rendered[0][0], 'Current response');
 }
@@ -492,6 +492,7 @@ for (const batch of [false, true]) {
   const renderCount = rendered.length;
   requests.at(-1).ok(books);
   assert.equal(rendered.length, renderCount, 'closed series ignores late responses');
+  c.invalidateSeriesBooksRequests_();
   c.showSearchResultSeriesPanel_(group);
   c.showSearchResultSeriesPanel_(group);
   requests.at(-2).ok([{ title: 'Stale response' }]);
@@ -499,6 +500,7 @@ for (const batch of [false, true]) {
   assert.equal(rendered.length, renderCount + 1, 'replacement series ignores stale responses');
   assert.equal(rendered.at(-1).length, 9);
   for (const invalid of [null, [], books.slice(0, 1), books.map(() => books[0]), books.map(book => ({ ...book, seriesKeyAuto: 'wrong-series' }))]) {
+    c.invalidateSeriesBooksRequests_();
     const retryGroup = c.buildSearchResultPresentation_([books[8]]).entries[0];
     const beforeRender = rendered.length;
     c.showSearchResultSeriesPanel_(retryGroup);

@@ -82,6 +82,12 @@ jobs:
       - name: Check series display order
         run: node tools/check-series-order.js
 
+      - name: Check series loading and request lifecycle
+        run: node tools/check-series-loading.js
+
+      - name: Check series API performance metadata
+        run: node tools/check-series-perf.js
+
       - name: Check spreadsheet mode transitions
         run: node tools/check-sheet-modes.js
 

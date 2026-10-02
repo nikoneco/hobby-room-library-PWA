@@ -223,6 +223,10 @@ let popupFocusReturn_ = null;
 let coverFocusReturn_ = null;
 const popupInertElements_ = new Map();
 let popupSeriesRequestGeneration_ = 0;
+const SERIES_BOOKS_REQUEST_TIMEOUT_MS = 25000;
+const SERIES_BOOKS_CACHE_LIMIT = 32;
+const seriesBooksCache_ = new Map();
+const seriesBooksInFlight_ = new Map();
 
 function focusPopupIfNeeded_() {
   const cover = document.getElementById('cover-fullscreen-overlay');
@@ -860,6 +864,7 @@ function syncBookDetailCacheRevision_(datasetRevision) {
   }
   // Release waiters before a response from the previous dataset can arrive.
   cancelledCallbacks.forEach(callback => callback(null, createStaleBookDetailError_()));
+  invalidateSeriesBooksRequests_();
 }
 
 function createStaleBookDetailError_() {
@@ -967,6 +972,7 @@ function mergeDeferredBookDetails_(book, detail) {
     book[key] = detail[key];
   });
   book.detailLoaded = true;
+  book.seriesCountRevision = String(currentDatasetRevision || '');
   book.detailLoading = false;
   book.detailError = '';
   return book;
@@ -1960,6 +1966,136 @@ function openCoverFullscreen_(book) {
   };
 }
 
+function cloneSeriesBook_(book) {
+  return Object.assign({}, book, {
+    seriesCountRevision: String(currentDatasetRevision || ''),
+    contributors: Array.isArray(book.contributors) ? book.contributors.slice() : [],
+    genreMeta: Array.isArray(book.genreMeta) ? book.genreMeta.map(item => Object.assign({}, item)) : []
+  });
+}
+
+function isCompleteSeriesBooks_(key, books, expectedCount) {
+  if (!Array.isArray(books) || !books.length || books.length < expectedCount) return false;
+  const identities = new Set();
+  return books.every(book => {
+    if (!book || String(book.seriesKeyAuto || '').trim() !== key || !String(book.title || '').trim() ||
+        Number(book.seriesCount || 0) > books.length) return false;
+    const identity = book.bookId ? 'id:' + book.bookId
+      : Number.isInteger(book.rowIndex) && book.rowIndex >= 0 ? 'row:' + book.rowIndex : '';
+    if (!identity || identities.has(identity)) return false;
+    identities.add(identity);
+    return true;
+  });
+}
+
+function getExpectedSeriesBooksCount_(sourceBook, group) {
+  const source = group || sourceBook;
+  if (source.seriesCountRevision === undefined) {
+    source.seriesCountRevision = sourceBook.seriesCountRevision === undefined
+      ? String(currentDatasetRevision || '') : sourceBook.seriesCountRevision;
+  }
+  // A previously rendered search/detail may retain a count from before deletion.
+  // New-revision members' own counts prove completeness instead of that old count.
+  if (source.seriesCountRevision !== String(currentDatasetRevision || '')) return 1;
+  return Math.max(1, group && group.books.length || 0, Number(group && group.ownedCount) || 0, Number(sourceBook.seriesCount) || 0);
+}
+
+function createStaleSeriesBooksError_() {
+  const error = new Error('Series dataset changed during loading');
+  error.code = 'SERIES_BOOKS_STALE';
+  return error;
+}
+
+function invalidateSeriesBooksRequests_() {
+  seriesBooksCache_.clear();
+  const pending = Array.from(seriesBooksInFlight_.values());
+  seriesBooksInFlight_.clear();
+  pending.forEach(entry => {
+    entry.settled = true;
+    if (typeof entry.cancel === 'function') entry.cancel();
+    pwaPerfEnd_(entry.perf, { ok: false, code: 'SERIES_BOOKS_STALE' });
+    entry.waiters.forEach(waiter => waiter.failure(createStaleSeriesBooksError_()));
+  });
+}
+
+function requestSeriesBooksTransport_(key, revision, success, failure, expectedCount) {
+  const transport = window.ShumiLibrarySeriesApi;
+  if (transport && typeof transport.request === 'function') return transport.request(key, revision, success, failure, expectedCount);
+  // Native google.script.run has no transport timer; provide the same single deadline.
+  let settled = false;
+  const timer = window.setTimeout(() => {
+    const error = new Error('通信がタイムアウトしました。時間を置いて再度お試しください。');
+    error.code = 'TIMEOUT';
+    finish_(failure, error);
+  }, SERIES_BOOKS_REQUEST_TIMEOUT_MS);
+  function finish_(callback, value) {
+    if (settled) return;
+    settled = true;
+    window.clearTimeout(timer);
+    callback(value);
+  }
+  try {
+    google.script.run.withSuccessHandler(books => finish_(success, books))
+      .withFailureHandler(error => finish_(failure, error)).getBooksBySeriesKey(key);
+  } catch (error) { finish_(failure, error); }
+  return () => { settled = true; window.clearTimeout(timer); };
+}
+
+function fetchSeriesBooks_(seriesKey, expectedCount, success, failure) {
+  const key = String(seriesKey || '').trim();
+  const revision = String(currentDatasetRevision || '');
+  const cacheKey = JSON.stringify([revision, key]);
+  const expected = Math.max(1, Number(expectedCount) || 0);
+  const cached = seriesBooksCache_.get(cacheKey);
+  const manager = window.ShumiLibraryLocalIndex;
+  const localCacheReady = !cached || cached.source !== 'local' || Boolean(manager &&
+    typeof manager.getCompleteSeriesBooks === 'function' && manager.getCompleteSeriesBooks(key, revision));
+  if (cached && localCacheReady && isCompleteSeriesBooks_(key, cached.books, expected)) {
+    pwaPerfRecord_('series:load', 0, { source: 'cache', revision, count: cached.books.length });
+    success(cached.books.map(cloneSeriesBook_));
+    return;
+  }
+  const existing = seriesBooksInFlight_.get(cacheKey);
+  if (existing) {
+    existing.expectedCount = Math.max(existing.expectedCount, expected);
+    existing.waiters.push({ success, failure });
+    return;
+  }
+  const entry = { settled: false, expectedCount: expected, waiters: [{ success, failure }], cancel: null };
+  seriesBooksInFlight_.set(cacheKey, entry);
+  const perf = pwaPerfStart_('series:load', { revision, shared: true });
+  entry.perf = perf;
+  function finish_(books, error, meta) {
+    if (entry.settled || seriesBooksInFlight_.get(cacheKey) !== entry) return;
+    entry.settled = true;
+    seriesBooksInFlight_.delete(cacheKey);
+    if (revision !== String(currentDatasetRevision || '')) error = createStaleSeriesBooksError_();
+    if (!error && !isCompleteSeriesBooks_(key, books, entry.expectedCount)) {
+      error = new Error('シリーズ全巻の情報を確認できませんでした。');
+      error.code = 'SERIES_BOOKS_INCOMPLETE';
+    }
+    pwaPerfEnd_(perf, { ok: !error, source: meta && meta.source || 'remote', count: Array.isArray(books) ? books.length : 0, code: error && error.code });
+    if (!error) {
+      seriesBooksCache_.set(cacheKey, { source: meta && meta.source || 'remote', books: books.map(cloneSeriesBook_) });
+      while (seriesBooksCache_.size > SERIES_BOOKS_CACHE_LIMIT) seriesBooksCache_.delete(seriesBooksCache_.keys().next().value);
+    }
+    entry.waiters.forEach(waiter => {
+      if (error) waiter.failure(error);
+      else waiter.success(books.map(cloneSeriesBook_));
+    });
+  }
+  try {
+    entry.cancel = requestSeriesBooksTransport_(key, revision, (books, meta) => finish_(books, null, meta), error => finish_(null, error), expected);
+  } catch (error) { finish_(null, error); }
+}
+
+function notifySeriesPanelRequestResult_(error) {
+  const pwa = window.ShumiLibraryPwa;
+  if (!pwa) return;
+  if (error && typeof pwa.handleApiFailure === 'function') pwa.handleApiFailure(error);
+  else if (!error && typeof pwa.clearApiFailure === 'function') pwa.clearApiFailure();
+}
+
 function openSeriesPanel(sourceBook) {
   if (!sourceBook || !sourceBook.seriesKeyAuto) return;
   const requestGeneration = ++popupSeriesRequestGeneration_;
@@ -1997,19 +2133,19 @@ function openSeriesPanel(sourceBook) {
     </div>
   `;
 
-  runBookDetailRequest_(function(success, failure) {
-    google.script.run.withSuccessHandler(success).withFailureHandler(failure).getBooksBySeriesKey(sourceBook.seriesKeyAuto);
-  }, function(seriesBooks) {
+  fetchSeriesBooks_(sourceBook.seriesKeyAuto, getExpectedSeriesBooksCount_(sourceBook), function(seriesBooks) {
       if (requestGeneration !== popupSeriesRequestGeneration_) return;
       if (requestRevision !== currentDatasetRevision) { openSeriesPanel(sourceBook); return; }
+      notifySeriesPanelRequestResult_();
       showSeriesPanel(sourceBook, Array.isArray(seriesBooks) ? seriesBooks : [], returnContext);
     }, function(error) {
       if (requestGeneration !== popupSeriesRequestGeneration_) return;
       if (requestRevision !== currentDatasetRevision) { openSeriesPanel(sourceBook); return; }
+      notifySeriesPanelRequestResult_(error);
       info.innerHTML = `
           <div class="series-panel">
             <div class="series-panel-title">シリーズ一覧を取得できませんでした</div>
-            <div class="series-panel-subtitle">通信状態を確認して、もう一度お試しください。</div>
+            <div class="series-panel-subtitle">${escapeHtml(error && error.message || '通信状態を確認して、もう一度お試しください。')}</div>
           <button type="button" id="series-panel-retry" class="popup-action-btn">もう一度読み込む</button>
           <button type="button" id="series-panel-back-detail" class="popup-action-btn primary">${uiIcon_('back', 'ui-icon-inline')}<span>詳細へ戻る</span></button>
         </div>
@@ -2025,28 +2161,14 @@ function openSeriesPanel(sourceBook) {
 }
 
 function isCompleteSearchResultSeries_(group, books) {
-  if (!Array.isArray(books) || !books.length) return false;
   const source = group.representativeBook || group.books[0];
   const key = String(group.key || source.seriesKeyAuto || '').trim();
-  const expected = Math.max(group.books.length, Number(group.ownedCount) || Number(source.seriesCount) || 0);
-  if (books.length < expected) return false;
-  const identities = new Set();
-  return books.every(book => {
-    if (!book || String(book.seriesKeyAuto || '').trim() !== key || !String(book.title || '').trim()) return false;
-    const identity = book.bookId ? `id:${book.bookId}`
-      : Number.isFinite(book.rowIndex) && book.rowIndex >= 0 ? `row:${book.rowIndex}` : '';
-    if (!identity || identities.has(identity)) return false;
-    identities.add(identity);
-    return true;
-  });
+  const expected = getExpectedSeriesBooksCount_(source, group);
+  return isCompleteSeriesBooks_(key, books, expected);
 }
 
 function showSearchResultSeriesPanel_(group) {
   if (!group || !Array.isArray(group.books) || !group.books.length) return;
-  if (Array.isArray(group.seriesBooks) && group.seriesBooksRevision === currentDatasetRevision) {
-    renderSearchResultSeriesPanel_(group, group.seriesBooks);
-    return;
-  }
   const sourceBook = group.representativeBook || group.books[0];
   const requestGeneration = ++popupSeriesRequestGeneration_;
   const requestRevision = currentDatasetRevision;
@@ -2074,19 +2196,20 @@ function showSearchResultSeriesPanel_(group) {
   overlay.onclick = e => { if (e.target === overlay) closePanel(); };
   document.onkeydown = e => { if (e.key === 'Escape') closePanel(); };
   focusPopupIfNeeded_();
-  const showFailure = function() {
+  const showFailure = function(error) {
     if (requestGeneration !== popupSeriesRequestGeneration_) return;
     if (requestRevision !== currentDatasetRevision) { showSearchResultSeriesPanel_(group); return; }
-    info.innerHTML = '<div class="series-panel"><div class="series-panel-title">シリーズ一覧を取得できませんでした</div><button type="button" id="series-panel-retry" class="popup-action-btn">もう一度読み込む</button></div>';
+    notifySeriesPanelRequestResult_(error);
+    info.innerHTML = '<div class="series-panel"><div class="series-panel-title">シリーズ一覧を取得できませんでした</div><div class="series-panel-subtitle">' + escapeHtml(error && error.message || '通信状態を確認して、もう一度お試しください。') + '</div><button type="button" id="series-panel-retry" class="popup-action-btn">もう一度読み込む</button></div>';
     document.getElementById('series-panel-retry').onclick = () => showSearchResultSeriesPanel_(group);
     focusPopupIfNeeded_();
   };
-  runBookDetailRequest_(function(success, failure) {
-    google.script.run.withSuccessHandler(success).withFailureHandler(failure).getBooksBySeriesKey(group.key || sourceBook.seriesKeyAuto);
-  }, function(books) {
+  fetchSeriesBooks_(group.key || sourceBook.seriesKeyAuto,
+    getExpectedSeriesBooksCount_(sourceBook, group), function(books) {
     if (requestGeneration !== popupSeriesRequestGeneration_) return;
     if (requestRevision !== currentDatasetRevision) { showSearchResultSeriesPanel_(group); return; }
     if (!isCompleteSearchResultSeries_(group, books)) { showFailure(); return; }
+    notifySeriesPanelRequestResult_();
     renderSearchResultSeriesPanel_(group, books);
   }, showFailure);
 }

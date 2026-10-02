@@ -1199,7 +1199,7 @@ assertEqual(sandbox.getSearchStatusCountText_(), '1シリーズ・7冊', 'search
       searchSeriesSource.includes("kind: 'search-result'") &&
       searchSeriesSource.includes('showPopup(book, idx, items') &&
       searchSeriesSource.includes('setupBookImageElement_') &&
-      searchSeriesSource.includes('getBooksBySeriesKey(group.key || sourceBook.seriesKeyAuto)'),
+      searchSeriesSource.includes('fetchSeriesBooks_(group.key || sourceBook.seriesKeyAuto,'),
     'search-result series popup expands by stable series key and preserves the return context'
   );
   assert(

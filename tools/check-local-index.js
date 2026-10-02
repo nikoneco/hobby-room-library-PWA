@@ -5,6 +5,10 @@ const vm = require('vm');
 const root = path.resolve(__dirname, '..');
 const shimSource = fs.readFileSync(path.join(root, 'docs', 'assets', 'js', 'gas-run-shim.js'), 'utf8');
 
+function jsonpCallback(window, name) {
+  return name.split('.').reduce((value, part) => value[part], window);
+}
+
 function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
@@ -172,7 +176,7 @@ async function checkDownloadedIndex(writeMode, invalid) {
     head: { appendChild(script) {
       scripts.push(script);
       const params = new URL(script.src).searchParams;
-      queueMicrotask(() => win[params.get('callback')]({
+      queueMicrotask(() => jsonpCallback(win, params.get('callback'))({
         ok: true,
         data: params.get('api') === 'libraryRevision' ? { revision: payload.revision } : payload
       }));
@@ -400,7 +404,7 @@ function createSearchRaceHarness(options) {
                 : api === 'searchSimple'
                   ? [{ title: 'server search result' }]
                   : [];
-          win[params.get('callback')]({ ok: true, data, error: null });
+          jsonpCallback(win, params.get('callback'))({ ok: true, data, error: null });
         }, route.delay || 0);
       }
     }
@@ -1001,7 +1005,7 @@ async function checkSeriesOrderSchemaUpgrade() {
   const getScriptApi = script => new URL(script.src).searchParams.get('api');
   const invokeScriptCallback = (targetWindow, script, data) => {
     const callback = new URL(script.src).searchParams.get('callback');
-    targetWindow[callback]({ ok: true, data, error: null });
+    jsonpCallback(targetWindow, callback)({ ok: true, data, error: null });
   };
   const revisionScript = onlineScripts.find(script => getScriptApi(script) === 'libraryRevision');
   const searchScript = onlineScripts.find(script => getScriptApi(script) === 'searchSimple');

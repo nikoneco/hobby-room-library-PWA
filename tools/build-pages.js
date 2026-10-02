@@ -2846,6 +2846,7 @@ function writeGasRunShim() {
 
   const GAS_JSONP_ENDPOINT = ${JSON.stringify(gasEndpoint)};
   const JSONP_TIMEOUT_MS = 60000;
+  const SERIES_REQUEST_TIMEOUT_MS = 25000;
   const LOCAL_INDEX_DB_NAME = 'shumiLibrary.localIndex.v1';
   const LOCAL_INDEX_STORE_NAME = 'snapshots';
   const LOCAL_INDEX_ACTIVE_KEY = 'active';
@@ -2909,10 +2910,17 @@ function writeGasRunShim() {
     getBookDetailByRowIndex: { api: 'bookDetail', argNames: ['rowIndex'] },
     getBookDetailsByRowIndexes: { api: 'bookDetails', argNames: ['rowIndexes'] },
     getSeriesInventoryStatus: { api: 'seriesStatus', argNames: [] },
-    getBooksBySeriesKey: { api: 'series', argNames: ['seriesKeyAuto'] }
+    getBooksBySeriesKey: { api: 'series', argNames: ['seriesKeyAuto'], timeoutMs: SERIES_REQUEST_TIMEOUT_MS }
   };
 
   let requestSeq = 0;
+  // A late downloaded script still resolves a callable after its request is removed.
+  // Only live callbacks occupy the registry; abandoned requests leave no tombstones.
+  const jsonpCallbacks = Object.create(null);
+  const ignoreLateJsonp_ = function() {};
+  window.__shumiLibraryJsonpCallbacks_ = new Proxy(jsonpCallbacks, {
+    get: function(target, key) { return target[key] || ignoreLateJsonp_; }
+  });
   const runnerState = {
     successHandler: null,
     failureHandler: null
@@ -3014,7 +3022,8 @@ function writeGasRunShim() {
       return;
     }
 
-    const callbackName = '__shumiLibraryJsonp_' + Date.now() + '_' + (++requestSeq);
+    const callbackId = 'r' + Date.now() + '_' + (++requestSeq);
+    const callbackName = '__shumiLibraryJsonpCallbacks_.' + callbackId;
     const params = new URLSearchParams();
     const script = document.createElement('script');
     const requestSentAtEpochMs = Date.now();
@@ -3029,17 +3038,15 @@ function writeGasRunShim() {
 
     function cleanup_() {
       if (timeoutId) window.clearTimeout(timeoutId);
-      try {
-        delete window[callbackName];
-      } catch (e) {
-        window[callbackName] = undefined;
-      }
+      timeoutId = 0;
+      delete jsonpCallbacks[callbackId];
+      script.onerror = null;
       if (script.parentNode) {
         script.parentNode.removeChild(script);
       }
     }
 
-    window[callbackName] = function(envelope) {
+    jsonpCallbacks[callbackId] = function(envelope) {
       if (finished) return;
       const callbackReceivedAtEpochMs = Date.now();
       finished = true;
@@ -3095,7 +3102,7 @@ function writeGasRunShim() {
       });
       if (!opt.quiet) notifySuccess_();
       if (typeof successHandler === 'function') {
-        successHandler(envelope.data);
+        successHandler(envelope.data, { source: 'remote' });
       }
     };
 
@@ -3110,7 +3117,7 @@ function writeGasRunShim() {
       } else {
         invokeFailure_(failureHandler, timeoutError);
       }
-    }, JSONP_TIMEOUT_MS);
+    }, config.timeoutMs || JSONP_TIMEOUT_MS);
 
     script.async = true;
     script.src = GAS_JSONP_ENDPOINT + '?' + params.toString();
@@ -3128,6 +3135,12 @@ function writeGasRunShim() {
     };
 
     document.head.appendChild(script);
+    return function() {
+      if (finished) return;
+      finished = true;
+      cleanup_();
+      endPerf_(perfToken, { ok: false, code: 'CANCELLED' });
+    };
   }
 
   let localIndexPayload = null;
@@ -3392,6 +3405,7 @@ function writeGasRunShim() {
   function cloneLocalBook_(record) {
     const book = record.book;
     return Object.assign({}, book, {
+      seriesCountRevision: localIndexPayload ? String(localIndexPayload.revision || '') : '',
       contributors: Array.isArray(book.contributors) ? book.contributors.slice() : [],
       genreMeta: Array.isArray(book.genreMeta)
         ? book.genreMeta.map(function(item) { return Object.assign({}, item); })
@@ -3426,7 +3440,39 @@ function writeGasRunShim() {
     return candidates.slice(0, requested).map(cloneLocalBook_);
   }
 
-  function canHandleLocally_(methodName, args) {
+  function getCompleteLocalSeries_(seriesKey, expectedRevision) {
+    const key = String(seriesKey || '').trim();
+    if (!key || !localIndexPayload || Number(localIndexPayload.version) !== LOCAL_INDEX_SCHEMA_VERSION ||
+        localIndexFreshnessState !== 'fresh' || !String(localIndexPayload.revision || '').trim() ||
+        (expectedRevision && String(localIndexPayload.revision) !== String(expectedRevision))) return null;
+    // Work from the complete index, never the title/author-filtered result group.
+    const records = localIndexRecords.filter(function(record) { return record.book.seriesKeyAuto === key; });
+    if (!records.length) return null;
+    const ids = new Set();
+    const rows = new Set();
+    if (!records.every(function(record) {
+      const book = record.book;
+      const row = book.rowIndex;
+      const id = String(book.bookId || '').trim();
+      if (!book.title.trim() || book.seriesCount !== records.length ||
+          !Number.isInteger(row) || row < 0 || rows.has(row) || (id && ids.has(id))) return false;
+      rows.add(row);
+      if (id) ids.add(id);
+      return true;
+    })) return null;
+    return records.map(cloneLocalBook_);
+  }
+
+  function activeClientRevision_() {
+    return typeof currentDatasetRevision === 'undefined' ? '' : String(currentDatasetRevision || '');
+  }
+
+  function canHandleLocally_(methodName, args, options) {
+    if (methodName === 'getBooksBySeriesKey') {
+      const opt = options || {};
+      const books = getCompleteLocalSeries_(args[0], opt.expectedRevision || activeClientRevision_());
+      return Boolean(books && books.length >= (Number(opt.expectedCount) || 0));
+    }
     if (!localIndexPayload) return false;
     if (!(navigator && navigator.onLine === false) && localIndexFreshnessState !== 'fresh') {
       return false;
@@ -3435,39 +3481,58 @@ function writeGasRunShim() {
     return methodName === 'searchBooksAdvanced' || methodName === 'getRandomBooks' || methodName === 'getBookshelfBooks';
   }
 
-  function invokeLocal_(methodName, args, successHandler, failureHandler, localErrorHandler) {
+  function invokeLocal_(methodName, args, successHandler, failureHandler, localErrorHandler, options) {
     const config = METHOD_CONFIG[methodName];
     const perfToken = startPerf_('api:' + config.api, {
       method: methodName,
       api: config.api,
       local: true
     });
-
-    window.setTimeout(function() {
+    let localFinished = false;
+    let cancelRemote = null;
+    const localTimer = window.setTimeout(function() {
+      let result = [];
       try {
-        let result = [];
         if (methodName === 'searchBooksSimple') result = searchLocalSimple_(args[0]);
         if (methodName === 'getBookshelfBooks') result = localIndexRecords.map(cloneLocalBook_);
         if (methodName === 'searchBooksAdvanced') result = searchLocalAdvanced_(args);
         if (methodName === 'getRandomBooks') result = pickLocalRandom_(args[0]);
-        endPerf_(perfToken, {
-          ok: true,
-          count: result.length,
-          local: true,
-          sourceCount: localIndexRecords.length,
-          revision: localIndexPayload.revision
-        });
-        if (typeof successHandler === 'function') successHandler(result);
+        if (methodName === 'getBooksBySeriesKey') {
+          const opt = options || {};
+          result = getCompleteLocalSeries_(args[0], opt.expectedRevision || activeClientRevision_());
+          if (!result || result.length < (Number(opt.expectedCount) || 0)) {
+            throw createError_('シリーズのローカル索引を再確認します。', 'LOCAL_SERIES_UNAVAILABLE');
+          }
+        }
       } catch (error) {
+        localFinished = true;
         endPerf_(perfToken, { ok: false, local: true, code: 'LOCAL_INDEX_ERROR' });
         console.warn('local index query failed; falling back to GAS', error);
         if (typeof localErrorHandler === 'function') {
           localErrorHandler(error);
         } else {
-          invokeRemoteJsonp_(methodName, args, successHandler, failureHandler);
+          cancelRemote = invokeRemoteJsonp_(methodName, args, successHandler, failureHandler, options);
         }
+        return;
       }
+      localFinished = true;
+      endPerf_(perfToken, {
+        ok: true,
+        count: result.length,
+        local: true,
+        sourceCount: localIndexRecords.length,
+        revision: localIndexPayload.revision
+      });
+      if (typeof successHandler === 'function') successHandler(result, { source: 'local' });
     }, 0);
+    return function() {
+      window.clearTimeout(localTimer);
+      if (!localFinished) {
+        localFinished = true;
+        endPerf_(perfToken, { ok: false, local: true, code: 'CANCELLED' });
+      }
+      if (typeof cancelRemote === 'function') cancelRemote();
+    };
   }
 
   function invokeSearchWithFreshIndex_(methodName, args, successHandler, failureHandler) {
@@ -3550,7 +3615,7 @@ function writeGasRunShim() {
     tryLocalSearch_();
   }
 
-  function invokeJsonp_(methodName, args, successHandler, failureHandler) {
+  function invokeJsonp_(methodName, args, successHandler, failureHandler, options) {
     const testMode = window.ShumiLibraryTestMode;
     if (testMode && testMode.enabled && /^searchBooks(Simple|Advanced)$/.test(methodName)) {
       testMode.calls += 1;
@@ -3560,9 +3625,8 @@ function writeGasRunShim() {
         return;
       }
     }
-    if (canHandleLocally_(methodName, args)) {
-      invokeLocal_(methodName, args, successHandler, failureHandler);
-      return;
+    if (canHandleLocally_(methodName, args, options)) {
+      return invokeLocal_(methodName, args, successHandler, failureHandler, null, options);
     }
     if (
       navigator && navigator.onLine !== false &&
@@ -3577,7 +3641,7 @@ function writeGasRunShim() {
       invokeSearchWithFreshIndex_(methodName, args, successHandler, failureHandler);
       return;
     }
-    invokeRemoteJsonp_(methodName, args, successHandler, failureHandler);
+    return invokeRemoteJsonp_(methodName, args, successHandler, failureHandler, options);
   }
 
   function openLocalIndexDb_() {
@@ -3854,6 +3918,7 @@ function writeGasRunShim() {
     },
     getRevision: function() { return localIndexPayload ? String(localIndexPayload.revision || '') : ''; },
     getRecordCount: function() { return localIndexRecords.length; },
+    getCompleteSeriesBooks: getCompleteLocalSeries_,
     getSuggestionTitles: function() {
       return Array.from(new Set(localIndexRecords.filter(function(record) {
         return record.book.seriesCount > 1 && record.book.seriesSearchTitle;
@@ -3879,6 +3944,13 @@ function writeGasRunShim() {
     noteServerRevision: function(revision) { return refreshLocalIndex_(true, revision); },
     checkForUpdates: function() { return refreshLocalIndex_(true, ''); },
     forceRefresh: forceRefreshLocalIndex_
+  };
+
+  // Series loading has one deadline owned by the transport, including cleanup.
+  window.ShumiLibrarySeriesApi = {
+    request: function(key, revision, success, failure, expectedCount) {
+      return invokeJsonp_('getBooksBySeriesKey', [key], success, failure, { quiet: true, expectedRevision: revision, expectedCount: expectedCount });
+    }
   };
 
   if (window.indexedDB) ensureLocalIndexLoaded_();

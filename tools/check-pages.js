@@ -494,8 +494,9 @@ assert(searchUrl.searchParams.get('perf') === '1', 'JSONP shim opts into server 
 assert(!searchUrl.searchParams.has('keyword'), 'JSONP shim avoids direct keyword transfer');
 assert(searchUrl.searchParams.get('keywordB64') === '6JGs6YCB', 'JSONP shim serializes keyword as Base64URL');
 const callbackName = searchUrl.searchParams.get('callback');
-assert(callbackName && typeof sandboxWindow[callbackName] === 'function', 'JSONP callback is registered');
-sandboxWindow[callbackName]({
+const jsonpCallback = callbackName.split('.').reduce((value, part) => value[part], sandboxWindow);
+assert(callbackName && typeof jsonpCallback === 'function', 'JSONP callback is registered');
+jsonpCallback({
   ok: true,
   data: [{ title: '葬送のフリーレン' }],
   error: null,
