@@ -462,7 +462,7 @@ for (const batch of [false, true]) {
   const { c, requests, rendered } = client();
   c.clearPopupTouchHandlers_ = () => {};
   c.focusPopupIfNeeded_ = () => {};
-  c.renderSearchResultSeriesPanel_ = (group, books) => { group.seriesBooks = books; rendered.push(books.map(book => book.title)); };
+  c.renderSearchResultSeriesPanel_ = (group, books) => { group.seriesBooks = books; group.seriesBooksRevision = vm.runInContext("currentDatasetRevision", c); rendered.push(books.map(book => book.title)); };
   const titles = ['クビキリサイクル : 青色サヴァンと戯言遣い', 'クビシメロマンチスト : 人間失格・零崎人識',
     'クビツリハイスクール : 戯言遣いの弟子', 'サイコロジカル. 下 (曳かれ者の小唄)', 'サイコロジカル. 上 (兎吊木垓輔の戯言殺し)',
     'ネコソギラジカル. 下 (青色サヴァンと戯言遣い)', 'ネコソギラジカル. 上 (十三階段)',
@@ -609,6 +609,53 @@ for (const batch of [false, true]) {
   const afterPlaceholder = image();
   c.setupBookImageElement_(afterPlaceholder, book);
   assert.equal(afterPlaceholder.src, primary, 'NO IMAGE must not suppress future recovery');
+}
+
+
+
+// Series requests crossing a dataset revision retry and finish; cached lists stay revision-bound.
+for (const mode of ['search', 'detail']) {
+  for (const response of ['success', 'failure']) {
+    const { c, requests, rendered } = client();
+    c.clearPopupTouchHandlers_ = () => {};
+    c.focusPopupIfNeeded_ = () => {};
+    c.renderSearchResultSeriesPanel_ = (group, books) => {
+      group.seriesBooks = books; group.seriesBooksRevision = vm.runInContext('currentDatasetRevision', c);
+      rendered.push(books.map(book => book.title));
+    };
+    c.showSeriesPanel = (_, books) => rendered.push(books.map(book => book.title));
+    const source = { bookId: 'series-revision-book', title: 'Series book', seriesKeyAuto: 'series-revision', seriesCount: 1 };
+    const group = { key: source.seriesKeyAuto, books: [source], representativeBook: source, ownedCount: 1 };
+    c.syncBookDetailCacheRevision_('before');
+    const open = () => mode === 'search' ? c.showSearchResultSeriesPanel_(group) : c.openSeriesPanel(source);
+    open();
+    const pending = requests.at(-1);
+    c.syncBookDetailCacheRevision_('after');
+    if (response === 'success') pending.ok([source]); else pending.fail(new Error('old-revision failure'));
+    assert.equal(requests.length, 2, 'revision-crossing ' + mode + ' ' + response + ' reissues request');
+    assert.equal(rendered.length, 0, 'stale series response cannot render or cache');
+    const fresh = { ...source, seriesOrder: 0 };
+    requests.at(-1).ok([fresh]);
+    assert.equal(rendered.length, 1, 'new-revision response completes the loading state');
+    if (mode === 'search') {
+      open(); assert.equal(requests.length, 2, 'same revision reuses complete series');
+      c.syncBookDetailCacheRevision_('third'); open();
+      assert.equal(requests.length, 3, 'revision edit rejects stale group memory');
+      requests.at(-1).ok([{ ...fresh, seriesOrder: 10 }]);
+      assert.equal(group.seriesBooks[0].seriesOrder, 10);
+    }
+  }
+}
+// Server null is authoritative even when an old local record has an order.
+{
+  const { c } = client();
+  c.window.ShumiLibraryLocalIndex = { getBookById: () => ({ bookId: 'book', seriesKeyAuto: 'series', seriesOrder: 4 }) };
+  const cleared = { bookId: 'book', seriesKeyAuto: 'series', seriesOrder: null };
+  c.hydratePopupBookFromLocalIndex_(cleared);
+  assert.equal(cleared.seriesOrder, null);
+  const missing = { bookId: 'book', seriesKeyAuto: 'series' };
+  c.hydratePopupBookFromLocalIndex_(missing);
+  assert.equal(missing.seriesOrder, 4);
 }
 
 console.log('client race, cache, cover reuse and detail recovery checks ok');

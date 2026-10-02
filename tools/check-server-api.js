@@ -53,7 +53,7 @@ assert(
   'documented public API registry does not contain duplicate names'
 );
 assert(source.includes('buildQuickBrowseCountsPayload_'), 'PWA initial data includes quick browse counts');
-assert(configSource.includes("LIBRARY_DATASET_KEY: 'library_dataset_v28'"), 'library cache key invalidates datasets without curated series names');
+assert(configSource.includes("LIBRARY_DATASET_KEY: 'library_dataset_v29'"), 'library cache key invalidates datasets without series order metadata');
 assert(source.includes('SHELF_DATASET_KEY'), 'server defines a separate bookshelf dataset cache key');
 assert(configSource.includes("SHELF_DATASET_KEY: 'library_shelf_dataset_v4'"), 'bookshelf cache key invalidates datasets without stable book IDs');
 assert(source.includes('getBookshelfLiteDataset_'), 'server has a lightweight bookshelf dataset path');
@@ -93,7 +93,7 @@ assert(source.includes('serverResponseReadyAtEpochMs'), 'JSONP performance trace
 assert(source.includes('perf.jsonpResponseChars'), 'JSONP performance trace includes the final script character count');
 assert(source.includes('datasetRevision: getDatasetSnapshotRevision_(dataset)'), 'initial API responses use the exact dataset snapshot revision');
 assert(source.includes('function buildLocalLibraryIndexPayload_'), 'server builds a lightweight local-search index');
-assert(source.includes('const LOCAL_LIBRARY_INDEX_VERSION_ = 6'), 'server publishes the media-aware local-index schema');
+assert(source.includes('const LOCAL_LIBRARY_INDEX_VERSION_ = 7'), 'server publishes the media-aware local-index schema');
 assert(source.includes("'releasedYm', 'story', 'theme', 'mood', 'status', 'media'"), 'local index appends media without shifting existing columns');
 assert((source.match(/params\.detailMedia/g) || []).length >= 2, 'JSONP preview and advanced search forward detailMedia');
 assert(source.includes('function buildLocalSearchMetadataPayload_'), 'server bundles search UI metadata into the local index');
@@ -1076,6 +1076,7 @@ const namedSeriesResult = vm.runInContext(`(() => {
     row[CONFIG.IDX.BOOK_UUID] = '00000000-0000-4000-8000-' + String(i).padStart(12, '0');
     return row;
   });
+  getLibrarySpreadsheet_ = () => ({ getSheetByName: () => null });
   loadMainBookData_ = () => rows;
   getGenreMasterData_ = () => ({ genreToCategory: {}, options: { story: [], theme: [], mood: [], status: [], media: [] } });
   getPublisherOptions_ = () => [];

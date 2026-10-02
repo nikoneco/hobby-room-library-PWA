@@ -73,6 +73,9 @@ jobs:
       - name: Check series registry lifecycle
         run: node tools/check-series-registry.js
 
+      - name: Check series display order
+        run: node tools/check-series-order.js
+
       - name: Check spreadsheet mode transitions
         run: node tools/check-sheet-modes.js
 

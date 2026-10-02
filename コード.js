@@ -334,6 +334,7 @@ function shouldClearLibrarySearchCacheOnEdit_(sheetName, range) {
 
   if (sheetName === MAIN) return true;
   if (sheetName === GENRE_MASTER) return true;
+  if (sheetName === CONFIG.SHEETS.SERIES_ORDER) return true;
   if (sheetName === SERIES_REGISTRY_CONFIG_.MASTER_SHEET) return true;
   if (sheetName === SERIES_REGISTRY_CONFIG_.ALIAS_SHEET) return true;
 

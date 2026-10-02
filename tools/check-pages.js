@@ -366,10 +366,10 @@ assert(gasRunShim.includes("window.addEventListener('focus'"), 'Pages client che
 assert(gasRunShim.includes("document.addEventListener('visibilitychange'"), 'Pages client checks the local index when visible again');
 assert(gasRunShim.includes("window.addEventListener('online'"), 'Pages client checks the local index when connectivity returns');
 assert(gasRunShim.includes('LOCAL_INDEX_CHECK_INTERVAL_MS'), 'Pages client periodically checks the local index while active');
-assert(gasRunShim.includes('const LOCAL_INDEX_SCHEMA_VERSION = 6'), 'Pages client invalidates the previous local-index schema');
+assert(gasRunShim.includes('const LOCAL_INDEX_SCHEMA_VERSION = 7'), 'Pages client invalidates the previous local-index schema');
 const serverIndexVersion = Number((serverSource.match(/LOCAL_LIBRARY_INDEX_VERSION_\s*=\s*(\d+)/) || [])[1]);
 const pagesIndexVersion = Number((buildPagesSource.match(/LOCAL_INDEX_SCHEMA_VERSION\s*=\s*(\d+)/) || [])[1]);
-assert(serverIndexVersion === pagesIndexVersion && serverIndexVersion === 6, 'GAS and Pages use the same media-aware local-index schema');
+assert(serverIndexVersion === pagesIndexVersion && serverIndexVersion === 7, 'GAS and Pages use the same series-order-aware local-index schema');
 assert(gasRunShim.includes("'detailMedia'"), 'Pages JSONP and local-search shim forwards the media filter');
 assert(gasRunShim.includes('genres.media.includes(criteria.media)'), 'Pages local search applies the media filter');
 assert(gasRunShim.includes("getSeriesInventoryStatus: { api: 'seriesStatus', argNames: [] }"), 'Pages client maps the series status read API');

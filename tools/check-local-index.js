@@ -11,7 +11,7 @@ function assert(condition, message) {
 
 function createPayload() {
   return {
-    version: 6,
+    version: 7,
     revision: 'fixture-revision',
     metadata: {
       suggest: {
@@ -67,7 +67,7 @@ function createPayload() {
         'せんしてぃぶ本1', 'せんしてぃぶほん', 'てすとさくしゃ', 'せんしてぃぶ本1 せんしてぃぶほん てすとさくしゃ', '同人出版社', 202401,
         [], ['18禁', '恋愛'], [], ['単巻'], ['漫画']
       ]
-    ]
+    ].map(record => record.concat(null))
   };
 }
 
@@ -394,7 +394,7 @@ function createSearchRaceHarness(options) {
           const data = routeData !== undefined
             ? routeData
             : api === 'libraryRevision'
-              ? { version: 6, revision: payload.revision }
+              ? { version: 7, revision: payload.revision }
               : api === 'localIndex'
                 ? payload
                 : api === 'searchSimple'
@@ -453,7 +453,7 @@ async function checkManualForceDownloadsSameRevision() {
   const harness = createSearchRaceHarness({
     payload: responsePayload,
     stored: {
-      key: 'active', schemaVersion: 6, revision: storedPayload.revision,
+      key: 'active', schemaVersion: 7, revision: storedPayload.revision,
       savedAt: '2026-09-20T12:00:00.000Z', payload: storedPayload
     },
     routes: { localIndex: { delay: 40, data: responsePayload } }
@@ -481,7 +481,7 @@ async function checkManualForceFailureAndOfflineKeepPrevious() {
   const previous = createPayload();
   previous.records[0][2] = '保持される旧データ';
   const stored = {
-    key: 'active', schemaVersion: 6, revision: previous.revision,
+    key: 'active', schemaVersion: 7, revision: previous.revision,
     savedAt: '2026-09-20T12:00:00.000Z', payload: previous
   };
   const failed = createSearchRaceHarness({
@@ -517,9 +517,9 @@ async function checkManualForceJoinsAutoRefresh() {
   const downloaded = appendFixtureBook(createPayload(), '自動確認中の強制更新');
   const harness = createSearchRaceHarness({
     payload: downloaded,
-    stored: { key: 'active', schemaVersion: 6, revision: storedPayload.revision, payload: storedPayload },
+    stored: { key: 'active', schemaVersion: 7, revision: storedPayload.revision, payload: storedPayload },
     routes: {
-      libraryRevision: { delay: 60, data: { version: 6, revision: storedPayload.revision } },
+      libraryRevision: { delay: 60, data: { version: 7, revision: storedPayload.revision } },
       localIndex: { delay: 25, data: downloaded }
     }
   });
@@ -549,7 +549,7 @@ async function checkForceRequestSurvivesRevisionFailure() {
   const downloaded = appendFixtureBook(createPayload(), 'revision失敗後の更新');
   const harness = createSearchRaceHarness({
     payload: downloaded,
-    stored: { key: 'active', schemaVersion: 6, revision: storedPayload.revision, payload: storedPayload },
+    stored: { key: 'active', schemaVersion: 7, revision: storedPayload.revision, payload: storedPayload },
     routes: {
       libraryRevision: { delay: 30, error: true },
       localIndex: { delay: 15, data: downloaded }
@@ -575,7 +575,7 @@ async function checkOutOfOrderIndexPersistenceKeepsLatest() {
   const latestPayload = appendFixtureBook(createPayload(), '後の最新取得');
   const harness = createSearchRaceHarness({
     payload: latestPayload,
-    stored: { key: 'active', schemaVersion: 6, revision: storedPayload.revision, payload: storedPayload },
+    stored: { key: 'active', schemaVersion: 7, revision: storedPayload.revision, payload: storedPayload },
     openDelays: { 2: 100 },
     routes: {
       localIndex: { delay: 5, data: requestNumber => requestNumber === 1 ? firstPayload : latestPayload }
@@ -609,7 +609,7 @@ async function checkOutOfOrderIndexPersistenceKeepsLatest() {
 
 async function checkFreshRevisionWinsBeforeRemoteSearch() {
   const payload = createPayload();
-  const stored = { key: 'active', schemaVersion: 6, revision: payload.revision, payload };
+  const stored = { key: 'active', schemaVersion: 7, revision: payload.revision, payload };
   const harness = createSearchRaceHarness({
     payload,
     stored,
@@ -682,9 +682,9 @@ async function checkIndexFailureFallsBackToRemote() {
   });
   const harness = createSearchRaceHarness({
     payload: freshPayload,
-    stored: { key: 'active', schemaVersion: 6, revision: stalePayload.revision, payload: stalePayload },
+    stored: { key: 'active', schemaVersion: 7, revision: stalePayload.revision, payload: stalePayload },
     routes: {
-      libraryRevision: { delay: 100, data: { version: 6, revision: freshPayload.revision } },
+      libraryRevision: { delay: 100, data: { version: 7, revision: freshPayload.revision } },
       localIndex: { delay: 200, error: true },
       searchSimple: { delay: 800, data: [{ title: 'server latest result' }] }
     }
@@ -745,7 +745,31 @@ async function checkSlowAndUnavailableIndexedDb() {
     'unsupported local-index API does not wait for a freshness grace period');
 }
 
+async function checkSeriesOrderSchemaUpgrade() {
+  const payload = createPayload();
+  payload.records[0][32] = 0; payload.records[1][32] = -2.5;
+  const old = JSON.parse(JSON.stringify(payload));
+  old.version = 6; old.records = old.records.map(record => record.slice(0, 32));
+  const harness = createSearchRaceHarness({ payload,
+    stored: { key: 'active', schemaVersion: 6, revision: old.revision, payload: old },
+    routes: { localIndex: { delay: 100 } }
+  });
+  harness.fireLoad(); await flushMicrotasks();
+  const manager = harness.window.ShumiLibraryLocalIndex;
+  assert(!manager.isReady(), 'schema6 cached index cannot become active or fresh after upgrade');
+  assert(harness.requests.some(request => request.api === 'localIndex'), 'upgrade downloads the full schema7 index even when revision matches');
+  assert(!harness.requests.some(request => request.api === 'libraryRevision'), 'upgrade cannot accept old order-less data through matching revision');
+  await harness.clock.advance(100);
+  assert(manager.isReady() && manager.getFreshnessState() === 'fresh', 'schema7 acquisition restores usable local index');
+  const search = harness.invokeCounted('searchBooksSimple', ['推しの子']);
+  await harness.clock.advance(0);
+  const result = await search.promise;
+  assert(result[0].seriesOrder === 0 && result[1].seriesOrder === -2.5, 'local searches preserve zero, negative decimal orders');
+  assert(result[0].bookId === payload.records[0][1], 'local search order remains catalog order');
+}
+
 (async function main() {
+  await checkSeriesOrderSchemaUpgrade();
   for (const mode of ['success', 'error', 'abort', 'pending']) await checkDownloadedIndex(mode, false);
   await checkDownloadedIndex('success', true);
   await checkManualForceDownloadsSameRevision();
@@ -762,7 +786,7 @@ async function checkSlowAndUnavailableIndexedDb() {
   const payload = createPayload();
   const stored = {
     key: 'active',
-    schemaVersion: 6,
+    schemaVersion: 7,
     revision: payload.revision,
     payload
   };
@@ -985,7 +1009,7 @@ async function checkSlowAndUnavailableIndexedDb() {
   assert(!searchScript, 'foreground search waits briefly before starting its remote fallback');
 
   invokeScriptCallback(onlineWindow, revisionScript, {
-    version: 6,
+    version: 7,
     revision: payload.revision
   });
   const freshSearch = await freshnessRacePromise;

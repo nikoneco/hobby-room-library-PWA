@@ -723,7 +723,7 @@ function buildPreviewIndexPayload_(dataset) {
   }));
 }
 
-const LOCAL_LIBRARY_INDEX_VERSION_ = 6;
+const LOCAL_LIBRARY_INDEX_VERSION_ = 7;
 
 /**
  * PWAのローカル索引と一緒に保存する検索UI用メタデータを返す。
@@ -786,7 +786,8 @@ function buildLocalLibraryIndexPayload_(dataset) {
       Array.isArray(genres.theme) ? genres.theme : [],
       Array.isArray(genres.mood) ? genres.mood : [],
       Array.isArray(genres.status) ? genres.status : [],
-      Array.isArray(genres.media) ? genres.media : []
+      Array.isArray(genres.media) ? genres.media : [],
+      typeof item.seriesOrder === 'number' && Number.isFinite(item.seriesOrder) ? item.seriesOrder : null
     ];
   });
 
@@ -799,7 +800,7 @@ function buildLocalLibraryIndexPayload_(dataset) {
       'isbn', 'yomi', 'genre', 'seriesKeyAuto', 'seriesCount', 'seriesSearchTitle',
       'isExtraSeries', 'volume', 'ownedMaxVolume', 'fallbackImg', 'fallbackImageSource',
       'isSensitive', 'indexTitle', 'indexYomi', 'indexAuthor', 'searchKey', 'indexPublisher',
-      'releasedYm', 'story', 'theme', 'mood', 'status', 'media'
+      'releasedYm', 'story', 'theme', 'mood', 'status', 'media', 'seriesOrder'
     ],
     records
   };
@@ -1158,6 +1159,7 @@ function mapRowsToBooks_(rows, indexData, options) {
       genreMeta     : idx ? (idx.genreMeta || []) : [],
       isSensitive,
       seriesKeyAuto   : idx ? (idx.seriesKeyAuto || '') : '',
+      seriesOrder     : idx && typeof idx.seriesOrder === 'number' && Number.isFinite(idx.seriesOrder) ? idx.seriesOrder : null,
       seriesCount     : idx ? Number(idx.seriesCount || 0) : 0,
       seriesSearchTitle: idx ? (idx.seriesSearchTitle || '') : '',
       isExtraSeries   : idx ? Boolean(idx.isExtraSeries) : false,
@@ -1473,6 +1475,57 @@ function matchesSearchCriteria_(idx, criteria) {
 }
 
 
+/** series_order is optional; read failures must propagate so incomplete orders are never cached. */
+function loadSeriesOrderValues_() {
+  const sheet = getLibrarySpreadsheet_().getSheetByName(CONFIG.SHEETS.SERIES_ORDER);
+  if (!sheet) return [];
+  const lastRow = sheet.getLastRow();
+  const lastColumn = sheet.getLastColumn();
+  if (lastRow < 2 || lastColumn < 4) return [];
+  return sheet.getRange(1, 1, lastRow, lastColumn).getValues();
+}
+
+function normalizeSeriesOrderNumber_(value) {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+  if (typeof value !== 'string') return null;
+  const text = value.trim();
+  if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/.test(text)) return null;
+  const number = Number(text);
+  return Number.isFinite(number) ? number : null;
+}
+
+/** Join only immutable series IDs and unique catalog UUIDs. Titles and row positions are display data. */
+function applySeriesOrdersToIndex_(rows, index, values, registry) {
+  const booksByUuid = new Map();
+  rows.forEach((row, rowIndex) => {
+    const uuid = normalizeBookUuid_(row[CONFIG.IDX.BOOK_UUID]);
+    index[rowIndex].seriesOrder = null;
+    if (!isValidBookUuid_(uuid)) return;
+    booksByUuid.set(uuid, booksByUuid.has(uuid) ? null : index[rowIndex]);
+  });
+  if (!registry || !registry.masterById || !Array.isArray(values)) return;
+  const headers = values[1] || [];
+  const width = values.reduce((max, row) => Math.max(max, row.length), 0);
+  const ordersByUuid = new Map();
+  // B:D, E:G, H:J ...; empty blocks and rows never end the scan.
+  for (let column = 1; column + 2 < width; column += 3) {
+    const seriesId = String(headers[column + 1] || '').trim();
+    if (!registry.masterById.has(seriesId)) continue;
+    for (let rowIndex = 2; rowIndex < values.length; rowIndex += 1) {
+      const row = values[rowIndex] || [];
+      const uuid = normalizeBookUuid_(row[column + 1]);
+      const order = normalizeSeriesOrderNumber_(row[column + 2]);
+      const book = booksByUuid.get(uuid);
+      if (order === null || !book || book.seriesKeyAuto !== seriesId) continue;
+      // A repeated UUID is ambiguous even if both entries specify the same number.
+      ordersByUuid.set(uuid, ordersByUuid.has(uuid) ? null : order);
+    }
+  }
+  ordersByUuid.forEach((order, uuid) => {
+    if (order !== null) booksByUuid.get(uuid).seriesOrder = order;
+  });
+}
+
 /**
  * 検索・サジェスト用データセットを構築
  *
@@ -1611,6 +1664,8 @@ function buildLibraryDataset_() {
     if (yomi) yomiSet.add(yomi);
     if (author) authorSet.add(author);
   });
+
+  applySeriesOrdersToIndex_(rows, index, loadSeriesOrderValues_(), seriesRegistry);
 
   const seriesMaxMap = buildSeriesMaxVolumeMap_({ index });
   const seriesGroupMap = new Map();
@@ -2098,6 +2153,7 @@ function isLibraryDatasetValid_(dataset) {
       typeof idx.seriesDisplayTitle === 'string' &&
       typeof idx.seriesSearchTitle === 'string' &&
       typeof idx.seriesCount === 'number' &&
+      (idx.seriesOrder === null || (typeof idx.seriesOrder === 'number' && Number.isFinite(idx.seriesOrder))) &&
       typeof idx.links === 'object'
     )
   );

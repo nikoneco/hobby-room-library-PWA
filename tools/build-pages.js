@@ -2849,7 +2849,7 @@ function writeGasRunShim() {
   const LOCAL_INDEX_DB_NAME = 'shumiLibrary.localIndex.v1';
   const LOCAL_INDEX_STORE_NAME = 'snapshots';
   const LOCAL_INDEX_ACTIVE_KEY = 'active';
-  const LOCAL_INDEX_SCHEMA_VERSION = 6;
+  const LOCAL_INDEX_SCHEMA_VERSION = 7;
   const LOCAL_INDEX_CHECK_INTERVAL_MS = 15 * 60 * 1000;
   const LOCAL_INDEX_CHECK_THROTTLE_MS = 5 * 60 * 1000;
   const LOCAL_SEARCH_REFRESH_GRACE_MS = 250;
@@ -3321,7 +3321,8 @@ function writeGasRunShim() {
     }
 
     return payload.records.map(function(record) {
-      if (!Array.isArray(record) || record.length < 32) {
+      if (!Array.isArray(record) || record.length < 33 ||
+          !(record[32] === null || (typeof record[32] === 'number' && Number.isFinite(record[32])))) {
         throw createError_('ローカル索引のレコードが壊れています。', 'LOCAL_INDEX_RECORD_INVALID');
       }
       const story = Array.isArray(record[27]) ? record[27] : [];
@@ -3346,6 +3347,7 @@ function writeGasRunShim() {
           genre: String(record[11] || ''),
           genreMeta: buildGenreMetaLocal_(story, theme, mood, status, media),
           seriesKeyAuto: String(record[12] || ''),
+          seriesOrder: record[32],
           seriesCount: Number(record[13] || 0),
           seriesSearchTitle: String(record[14] || ''),
           isExtraSeries: Boolean(record[15]),

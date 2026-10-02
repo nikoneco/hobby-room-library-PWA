@@ -617,6 +617,10 @@ function hydratePopupBookFromLocalIndex_(book) {
     }
   });
 
+  if (book.seriesOrder === undefined && localBook.seriesKeyAuto === book.seriesKeyAuto) {
+    book.seriesOrder = typeof localBook.seriesOrder === 'number' && Number.isFinite(localBook.seriesOrder) ? localBook.seriesOrder : null;
+  }
+
   if ((!Array.isArray(book.genreMeta) || !book.genreMeta.length) && Array.isArray(localBook.genreMeta)) {
     book.genreMeta = localBook.genreMeta.map(item => Object.assign({}, item));
   }
@@ -1942,6 +1946,7 @@ function openCoverFullscreen_(book) {
 function openSeriesPanel(sourceBook) {
   if (!sourceBook || !sourceBook.seriesKeyAuto) return;
   const requestGeneration = ++popupSeriesRequestGeneration_;
+  const requestRevision = currentDatasetRevision;
 
   const overlay = document.getElementById('image-popup-overlay');
   const popupContent = document.getElementById('image-popup-content');
@@ -1979,9 +1984,11 @@ function openSeriesPanel(sourceBook) {
     google.script.run.withSuccessHandler(success).withFailureHandler(failure).getBooksBySeriesKey(sourceBook.seriesKeyAuto);
   }, function(seriesBooks) {
       if (requestGeneration !== popupSeriesRequestGeneration_) return;
+      if (requestRevision !== currentDatasetRevision) { openSeriesPanel(sourceBook); return; }
       showSeriesPanel(sourceBook, Array.isArray(seriesBooks) ? seriesBooks : [], returnContext);
     }, function(error) {
       if (requestGeneration !== popupSeriesRequestGeneration_) return;
+      if (requestRevision !== currentDatasetRevision) { openSeriesPanel(sourceBook); return; }
       info.innerHTML = `
           <div class="series-panel">
             <div class="series-panel-title">シリーズ一覧を取得できませんでした</div>
@@ -2019,12 +2026,13 @@ function isCompleteSearchResultSeries_(group, books) {
 
 function showSearchResultSeriesPanel_(group) {
   if (!group || !Array.isArray(group.books) || !group.books.length) return;
-  if (Array.isArray(group.seriesBooks)) {
+  if (Array.isArray(group.seriesBooks) && group.seriesBooksRevision === currentDatasetRevision) {
     renderSearchResultSeriesPanel_(group, group.seriesBooks);
     return;
   }
   const sourceBook = group.representativeBook || group.books[0];
   const requestGeneration = ++popupSeriesRequestGeneration_;
+  const requestRevision = currentDatasetRevision;
   const overlay = document.getElementById('image-popup-overlay');
   const popupContent = document.getElementById('image-popup-content');
   const info = document.getElementById('image-popup-info');
@@ -2051,6 +2059,7 @@ function showSearchResultSeriesPanel_(group) {
   focusPopupIfNeeded_();
   const showFailure = function() {
     if (requestGeneration !== popupSeriesRequestGeneration_) return;
+    if (requestRevision !== currentDatasetRevision) { showSearchResultSeriesPanel_(group); return; }
     info.innerHTML = '<div class="series-panel"><div class="series-panel-title">シリーズ一覧を取得できませんでした</div><button type="button" id="series-panel-retry" class="popup-action-btn">もう一度読み込む</button></div>';
     document.getElementById('series-panel-retry').onclick = () => showSearchResultSeriesPanel_(group);
     focusPopupIfNeeded_();
@@ -2059,6 +2068,7 @@ function showSearchResultSeriesPanel_(group) {
     google.script.run.withSuccessHandler(success).withFailureHandler(failure).getBooksBySeriesKey(group.key || sourceBook.seriesKeyAuto);
   }, function(books) {
     if (requestGeneration !== popupSeriesRequestGeneration_) return;
+    if (requestRevision !== currentDatasetRevision) { showSearchResultSeriesPanel_(group); return; }
     if (!isCompleteSearchResultSeries_(group, books)) { showFailure(); return; }
     renderSearchResultSeriesPanel_(group, books);
   }, showFailure);
@@ -2076,7 +2086,8 @@ function renderSearchResultSeriesPanel_(group, seriesBooks) {
   const prevBtn = document.getElementById('popup-prev');
   const nextBtn = document.getElementById('popup-next');
   const items = sortSeriesBooksForDisplay_(Array.isArray(seriesBooks) ? seriesBooks : []);
-  group.seriesBooks = items;
+  group.seriesBooks = Array.isArray(seriesBooks) ? seriesBooks.slice() : [];
+  group.seriesBooksRevision = currentDatasetRevision;
   const sourceBook = group.representativeBook || group.books[0];
   const sourceTitle = group.title || sourceBook.seriesSearchTitle || sourceBook.title || 'シリーズ';
 
@@ -2309,7 +2320,7 @@ function getSeriesVolumeLabel_(book) {
 
 function sortSeriesBooksForDisplay_(books) {
   const rank = { '前': 1, '上': 2, '中': 3, '下': 4, '後': 5 };
-  return books
+  const baseline = books
     .map((book, index) => ({ book, index, part: getSeriesPartLabel_(book) }))
     .sort((a, b) => {
       if (a.part && b.part && rank[a.part] !== rank[b.part]) {
@@ -2318,6 +2329,26 @@ function sortSeriesBooksForDisplay_(books) {
       return a.index - b.index;
     })
     .map(entry => entry.book);
+  const groups = new Map();
+  baseline.forEach((book, position) => {
+    const key = String(book && book.seriesKeyAuto || '').trim();
+    if (!key) return;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push({ book, position });
+  });
+  groups.forEach(entries => {
+    const orderOf = entry => typeof entry.book.seriesOrder === 'number' && Number.isFinite(entry.book.seriesOrder)
+      ? entry.book.seriesOrder : null;
+    const sorted = entries.slice().sort((a, b) => {
+      const aOrder = orderOf(a);
+      const bOrder = orderOf(b);
+      if (aOrder !== null && bOrder !== null && aOrder !== bOrder) return aOrder - bOrder;
+      if ((aOrder !== null) !== (bOrder !== null)) return aOrder !== null ? -1 : 1;
+      return a.position - b.position;
+    });
+    entries.forEach((entry, index) => { baseline[entry.position] = sorted[index].book; });
+  });
+  return baseline;
 }
 
 function showPopup(book, index, dataArr, seriesContext, options) {
