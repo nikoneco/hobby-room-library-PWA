@@ -1219,6 +1219,9 @@ function buildSearchResultPresentation_(books) {
 
     seriesGroupCount += 1;
     entry.kind = 'series';
+    if (entry.books.some(book => typeof book.seriesOrder === 'number' && Number.isFinite(book.seriesOrder))) {
+      entry.representativeBook = sortSeriesBooksForDisplay_(entry.books)[0] || entry.representativeBook;
+    }
     entry.title = getSearchResultSeriesTitle_(entry);
     entry.matchCount = entry.books.length;
     entry.ownedCount = ownedCount;

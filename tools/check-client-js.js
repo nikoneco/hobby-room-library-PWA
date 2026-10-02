@@ -1123,6 +1123,38 @@ assertEqual(
   'story:医療,status:連載中,theme:仕事',
   'series result merges unique genres from matching volumes'
 );
+{
+  const coverBooks = [
+    { bookId: 'book-azkaban', title: 'ハリー・ポッターとアズカバンの囚人', seriesKeyAuto: 'harry', seriesSearchTitle: 'ハリー・ポッターシリーズ', seriesCount: 7, seriesOrder: 30, img: 'azkaban.jpg' },
+    { title: '対象外 1', seriesKeyAuto: 'other', seriesCount: 2 },
+    { bookId: 'book-stone', title: 'ハリー・ポッターと賢者の石', seriesKeyAuto: 'harry', seriesSearchTitle: 'ハリー・ポッターシリーズ', seriesCount: 7, seriesOrder: 10, img: 'stone.jpg', fallbackImg: 'stone-fallback.jpg' },
+    { title: '対象外 2', seriesKeyAuto: 'other', seriesCount: 2 },
+    { bookId: 'book-new', title: '未登録の新刊', seriesKeyAuto: 'harry', seriesCount: 7, seriesOrder: null }
+  ];
+  const before = JSON.stringify(coverBooks);
+  const presentation = sandbox.buildSearchResultPresentation_(coverBooks);
+  const group = presentation.entries[0];
+  assertEqual(group.representativeBook.bookId, 'book-stone', 'series cover selects the book with the smallest configured order');
+  assertEqual(group.representativeBook.img, 'stone.jpg', 'series cover uses the selected book image');
+  assertEqual(group.representativeBook.fallbackImg, 'stone-fallback.jpg', 'series cover retains the selected book fallback image');
+  assertEqual(group.originalIndex, 0, 'changing representative does not move the series group');
+  assertEqual(group.matchCount, 3, 'representative selection preserves matching count');
+  assertEqual(group.ownedCount, 7, 'representative selection preserves owned count');
+  assertEqual(group.books.map(book => book.bookId).join(','), 'book-azkaban,book-stone,book-new', 'representative selection preserves matching book order');
+  assertEqual(presentation.entries[1].representativeBook.title, '対象外 1', 'unconfigured series retains its representative');
+  assertEqual(JSON.stringify(coverBooks), before, 'representative selection does not mutate search books');
+  const basic = order => ({ title: 'First match', seriesKeyAuto: 'ordered', seriesCount: 2, seriesOrder: order });
+  for (const missing of [undefined, null, '', '0', NaN, Infinity]) {
+    const entry = sandbox.buildSearchResultPresentation_([basic(missing), { ...basic(null), title: 'Second match' }]).entries[0];
+    assertEqual(entry.representativeBook.title, 'First match', 'invalid or absent order keeps the previous representative');
+  }
+  for (const number of [0, -1, 0.5]) {
+    const entry = sandbox.buildSearchResultPresentation_([basic(null), { ...basic(number), title: 'Ordered match' }]).entries[0];
+    assertEqual(entry.representativeBook.title, 'Ordered match', 'finite order outranks an unregistered cover candidate');
+  }
+  const tied = sandbox.buildSearchResultPresentation_([basic(10), { ...basic(10), title: 'Second match' }]).entries[0];
+  assertEqual(tied.representativeBook.title, 'First match', 'tied cover orders preserve the existing baseline');
+}
 const staticSeriesChips = sandbox.buildGenreChips(
   { genreMeta: groupedSearchPresentation.entries[0].genreMeta },
   { limit: 3, interactive: false }
