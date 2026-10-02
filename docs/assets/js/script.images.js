@@ -381,7 +381,7 @@ function buildGeneratedBookCoverUrl_(book) {
     if (bookGeneratedCoverUrls_.has(key)) return bookGeneratedCoverUrls_.get(key);
     const palettes = [
       ['#4b5750', '#cbbd9b'], ['#5a4c40', '#d2b58b'],
-      ['#45545c', '#c6bea9'], ['#61544c', '#d8c3a1']
+      ['#45545c', '#c6bea9'], ['#a395b5', '#d1c2dd', '#302d26']
     ];
     let hash = 0;
     for (const character of title) hash = (Math.imul(hash, 31) + character.codePointAt(0)) | 0;
@@ -403,7 +403,7 @@ function buildGeneratedBookCoverUrl_(book) {
       (volume ? '<text x="263" y="66" text-anchor="end" fill="#625949" font-family="sans-serif" font-size="16">' + escapeGeneratedCoverText_(volume) + '</text>' : '') +
       '<text fill="#302d26" font-family="serif" font-size="21" font-weight="600">' + textLines(titleLines, 123, 27) + '</text>' +
       '<text fill="#575246" font-family="sans-serif" font-size="15">' + textLines(authorLines, 326, 18) + '</text>' +
-      '<text x="156" y="416" text-anchor="middle" fill="#eee6d5" fill-opacity=".68" font-family="sans-serif" font-size="10">書誌から作成</text></svg>';
+      '<text x="156" y="416" text-anchor="middle" fill="' + (palette[2] || '#eee6d5') + '" fill-opacity=".68" font-family="sans-serif" font-size="10">趣味部屋図書館</text></svg>';
     const url = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
     bookGeneratedCoverUrls_.set(key, url);
     if (bookGeneratedCoverUrls_.size > BOOK_IMAGE_RESOLVED_CACHE_LIMIT) {
