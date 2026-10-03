@@ -418,13 +418,22 @@ function attachPopupActionHandlers(book, seriesContext) {
   if (backBtn && seriesContext && Array.isArray(seriesContext.items)) {
     backBtn.onclick = function(e) {
       e.stopPropagation();
-      if (seriesContext.kind === 'search-result' && seriesContext.group) {
-        showSearchResultSeriesPanel_(seriesContext.group);
-        return;
-      }
-      showSeriesPanel(seriesContext.sourceBook || book, seriesContext.items, seriesContext.returnContext || null);
+      returnToPopupSeriesPanel_(book, seriesContext);
     };
   }
+}
+
+function returnToPopupSeriesPanel_(book, seriesContext) {
+  if (!seriesContext || !Array.isArray(seriesContext.items)) return false;
+  closeCoverFullscreen_();
+  clearPopupNeighborDetailTimer_();
+  clearPopupImagePrefetchTimer_();
+  if (seriesContext.kind === 'search-result' && seriesContext.group) {
+    showSearchResultSeriesPanel_(seriesContext.group);
+  } else {
+    showSeriesPanel(seriesContext.sourceBook || book, seriesContext.items, seriesContext.returnContext || null);
+  }
+  return true;
 }
 
 function getPopupNavBookLabel_(targetIndex) {
@@ -2668,7 +2677,9 @@ function showPopup(book, index, dataArr, seriesContext, options) {
   overlay.onclick = function(e) {
     if (e.target === overlay) hide();
   };
-  closeBtn.onclick = hide;
+  closeBtn.onclick = function() {
+    if (!returnToPopupSeriesPanel_(sourceBook, popupSeriesContext)) hide();
+  };
 
   document.onkeydown = function(e) {
     if (e.key === 'Escape') hide();
