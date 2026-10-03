@@ -389,7 +389,8 @@ function createSearchRaceHarness(options) {
         requests.push({ api, at: clock.now() });
         clock.setTimeout(() => {
           if (route.error) {
-            script.onerror();
+            // Removing a cancelled script also removes its event handler.
+            if (typeof script.onerror === 'function') script.onerror();
             return;
           }
           const routeData = typeof route.data === 'function'
@@ -565,7 +566,7 @@ async function checkForceRequestSurvivesRevisionFailure() {
   await flushMicrotasks();
   await harness.clock.advance(30);
   assert(harness.requests.filter(request => request.api === 'localIndex').length === 1,
-    'manual force falls back to one full acquisition after an in-flight revision failure');
+    'manual force supersedes the in-flight revision with one full acquisition');
   await harness.clock.advance(15);
   const result = await update;
   assert(result.success, 'successful full acquisition satisfies force request despite revision failure');

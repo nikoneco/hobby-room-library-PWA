@@ -181,7 +181,22 @@ function getCacheMetaKey_(key) {
 }
 
 function getUtf8ByteLength_(value) {
-  return Utilities.newBlob(String(value == null ? '' : value)).getBytes().length;
+  const text = String(value == null ? '' : value);
+  let bytes = 0;
+  for (let i = 0; i < text.length; i++) {
+    const code = text.charCodeAt(i);
+    if (code < 0x80) bytes += 1;
+    else if (code < 0x800) bytes += 2;
+    else if (code >= 0xD800 && code <= 0xDBFF && i + 1 < text.length &&
+      text.charCodeAt(i + 1) >= 0xDC00 && text.charCodeAt(i + 1) <= 0xDFFF) {
+      bytes += 4;
+      i += 1;
+    } else if (code >= 0xD800 && code <= 0xDFFF) {
+      // Preserve GAS's exact malformed UTF-16 encoding rather than assuming a replacement.
+      return Utilities.newBlob(text).getBytes().length;
+    } else bytes += 3;
+  }
+  return bytes;
 }
 
 function splitUtf8ByByteLimit_(value, byteLimit) {
@@ -1562,11 +1577,17 @@ function applySeriesOrdersToIndex_(rows, index, values, registry) {
  *   }
  * }}
  */
-function buildLibraryDataset_() {
+function buildLibraryDataset_(perf) {
   const rows = loadMainBookData_();
   const genreMaster = getGenreMasterData_();
   const publisherOptions = getPublisherOptions_();
-  const seriesRegistry = loadSeriesRegistryLookup_();
+  const seriesRegistryStartedAt = perf ? Date.now() : 0;
+  let seriesRegistry;
+  try {
+    seriesRegistry = loadSeriesRegistryLookup_(perf, false);
+  } finally {
+    if (perf) addWebAppPerfDuration_(perf, 'seriesRegistryLookupMs', seriesRegistryStartedAt);
+  }
   const seriesRegistryDisplayNames = new Map();
 
   const index = [];
@@ -2149,7 +2170,7 @@ function getLibraryDataset_(perf) {
   return getOrBuildCachedDataset_(
     cacheKey,
     isLibraryDatasetValid_,
-    buildLibraryDataset_,
+    perf ? () => buildLibraryDataset_(perf) : buildLibraryDataset_,
     perf
   );
 }
@@ -2583,15 +2604,20 @@ function parseBookDetailIds_(bookIds) {
     .slice(0, WEBAPP_API_LIMITS_.BOOK_DETAIL_BATCH_MAX);
 }
 
-function getBookDetailsByIds(bookIds) {
+function getBookDetailsByIds(bookIds, perf) {
   try {
     const targets = parseBookDetailIds_(bookIds);
     if (!targets.length) return [];
 
-    const dataset = getLibraryDataset_();
+    const dataset = getLibraryDataset_(perf);
     const rows = dataset.rows || [];
     const index = dataset.index || [];
     const rowIndexById = {};
+    if (perf) {
+      perf.sourceCount = rows.length;
+      perf.targetCount = targets.length;
+    }
+    const idMapStartedAt = perf ? Date.now() : 0;
 
     rows.forEach((row, rowIndex) => {
       const bookId = normalizeBookUuid_(row && row[CONFIG.IDX.BOOK_UUID]);
@@ -2600,7 +2626,9 @@ function getBookDetailsByIds(bookIds) {
       }
     });
 
-    return targets
+    if (perf) addWebAppPerfDuration_(perf, 'detailIdMapMs', idMapStartedAt);
+    const detailMapStartedAt = perf ? Date.now() : 0;
+    const books = targets
       .map(bookId => rowIndexById[bookId])
       .filter(rowIndex => rowIndex !== undefined)
       .map(rowIndex => mapRowsToBooks_(
@@ -2609,6 +2637,9 @@ function getBookDetailsByIds(bookIds) {
         { includeImages: false, rowOffset: rowIndex }
       )[0] || null)
       .filter(Boolean);
+    if (perf) addWebAppPerfDuration_(perf, 'detailMapMs', detailMapStartedAt);
+    if (perf) perf.resultCount = books.length;
+    return books;
   } catch (e) {
     console.error('getBookDetailsByIds error:', e);
     return [];
@@ -2702,7 +2733,7 @@ const PUBLIC_WEBAPP_JSONP_API_HANDLERS_ = Object.freeze({
   shelf: () => getBookshelfBooks(),
   shelfChunk: params => getBookshelfBooksChunk(params.offset, params.limit),
   bookDetailById: params => getBookDetailById(params.bookId || params.id || ''),
-  bookDetailsByIds: params => getBookDetailsByIds(params.bookIds || params.ids || ''),
+  bookDetailsByIds: (params, perf) => getBookDetailsByIds(params.bookIds || params.ids || '', perf),
   bookDetail: params => getBookDetailByRowIndex(params.rowIndex),
   bookDetails: params => getBookDetailsByRowIndexes(params.rowIndexes || params.rowIndexesCsv || ''),
   seriesStatus: () => getSeriesInventoryStatus(),
@@ -2751,8 +2782,11 @@ function handleWebAppJsonpRequest_(apiName, params) {
     perf.serverMs = Math.max(0, serverResponseReadyAt - serverStartedAt);
     envelope.perf = perf;
   }
+  const initialSerializeStartedAt = perf ? Date.now() : 0;
   let body = `${callback}(${stringifyForJsonp_(envelope)});`;
   if (perf) {
+    // First serialization only; excludes the diagnostic/character-count rewrites below.
+    addWebAppPerfDuration_(perf, 'jsonpInitialSerializeMs', initialSerializeStartedAt);
     // 文字数自体をレスポンスへ含めるため、桁数が安定するまで再生成する。
     for (let i = 0; i < 4; i += 1) {
       const responseChars = body.length;

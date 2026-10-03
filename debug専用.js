@@ -2045,3 +2045,142 @@ function debugCompareInitialSearchApiIntegration_() {
   console.log(JSON.stringify(result, null, 2));
   return result;
 }
+
+/**
+ * Editor-only cold read diagnostic. No Sheet/Property writes or ScriptCache access.
+ * UserCache isolates temporary entries from the production ScriptCache item limit.
+ * Its put/get timings are a scope-specific comparison, not production cacheWriteMs.
+ */
+function diagnoseLibraryColdRead_() {
+  const startedAt = Date.now();
+  const perf = {};
+  const result = {
+    mode: 'READ_ONLY_COLD_DIAGNOSTIC',
+    cacheScope: 'USER',
+    productionScriptCacheTouched: false,
+    sharedLockAcquired: false,
+    ttlSeconds: 60,
+    cacheItemLimit: 1000,
+    userCacheOccupancyKnown: false,
+    timingsMs: {},
+    counts: {},
+    validDataset: false,
+    inconsistent: false,
+    revisionCheckAvailable: false,
+    cacheRoundTripVerified: false,
+    cacheWriteSkipped: false,
+    cleanupAttempted: false,
+    cleanupOk: true,
+    dependencyLogsSuppressed: false,
+    errorStage: null,
+    ok: false
+  };
+  let cache = null;
+  const diagnosticKeys = [];
+  let stage = 'revisionBefore';
+  let revisionBefore = 'unavailable';
+  let revisionAfterBuild = 'unavailable';
+  let revisionAfter = 'unavailable';
+  const measure = (name, action) => {
+    stage = name;
+    const at = Date.now();
+    try { return action(); }
+    finally { result.timingsMs[name] = Math.max(0, Date.now() - at); }
+  };
+  try {
+    stage = 'revisionBefore';
+    revisionBefore = getLibraryDatasetRevision_();
+    const dataset = measure('buildMs', () => buildLibraryDataset_(perf));
+    stage = 'revisionAfterBuild';
+    revisionAfterBuild = getLibraryDatasetRevision_();
+    stampDatasetRevision_(dataset, revisionBefore);
+    result.counts.rows = Array.isArray(dataset.rows) ? dataset.rows.length : 0;
+    result.counts.index = Array.isArray(dataset.index) ? dataset.index.length : 0;
+    result.validDataset = measure('validationMs', () => isLibraryDatasetValid_(dataset));
+    const json = measure('stringifyMs', () => JSON.stringify(dataset));
+    result.counts.jsonChars = json.length;
+    const chunks = measure('splitMs', () => splitUtf8ByByteLimit_(json, CACHE_CONFIG.CHUNK_BYTE_LIMIT));
+    result.counts.chunks = chunks.length;
+    result.counts.entries = chunks.length + 1;
+    result.counts.jsonBytes = measure('utf8TotalMs', () => getUtf8ByteLength_(json));
+    result.counts.maxChunkBytes = measure('utf8ChunksMs', () => {
+      let max = 0;
+      chunks.forEach(chunk => {
+        const bytes = getUtf8ByteLength_(chunk);
+        if (bytes > CACHE_CONFIG.CHUNK_BYTE_LIMIT) throw new Error('Diagnostic chunk exceeds byte limit');
+        max = Math.max(max, bytes);
+      });
+      return max;
+    });
+    if (result.counts.entries > result.cacheItemLimit) {
+      result.cacheWriteSkipped = true;
+      result.errorStage = 'cacheEntryLimit';
+    } else {
+      stage = 'cacheKey';
+      const diagnosticKey = 'debug_library_cold_read_v1_' + Utilities.getUuid();
+      const metaKey = diagnosticKey + ':meta';
+      const payload = {};
+      payload[metaKey] = JSON.stringify({
+        chunkCount: chunks.length,
+        byteLength: result.counts.jsonBytes,
+        charLength: json.length
+      });
+      diagnosticKeys.push(metaKey);
+      chunks.forEach((chunk, index) => {
+        const key = diagnosticKey + ':chunk:' + index;
+        diagnosticKeys.push(key);
+        payload[key] = chunk;
+      });
+      stage = 'userCache';
+      cache = CacheService.getUserCache();
+      measure('cachePutMs', () => cache.putAll(payload, result.ttlSeconds));
+      const restoredJson = measure('cacheReadMs', () => {
+        const metaText = cache.get(metaKey);
+        if (!metaText) throw new Error('Diagnostic cache metadata is missing');
+        const meta = JSON.parse(metaText);
+        if (Number(meta.chunkCount) !== chunks.length || Number(meta.charLength) !== json.length) {
+          throw new Error('Diagnostic cache metadata differs');
+        }
+        const chunkMap = cache.getAll(diagnosticKeys.slice(1));
+        const restored = chunks.map((_, index) => {
+          const text = chunkMap[diagnosticKey + ':chunk:' + index];
+          if (typeof text !== 'string') throw new Error('Diagnostic cache chunk is missing');
+          return text;
+        }).join('');
+        if (restored.length !== json.length) throw new Error('Diagnostic cache length differs');
+        return restored;
+      });
+      const restored = measure('cacheParseMs', () => JSON.parse(restoredJson));
+      result.cacheRoundTripVerified = measure('roundTripVerifyMs', () => JSON.stringify(restored) === json);
+      if (!result.cacheRoundTripVerified) result.errorStage = 'roundTripVerifyMs';
+    }
+  } catch (error) {
+    // Fixed stage names only: do not log exception messages, raw data, or IDs.
+    result.errorStage = stage;
+  } finally {
+    if (cache && diagnosticKeys.length) {
+      result.cleanupAttempted = true;
+      try { measure('cleanupMs', () => cache.removeAll(diagnosticKeys)); }
+      catch (error) { result.cleanupOk = false; }
+    }
+    try { revisionAfter = getLibraryDatasetRevision_(); }
+    catch (error) { revisionAfter = 'unavailable'; }
+  }
+  result.revisionCheckAvailable = [revisionBefore, revisionAfterBuild, revisionAfter]
+    .every(revision => revision !== 'unavailable');
+  result.inconsistent = !result.revisionCheckAvailable ||
+    revisionBefore !== revisionAfterBuild || revisionBefore !== revisionAfter;
+  // Whitelist numbers from nested build diagnostics; never copy catalogue data.
+  [
+    'seriesRegistryLookupMs', 'seriesCatalogUsageMs',
+    'seriesCatalogLastRowMs', 'seriesCatalogColumnsMs'
+  ].forEach(name => {
+    if (Number.isFinite(perf[name])) result.timingsMs[name] = perf[name];
+  });
+  result.timingsMs.totalMs = Math.max(0, Date.now() - startedAt);
+  result.ok = !result.errorStage && result.validDataset && !result.inconsistent &&
+    result.cacheRoundTripVerified && result.cleanupOk;
+  // Standard private dependency logs are unchanged; this summary contains no raw error.
+  console.log(JSON.stringify(result));
+  return result;
+}

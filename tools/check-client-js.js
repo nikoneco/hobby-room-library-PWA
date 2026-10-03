@@ -923,10 +923,10 @@ assert(
     clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('function handlePopupContextBookDetailResult_') &&
     clientScriptSources[clientScriptFiles.indexOf('script.state.js.html')].includes('POPUP_CURRENT_DETAIL_RENDER_DELAY_MS') &&
     clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('function requestBookDetailByStableIdentity_') &&
-    clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('.getBookDetailById(book.bookId)') &&
+    clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes("requestBookDetailTransport_('getBookDetailById', [book.bookId]") &&
     clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('function requestBookDetailsByStableIdentities_') &&
-    clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('.getBookDetailsByIds(bookIds)') &&
-    clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('.getBookDetailsByRowIndexes(rowIndexes)') &&
+    clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes("requestBookDetailTransport_('getBookDetailsByIds', [bookIds]") &&
+    clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes("requestBookDetailTransport_('getBookDetailsByRowIndexes', [rowIndexes]") &&
     clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes("mode: 'currentOnly'") &&
     clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('forceCurrent: Boolean(popupOptions.forceCurrentDetailFetch)') &&
     clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('deferCurrentApplyMs: deferCurrentDetailRender ? POPUP_CURRENT_DETAIL_RENDER_DELAY_MS : 0') &&

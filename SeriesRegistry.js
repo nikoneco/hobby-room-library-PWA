@@ -523,7 +523,7 @@ function isSeriesRegistryV2Active_() {
   }
 }
 
-function loadSeriesRegistryLookup_() {
+function loadSeriesRegistryLookup_(perf, includeCatalogUsage) {
   if (!isSeriesRegistryV2Active_()) return null;
   const spreadsheet = getLibrarySpreadsheet_();
   const masterSheet = spreadsheet.getSheetByName(SERIES_REGISTRY_CONFIG_.MASTER_SHEET);
@@ -665,11 +665,23 @@ function loadSeriesRegistryLookup_() {
     masterSheet,
     aliasSheet
   };
-  lookup.catalogUsage = readSeriesRegistryCatalogUsage_(lookup);
+  // Web dataset resolution needs registry identity, not catalog write-validation usage.
+  // Default callers retain the full usage scan for merge/edit safety checks.
+  if (includeCatalogUsage !== false) {
+    const catalogUsageStartedAt = perf ? Date.now() : 0;
+    try {
+      lookup.catalogUsage = readSeriesRegistryCatalogUsage_(lookup, undefined, perf);
+    } finally {
+      if (perf) addWebAppPerfDuration_(perf, 'seriesCatalogUsageMs', catalogUsageStartedAt);
+    }
+  } else if (perf) {
+    ['seriesCatalogUsageMs', 'seriesCatalogLastRowMs', 'seriesCatalogColumnsMs']
+      .forEach(name => { if (!Number.isFinite(perf[name])) perf[name] = 0; });
+  }
   return lookup;
 }
 
-function readSeriesRegistryCatalogUsage_(lookup, catalogSheet) {
+function readSeriesRegistryCatalogUsage_(lookup, catalogSheet, perf) {
   const result = {
     refsBySeriesId: new Map(),
     keyCounts: new Map(),
@@ -682,11 +694,14 @@ function readSeriesRegistryCatalogUsage_(lookup, catalogSheet) {
   };
   if (!lookup || typeof CONFIG === 'undefined' || !CONFIG.SHEETS || !CONFIG.COL) return result;
   const sheet = catalogSheet || getSheet(CONFIG.SHEETS.MAIN);
+  const lastRowStartedAt = perf ? Date.now() : 0;
   const lastRow = getLastDataRow(sheet, CONFIG.COL.TITLE);
+  if (perf) addWebAppPerfDuration_(perf, 'seriesCatalogLastRowMs', lastRowStartedAt);
   if (lastRow < 2) {
     result.complete = true;
     return result;
   }
+  const columnsStartedAt = perf ? Date.now() : 0;
   const keys = sheet
     .getRange(2, CONFIG.COL.SERIES_KEY_AUTO, lastRow - 1, 1)
     .getDisplayValues();
@@ -694,6 +709,7 @@ function readSeriesRegistryCatalogUsage_(lookup, catalogSheet) {
     .getRange(2, CONFIG.COL.TITLE, lastRow - 1, 1)
     .getDisplayValues();
   const manualNotes = sheet.getRange(2, CONFIG.COL.SERIES_KEY_AUTO, lastRow - 1, 1).getNotes();
+  if (perf) addWebAppPerfDuration_(perf, 'seriesCatalogColumnsMs', columnsStartedAt);
   const manualOverrideBaseSignatures = new Set();
   const resolvedCatalogRows = [];
   result.checkedBooks = keys.length;

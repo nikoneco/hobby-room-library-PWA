@@ -55,6 +55,12 @@ jobs:
       - name: Check client request races
         run: node tools/check-client-races.js
 
+      - name: Check book detail request lifecycle
+        run: node tools/check-book-detail-transport.js
+
+      - name: Check library revision fallback
+        run: node tools/check-library-revision-hedge.js
+
       - name: Check generated fallback covers
         run: node tools/check-fallback-covers.js
 
@@ -87,6 +93,9 @@ jobs:
 
       - name: Check series API performance metadata
         run: node tools/check-series-perf.js
+
+      - name: Check cold library rebuild compatibility
+        run: node tools/check-cold-optimization.js
 
       - name: Check spreadsheet mode transitions
         run: node tools/check-sheet-modes.js

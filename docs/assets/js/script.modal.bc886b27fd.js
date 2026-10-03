@@ -1040,6 +1040,7 @@ function handleDeferredBookDetailResult_(book, index, dataArr, seriesContext, op
 
 function runBookDetailRequest_(request, onSuccess, onFailure) {
   let settled = false;
+  const transportCancels = [];
   const timer = window.setTimeout(function() {
     const error = new Error('Book detail request timed out');
     error.code = 'BOOK_DETAIL_TIMEOUT';
@@ -1049,21 +1050,38 @@ function runBookDetailRequest_(request, onSuccess, onFailure) {
     if (settled) return;
     settled = true;
     window.clearTimeout(timer);
+    transportCancels.splice(0).forEach(cancel => cancel());
     if (typeof callback === 'function') callback(...args);
   }
   try {
     request(
       (...args) => finish_(onSuccess, args),
       (...args) => finish_(onFailure, args),
-      () => !settled
+      () => !settled,
+      cancel => {
+        if (typeof cancel !== 'function') return;
+        if (settled) cancel();
+        else transportCancels.push(cancel);
+      }
     );
   } catch (error) {
     finish_(onFailure, [error]);
   }
 }
 
+function requestBookDetailTransport_(methodName, args, onSuccess, onFailure, registerCancel) {
+  const transport = window.ShumiLibraryBookDetailApi;
+  if (transport && typeof transport.request === 'function') {
+    registerCancel(transport.request(methodName, args, onSuccess, onFailure));
+    return;
+  }
+  // Native GAS has no cancellation API; the common deadline still rejects late replies.
+  const runner = google.script.run.withSuccessHandler(onSuccess).withFailureHandler(onFailure);
+  runner[methodName](...args);
+}
+
 function requestBookDetailByStableIdentity_(book, onSuccess, onFailure) {
-  runBookDetailRequest_(function(onSuccess, onFailure, isActive) {
+  runBookDetailRequest_(function(onSuccess, onFailure, isActive, registerCancel) {
   const canUseRowIndex = book && book.rowIndex !== undefined && book.rowIndex !== null;
   const requestByRowIndex_ = function(previousError) {
     if (!isActive()) return;
@@ -1071,20 +1089,14 @@ function requestBookDetailByStableIdentity_(book, onSuccess, onFailure) {
       if (typeof onFailure === 'function') onFailure(previousError || new Error('Book identity is unavailable'));
       return;
     }
-    google.script.run
-      .withSuccessHandler(onSuccess)
-      .withFailureHandler(onFailure)
-      .getBookDetailByRowIndex(book.rowIndex);
+    requestBookDetailTransport_('getBookDetailByRowIndex', [book.rowIndex], onSuccess, onFailure, registerCancel);
   };
 
   if (book && hasDisplayValue_(book.bookId)) {
-    google.script.run
-      .withSuccessHandler(onSuccess)
-      .withFailureHandler(function(error) {
+    requestBookDetailTransport_('getBookDetailById', [book.bookId], onSuccess, function(error) {
         // GAS旧版とPages新版が一時的に混在しても、旧APIで表示を継続する。
         requestByRowIndex_(error);
-      })
-      .getBookDetailById(book.bookId);
+      }, registerCancel);
     return;
   }
 
@@ -1093,7 +1105,7 @@ function requestBookDetailByStableIdentity_(book, onSuccess, onFailure) {
 }
 
 function requestBookDetailsByStableIdentities_(books, onSuccess, onFailure) {
-  runBookDetailRequest_(function(onSuccess, onFailure, isActive) {
+  runBookDetailRequest_(function(onSuccess, onFailure, isActive, registerCancel) {
   const targets = Array.isArray(books) ? books.filter(Boolean) : [];
   const canUseBookIds = targets.length > 0 && targets.every(book => hasDisplayValue_(book.bookId));
   const canUseRowIndexes = targets.length > 0 && targets.every(book =>
@@ -1107,21 +1119,17 @@ function requestBookDetailsByStableIdentities_(books, onSuccess, onFailure) {
       return;
     }
     const rowIndexes = targets.map(book => book.rowIndex).join(',');
-    google.script.run
-      .withSuccessHandler(function(details) { onSuccess(details, false); })
-      .withFailureHandler(onFailure)
-      .getBookDetailsByRowIndexes(rowIndexes);
+    requestBookDetailTransport_('getBookDetailsByRowIndexes', [rowIndexes],
+      function(details) { onSuccess(details, false); }, onFailure, registerCancel);
   };
 
   if (canUseBookIds) {
     const bookIds = targets.map(book => book.bookId).join(',');
-    google.script.run
-      .withSuccessHandler(function(details) { onSuccess(details, true); })
-      .withFailureHandler(function(error) {
+    requestBookDetailTransport_('getBookDetailsByIds', [bookIds],
+      function(details) { onSuccess(details, true); }, function(error) {
         // 新UUID APIが未反映の短い配備差も、rowIndex互換APIで吸収する。
         requestByRowIndexes_(error);
-      })
-      .getBookDetailsByIds(bookIds);
+      }, registerCancel);
     return;
   }
 

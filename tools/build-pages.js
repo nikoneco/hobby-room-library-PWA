@@ -2854,6 +2854,7 @@ function writeGasRunShim() {
   const LOCAL_INDEX_CHECK_INTERVAL_MS = 15 * 60 * 1000;
   const LOCAL_INDEX_CHECK_THROTTLE_MS = 5 * 60 * 1000;
   const LOCAL_SEARCH_REFRESH_GRACE_MS = 250;
+  const LIBRARY_REVISION_HEDGE_DELAY_MS = 3000;
 
   const METHOD_CONFIG = {
     getInitialSearchData: { api: 'initial', argNames: [] },
@@ -3149,6 +3150,7 @@ function writeGasRunShim() {
   let localIndexByRowIndex = new Map();
   let localIndexLoadPromise = null;
   let localIndexRefreshPromise = null;
+  let localIndexRevisionRead = null;
   let localIndexLastCheckedAt = 0;
   let localIndexFreshnessState = 'unchecked';
   let localIndexRefreshPhase = 'idle';
@@ -3752,9 +3754,97 @@ function writeGasRunShim() {
     dispatchLocalIndexReady_(updated);
   }
 
+  // Only the lightweight revision read has a bounded backup. Its original
+  // deadline covers both transports; one failed attempt cannot reject the other.
+  function invokeLibraryRevisionRead_(success, failure, options) {
+    const opt = options || { quiet: true };
+    const attempts = [];
+    let settled = false;
+    let hedgeTimer = null;
+    let deadlineTimer = null;
+
+    function finish_(callback, value) {
+      if (settled) return;
+      settled = true;
+      if (hedgeTimer !== null) window.clearTimeout(hedgeTimer);
+      if (deadlineTimer !== null) window.clearTimeout(deadlineTimer);
+      hedgeTimer = deadlineTimer = null;
+      attempts.forEach(function(attempt) {
+        if (typeof attempt.cancel === 'function') attempt.cancel();
+      });
+      if (typeof callback === 'function') callback(value);
+    }
+
+    function startBackup_() {
+      if (settled || attempts.length >= 2) return;
+      if (hedgeTimer !== null) window.clearTimeout(hedgeTimer);
+      hedgeTimer = null;
+      startAttempt_(true);
+    }
+
+    function startAttempt_(backup) {
+      const attempt = { failed: false, cancel: null };
+      attempts.push(attempt);
+      function failed_(error) {
+        if (settled || attempt.failed) return;
+        attempt.failed = true;
+        // A joined manual refresh requires the full index, not another revision
+        // attempt. Preserve refreshLocalIndex_'s existing acquisition fallback.
+        if (localIndexForceDownloadRequested) {
+          finish_(failure, error);
+          return;
+        }
+        if (!backup && error && (error.code === 'SCRIPT_ERROR' || error.code === 'TIMEOUT')) startBackup_();
+        if (attempts.length === 2 && attempts.every(function(item) { return item.failed; })) finish_(failure, error);
+      }
+      const requestOptions = Object.assign({}, opt, {
+        quiet: true,
+        perfName: backup ? (opt.perfName || 'api:libraryRevision') + ':hedge' : opt.perfName
+      });
+      const cancel = invokeRemoteJsonp_('getLibraryDatasetRevisionForPwa_', [], function(payload) {
+        if (!payload || typeof payload.revision !== 'string' || !payload.revision.trim()) {
+          failed_(createError_('Invalid library revision response', 'INVALID_LIBRARY_REVISION'));
+          return;
+        }
+        finish_(success, payload);
+      }, failed_, requestOptions);
+      if (settled && typeof cancel === 'function') cancel();
+      else attempt.cancel = cancel;
+    }
+
+    deadlineTimer = window.setTimeout(function() {
+      finish_(failure, createError_('通信がタイムアウトしました。時間を置いて再度お試しください。', 'TIMEOUT'));
+    }, JSONP_TIMEOUT_MS);
+    hedgeTimer = window.setTimeout(startBackup_, LIBRARY_REVISION_HEDGE_DELAY_MS);
+    startAttempt_(false);
+    return function(error) {
+      finish_(failure, error || createError_('Revision read cancelled', 'CANCELLED'));
+    };
+  }
+
   function invokeRemotePromise_(methodName, args, options) {
     return new Promise(function(resolve, reject) {
-      invokeRemoteJsonp_(methodName, args || [], resolve, reject, options || { quiet: true });
+      if (methodName === 'getLibraryDatasetRevisionForPwa_') {
+        const operation = { cancel: null };
+        localIndexRevisionRead = operation;
+        function complete_(callback, value) {
+          if (localIndexRevisionRead === operation) localIndexRevisionRead = null;
+          callback(value);
+        }
+        operation.cancel = invokeLibraryRevisionRead_(function(payload) {
+          complete_(resolve, payload);
+        }, function(error) {
+          complete_(reject, error);
+        }, options);
+        // A synchronous transport hook can request a force refresh before the
+        // cancel handle has been assigned. Honor that request after registration.
+        if (localIndexRevisionRead === operation && localIndexForceDownloadRequested &&
+            localIndexRefreshPhase === 'checking') {
+          operation.cancel(createError_('Full index refresh requested', 'FORCED_REFRESH'));
+        }
+      } else {
+        invokeRemoteJsonp_(methodName, args || [], resolve, reject, options || { quiet: true });
+      }
     });
   }
 
@@ -3820,6 +3910,13 @@ function writeGasRunShim() {
     if (localIndexRefreshPromise) {
       if (forceDownload && localIndexRefreshPhase !== 'downloading') {
         localIndexForceDownloadRequested = true;
+        // A manual full refresh supersedes the revision check even if its first
+        // attempt already failed. Reject the shared wait so its existing catch
+        // starts one full acquisition, rather than leaving the Promise pending.
+        if (localIndexRefreshPhase === 'checking' && localIndexRevisionRead &&
+            typeof localIndexRevisionRead.cancel === 'function') {
+          localIndexRevisionRead.cancel(createError_('Full index refresh requested', 'FORCED_REFRESH'));
+        }
       }
       return localIndexRefreshPromise;
     }
@@ -3950,6 +4047,18 @@ function writeGasRunShim() {
   window.ShumiLibrarySeriesApi = {
     request: function(key, revision, success, failure, expectedCount) {
       return invokeJsonp_('getBooksBySeriesKey', [key], success, failure, { quiet: true, expectedRevision: revision, expectedCount: expectedCount });
+    }
+  };
+
+  // The modal owns one deadline across UUID requests and legacy row fallbacks.
+  // Return cancellation so its deadline also removes pending JSONP transports.
+  window.ShumiLibraryBookDetailApi = {
+    request: function(methodName, args, success, failure) {
+      if (!['getBookDetailById', 'getBookDetailsByIds', 'getBookDetailByRowIndex', 'getBookDetailsByRowIndexes'].includes(methodName)) {
+        if (typeof failure === 'function') failure(createError_('Unsupported book detail API', 'UNSUPPORTED_API'));
+        return function() {};
+      }
+      return invokeRemoteJsonp_(methodName, args, success, failure, { quiet: true });
     }
   };
 
