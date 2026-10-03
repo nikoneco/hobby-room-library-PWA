@@ -61,6 +61,12 @@ jobs:
       - name: Check library revision fallback
         run: node tools/check-library-revision-hedge.js
 
+      - name: Check revision frame client transport
+        run: node tools/check-library-revision-frame.js
+
+      - name: Check revision frame server transport
+        run: node tools/check-revision-frame-server.js
+
       - name: Check generated fallback covers
         run: node tools/check-fallback-covers.js
 

@@ -30,8 +30,37 @@ assert(injectStart >= 0 && injectEnd > injectStart);
 prelude = prelude.slice(0, injectStart) + '  vm.runInContext(shim, c);\n' + prelude.slice(injectEnd);
 const host = { require, URL, URLSearchParams, Buffer, fixtureShim, __dirname, module: { exports: {} } };
 vm.runInNewContext(prelude + '\nmodule.exports = { harness, payload };', host);
-const { harness, payload } = host.module.exports;
-const callback = (h, request) => request.params.get('callback').split('.').reduce((obj, key) => obj[key], h.window);
+const { harness: baseHarness, payload } = host.module.exports;
+function harness() {
+  const h = baseHarness();
+  const listeners = new Set(), activeFrames = new Set();
+  h.window.crypto = require('node:crypto').webcrypto;
+  h.window.addEventListener = (type, listener) => { if (type === 'message') listeners.add(listener); };
+  h.window.removeEventListener = (type, listener) => { if (type === 'message') listeners.delete(listener); };
+  const create = h.document.createElement;
+  h.document.createElement = function(tag) {
+    const node = create(tag);
+    if (tag === 'iframe') node.contentWindow = { parent: h.window };
+    return node;
+  };
+  h.document.body.appendChild = function(frame) {
+    activeFrames.add(frame);
+    frame.parentNode = { removeChild() { activeFrames.delete(frame); frame.parentNode = null; } };
+    h.requests.push({ script: frame, frame, params: new URL(frame.src).searchParams });
+  };
+  h.message = event => Array.from(listeners).forEach(listener => listener(event));
+  h.frameReply = (request, envelope, overrides = {}) => h.message(Object.assign({
+    origin: 'https://fixture-script.googleusercontent.com', source: request.frame.contentWindow,
+    data: { kind: 'SHUMI_LIBRARY_REVISION_FRAME_V1', nonce: request.params.get('nonce'), envelope }
+  }, overrides));
+  const reply = h.reply;
+  h.reply = (request, data, error) => request.frame
+    ? h.frameReply(request, error ? { ok: false, error: { message: error } } : { ok: true, data })
+    : reply(request, data, error);
+  return Object.assign(h, { activeFrames, messageListeners: listeners });
+}
+const callback = (h, request) => request.frame ? envelope => h.frameReply(request, envelope)
+  : request.params.get('callback').split('.').reduce((obj, key) => obj[key], h.window);
 const flush = async () => { for (let i = 0; i < 12; i++) await Promise.resolve(); };
 
 function begin() {
@@ -46,6 +75,8 @@ function begin() {
 }
 function cleaned(h) {
   assert.equal(h.activeScripts.size, 0);
+  assert.equal(h.activeFrames.size, 0, 'winner/deadline removes backup iframe');
+  assert.equal(h.messageListeners.size, 0, 'winner/deadline removes backup message listener');
   assert.equal(h.timers.size, 0, 'winner/deadline removes hedge and transport timers');
   assert.equal(h.notifications.length, 0, 'revision reads remain quiet');
 }
@@ -71,7 +102,9 @@ async function main() {
     h.advance(1);
     assert.equal(h.requests.length, 2);
     assert.equal(h.requests[1].params.get('api'), 'libraryRevision');
-    assert.notEqual(h.requests[0].params.get('callback'), h.requests[1].params.get('callback'));
+    assert.equal(h.requests[1].params.get('transport'), 'revisionFrame');
+    assert.equal(h.requests[1].params.has('callback'), false);
+    assert.match(h.requests[1].params.get('nonce'), /^[a-f0-9]{32}$/);
     h.advance(1000);
     h.reply(h.requests[1], { revision: 'one' });
     assert.equal(results.length, 1);
@@ -279,6 +312,8 @@ async function main() {
     const force = h.window.ShumiLibraryLocalIndex.forceRefresh();
     const duplicateForce = h.window.ShumiLibraryLocalIndex.forceRefresh();
     assert.equal(h.activeScripts.size, 0, phase + ': manual request synchronously cancels the revision transports');
+    assert.equal(h.activeFrames.size, 0, phase + ': manual request cancels the frame');
+    assert.equal(h.messageListeners.size, 0, phase + ': manual request removes the listener');
     assert.equal(h.timers.size, 0, phase + ': manual request clears both transport and hedge deadlines');
     await flush();
     const full = h.requests.find(request => request.params.get('api') === 'localIndex');
@@ -331,4 +366,5 @@ async function main() {
   }
   console.log('library revision hedge checks ok: 3s backup, fast failure, first valid response, two-attempt cap, original deadline, cleanup, freshness and heavy-API isolation');
 }
-main().catch(error => { console.error(error); process.exitCode = 1; });
+module.exports = { harness, payload, begin, cleaned, flush, main };
+if (require.main === module) main().catch(error => { console.error(error); process.exitCode = 1; });

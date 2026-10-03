@@ -2750,11 +2750,52 @@ function doGet(e) {
   const params = e && e.parameter ? e.parameter : {};
   const apiName = String(params.api || '').trim();
 
+  if (apiName === 'libraryRevision' && params.transport === 'revisionFrame') {
+    return handleLibraryRevisionFrameRequest_(params);
+  }
+
   if (apiName) {
     return handleWebAppJsonpRequest_(apiName, params);
   }
 
   return HtmlService.createTemplateFromFile('index').evaluate();
+}
+
+/** Read-only revision backup without ContentService's single-use redirect. */
+function handleLibraryRevisionFrameRequest_(params) {
+  const nonce = String(params.nonce || '');
+  if (!/^[0-9a-f]{32}$/i.test(nonce)) {
+    return HtmlService.createHtmlOutput('<!doctype html><meta charset="utf-8"><title>Invalid request</title>');
+  }
+  const startedAt = Date.now();
+  const perf = String(params.perf || '') === '1' ? {
+    version: 2,
+    serverStartedAtEpochMs: startedAt,
+    serverStartedAt: new Date(startedAt).toISOString()
+  } : null;
+  let envelope;
+  try {
+    envelope = { ok: true, data: getLibraryDatasetRevisionForPwa_(), error: null };
+  } catch (error) {
+    envelope = { ok: false, data: null, error: { api: 'libraryRevision', message: 'Revision request failed' } };
+  }
+  if (perf) {
+    const readyAt = Date.now();
+    perf.serverResponseReadyAtEpochMs = readyAt;
+    perf.serverResponseReadyAt = new Date(readyAt).toISOString();
+    perf.serverMs = Math.max(0, readyAt - startedAt);
+    envelope.perf = perf;
+  }
+  const escapedMessage = JSON.stringify({
+    kind: 'SHUMI_LIBRARY_REVISION_FRAME_V1', nonce, envelope
+  }).replace(/[<>&\u2028\u2029]/g, character => ({
+    '<': '\\u003c', '>': '\\u003e', '&': '\\u0026',
+    '\u2028': '\\u2028', '\u2029': '\\u2029'
+  })[character]);
+  // Only this anonymous, read-only response is embeddable. No origin is taken from the URL.
+  return HtmlService.createHtmlOutput('<!doctype html><html><head><meta charset="utf-8"></head><body><script>window.top.postMessage(' +
+    escapedMessage + ',"https://nikoneco.github.io");</script></body></html>')
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
 /**
