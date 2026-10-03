@@ -4230,7 +4230,7 @@ function writeGasRunShim() {
 
   if (typeof window.addEventListener === 'function') {
     window.addEventListener('load', function() {
-      refreshLocalIndex_(true, '');
+      refreshLocalIndex_(false, '');
     });
     window.addEventListener('focus', function() { refreshLocalIndex_(false, ''); });
     window.addEventListener('online', function() { refreshLocalIndex_(true, ''); });

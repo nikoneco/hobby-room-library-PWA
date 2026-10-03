@@ -3,7 +3,16 @@ const path = require('path');
 const vm = require('vm');
 
 const root = path.resolve(__dirname, '..');
-const shimSource = fs.readFileSync(path.join(root, 'docs', 'assets', 'js', 'gas-run-shim.js'), 'utf8');
+// Exercise the real generator without rebuilding docs or contacting any endpoint.
+const buildSource = fs.readFileSync(path.join(root, 'tools', 'build-pages.js'), 'utf8');
+const shimStart = buildSource.indexOf('function writeGasRunShim() {');
+const shimEnd = buildSource.indexOf('function writePwaClient()', shimStart);
+if (shimStart < 0 || shimEnd <= shimStart) throw new Error('Shim generator not found');
+let shimSource;
+vm.runInNewContext(buildSource.slice(shimStart, shimEnd) + '\nwriteGasRunShim();', {
+  fs: { writeFileSync(file, content) { shimSource = content; } }, path,
+  jsDir: '/fixture', gasEndpoint: 'https://example.invalid/exec'
+});
 
 function jsonpCallback(window, name) {
   return name.split('.').reduce((value, part) => value[part], window);
@@ -612,6 +621,57 @@ async function checkOutOfOrderIndexPersistenceKeepsLatest() {
     'newer index remains active after stale storage work completes');
 }
 
+async function checkStartupLoadRefresh() {
+  // DOMContentLoaded bootstrap is represented by the same public check call.
+  const inflight = createSearchRaceHarness({ routes: { localIndex: { delay: 100 } } });
+  const pending = inflight.window.ShumiLibraryLocalIndex.checkForUpdates();
+  await flushMicrotasks();
+  inflight.fireLoad();
+  await flushMicrotasks();
+  assert(inflight.requests.length === 1 && inflight.requests[0].api === 'localIndex',
+    'load joins the cold index acquisition already in flight');
+  await inflight.clock.advance(100);
+  await pending;
+  assert(inflight.window.ShumiLibraryLocalIndex.getFreshnessState() === 'fresh',
+    'joined startup acquisition becomes fresh');
+
+  const payload = createPayload();
+  const saved = createSearchRaceHarness({
+    payload, stored: { key: 'active', schemaVersion: 7, revision: payload.revision, payload },
+    routes: { libraryRevision: { delay: 100 } }
+  });
+  const savedManager = saved.window.ShumiLibraryLocalIndex;
+  await savedManager.whenLoaded();
+  assert(savedManager.getFreshnessState() !== 'fresh', 'saved index starts unvalidated');
+  saved.fireLoad();
+  await flushMicrotasks();
+  assert(saved.requests.length === 1 && saved.requests[0].api === 'libraryRevision',
+    'saved-index load still requests server revision validation');
+  assert(savedManager.countMatches(['推しの子']) === null,
+    'saved index cannot answer local preview before revision validation');
+  await saved.clock.advance(100);
+  assert(savedManager.getFreshnessState() === 'fresh', 'matching startup revision permits local queries');
+
+  const completed = createSearchRaceHarness({ routes: { localIndex: { delay: 100 } }, writeMode: 'pending' });
+  const completedManager = completed.window.ShumiLibraryLocalIndex;
+  const acquisition = completedManager.checkForUpdates();
+  await flushMicrotasks();
+  await completed.clock.advance(100);
+  await acquisition;
+  assert(completedManager.getFreshnessState() === 'fresh', 'cold acquisition finishes before load');
+  completed.fireLoad();
+  await flushMicrotasks();
+  assert(completed.requests.length === 1 && completed.requests[0].api === 'localIndex',
+    'load after completed cold acquisition must not start a duplicate revision request; got ' +
+      completed.requests.map(request => request.api).join(','));
+  assert(completedManager.getFreshnessState() === 'fresh',
+    'load does not temporarily block a newly downloaded fresh index');
+  const search = completed.invokeCounted('searchBooksSimple', ['推しの子']);
+  await completed.clock.advance(0);
+  assert((await search.promise).length === 2 && completed.requests.length === 1,
+    'search after late load remains local without grace or another transport');
+}
+
 async function checkFreshRevisionWinsBeforeRemoteSearch() {
   const payload = createPayload();
   const stored = { key: 'active', schemaVersion: 7, revision: payload.revision, payload };
@@ -774,6 +834,7 @@ async function checkSeriesOrderSchemaUpgrade() {
 }
 
 (async function main() {
+  await checkStartupLoadRefresh();
   await checkSeriesOrderSchemaUpgrade();
   for (const mode of ['success', 'error', 'abort', 'pending']) await checkDownloadedIndex(mode, false);
   await checkDownloadedIndex('success', true);
