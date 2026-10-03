@@ -40,7 +40,7 @@ function ensureDir(dir) {
 }
 
 function readUtf8(fileName) {
-  return fs.readFileSync(path.join(root, fileName), 'utf8');
+  return fs.readFileSync(path.join(root, fileName), 'utf8').replace(/\r\n/g, '\n');
 }
 
 function stripWrapper(source, tagName) {
