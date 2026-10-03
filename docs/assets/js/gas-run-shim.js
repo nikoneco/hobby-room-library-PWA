@@ -163,6 +163,10 @@
       return;
     }
 
+    if (config.api !== 'libraryRevision') {
+      return invokeRemoteFrame_(methodName, config, args, successHandler, failureHandler, opt, false);
+    }
+
     const perfToken = startPerf_(opt.perfName || ('api:' + config.api), {
       method: methodName,
       api: config.api,
@@ -700,6 +704,7 @@
     let localQueued = false;
     let localFailed = false;
     let graceTimer = null;
+    let cancelRemote = null;
 
     function cleanupWait_() {
       if (graceTimer !== null) {
@@ -709,6 +714,8 @@
       if (document && typeof document.removeEventListener === 'function') {
         document.removeEventListener('shumi-library-local-index-ready', onLocalIndexReady_);
       }
+      if (typeof cancelRemote === 'function') cancelRemote();
+      cancelRemote = null;
     }
 
     function finishSuccess_(result, remote) {
@@ -744,11 +751,13 @@
       if (settled || remoteStarted) return;
       if (!localFailed && tryLocalSearch_()) return;
       remoteStarted = true;
-      invokeRemoteJsonp_(methodName, args, function(result) {
+      const cancel = invokeRemoteJsonp_(methodName, args, function(result) {
         finishSuccess_(result, true);
       }, function(error) {
         finishFailure_(error);
       }, { quiet: true });
+      if (settled && typeof cancel === 'function') cancel();
+      else cancelRemote = cancel;
     }
 
     function onLocalIndexReady_() {
@@ -913,18 +922,23 @@
 
   // HtmlService avoids ContentService's script-download redirect path. Accept
   // only a nonce-bound message sent by this frame (including its nested sandbox).
-  function invokeLibraryRevisionFrame_(success, failure, options) {
+  function invokeRemoteFrame_(methodName, config, args, success, failure, options, revisionBackup) {
     const opt = options || {};
-    const perfToken = startPerf_(opt.perfName || 'api:libraryRevision:hedge', {
-      method: 'getLibraryDatasetRevisionForPwa_', api: 'libraryRevision',
-      background: true, transport: 'revisionFrame'
+    const transportName = revisionBackup ? 'revisionFrame' : 'apiFrame';
+    const messageKind = revisionBackup ? 'SHUMI_LIBRARY_REVISION_FRAME_V1' : 'SHUMI_LIBRARY_API_FRAME_V1';
+    const perfToken = startPerf_(opt.perfName || ('api:' + config.api), {
+      method: methodName, api: config.api,
+      background: Boolean(opt.quiet), transport: transportName
     });
     let finished = false;
     let frame = null;
     let listening = false;
+    let timeoutId = null;
     const requestSentAtEpochMs = Date.now();
 
     function cleanup_() {
+      if (timeoutId !== null) window.clearTimeout(timeoutId);
+      timeoutId = null;
       if (listening) window.removeEventListener('message', receive_);
       listening = false;
       if (frame) {
@@ -940,8 +954,10 @@
       const serverPerf = envelope && envelope.perf && typeof envelope.perf === 'object'
         ? envelope.perf : undefined;
       const transportPerf = {
-        name: 'revisionFrame', requestSentAtEpochMs: requestSentAtEpochMs,
+        name: transportName, requestSentAtEpochMs: requestSentAtEpochMs,
+        requestSentAt: new Date(requestSentAtEpochMs).toISOString(),
         callbackReceivedAtEpochMs: callbackReceivedAtEpochMs,
+        callbackReceivedAt: new Date(callbackReceivedAtEpochMs).toISOString(),
         callbackWaitMs: Math.max(0, callbackReceivedAtEpochMs - requestSentAtEpochMs)
       };
       if (serverPerf) {
@@ -956,11 +972,17 @@
       }
       endPerf_(perfToken, {
         ok: !error, code: error ? error.code : undefined,
+        count: envelope && Array.isArray(envelope.data) ? envelope.data.length : undefined,
         server: serverPerf, transport: transportPerf
       });
       if (error) {
-        if (typeof failure === 'function') failure(error);
-      } else if (typeof success === 'function') success(envelope.data);
+        if (opt.quiet) {
+          if (typeof failure === 'function') failure(error);
+        } else invokeFailure_(failure, error);
+      } else {
+        if (!opt.quiet) notifySuccess_();
+        if (typeof success === 'function') success(envelope.data, { source: 'remote' });
+      }
     }
     function belongsToFrame_(source) {
       if (!frame || !frame.contentWindow || !source) return false;
@@ -984,15 +1006,25 @@
           !belongsToFrame_(event.source)) return;
       const message = event.data;
       if (!message || typeof message !== 'object' ||
-          message.kind !== 'SHUMI_LIBRARY_REVISION_FRAME_V1' || message.nonce !== nonce) return;
+          message.kind !== messageKind || message.nonce !== nonce ||
+          (!revisionBackup && message.api !== config.api)) return;
       const envelope = message.envelope;
-      if (!envelope || typeof envelope !== 'object' || envelope.ok !== true ||
-          !envelope.data || typeof envelope.data !== 'object' ||
-          typeof envelope.data.revision !== 'string' || !envelope.data.revision.trim()) {
-        finish_(createError_('Invalid library revision frame response', 'INVALID_LIBRARY_REVISION_FRAME'));
+      if (!envelope || typeof envelope !== 'object' || Array.isArray(envelope) ||
+          typeof envelope.ok !== 'boolean' || !Object.prototype.hasOwnProperty.call(envelope, 'data') ||
+          (revisionBackup && (envelope.ok !== true || !envelope.data ||
+            typeof envelope.data.revision !== 'string' || !envelope.data.revision.trim()))) {
+        finish_(createError_('Invalid API frame response', revisionBackup ? 'INVALID_LIBRARY_REVISION_FRAME' : 'INVALID_API_FRAME'));
+        return;
+      }
+      if (!envelope.ok) {
+        finish_(createError_('APIからエラーが返りました。', 'API_ERROR'), envelope);
         return;
       }
       finish_(null, envelope);
+    }
+    if (navigator && navigator.onLine === false) {
+      finish_(createError_('端末がオフラインです。通信が戻ってから再試行してください。', 'OFFLINE'));
+      return;
     }
     try {
       if (!window.crypto || typeof window.crypto.getRandomValues !== 'function') {
@@ -1002,31 +1034,42 @@
       window.crypto.getRandomValues(bytes);
       nonce = Array.from(bytes, function(value) { return value.toString(16).padStart(2, '0'); }).join('');
       const params = new URLSearchParams();
-      params.set('api', 'libraryRevision');
-      params.set('transport', 'revisionFrame');
+      params.set('api', config.api);
+      params.set('transport', transportName);
       params.set('nonce', nonce);
       if (perfToken) params.set('perf', '1');
+      appendArgs_(params, config.argNames, args);
       frame = document.createElement('iframe');
       frame.hidden = true;
       frame.tabIndex = -1;
       frame.setAttribute('aria-hidden', 'true');
       frame.style.display = 'none';
       frame.onerror = function() {
-        finish_(createError_('Revision frame load failed', 'REVISION_FRAME_ERROR'));
+        finish_(createError_('APIを読み込めませんでした。通信状態を確認してください。', revisionBackup ? 'REVISION_FRAME_ERROR' : 'SCRIPT_ERROR'));
       };
       window.addEventListener('message', receive_);
       listening = true;
+      if (!revisionBackup) {
+        timeoutId = window.setTimeout(function() {
+          finish_(createError_('通信がタイムアウトしました。時間を置いて再度お試しください。', 'TIMEOUT'));
+        }, config.timeoutMs || JSONP_TIMEOUT_MS);
+      }
       frame.src = GAS_JSONP_ENDPOINT + '?' + params.toString();
       (document.body || document.head).appendChild(frame);
     } catch (error) {
-      finish_(createError_('Revision frame unavailable', 'REVISION_FRAME_UNAVAILABLE'));
+      finish_(createError_('API frame unavailable', revisionBackup ? 'REVISION_FRAME_UNAVAILABLE' : 'API_FRAME_UNAVAILABLE'));
     }
     return function() {
       if (finished) return;
       finished = true;
       cleanup_();
-      endPerf_(perfToken, { ok: false, code: 'CANCELLED', transport: { name: 'revisionFrame' } });
+      endPerf_(perfToken, { ok: false, code: 'CANCELLED', transport: { name: transportName } });
     };
+  }
+
+  function invokeLibraryRevisionFrame_(success, failure, options) {
+    return invokeRemoteFrame_('getLibraryDatasetRevisionForPwa_', METHOD_CONFIG.getLibraryDatasetRevisionForPwa_,
+      [], success, failure, options, true);
   }
 
   // Only the lightweight revision read has a bounded backup. Its original

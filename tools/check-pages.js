@@ -461,6 +461,7 @@ const sandboxDocument = {
   }
 };
 const sandboxNavigator = { onLine: true };
+require('./frame-test-fixture').installFrameFixture(sandboxWindow, sandboxDocument);
 
 vm.runInNewContext(read(path.join(docs, 'assets', 'js', 'gas-run-shim.js')), {
   window: sandboxWindow,
@@ -487,7 +488,8 @@ sandboxWindow.google.script.run
   })
   .searchBooksSimple('葬送');
 
-assert(appendedScripts.length === 1, 'JSONP shim appends one script for search');
+assert(appendedScripts.length === 1 && appendedScripts[0].frame, 'search sends one HtmlService iframe request');
+assert(!new URL(appendedScripts[0].frame.src).searchParams.has('callback'), 'frame URL has no JSONP callback');
 const searchUrl = new URL(appendedScripts[0].src);
 assert(searchUrl.searchParams.get('api') === 'searchSimple', 'JSONP shim maps searchBooksSimple');
 assert(searchUrl.searchParams.get('perf') === '1', 'JSONP shim opts into server timings while the performance HUD records');
@@ -517,7 +519,7 @@ assert(sandboxWindow.ShumiLibraryPwa.perfEntries.length === 1, 'JSONP shim compl
 assert(sandboxWindow.ShumiLibraryPwa.perfEntries[0].meta.server.cacheStatus === 'hit', 'JSONP shim carries server timing details into the performance entry');
 assert(sandboxWindow.ShumiLibraryPwa.perfEntries[0].meta.transport.requestSentAtEpochMs > 0, 'JSONP shim records request-sent epoch time');
 assert(sandboxWindow.ShumiLibraryPwa.perfEntries[0].meta.transport.callbackReceivedAtEpochMs > 0, 'JSONP shim records callback-received epoch time');
-assert(sandboxWindow.ShumiLibraryPwa.perfEntries[0].meta.transport.jsonpResponseChars === 1234, 'JSONP shim records JSONP response character count');
+assert(sandboxWindow.ShumiLibraryPwa.perfEntries[0].meta.transport.name === 'apiFrame', 'read APIs report HtmlService frame transport');
 assert(failureCode === '', 'JSONP shim does not call failure on success');
 assert(sandboxWindow.ShumiLibraryPwa.cleared === 1, 'JSONP shim clears network warning on success');
 

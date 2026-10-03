@@ -18,7 +18,8 @@ vm.runInNewContext(build.slice(start, end) + '\nwriteGasRunShim();', {
 // Expose private entry points only to the VM, following the series-loading fixture.
 fixtureShim = fixtureShim.replace(/\}\)\(\);\s*$/, `
   window.revisionFixture = {
-    read: invokeLibraryRevisionRead_, activate: activateLocalIndex_, remotePromise: invokeRemotePromise_
+    read: invokeLibraryRevisionRead_, activate: activateLocalIndex_, remotePromise: invokeRemotePromise_,
+    remote: invokeRemoteJsonp_, search: invokeSearchWithFreshIndex_
   };
 })();`);
 const existing = read('tools/check-series-loading.js');
@@ -32,32 +33,17 @@ const host = { require, URL, URLSearchParams, Buffer, fixtureShim, __dirname, mo
 vm.runInNewContext(prelude + '\nmodule.exports = { harness, payload };', host);
 const { harness: baseHarness, payload } = host.module.exports;
 function harness() {
-  const h = baseHarness();
-  const listeners = new Set(), activeFrames = new Set();
-  h.window.crypto = require('node:crypto').webcrypto;
-  h.window.addEventListener = (type, listener) => { if (type === 'message') listeners.add(listener); };
-  h.window.removeEventListener = (type, listener) => { if (type === 'message') listeners.delete(listener); };
-  const create = h.document.createElement;
-  h.document.createElement = function(tag) {
-    const node = create(tag);
-    if (tag === 'iframe') node.contentWindow = { parent: h.window };
-    return node;
-  };
+  const h = baseHarness(), fixture = h.frameFixture;
+  h.message = fixture.message;
+  h.frameReply = (request, envelope, overrides = {}) => fixture.reply(request.frame || request.script.frame, envelope, overrides);
+  const append = h.document.body.appendChild;
   h.document.body.appendChild = function(frame) {
-    activeFrames.add(frame);
-    frame.parentNode = { removeChild() { activeFrames.delete(frame); frame.parentNode = null; } };
-    h.requests.push({ script: frame, frame, params: new URL(frame.src).searchParams });
+    const result = append(frame);
+    const request = h.requests[h.requests.length - 1];
+    request.frame = frame;
+    return result;
   };
-  h.message = event => Array.from(listeners).forEach(listener => listener(event));
-  h.frameReply = (request, envelope, overrides = {}) => h.message(Object.assign({
-    origin: 'https://fixture-script.googleusercontent.com', source: request.frame.contentWindow,
-    data: { kind: 'SHUMI_LIBRARY_REVISION_FRAME_V1', nonce: request.params.get('nonce'), envelope }
-  }, overrides));
-  const reply = h.reply;
-  h.reply = (request, data, error) => request.frame
-    ? h.frameReply(request, error ? { ok: false, error: { message: error } } : { ok: true, data })
-    : reply(request, data, error);
-  return Object.assign(h, { activeFrames, messageListeners: listeners });
+  return Object.assign(h, { activeFrames: fixture.activeFrames, messageListeners: fixture.listeners });
 }
 const callback = (h, request) => request.frame ? envelope => h.frameReply(request, envelope)
   : request.params.get('callback').split('.').reduce((obj, key) => obj[key], h.window);
@@ -103,7 +89,7 @@ async function main() {
     assert.equal(h.requests.length, 2);
     assert.equal(h.requests[1].params.get('api'), 'libraryRevision');
     assert.equal(h.requests[1].params.get('transport'), 'revisionFrame');
-    assert.equal(h.requests[1].params.has('callback'), false);
+    assert.equal(new URL(h.requests[1].frame.src).searchParams.has('callback'), false);
     assert.match(h.requests[1].params.get('nonce'), /^[a-f0-9]{32}$/);
     h.advance(1000);
     h.reply(h.requests[1], { revision: 'one' });
@@ -252,7 +238,7 @@ async function main() {
     assert.equal(results[0].atMs, 4000, '3s backup plus 1s response releases a local query');
     assert(results[0].books.some(book => book.title === 'クビキリサイクル'));
     assert(h.perf.some(entry => entry.name === 'api:searchSimple' && entry.meta.local && entry.result.ok));
-    assert(h.activeScripts.has(remoteSearch.script), 'local result wins while the remote search is still pending');
+    assert(!h.activeScripts.has(remoteSearch.script), 'local winner cancels the pending remote search frame');
     assert(!h.activeScripts.has(primary.script), 'winning revision cancels its hung primary');
     assert.equal(h.requests.length, 3, 'no duplicate refresh pair or heavy API retry');
     h.advance(16000);

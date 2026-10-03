@@ -2750,6 +2750,10 @@ function doGet(e) {
   const params = e && e.parameter ? e.parameter : {};
   const apiName = String(params.api || '').trim();
 
+  if (params.transport === 'apiFrame') {
+    return handlePublicApiFrameRequest_(apiName, params);
+  }
+
   if (apiName === 'libraryRevision' && params.transport === 'revisionFrame') {
     return handleLibraryRevisionFrameRequest_(params);
   }
@@ -2786,9 +2790,42 @@ function handleLibraryRevisionFrameRequest_(params) {
     perf.serverMs = Math.max(0, readyAt - startedAt);
     envelope.perf = perf;
   }
-  const escapedMessage = JSON.stringify({
+  return createPublicApiFrameHtmlOutput_({
     kind: 'SHUMI_LIBRARY_REVISION_FRAME_V1', nonce, envelope
-  }).replace(/[<>&\u2028\u2029]/g, character => ({
+  });
+}
+
+/** Use the same existing public read-only whitelist; private RPCs are never dispatched. */
+function handlePublicApiFrameRequest_(apiName, params) {
+  const nonce = String(params.nonce || '');
+  if (!/^[0-9a-f]{32}$/i.test(nonce) ||
+      !Object.prototype.hasOwnProperty.call(PUBLIC_WEBAPP_JSONP_API_HANDLERS_, apiName)) {
+    return HtmlService.createHtmlOutput('<!doctype html><meta charset="utf-8"><title>Invalid request</title>');
+  }
+  const startedAt = Date.now();
+  const perf = String(params.perf || '') === '1' ? {
+    version: 2,
+    serverStartedAtEpochMs: startedAt,
+    serverStartedAt: new Date(startedAt).toISOString()
+  } : null;
+  let envelope;
+  try {
+    envelope = { ok: true, data: dispatchWebAppJsonpApi_(apiName, decodeWebAppJsonpParams_(params), perf), error: null };
+  } catch (error) {
+    envelope = { ok: false, data: null, error: { api: apiName, message: 'API request failed' } };
+  }
+  if (perf) {
+    const readyAt = Date.now();
+    perf.serverResponseReadyAtEpochMs = readyAt;
+    perf.serverResponseReadyAt = new Date(readyAt).toISOString();
+    perf.serverMs = Math.max(0, readyAt - startedAt);
+    envelope.perf = perf;
+  }
+  return createPublicApiFrameHtmlOutput_({ kind: 'SHUMI_LIBRARY_API_FRAME_V1', api: apiName, nonce, envelope });
+}
+
+function createPublicApiFrameHtmlOutput_(message) {
+  const escapedMessage = JSON.stringify(message).replace(/[<>&\u2028\u2029]/g, character => ({
     '<': '\\u003c', '>': '\\u003e', '&': '\\u0026',
     '\u2028': '\\u2028', '\u2029': '\\u2029'
   })[character]);

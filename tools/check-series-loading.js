@@ -65,6 +65,7 @@ function harness() {
       requests.push({ script, params: new URL(script.src).searchParams });
     } }
   };
+  const frameFixture = require('./frame-test-fixture').installFrameFixture(window, document);
   const c = vm.createContext({ window, document, navigator: { onLine: true }, console: { log() {}, warn() {} },
     URLSearchParams, CustomEvent: function(type, detail) { this.type = type; this.detail = detail; },
     btoa: text => Buffer.from(text, 'binary').toString('base64'), setTimeout: window.setTimeout, clearTimeout: window.clearTimeout });
@@ -102,7 +103,7 @@ function harness() {
     c.fetchSeriesBooks_(key, count, books => outcomes.push({ books: plain(books) }), error => outcomes.push({ code: error.code }));
     return outcomes;
   }
-  return { c, window, document, nodes, timers, requests, activeScripts, eval_, advance, reply, call, perf, notifications,
+  return { c, window, document, nodes, timers, requests, activeScripts, eval_, advance, reply, call, perf, notifications, frameFixture,
     activate(data = payload(), fresh = true) { window.seriesFixture.activate(data, fresh); } };
 }
 const booksFor = (h, key = seriesFixtures[0][0]) => plain(h.window.ShumiLibraryLocalIndex.getCompleteSeriesBooks(key, 'revision-one'));

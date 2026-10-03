@@ -67,6 +67,12 @@ jobs:
       - name: Check revision frame server transport
         run: node tools/check-revision-frame-server.js
 
+      - name: Check public API frame client transport
+        run: node tools/check-public-api-frame.js
+
+      - name: Check public API frame server transport
+        run: node tools/check-public-api-frame-server.js
+
       - name: Check generated fallback covers
         run: node tools/check-fallback-covers.js
 

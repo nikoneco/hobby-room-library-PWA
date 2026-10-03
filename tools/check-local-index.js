@@ -182,7 +182,7 @@ async function checkDownloadedIndex(writeMode, invalid) {
       }));
     } }
   };
-  vm.runInNewContext(shimSource, {
+  runFrameVm(shimSource, {
     window: win, document: doc, navigator: { onLine: true }, URLSearchParams,
     console: { warn: (...args) => warnings.push(args), error() {} }
   });
@@ -415,7 +415,7 @@ function createSearchRaceHarness(options) {
     static now() { return 1700000000000 + clock.now(); }
   };
 
-  vm.runInNewContext(shimSource, {
+  runFrameVm(shimSource, {
     window: win,
     document: doc,
     navigator: nav,
@@ -825,7 +825,7 @@ async function checkSeriesOrderSchemaUpgrade() {
     head: { appendChild(script) { appendedScripts.push(script); } }
   };
 
-  vm.runInNewContext(shimSource, {
+  runFrameVm(shimSource, {
     window: sandboxWindow,
     document: sandboxDocument,
     navigator: { onLine: false },
@@ -972,7 +972,7 @@ async function checkSeriesOrderSchemaUpgrade() {
     head: { appendChild(script) { onlineScripts.push(script); } }
   };
 
-  vm.runInNewContext(shimSource, {
+  runFrameVm(shimSource, {
     window: onlineWindow,
     document: onlineDocument,
     navigator: { onLine: true },
@@ -1058,3 +1058,8 @@ async function checkSeriesOrderSchemaUpgrade() {
   console.error(error);
   process.exitCode = 1;
 });
+
+function runFrameVm(source, context, options) {
+  require('./frame-test-fixture').installFrameFixture(context.window, context.document);
+  return vm.runInNewContext(source, context, options);
+}

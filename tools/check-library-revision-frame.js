@@ -31,7 +31,7 @@ async function main() {
     assert.equal(request.params.get('nonce'), '000102030405060708090a0b0c0d0e0f');
     assert.equal(request.params.get('api'), 'libraryRevision');
     assert.equal(request.params.get('transport'), 'revisionFrame');
-    assert.equal(request.params.has('callback'), false);
+    assert.equal(new URL(request.frame.src).searchParams.has('callback'), false);
     assert.equal(request.frame.hidden, true);
     assert.equal(request.frame.tabIndex, -1);
     assert.equal(request.frame.style.display, 'none');
@@ -184,6 +184,7 @@ async function main() {
     let force;
     h.document.body.appendChild = function(frame) {
       append(frame);
+      if (new URL(frame.src).searchParams.get('transport') !== 'revisionFrame') return;
       force = manager.forceRefresh();
       if (immediateSuccess) h.reply(h.requests[h.requests.length - 1], { revision: 'revision-one' });
     };

@@ -82,6 +82,7 @@ async function localFixture(payload) {
     addEventListener() {}, dispatchEvent() {},
     createElement() { return {}; }, head: { appendChild(script) { network.push(script); } }
   };
+  require('./frame-test-fixture').installFrameFixture(window, document);
   vm.runInNewContext(shimSource, {
     window, document, navigator, URLSearchParams, Promise, Date, CustomEvent: function(type, init) { this.type = type; this.detail = init.detail; },
     btoa: value => Buffer.from(value, 'binary').toString('base64'), console: { warn() {}, error() {} }
