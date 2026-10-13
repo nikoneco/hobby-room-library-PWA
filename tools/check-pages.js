@@ -172,7 +172,23 @@ assert(pagesWorkflow.includes('actions/deploy-pages@v5'), 'Pages workflow deploy
 });
 
 assert(manifest.name === '趣味部屋図書館', 'manifest name is set');
-assert(manifest.id === './', 'manifest has stable app id');
+const publicManifestUrl = 'https://nikoneco.github.io/hobby-room-library-PWA/manifest.webmanifest';
+const publicStartUrl = new URL(manifest.start_url, publicManifestUrl);
+const publicScopeUrl = new URL(manifest.scope, publicManifestUrl);
+// Manifest IDs resolve against the start_url origin, not the manifest directory.
+// Preserve existing installs; moving this ID to the library path makes a new app.
+const appIdBase = publicStartUrl.origin + '/';
+const resolvedAppId = new URL(manifest.id, appIdBase);
+const previousAppId = new URL('./', appIdBase);
+assert(manifest.id === '/', 'manifest explicitly pins the existing origin-root identity');
+assert(resolvedAppId.href === previousAppId.href && resolvedAppId.href === 'https://nikoneco.github.io/',
+  'manifest preserves the resolved identity of existing library installs');
+assert(publicStartUrl.href === 'https://nikoneco.github.io/hobby-room-library-PWA/',
+  'manifest start_url resolves to the library, not another same-origin app');
+assert(publicScopeUrl.href === publicStartUrl.href,
+  'manifest scope remains confined to the library directory');
+assert(resolvedAppId.href !== new URL('/Sudoku/', appIdBase).href,
+  'library identity differs from the Sudoku identity');
 assert(manifest.lang === 'ja', 'manifest language is Japanese');
 assert(manifest.display === 'standalone', 'manifest display is standalone');
 assert(Array.isArray(manifest.display_override) && manifest.display_override.includes('standalone'), 'manifest has display override fallback');

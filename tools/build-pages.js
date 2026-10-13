@@ -5511,7 +5511,8 @@ function writePwaClient() {
 
 function writePwaFiles() {
   const manifest = {
-    id: './',
+    // Keep the installed identity at the origin root, separate from launch scope.
+    id: '/',
     name: '趣味部屋図書館',
     short_name: '図書館',
     description: '蔵書目録を検索し、本棚から読みたい本を見つけるPWA。',
