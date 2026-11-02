@@ -649,11 +649,15 @@
       trace.cleanup = null;
     }
     trace.cleanup = cleanup_;
+    function isFallbackCover_(img) {
+      return img.classList.contains('book-image-generated-cover') ||
+        (typeof NO_IMAGE_URL === 'string' && (img.currentSrc || img.src) === NO_IMAGE_URL);
+    }
     function updateCovers_(timedOut) {
       if (activeSearchPerf !== trace || !isPerfHudEnabled_()) return;
       const covers = trace.covers;
-      covers.loaded = images.filter(img => img.classList.contains('book-image-loaded') && img.naturalWidth > 0 && !img.classList.contains('book-image-generated-cover')).length;
-      covers.fallback = images.filter(img => img.classList.contains('book-image-loaded') && img.naturalWidth > 0 && img.classList.contains('book-image-generated-cover')).length;
+      covers.loaded = images.filter(img => img.classList.contains('book-image-loaded') && img.naturalWidth > 0 && !isFallbackCover_(img)).length;
+      covers.fallback = images.filter(img => img.classList.contains('book-image-loaded') && img.naturalWidth > 0 && isFallbackCover_(img)).length;
       covers.failed = images.filter(img => img.classList.contains('book-image-loaded') && !img.naturalWidth).length;
       covers.pending = covers.total - covers.loaded - covers.fallback - covers.failed;
       if (!covers.pending || timedOut) {

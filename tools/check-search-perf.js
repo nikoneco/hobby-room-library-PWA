@@ -150,16 +150,18 @@ function harness(enabled = true, stored = []) {
 // Cover observation never delays the first-result milestone; fallbacks/failures settle separately.
 {
   const h = harness(), trace = h.pwa.startSearch(1); h.receive(trace);
-  const result = h.result(), images = Array.from({ length: 3 }, () => new h.Node('img'));
+  const result = h.result(), images = Array.from({ length: 4 }, () => new h.Node('img'));
   images.forEach(img => result.appendChild(img)); h.pwa.renderSearch(trace, result, 3); h.frame(); h.frame();
-  assert.equal(trace.status, 'success'); assert.equal(trace.covers.pending, 3);
+  assert.equal(trace.status, 'success'); assert.equal(trace.covers.pending, 4);
   const total = trace.totalMs; h.advance(200);
   images[0].naturalWidth = 100; images[0].className = 'book-image-loaded';
   images[1].naturalWidth = 100; images[1].className = 'book-image-loaded book-image-generated-cover';
   images[2].naturalWidth = 0; images[2].className = 'book-image-loaded';
+  h.c.NO_IMAGE_URL = 'https://example.invalid/no-image.jpg';
+  images[3].src = h.c.NO_IMAGE_URL; images[3].naturalWidth = 100; images[3].className = 'book-image-loaded';
   [...h.observers].forEach(observer => observer.fn());
   assert.equal(trace.totalMs, total); assert.equal(trace.covers.elapsedMs, total + 200);
-  assert.equal(trace.covers.loaded, 1); assert.equal(trace.covers.fallback, 1); assert.equal(trace.covers.failed, 1);
+  assert.equal(trace.covers.loaded, 1); assert.equal(trace.covers.fallback, 2); assert.equal(trace.covers.failed, 1);
   assert.equal(trace.covers.status, 'settled'); assert.equal(h.observers.size + h.timers.size + h.frames.size, 0);
 }
 {
