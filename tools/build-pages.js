@@ -3259,8 +3259,98 @@ function writeGasRunShim() {
     if (!q) return true;
     if (item && item.searchKey && item.searchKey.includes(q)) return true;
     if (item && normalizeKanaLocal_(item.seriesSearchTitle || '').includes(q)) return true;
-    return titleYomiMixedMatchLocal_(q, item && item.title, item && item.yomi);
+    return titleYomiMixedMatchLocal_(q, item && item.title, item && item.yomi) || alignedTitleReadingMatchLocal_(q, item);
   }
+
+  // A conservative supplement to the existing matcher. Shared, unique kana /
+  // bracket anchors align a title with its stored reading; no reading is guessed.
+  // Each aligned gap offers at most its literal title and its recorded reading.
+  // A streaming prefix automaton checks the alternatives without enumerating the
+  // exponentially many whole-title combinations or allowing gaps / edit distance.
+  const alignedTitleReadingCache_ = new WeakMap();
+  let alignedTitleQuery_ = null;
+  function isAlignedMixedQueryLocal_(query) {
+    return query.length <= 128 && /[\u3400-\u9fff]/.test(query) && /[\u3041-\u3096\u30fc]/.test(query);
+  }
+  function compileAlignedTitleReadingLocal_(title, yomi) {
+    if (!title || !yomi || title.length > 512 || yomi.length > 512) return null;
+    const anchors = title.match(/[\u3041-\u3096\u30fc]+|[〈〉《》]+/g) || [];
+    if (!anchors.length) return null;
+    const parts = [];
+    let t = 0, y = 0, alternatives = 0;
+    function gap_(titlePart, readingPart) {
+      const choices = [titlePart];
+      if (titlePart !== readingPart && /[\u3400-\u9fff]/.test(titlePart) &&
+          readingPart && !/[\u3400-\u9fff]/.test(readingPart)) {
+        choices.push(readingPart);
+        alternatives += 1;
+      }
+      parts.push(choices);
+    }
+    for (const anchor of anchors) {
+      const ti = title.indexOf(anchor, t);
+      const yi = yomi.indexOf(anchor, y);
+      // Repeated or missing anchors cannot establish a reliable correspondence.
+      if (yi < 0 || yomi.indexOf(anchor) !== yomi.lastIndexOf(anchor)) return null;
+      gap_(title.slice(t, ti), yomi.slice(y, yi));
+      parts.push([anchor]);
+      t = ti + anchor.length;
+      y = yi + anchor.length;
+    }
+    gap_(title.slice(t), yomi.slice(y));
+    return alternatives ? parts : null;
+  }
+  function alignedTitleReadingMatchLocal_(query, item) {
+    if (!item) return false;
+    // One current query only; do not rebuild its chunks / prefix table per book.
+    if (!alignedTitleQuery_ || alignedTitleQuery_.query !== query) {
+      const mixed = isAlignedMixedQueryLocal_(query);
+      const prefix = [0];
+      if (mixed) for (let i = 1, j = 0; i < query.length; i += 1) {
+        while (j && query[i] !== query[j]) j = prefix[j - 1];
+        if (query[i] === query[j]) j += 1;
+        prefix[i] = j;
+      }
+      alignedTitleQuery_ = { query: query, mixed: mixed, prefix: prefix,
+        chunks: mixed ? query.match(/[\u3400-\u9fff]+/g) : [],
+        readings: mixed ? query.match(/[\u3041-\u3096\u30fc]+/g) : [] };
+    }
+    if (!alignedTitleQuery_.mixed) return false;
+    const title = String(item.title || ''), yomi = String(item.yomi || '');
+    let at = 0;
+    for (const chunk of alignedTitleQuery_.chunks) {
+      at = title.indexOf(chunk, at);
+      if (at < 0) return false;
+      at += chunk.length;
+    }
+    for (const chunk of alignedTitleQuery_.readings) if (!yomi.includes(chunk)) return false;
+    let cached = alignedTitleReadingCache_.get(item);
+    if (!cached || cached.title !== title || cached.yomi !== yomi) {
+      cached = { title: title, yomi: yomi, parts: compileAlignedTitleReadingLocal_(title, yomi) };
+      alignedTitleReadingCache_.set(item, cached);
+    }
+    if (!cached.parts) return false;
+    const prefix = alignedTitleQuery_.prefix;
+    let states = new Set([0]);
+    for (const choices of cached.parts) {
+      const next = new Set();
+      for (const choice of choices) for (const state of states) {
+        let j = state;
+        for (const char of choice) {
+          while (j && char !== query[j]) j = prefix[j - 1];
+          if (char === query[j]) j += 1;
+          if (j === query.length) return true;
+        }
+        next.add(j);
+      }
+      states = next;
+    }
+    return false;
+  }
+  window.ShumiLibraryTitleReading = {
+    isMixed: isAlignedMixedQueryLocal_,
+    matches: alignedTitleReadingMatchLocal_
+  };
 
   function normalizeReleasedYmLocal_(year, month, isFrom) {
     if (!year) return 0;
@@ -3325,8 +3415,8 @@ function writeGasRunShim() {
     const releasedYm = Number(item.releasedYm || 0);
     return Boolean(
       (!criteria.keyword || keywordMixedMatchLocal_(criteria.keyword, item)) &&
-      (!criteria.title || titleYomiMixedMatchLocal_(criteria.title, item.title, item.yomi)) &&
-      (!criteria.yomi || titleYomiMixedMatchLocal_(criteria.yomi, item.title, item.yomi)) &&
+      (!criteria.title || titleYomiMixedMatchLocal_(criteria.title, item.title, item.yomi) || alignedTitleReadingMatchLocal_(criteria.title, item)) &&
+      (!criteria.yomi || titleYomiMixedMatchLocal_(criteria.yomi, item.title, item.yomi) || alignedTitleReadingMatchLocal_(criteria.yomi, item)) &&
       (!criteria.author || (item.author && item.author.includes(criteria.author)) ||
         (Array.isArray(item.contributors) && item.contributors.some(function(name) { return name.includes(criteria.author); }))) &&
       (!criteria.publisher || item.publisher === criteria.publisher) &&

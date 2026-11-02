@@ -949,6 +949,22 @@ function getInitialSearchData() {
   }
 }
 
+// Pair existing suggestion positions, without duplicating title/reading text.
+function buildTitleYomiPairsForPwa_(index, suggest) {
+  suggest = suggest || {};
+  const titlePositions = new Map((suggest.titles || []).map((value, position) => [normalizeKana(value), position]));
+  const yomiPositions = new Map((suggest.yomis || []).map((value, position) => [normalizeKana(value), position]));
+  const seen = new Set();
+  const pairs = [];
+  for (const item of index || []) {
+    const title = titlePositions.get(item.title), yomi = yomiPositions.get(item.yomi);
+    if (title === undefined || yomi === undefined) continue;
+    const key = title + ':' + yomi;
+    if (!seen.has(key)) { seen.add(key); pairs.push([title, yomi]); }
+  }
+  return pairs;
+}
+
 /**
  * PWA(JSONP)向け初期表示用データを返す。
  * 件数プレビュー用インデックスは全件分の転送が重いため、PWAでは初期ロードから外す。
@@ -974,7 +990,7 @@ function getInitialSearchDataForPwa_(perf) {
     const metadata = buildLocalSearchMetadataPayload_(dataset);
 
     return {
-      suggest: metadata.suggest,
+      suggest: Object.assign({}, metadata.suggest, { titleYomiPairs: buildTitleYomiPairsForPwa_(dataset.index, metadata.suggest) }),
       advancedOptions: metadata.advancedOptions,
       previewIndex: [],
       quickBrowseCounts: metadata.quickBrowseCounts,
@@ -1421,12 +1437,94 @@ function findChunkMixedMatch_(chunk, text, minProgress) {
   return null;
 }
 
+// Same bounded, anchored supplement as the PWA local matcher; legacy hits win.
+const alignedTitleReadingCache_ = new WeakMap();
+let alignedTitleQuery_ = null;
+function isAlignedMixedQuery_(query) {
+  return query.length <= 128 && /[㐀-鿿]/.test(query) && /[ぁ-ゖー]/.test(query);
+}
+function compileAlignedTitleReading_(title, yomi) {
+  if (!title || !yomi || title.length > 512 || yomi.length > 512) return null;
+  const anchors = title.match(/[ぁ-ゖー]+|[〈〉《》]+/g) || [];
+  if (!anchors.length) return null;
+  const parts = [];
+  let t = 0, y = 0, alternatives = 0;
+  function gap_(titlePart, readingPart) {
+    const choices = [titlePart];
+    if (titlePart !== readingPart && /[㐀-鿿]/.test(titlePart) &&
+        readingPart && !/[㐀-鿿]/.test(readingPart)) {
+      choices.push(readingPart);
+      alternatives += 1;
+    }
+    parts.push(choices);
+  }
+  for (const anchor of anchors) {
+    const ti = title.indexOf(anchor, t);
+    const yi = yomi.indexOf(anchor, y);
+    // Repeated or missing anchors cannot establish a reliable correspondence.
+    if (yi < 0 || yomi.indexOf(anchor) !== yomi.lastIndexOf(anchor)) return null;
+    gap_(title.slice(t, ti), yomi.slice(y, yi));
+    parts.push([anchor]);
+    t = ti + anchor.length;
+    y = yi + anchor.length;
+  }
+  gap_(title.slice(t), yomi.slice(y));
+  return alternatives ? parts : null;
+}
+function alignedTitleReadingMatch_(query, item) {
+  if (!item) return false;
+  // One current query only; do not rebuild its chunks / prefix table per book.
+  if (!alignedTitleQuery_ || alignedTitleQuery_.query !== query) {
+    const mixed = isAlignedMixedQuery_(query);
+    const prefix = [0];
+    if (mixed) for (let i = 1, j = 0; i < query.length; i += 1) {
+      while (j && query[i] !== query[j]) j = prefix[j - 1];
+      if (query[i] === query[j]) j += 1;
+      prefix[i] = j;
+    }
+    alignedTitleQuery_ = { query: query, mixed: mixed, prefix: prefix,
+      chunks: mixed ? query.match(/[㐀-鿿]+/g) : [],
+      readings: mixed ? query.match(/[ぁ-ゖー]+/g) : [] };
+  }
+  if (!alignedTitleQuery_.mixed) return false;
+  const title = String(item.title || ''), yomi = String(item.yomi || '');
+  let at = 0;
+  for (const chunk of alignedTitleQuery_.chunks) {
+    at = title.indexOf(chunk, at);
+    if (at < 0) return false;
+    at += chunk.length;
+  }
+  for (const chunk of alignedTitleQuery_.readings) if (!yomi.includes(chunk)) return false;
+  let cached = alignedTitleReadingCache_.get(item);
+  if (!cached || cached.title !== title || cached.yomi !== yomi) {
+    cached = { title: title, yomi: yomi, parts: compileAlignedTitleReading_(title, yomi) };
+    alignedTitleReadingCache_.set(item, cached);
+  }
+  if (!cached.parts) return false;
+  const prefix = alignedTitleQuery_.prefix;
+  let states = new Set([0]);
+  for (const choices of cached.parts) {
+    const next = new Set();
+    for (const choice of choices) for (const state of states) {
+      let j = state;
+      for (const char of choice) {
+        while (j && char !== query[j]) j = prefix[j - 1];
+        if (char === query[j]) j += 1;
+        if (j === query.length) return true;
+      }
+      next.add(j);
+    }
+    states = next;
+  }
+  return false;
+}
+
 function keywordMixedMatch_(query, idx) {
   const q = normalizeKana(query || '');
   if (!q) return true;
   if (idx && idx.searchKey && idx.searchKey.includes(q)) return true;
   if (idx && normalizeKana(idx.seriesSearchTitle || '').includes(q)) return true;
-  return titleYomiMixedMatch_(q, idx && idx.title, idx && idx.yomi);
+  return titleYomiMixedMatch_(q, idx && idx.title, idx && idx.yomi) || alignedTitleReadingMatch_(q, idx);
 }
 
 function buildServerSearchCriteria_(
@@ -1470,8 +1568,8 @@ function matchesSearchCriteria_(idx, criteria) {
   const c = criteria || buildServerSearchCriteria_();
 
   const keywordMatch = !c.nKeyword || keywordMixedMatch_(c.nKeyword, item);
-  const titleMatch = !c.nTitle || titleYomiMixedMatch_(c.nTitle, item.title, item.yomi);
-  const yomiMatch = !c.nYomi || titleYomiMixedMatch_(c.nYomi, item.title, item.yomi);
+  const titleMatch = !c.nTitle || titleYomiMixedMatch_(c.nTitle, item.title, item.yomi) || alignedTitleReadingMatch_(c.nTitle, item);
+  const yomiMatch = !c.nYomi || titleYomiMixedMatch_(c.nYomi, item.title, item.yomi) || alignedTitleReadingMatch_(c.nYomi, item);
   const authorMatch = !c.nAuthor || (item.author && item.author.includes(c.nAuthor)) ||
     (Array.isArray(item.contributors) && item.contributors.some(name => name.includes(c.nAuthor)));
   const publisherMatch = !c.selectedPublisher || item.publisher === c.selectedPublisher;

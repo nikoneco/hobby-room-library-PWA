@@ -82,6 +82,12 @@ jobs:
       - name: Check contributors and preview counts
         run: node tools/check-contributors-preview.js
 
+      - name: Check suggestion cache compatibility
+        run: node tools/check-suggestion-cache.js
+
+      - name: Check anchored title and reading matching
+        run: node tools/check-title-reading-match.js
+
       - name: Check similar book ranking
         run: node tools/check-similar-books.js
 

@@ -3,6 +3,7 @@ let popupData = [];
 let popupSeriesContext = null;
 
 let SUGGEST_DATA = { titles: [], yomis: [], authors: [] };
+let normalizedSuggestionCache_ = null;
 let ADVANCED_OPTIONS = {
   publishers: [],
   storyGenres: [],
@@ -720,33 +721,110 @@ function populateAdvancedOptions() {
   syncReleasedRangeOptions_();
 }
 
-function suggest(input, type) {
-  if (!input || input.length < 1) return [];
-  const nInput = normalizeKana(input);
+function sameSuggestionValues_(values, entries) {
+  return values.length === entries.length && values.every((value, index) => value === entries[index].value);
+}
+
+function sameSuggestionPairs_(pairs, cachedPairs) {
+  return pairs.length === cachedPairs.length && pairs.every((pair, index) => {
+    const cached = cachedPairs[index];
+    return pair === cached || (Array.isArray(pair) && Array.isArray(cached) &&
+      pair.length === cached.length && pair.every((value, part) => value === cached[part]));
+  });
+}
+
+function getNormalizedSuggestionData_(input) {
   const manager = window.ShumiLibraryLocalIndex;
   const groupedTitles = manager && typeof manager.getSuggestionTitles === 'function'
     ? manager.getSuggestionTitles(input)
     : (SUGGEST_DATA.seriesTitles || []);
-  const seriesMatches = groupedTitles.filter(v => normalizeKana(v).includes(nInput));
-  const titles = (SUGGEST_DATA.titles || []).filter(title => !seriesMatches.some(series =>
-    normalizeKana(title).startsWith(normalizeKana(series))
-  ));
+  const revision = manager && typeof manager.getRevision === 'function' ? String(manager.getRevision() || '') : '';
+  const titles = SUGGEST_DATA.titles || [];
+  const authors = SUGGEST_DATA.authors || [];
+  const yomis = SUGGEST_DATA.yomis || [];
+  const pairs = Array.isArray(SUGGEST_DATA.titleYomiPairs) ? SUGGEST_DATA.titleYomiPairs : [];
+  const cached = normalizedSuggestionCache_;
+  // Compare values as well as revision: legacy metadata can be replaced or edited
+  // without a revision, and a manager may return a new series array on each call.
+  if (cached && cached.manager === manager && cached.revision === revision && cached.previewSource === PREVIEW_INDEX &&
+      sameSuggestionPairs_(pairs, cached.pairs) &&
+      sameSuggestionValues_(groupedTitles, cached.series) &&
+      sameSuggestionValues_(titles, cached.titles) &&
+      sameSuggestionValues_(authors, cached.authors) &&
+      sameSuggestionValues_(yomis, cached.yomis)) return cached;
 
-  let arr = [];
-  if (type === 'keyword') {
-    arr = Array.from(new Set([
-      ...seriesMatches,
-      ...titles,
-      ...(SUGGEST_DATA.authors || []),
-      ...(SUGGEST_DATA.yomis || []).filter(yomi => !seriesMatches.some(series =>
-        normalizeKana(yomi).startsWith(normalizeKana(series))
-      )).map(yomi => /[0-9０-９]/.test(input) ? yomi : String(yomi).replace(/[\s.・]+(?:第)?[0-9０-９]+(?:巻)?\s*$/, ''))
-    ]));
-  } else if (type === 'detailTitle') {
-    arr = Array.from(new Set([...seriesMatches, ...titles]));
+  const entries = values => values.map(value => ({ value, normalized: normalizeKana(value) }));
+  // Lazy and bounded to one pool. Construct completely before replacing the old
+  // pool, so a failed metadata read/build cannot leave a partially cached result.
+  const next = {
+    manager, revision, previewSource: PREVIEW_INDEX, pairs: pairs.map(pair => Array.isArray(pair) ? pair.slice() : pair),
+    series: entries(groupedTitles), titles: entries(titles), authors: entries(authors),
+    yomis: entries(yomis).map(entry => {
+      const shortValue = String(entry.value).replace(/[\s.・]+(?:第)?[0-9０-９]+(?:巻)?\s*$/, '');
+      return Object.assign(entry, { shortValue, shortNormalized: normalizeKana(shortValue) });
+    })
+  };
+  next.preview = PREVIEW_INDEX.length ? PREVIEW_INDEX : pairs.filter(pair =>
+    Array.isArray(pair) && pair.length === 2 && Number.isInteger(pair[0]) && Number.isInteger(pair[1]) &&
+    pair[0] >= 0 && pair[0] < titles.length && pair[1] >= 0 && pair[1] < yomis.length).map(pair => ({
+    title: next.titles[pair[0]].normalized, yomi: next.yomis[pair[1]].normalized
+  }));
+  normalizedSuggestionCache_ = next;
+  return next;
+}
+
+function suggest(input, type) {
+  if (!input || input.length < 1 || !['keyword', 'detailTitle'].includes(type)) return [];
+  const nInput = normalizeKana(input);
+  const pool = getNormalizedSuggestionData_(input);
+  const seriesMatches = pool.series.filter(entry => entry.normalized.includes(nInput));
+  const hiddenBySeries = entry => seriesMatches.some(series => entry.normalized.startsWith(series.normalized));
+  const result = [];
+  const seen = new Set();
+  function add_(value, normalized) {
+    if (seen.has(value)) return false;
+    seen.add(value);
+    if (normalized.includes(nInput)) result.push(value);
+    return result.length === 6;
   }
 
-  return arr.filter(v => normalizeKana(v).includes(nInput)).slice(0, 6);
+  // Preserve the legacy Set/concatenation order, stopping only after the same
+  // first six distinct matches. Suppression uses the original, unstripped yomi.
+  for (const entry of seriesMatches) if (add_(entry.value, entry.normalized)) return result;
+  for (const entry of pool.titles) {
+    if (!hiddenBySeries(entry) && add_(entry.value, entry.normalized)) return result;
+  }
+  if (type === 'keyword') {
+    for (const entry of pool.authors) if (add_(entry.value, entry.normalized)) return result;
+    const keepVolume = /[0-9０-９]/.test(input);
+    for (const entry of pool.yomis) {
+      if (hiddenBySeries(entry)) continue;
+      if (add_(keepVolume ? entry.value : entry.shortValue,
+        keepVolume ? entry.normalized : entry.shortNormalized)) return result;
+    }
+  }
+  // Keep all established suggestions and their ranking. Only fill a previously
+  // empty mixed-script query using actual paired title/reading index records.
+  if (!result.length) return suggestAlignedTitles_(nInput, pool, type);
+  return result;
+}
+
+function suggestAlignedTitles_(query, pool, type) {
+  const matcher = window.ShumiLibraryTitleReading;
+  const readingOnly = type === 'detailTitle' && /^[\u3041-\u3096\u30fc]+$/.test(query);
+  if (!matcher || (!matcher.isMixed(query) && !readingOnly)) return [];
+  const matchedTitles = new Set();
+  for (const item of pool.preview) {
+    if ((readingOnly && String(item.yomi || '').includes(query)) || matcher.matches(query, item)) matchedTitles.add(String(item.title || ''));
+  }
+  if (!matchedTitles.size) return [];
+  const matched = Array.from(matchedTitles);
+  const series = pool.series.filter(entry => matched.some(title => title.startsWith(entry.normalized)));
+  const values = series.map(entry => entry.value);
+  for (const entry of pool.titles) {
+    if (matchedTitles.has(entry.normalized) && !series.some(group => entry.normalized.startsWith(group.normalized))) values.push(entry.value);
+  }
+  return Array.from(new Set(values)).slice(0, 6);
 }
 
 function isSearchCompositionEvent_(event) {
