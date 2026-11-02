@@ -55,6 +55,9 @@ jobs:
       - name: Check client request races
         run: node tools/check-client-races.js
 
+      - name: Check search performance lifecycle
+        run: node tools/check-search-perf.js
+
       - name: Check book detail request lifecycle
         run: node tools/check-book-detail-transport.js
 

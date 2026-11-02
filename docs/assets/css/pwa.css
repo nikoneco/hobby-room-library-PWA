@@ -824,6 +824,18 @@ body.pwa-settings-open {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 7px;
+  min-height: 0;
+  overflow: auto;
+  flex: 1 1 auto;
+}
+
+.pwa-perf-hud-stat.is-wide {
+  grid-column: 1 / -1;
+}
+
+.pwa-perf-hud-stat.is-wide .pwa-perf-hud-stat-value {
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .pwa-perf-hud-stat {
@@ -858,6 +870,8 @@ body.pwa-settings-open {
   display: grid;
   gap: 6px;
   overflow: auto;
+  max-height: 96px;
+  flex: 0 0 auto;
   padding-right: 3px;
 }
 

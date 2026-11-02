@@ -118,7 +118,7 @@
 
   function endPerf_(token, meta) {
     if (window.ShumiLibraryPwa && typeof window.ShumiLibraryPwa.perfEnd === 'function') {
-      window.ShumiLibraryPwa.perfEnd(token, meta);
+      return window.ShumiLibraryPwa.perfEnd(token, meta);
     }
   }
 
@@ -645,11 +645,13 @@
   }
 
   function invokeLocal_(methodName, args, successHandler, failureHandler, localErrorHandler, options) {
+    const opt = options || {};
     const config = METHOD_CONFIG[methodName];
     const perfToken = startPerf_('api:' + config.api, {
       method: methodName,
       api: config.api,
-      local: true
+      local: true,
+      searchId: opt.searchId
     });
     let localFinished = false;
     let cancelRemote = null;
@@ -679,14 +681,14 @@
         return;
       }
       localFinished = true;
-      endPerf_(perfToken, {
+      const perf = endPerf_(perfToken, {
         ok: true,
         count: result.length,
         local: true,
         sourceCount: localIndexRecords.length,
         revision: localIndexPayload.revision
       });
-      if (typeof successHandler === 'function') successHandler(result, { source: 'local' });
+      if (typeof successHandler === 'function') successHandler(result, { source: 'local', perf: perf, token: perfToken });
     }, 0);
     return function() {
       window.clearTimeout(localTimer);
@@ -698,7 +700,7 @@
     };
   }
 
-  function invokeSearchWithFreshIndex_(methodName, args, successHandler, failureHandler) {
+  function invokeSearchWithFreshIndex_(methodName, args, successHandler, failureHandler, options) {
     let settled = false;
     let remoteStarted = false;
     let localQueued = false;
@@ -718,12 +720,12 @@
       cancelRemote = null;
     }
 
-    function finishSuccess_(result, remote) {
+    function finishSuccess_(result, remote, info) {
       if (settled) return;
       settled = true;
       cleanupWait_();
       if (remote) notifySuccess_();
-      if (typeof successHandler === 'function') successHandler(result);
+      if (typeof successHandler === 'function') successHandler(result, info);
     }
 
     function finishFailure_(error) {
@@ -737,13 +739,13 @@
     function tryLocalSearch_() {
       if (settled || localQueued || localFailed || !canHandleLocally_(methodName, args)) return false;
       localQueued = true;
-      invokeLocal_(methodName, args, function(result) {
-        finishSuccess_(result, false);
+      invokeLocal_(methodName, args, function(result, info) {
+        finishSuccess_(result, false, info);
       }, failureHandler, function() {
         localQueued = false;
         localFailed = true;
         startRemoteSearch_();
-      });
+      }, options);
       return true;
     }
 
@@ -751,11 +753,11 @@
       if (settled || remoteStarted) return;
       if (!localFailed && tryLocalSearch_()) return;
       remoteStarted = true;
-      const cancel = invokeRemoteJsonp_(methodName, args, function(result) {
-        finishSuccess_(result, true);
+      const cancel = invokeRemoteJsonp_(methodName, args, function(result, info) {
+        finishSuccess_(result, true, info);
       }, function(error) {
         finishFailure_(error);
-      }, { quiet: true });
+      }, Object.assign({}, options, { quiet: true }));
       if (settled && typeof cancel === 'function') cancel();
       else cancelRemote = cancel;
     }
@@ -784,6 +786,23 @@
   }
 
   function invokeJsonp_(methodName, args, successHandler, failureHandler, options) {
+    const pwa = window.ShumiLibraryPwa;
+    const trace = /^searchBooks(Simple|Advanced)$/.test(methodName) && pwa &&
+      typeof pwa.getSearch === 'function' ? pwa.getSearch() : null;
+    if (trace) {
+      options = Object.assign({}, options, { searchId: trace.id });
+      const success = successHandler;
+      const failure = failureHandler;
+      pwa.dispatchSearch(trace);
+      successHandler = function(data, info) {
+        pwa.receiveSearch(trace, info || {});
+        if (typeof success === 'function') success(data);
+      };
+      failureHandler = function(error) {
+        pwa.failSearch(trace, error && error.code || 'API_ERROR');
+        if (typeof failure === 'function') failure(error);
+      };
+    }
     const testMode = window.ShumiLibraryTestMode;
     if (testMode && testMode.enabled && /^searchBooks(Simple|Advanced)$/.test(methodName)) {
       testMode.calls += 1;
@@ -806,7 +825,7 @@
       typeof window.ShumiLibraryLocalIndex.whenLoaded === 'function' &&
       typeof window.ShumiLibraryLocalIndex.checkForUpdates === 'function'
     ) {
-      invokeSearchWithFreshIndex_(methodName, args, successHandler, failureHandler);
+      invokeSearchWithFreshIndex_(methodName, args, successHandler, failureHandler, options);
       return;
     }
     return invokeRemoteJsonp_(methodName, args, successHandler, failureHandler, options);
@@ -928,6 +947,7 @@
     const messageKind = revisionBackup ? 'SHUMI_LIBRARY_REVISION_FRAME_V1' : 'SHUMI_LIBRARY_API_FRAME_V1';
     const perfToken = startPerf_(opt.perfName || ('api:' + config.api), {
       method: methodName, api: config.api,
+      searchId: opt.searchId,
       background: Boolean(opt.quiet), transport: transportName
     });
     let finished = false;
@@ -970,7 +990,7 @@
           transportPerf.afterServerApproxMs = callbackReceivedAtEpochMs - serverResponseReadyAtEpochMs;
         }
       }
-      endPerf_(perfToken, {
+      const perf = endPerf_(perfToken, {
         ok: !error, code: error ? error.code : undefined,
         count: envelope && Array.isArray(envelope.data) ? envelope.data.length : undefined,
         server: serverPerf, transport: transportPerf
@@ -981,7 +1001,7 @@
         } else invokeFailure_(failure, error);
       } else {
         if (!opt.quiet) notifySuccess_();
-        if (typeof success === 'function') success(envelope.data, { source: 'remote' });
+        if (typeof success === 'function') success(envelope.data, { source: 'remote', perf: perf, token: perfToken });
       }
     }
     function belongsToFrame_(source) {

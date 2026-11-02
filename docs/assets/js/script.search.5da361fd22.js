@@ -2018,9 +2018,11 @@ function hasAnyAdvancedCondition_(params) {
   });
 }
 
-function beginResultRequest_() {
+function beginResultRequest_(kind) {
+  pwaSearchPerf_('cancelSearch', 'superseded');
   cancelPreviewCountRequest_();
   resultRequestGeneration += 1;
+  if (kind === 'search') pwaSearchPerf_('startSearch', resultRequestGeneration);
   cancelShelfJump_();
   searchStatusState.removingChipKey = '';
   isRandomBooksLoading = false;
@@ -2033,8 +2035,9 @@ function isCurrentResultRequest_(generation) {
 }
 
 function rerunSearchWithParams_(params, loadingMessage) {
-  const requestGeneration = beginResultRequest_();
+  const requestGeneration = beginResultRequest_('search');
   if (!hasAnySearchCondition_(params)) {
+    pwaSearchPerf_('cancelSearch', 'empty-input');
     hideSpinner();
     syncSearchStatusPreviewFromForm_();
     return;
@@ -2057,7 +2060,7 @@ function rerunSearchWithParams_(params, loadingMessage) {
         if (!isCurrentResultRequest_(requestGeneration)) return;
         lastResultKind = 'search';
         lastResult = data;
-        showResult(data);
+        showResult(data, pwaSearchPerf_('getSearch', requestGeneration));
         showSearchStatusResult_('advanced', data.length, params);
       })
       .withFailureHandler(function(err) {
@@ -2090,7 +2093,7 @@ function rerunSearchWithParams_(params, loadingMessage) {
       if (!isCurrentResultRequest_(requestGeneration)) return;
       lastResultKind = 'search';
       lastResult = data;
-      showResult(data);
+      showResult(data, pwaSearchPerf_('getSearch', requestGeneration));
       showSearchStatusResult_('normal', data.length, { keyword: params.keyword });
     })
     .withFailureHandler(function(err) {
@@ -2234,7 +2237,7 @@ function showSearchFailure_(retry) {
 }
 
 function search() {
-  const requestGeneration = beginResultRequest_();
+  const requestGeneration = beginResultRequest_('search');
   hideAllSuggest();
 
   const keywordEl = document.getElementById('keyword');
@@ -2243,6 +2246,7 @@ function search() {
   const params = getAdvancedSearchParams_();
   if (isAdvancedOpen() || hasAnyAdvancedCondition_(params)) {
     if (!hasAnySearchCondition_(params)) {
+      pwaSearchPerf_('cancelSearch', 'empty-input');
       showEmptySearchNotice_('検索条件を入力してください');
       return;
     }
@@ -2261,7 +2265,7 @@ function search() {
         closeAdvancedSearchPanel_();
         lastResultKind = 'search';
         lastResult = data;
-        showResult(data);
+        showResult(data, pwaSearchPerf_('getSearch', requestGeneration));
         showSearchStatusResult_('advanced', data.length, params);
       })
       .withFailureHandler(function(err) {
@@ -2290,6 +2294,7 @@ function search() {
   }
 
   if (!String(keyword).trim()) {
+    pwaSearchPerf_('cancelSearch', 'empty-input');
     showEmptySearchNotice_('検索語を入力してください');
     if (keywordEl) keywordEl.focus();
     return;
@@ -2308,7 +2313,7 @@ function search() {
       if (!isCurrentResultRequest_(requestGeneration)) return;
       lastResultKind = 'search';
       lastResult = data;
-      showResult(data);
+      showResult(data, pwaSearchPerf_('getSearch', requestGeneration));
       showSearchStatusResult_('normal', data.length, { keyword: keyword });
     })
     .withFailureHandler(function(err) {

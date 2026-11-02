@@ -16,6 +16,7 @@
   const QUIET_MOTION_STORAGE_KEY = 'shumiLibrary.quietMotion.v1';
   const PERF_HUD_STORAGE_KEY = 'shumiLibrary.perfHudEnabled.v1';
   const PERF_LOG_STORAGE_KEY = 'shumiLibrary.perfLog.v1';
+  const SEARCH_PERF_STORAGE_KEY = 'shumiLibrary.searchPerf.v1';
   const PERF_LOG_LIMIT = 20;
   const PERF_SLOW_THRESHOLD_MS = 250;
   const PERF_LONG_TASK_THRESHOLD_MS = 50;
@@ -87,6 +88,10 @@
   let perfHudEnabled = false;
   let perfHudElement = null;
   let perfLog = null;
+  let searchPerfHistory = null;
+  let activeSearchPerf = null;
+  let searchPerfSequence = 0;
+  const searchPerfSession = Date.now().toString(36);
   let perfLongTaskObserver = null;
 
   function isStandalone_() {
@@ -534,6 +539,191 @@
     return Math.round(value) + 'ms';
   }
 
+  function getSearchHistory_() {
+    if (searchPerfHistory) return searchPerfHistory;
+    try {
+      const parsed = JSON.parse(window.localStorage.getItem(SEARCH_PERF_STORAGE_KEY) || '[]');
+      searchPerfHistory = Array.isArray(parsed) ? parsed.filter(item => item && typeof item === 'object' && item.id).slice(-5) : [];
+      searchPerfHistory.forEach(function(item) {
+        if (item.status === 'pending') {
+          item.status = 'cancelled';
+          item.code = 'previous-session';
+        }
+        if (item.covers && item.covers.status === 'pending') item.covers.status = 'interrupted';
+      });
+    } catch (e) { searchPerfHistory = []; }
+    return searchPerfHistory;
+  }
+
+  function saveSearchPerf_() {
+    try { window.localStorage.setItem(SEARCH_PERF_STORAGE_KEY, JSON.stringify(getSearchHistory_())); }
+    catch (e) { /* Diagnostics remain usable without storage. */ }
+    renderPerfHud_();
+  }
+
+  function getSearchPerf_(generation) {
+    return isPerfHudEnabled_() && activeSearchPerf && activeSearchPerf.status === 'pending' &&
+      (generation === undefined || activeSearchPerf.generation === generation) ? activeSearchPerf : null;
+  }
+
+  function cancelSearchPerf_(reason) {
+    const trace = activeSearchPerf;
+    if (!trace) return;
+    activeSearchPerf = null;
+    if (trace.cleanup) trace.cleanup();
+    if (trace.status === 'pending') {
+      trace.status = 'cancelled';
+      trace.code = reason || 'cancelled';
+      trace.elapsedMs = Math.max(0, now_() - trace.startedAt);
+    }
+    if (trace.covers && trace.covers.status === 'pending') trace.covers.status = 'interrupted';
+    saveSearchPerf_();
+  }
+
+  function startSearchPerf_(generation) {
+    if (!isPerfHudEnabled_()) return null;
+    cancelSearchPerf_('superseded');
+    const trace = {
+      id: searchPerfSession + '-' + (++searchPerfSequence), generation: generation,
+      session: searchPerfSession, at: new Date().toISOString(),
+      startedAt: now_(), status: 'pending'
+    };
+    activeSearchPerf = trace;
+    const history = getSearchHistory_();
+    history.push(trace);
+    // Keep the last successful search even through repeated cancellations.
+    while (history.length > 5) {
+      const success = history.slice().reverse().find(item => item.status === 'success');
+      history.splice(history.findIndex(item => item !== success), 1);
+    }
+    saveSearchPerf_();
+    return trace;
+  }
+
+  function dispatchSearchPerf_(trace) {
+    if (trace === getSearchPerf_()) trace.dispatchedAt = now_();
+  }
+
+  function receiveSearchPerf_(trace, info) {
+    if (trace !== getSearchPerf_()) return;
+    const token = info.token;
+    const receivedAt = token && Number.isFinite(token.finishedAt) ? token.finishedAt : now_();
+    const queryAt = token && Number.isFinite(token.startedAt) ? token.startedAt : trace.dispatchedAt;
+    trace.receivedAt = receivedAt;
+    trace.source = info.source === 'local' ? 'local' : 'GAS';
+    trace.api = info.perf || null;
+    trace.inputMs = Math.max(0, trace.dispatchedAt - trace.startedAt);
+    // These are the winning path's intervals. Parallel losing attempts stay in the log.
+    trace.prepareMs = Math.max(0, queryAt - trace.dispatchedAt);
+    trace.queryMs = Math.max(0, receivedAt - queryAt);
+    saveSearchPerf_();
+  }
+
+  function failSearchPerf_(trace, code) {
+    if (trace !== getSearchPerf_()) return;
+    if (trace.cleanup) trace.cleanup();
+    trace.status = 'failed';
+    trace.code = code;
+    trace.elapsedMs = Math.max(0, now_() - trace.startedAt);
+    saveSearchPerf_();
+  }
+
+  function renderSearchPerf_(trace, result, count) {
+    if (!trace || trace !== getSearchPerf_()) return;
+    if (trace.cleanup) trace.cleanup();
+    trace.domAt = now_();
+    trace.assembleMs = Math.max(0, trace.domAt - trace.receivedAt);
+    trace.count = count;
+    let frameId = null;
+    let deadlineId = null;
+    let coverDeadlineId = null;
+    let observer = null;
+    let images = null;
+    let observedVisible = false;
+    function cleanup_() {
+      if (frameId !== null) window.cancelAnimationFrame(frameId);
+      if (deadlineId !== null) window.clearTimeout(deadlineId);
+      if (coverDeadlineId !== null) window.clearTimeout(coverDeadlineId);
+      if (observer) observer.disconnect();
+      frameId = deadlineId = coverDeadlineId = null;
+      trace.cleanup = null;
+    }
+    trace.cleanup = cleanup_;
+    function updateCovers_(timedOut) {
+      if (activeSearchPerf !== trace || !isPerfHudEnabled_()) return;
+      const covers = trace.covers;
+      covers.loaded = images.filter(img => img.classList.contains('book-image-loaded') && img.naturalWidth > 0 && !img.classList.contains('book-image-generated-cover')).length;
+      covers.fallback = images.filter(img => img.classList.contains('book-image-loaded') && img.naturalWidth > 0 && img.classList.contains('book-image-generated-cover')).length;
+      covers.failed = images.filter(img => img.classList.contains('book-image-loaded') && !img.naturalWidth).length;
+      covers.pending = covers.total - covers.loaded - covers.fallback - covers.failed;
+      if (!covers.pending || timedOut) {
+        covers.status = covers.pending ? 'timeout' : 'settled';
+        // Image load/fallback settled, not a guarantee that pixels have painted.
+        if (covers.total) covers.elapsedMs = Math.max(0, now_() - trace.startedAt);
+        cleanup_();
+      }
+      saveSearchPerf_();
+    }
+    function startCovers_() {
+      // Include unloaded images with no dimensions yet by using their visible result card.
+      // Observe only the initial viewport's results; never force lazy image requests.
+      images = Array.from(result.querySelectorAll('img')).filter(function(img) {
+        let rect = img.getBoundingClientRect();
+        if (!rect.width || !rect.height) {
+          const card = img.closest('.book-card, .shelf-book');
+          if (card) rect = card.getBoundingClientRect();
+        }
+        return rect.width > 0 && rect.height > 0 && rect.bottom > 0 && rect.top < window.innerHeight &&
+          rect.right > 0 && rect.left < window.innerWidth;
+      }).slice(0, 12);
+      trace.covers = { scope: 'initial-visible-results-max12', total: images.length, status: 'pending' };
+      if (images.length && window.MutationObserver) {
+        observer = new window.MutationObserver(function() { updateCovers_(false); });
+        images.forEach(img => observer.observe(img, { attributes: true, attributeFilter: ['class'] }));
+      }
+      coverDeadlineId = window.setTimeout(function() { updateCovers_(true); }, 15000);
+      updateCovers_(false);
+    }
+    function checkFrame_() {
+      frameId = null;
+      if (trace !== getSearchPerf_()) return;
+      if (document.visibilityState === 'hidden' || !result.isConnected) {
+        cancelSearchPerf_('hidden-or-detached');
+        return;
+      }
+      const first = result.querySelector(count ? '.book-card, .shelf-book' : '.empty-result');
+      let visible = Boolean(first);
+      if (first) {
+        const rect = first.getBoundingClientRect();
+        visible = rect.width > 0 && rect.height > 0 && rect.bottom > 0 && rect.top < window.innerHeight &&
+          rect.right > 0 && rect.left < window.innerWidth;
+        for (let node = first; visible && node; node = node.parentElement) {
+          const style = window.getComputedStyle(node);
+          visible = style.display !== 'none' && style.visibility === 'visible' && Number(style.opacity) > 0;
+        }
+      }
+      if (visible && observedVisible) {
+        window.clearTimeout(deadlineId);
+        deadlineId = null;
+        trace.status = 'success';
+        const visibleAt = now_();
+        trace.totalMs = Math.max(0, visibleAt - trace.startedAt);
+        trace.displayWaitMs = Math.max(0, visibleAt - trace.domAt);
+        startCovers_();
+        recordPerf_('search:visible-opportunity', trace.totalMs, { searchId: trace.id, count: count, local: trace.source === 'local', ok: true });
+        return;
+      }
+      observedVisible = visible;
+      frameId = window.requestAnimationFrame(checkFrame_);
+    }
+    deadlineId = window.setTimeout(function() {
+      cleanup_();
+      failSearchPerf_(trace, 'DISPLAY_NOT_CONFIRMED');
+    }, 5000);
+    frameId = window.requestAnimationFrame(checkFrame_);
+    saveSearchPerf_();
+  }
+
   function formatClockTime_(value) {
     const date = value instanceof Date ? value : new Date(value);
     if (!Number.isFinite(date.getTime())) return '-';
@@ -556,12 +746,15 @@
     const meta = entry && entry.meta && typeof entry.meta === 'object' ? entry.meta : {};
     const server = meta.server && typeof meta.server === 'object' ? meta.server : null;
     const parts = [];
+    if (meta.searchId) parts.push('#' + meta.searchId);
+    if (meta.local === true || meta.api) parts.push(meta.local === true ? 'ローカル' : 'GAS');
+    if (meta.ok === true) parts.push('成功');
     if (meta.api) parts.push('api=' + meta.api);
     if (meta.method) parts.push('method=' + meta.method);
     if (meta.count !== undefined) parts.push('count=' + meta.count);
     if (server && server.serverMs !== undefined) parts.push('GAS=' + formatDuration_(server.serverMs));
     if (server && server.cacheStatus) parts.push('cache=' + formatCacheStatus_(server.cacheStatus));
-    if (meta.ok === false) parts.push('fail');
+    if (meta.ok === false) parts.push(meta.code === 'CANCELLED' ? '取消' : '失敗');
     if (meta.code) parts.push('code=' + meta.code);
     return parts.join(' / ');
   }
@@ -625,11 +818,14 @@
     const note = document.createElement('p');
     note.id = 'pwaPerfHudNote';
     note.className = 'pwa-perf-hud-note';
-    note.textContent = '直近20件を保存します。概算値は端末とGoogleの時計差を含みます';
+    note.textContent = '先頭表示は可視状態と次の描画機会の確認（遮蔽・実描画の保証ではありません）。表紙は初期画面内の結果にある最大12枚の読込確定の確認。総時間と表紙は検索確定から、内訳は採用経路の区間時間。下段8件、コピー20件。概算値は端末とGoogleの時計差を含みます';
     hud.appendChild(note);
 
     copyButton.addEventListener('click', copyPerfLog_);
     clearButton.addEventListener('click', function() {
+      cancelSearchPerf_('cleared');
+      searchPerfHistory = [];
+      saveSearchPerf_();
       perfLog = [];
       savePerfLog_();
       renderPerfHud_();
@@ -661,8 +857,10 @@
     hud.hidden = false;
 
     if (summaryEl) {
-      const latestApi = entries.slice().reverse().find(entry => String(entry.name || '').indexOf('api:') === 0);
-      const latestRender = entries.slice().reverse().find(entry => String(entry.name || '').indexOf('render:') === 0 || String(entry.name || '').indexOf('shelf:') === 0);
+      const history = getSearchHistory_();
+      const latest = history[history.length - 1];
+      const search = history.slice().reverse().find(item => item.status === 'success');
+      const latestApi = search && search.api;
       const longTasks = entries.filter(entry => String(entry.name || '') === 'longtask').length;
       const latestServer = latestApi && latestApi.meta && latestApi.meta.server && typeof latestApi.meta.server === 'object'
         ? latestApi.meta.server
@@ -671,7 +869,16 @@
         ? latestApi.meta.transport
         : null;
       const stats = [
-        { label: 'API', value: latestApi ? formatDuration_(latestApi.durationMs) : '-' },
+        { label: latest && latest.session !== searchPerfSession ? '過去の検索' : '今回の検索', value: latest ? '#' + latest.id + ' ' + ({ pending: '計測中', success: '成功', cancelled: '取消 / ' + (latest.code || ''), failed: '未完了 / ' + (latest.code || '') }[latest.status] || latest.status) : '検索待ち' },
+        { label: '保持した成功検索', value: search ? '#' + search.id + (search.session === searchPerfSession ? ' / 今回起動中' : ' / 過去の起動') + ' / ' + (search.source === 'local' ? 'ローカル' : 'GAS') + ' / ' + search.count + '件' : '-' },
+        { label: '先頭表示（描画機会後）', value: search ? formatDuration_(search.totalMs) : '-' },
+        { label: '入力・UI準備', value: search ? formatDuration_(search.inputMs) : '-' },
+        { label: '索引・鮮度等の準備待ち', value: search ? formatDuration_(search.prepareMs) : '-' },
+        { label: '検索（採用された経路）', value: search ? formatDuration_(search.queryMs) : '-' },
+        { label: '結果組立・DOM追加', value: search ? formatDuration_(search.assembleMs) : '-' },
+        { label: '表示待ち', value: search ? formatDuration_(search.displayWaitMs) : '-' },
+        { label: '表紙読込確認（初期画面内）', value: search && search.covers ? search.covers.total ? search.covers.total + '枚 / ' + ({ pending: '待機中', settled: '確定', interrupted: '中断', timeout: '未完了' }[search.covers.status]) + (search.covers.elapsedMs !== undefined ? ' ' + formatDuration_(search.covers.elapsedMs) : '') + ' / 成功' + search.covers.loaded + ' 代替' + search.covers.fallback + ' 失敗' + search.covers.failed + ' 待機' + search.covers.pending : '対象なし' : '-' },
+        { label: '採用API', value: latestApi ? formatDuration_(latestApi.durationMs) : '-' },
         { label: 'GAS内部', value: latestServer ? formatDuration_(latestServer.serverMs) : '-' },
         { label: '通信・起動等', value: latestServer && latestServer.outsideServerMs !== undefined ? formatDuration_(latestServer.outsideServerMs) : '-' },
         { label: 'リクエスト送信', value: latestTransport ? formatClockTime_(latestTransport.requestSentAtEpochMs) : '-' },
@@ -682,13 +889,14 @@
         { label: '応答準備後（概算）', value: latestTransport ? formatSignedDuration_(latestTransport.afterServerApproxMs) : '-' },
         { label: 'JSONP文字数', value: latestTransport && latestTransport.jsonpResponseChars !== undefined ? Number(latestTransport.jsonpResponseChars).toLocaleString('ja-JP') : '-' },
         { label: 'キャッシュ', value: latestServer && latestServer.cacheStatus ? formatCacheStatus_(latestServer.cacheStatus) : '-' },
-        { label: '描画', value: latestRender ? formatDuration_(latestRender.durationMs) : '-' },
         { label: 'Long task', value: String(longTasks) }
       ];
       summaryEl.innerHTML = '';
       stats.forEach(function(stat) {
         const item = document.createElement('div');
         item.className = 'pwa-perf-hud-stat';
+        if (/検索$|^表紙/.test(stat.label)) item.classList.add('is-wide');
+        item.title = stat.label + ': ' + stat.value;
         item.innerHTML = '<span class="pwa-perf-hud-stat-label"></span><span class="pwa-perf-hud-stat-value"></span>';
         item.querySelector('.pwa-perf-hud-stat-label').textContent = stat.label;
         item.querySelector('.pwa-perf-hud-stat-value').textContent = stat.value;
@@ -707,7 +915,10 @@
       const name = document.createElement('div');
       name.className = 'pwa-perf-hud-name';
       const metaText = summarizePerfMeta_(entry);
-      name.textContent = metaText ? entry.name + ' / ' + metaText : entry.name;
+      const searchId = entry.meta && entry.meta.searchId;
+      const scope = !searchId ? '別処理' : (searchId === (getSearchHistory_().at(-1) || {}).id ? '今回' : '過去');
+      const kind = /^sync:/.test(entry.name) ? '同期' : /^api:bookDetail/.test(entry.name) ? '詳細取得・先読み' : /^api:search/.test(entry.name) ? '検索経路' : /^(render:|shelf:)/.test(entry.name) ? '描画処理' : '計測';
+      name.textContent = '[' + scope + ' / ' + kind + '] ' + (metaText ? entry.name + ' / ' + metaText : entry.name);
       const time = document.createElement('div');
       time.className = 'pwa-perf-hud-time';
       time.textContent = formatDuration_(entry.durationMs);
@@ -722,6 +933,7 @@
       generatedAt: new Date().toISOString(),
       url: window.location.href,
       userAgent: navigator.userAgent,
+      searches: getSearchHistory_(),
       entries: getPerfLog_()
     };
     const text = JSON.stringify(payload, null, 2);
@@ -785,8 +997,9 @@
 
   function endPerf_(token, meta) {
     if (!token) return null;
+    token.finishedAt = now_();
     const mergedMeta = Object.assign({}, token.meta || {}, meta || {});
-    const durationMs = now_() - Number(token.startedAt || now_());
+    const durationMs = token.finishedAt - Number(token.startedAt);
     if (mergedMeta.server && typeof mergedMeta.server === 'object') {
       mergedMeta.server = Object.assign({}, mergedMeta.server, {
         outsideServerMs: Math.max(0, Math.round(durationMs - Number(mergedMeta.server.serverMs || 0)))
@@ -813,9 +1026,14 @@
   }
 
   function setPerfHudEnabled_(enabled) {
+    if (!enabled) cancelSearchPerf_('hud-disabled');
     perfHudEnabled = Boolean(enabled);
     setStoredBoolean_(PERF_HUD_STORAGE_KEY, perfHudEnabled);
     if (perfHudEnabled) observeLongTasks_();
+    else if (perfLongTaskObserver) {
+      perfLongTaskObserver.disconnect();
+      perfLongTaskObserver = null;
+    }
     renderPerfHud_();
   }
 
@@ -1157,6 +1375,13 @@
     perfStart: startPerf_,
     perfEnd: endPerf_,
     recordPerf: recordPerf_,
+    startSearch: startSearchPerf_,
+    getSearch: getSearchPerf_,
+    cancelSearch: cancelSearchPerf_,
+    dispatchSearch: dispatchSearchPerf_,
+    receiveSearch: receiveSearchPerf_,
+    failSearch: failSearchPerf_,
+    renderSearch: renderSearchPerf_,
     handleApiFailure: function(error) {
       if (error && error.code === 'OFFLINE') {
         setBanner_(OFFLINE_MESSAGE, 'error');
@@ -1172,6 +1397,10 @@
   };
 
   window.addEventListener('online', syncOnlineState_);
+  window.addEventListener('pagehide', function() { cancelSearchPerf_('pagehide'); });
+  document.addEventListener('visibilitychange', function() {
+    if (document.visibilityState === 'hidden') cancelSearchPerf_('hidden');
+  });
   window.addEventListener('offline', syncOnlineState_);
   window.addEventListener('beforeinstallprompt', function(event) {
     event.preventDefault();

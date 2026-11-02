@@ -111,6 +111,13 @@ function pwaPerfStart_(name, meta) {
   return pwa.perfStart(name, meta || {});
 }
 
+// Optional PWA diagnostics must never be required by the GAS-hosted client.
+function pwaSearchPerf_(method, ...args) {
+  const pwa = window.ShumiLibraryPwa;
+  if (!pwa || typeof pwa[method] !== 'function') return null;
+  return pwa[method](...args);
+}
+
 function pwaPerfEnd_(token, meta) {
   const pwa = window.ShumiLibraryPwa;
   if (!pwa || typeof pwa.perfEnd !== 'function') return;

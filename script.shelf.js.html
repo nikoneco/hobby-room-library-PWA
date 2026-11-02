@@ -1087,7 +1087,8 @@ function scheduleIncrementalResultRender_(result, data, viewMode, appendItems, r
     const start = nextIndex;
     const end = Math.min(start + chunkSize, data.length);
     const chunkToken = pwaPerfStart_('render:' + viewMode + ':chunk', {
-      count: end - start
+      count: end - start,
+      searchId: renderPerfToken && renderPerfToken.meta && renderPerfToken.meta.searchId
     });
     appendItems(start, end);
     nextIndex = end;
@@ -1298,7 +1299,8 @@ function syncSearchResultPresentationStats_(stats) {
   if (typeof syncMobileAppDockState_ === 'function') syncMobileAppDockState_();
 }
 
-function showResult(data) {
+function showResult(data, searchPerf) {
+  if (!searchPerf) pwaSearchPerf_('cancelSearch', 'view-change');
   (Array.isArray(data) ? data : []).forEach(book => {
     if (book && book.seriesCountRevision === undefined) book.seriesCountRevision = String(currentDatasetRevision || '');
   });
@@ -1326,6 +1328,10 @@ function showResult(data) {
     resetImageLoadStats_([]);
     disconnectShelfScrollSpy_();
     unmountShelfRoomMapPortal_();
+    // A previous search can leave the container transparent. Empty results also reveal.
+    result.classList.remove('result-fade');
+    result.classList.add('show');
+    pwaSearchPerf_('renderSearch', searchPerf, result, 0);
     return;
   }
 
@@ -1339,6 +1345,7 @@ function showResult(data) {
   const renderItems = presentation ? presentation.entries : data;
   syncSearchResultPresentationStats_(presentation);
   const renderPerfToken = pwaPerfStart_('render:' + viewMode, {
+    searchId: searchPerf && searchPerf.id,
     count: renderItems.length,
     rawCount: data.length,
     seriesGroups: presentation ? presentation.seriesGroupCount : 0
@@ -1536,9 +1543,12 @@ function showResult(data) {
   result.classList.remove('show');
   result.classList.add('result-fade');
 
+  const revealRunId = resultRenderRunId;
   setTimeout(() => {
+    if (revealRunId !== resultRenderRunId) return;
     result.classList.add('show');
   }, 40);
+  pwaSearchPerf_('renderSearch', searchPerf, result, data.length);
 }
 
 function formatSeriesStatusVolumeList_(volumes) {
