@@ -17,12 +17,7 @@ window.addEventListener('DOMContentLoaded', function() {
   bindMobileAppDockInputState_();
   bindBookshelfScrollMemory_();
 
-  ['keyword', 'detailTitle', 'detailYomi', 'detailAuthor'].forEach(id => {
-    const input = document.getElementById(id);
-    if (!input) return;
-    input.addEventListener('compositionstart', function() { input.dataset.composing = 'true'; });
-    input.addEventListener('compositionend', function() { input.dataset.composing = 'false'; });
-  });
+  bindSearchInputControls_();
 
   const keywordInput = document.getElementById('keyword');
   keywordInput.addEventListener('input', function() {
@@ -104,35 +99,7 @@ window.addEventListener('DOMContentLoaded', function() {
 
   syncSearchStatusPreviewFromForm_();
 
-  const enterTargets = [
-    'keyword',
-    'detailTitle',
-    'detailYomi',
-    'detailAuthor'
-  ];
-
-  enterTargets.forEach(id => {
-    const input = document.getElementById(id);
-    if (!input) return;
-
-    input.addEventListener('keydown', function(event) {
-      if (event.defaultPrevented || isSearchCompositionEvent_(event)) return;
-      const keywordSuggestOpen =
-        id === 'keyword' &&
-        document.getElementById('keyword-suggest').style.display === 'block' &&
-        currentSuggestIndex.keyword >= 0;
-
-      const detailTitleSuggestOpen =
-        id === 'detailTitle' &&
-        document.getElementById('detailTitle-suggest').style.display === 'block' &&
-        currentSuggestIndex.detailTitle >= 0;
-
-      if (event.key === 'Enter' && !keywordSuggestOpen && !detailTitleSuggestOpen) {
-        event.preventDefault();
-        search();
-      }
-    });
-  });
+  bindSearchSubmitHandlers_();
 
   const tileBtn = document.getElementById('tileViewBtn');
   const listBtn = document.getElementById('listViewBtn');

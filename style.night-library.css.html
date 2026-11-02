@@ -2415,4 +2415,47 @@ body.sandbox-redesign.pwa-quiet-motion #result .shelf-book-cover-wrap { transfor
   body.sandbox-redesign #result .card-view .book-title { font-size: 17px; }
   body.sandbox-redesign #result .card-view .genre-chip-wrap { gap: 4px var(--night-space-small); }
 }
+/* Clear only this text field; reserve a full touch target inside its boundary. */
+body.sandbox-redesign #searchContainer .search-text-control {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+}
+body.sandbox-redesign #searchContainer .search-text-control > input {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding-inline-end: 54px;
+}
+body.sandbox-redesign #searchContainer .search-input-clear {
+  position: absolute;
+  inset-inline-end: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--night-radius-control);
+  background: transparent;
+  box-shadow: none;
+  color: var(--night-muted);
+  font: 400 26px/1 system-ui, sans-serif;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: none;
+}
+body.sandbox-redesign #searchContainer .search-input-clear[hidden] { display: none; }
+body.sandbox-redesign #searchContainer .search-input-clear:hover { color: var(--night-accent-strong); }
+body.sandbox-redesign #searchContainer .search-input-clear:focus-visible {
+  color: var(--night-accent-strong);
+  outline: 2px solid var(--night-accent-strong);
+  outline-offset: -4px;
+}
 </style>

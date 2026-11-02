@@ -827,8 +827,129 @@ function suggestAlignedTitles_(query, pool, type) {
   return Array.from(new Set(values)).slice(0, 6);
 }
 
+const SEARCH_TEXT_INPUT_IDS_ = ['keyword', 'detailTitle', 'detailYomi', 'detailAuthor'];
+const SEARCH_IME_COMMIT_WINDOW_MS_ = 50;
+const searchInputStates_ = new WeakMap();
+let lastSearchInput_ = null;
+let searchSubmitHandled_ = false;
+let searchKeyboardIntent_ = false;
+let searchButtonIntent_ = false;
+
 function isSearchCompositionEvent_(event) {
-  return Boolean(event && (event.isComposing || event.keyCode === 229 || (event.target && event.target.dataset && event.target.dataset.composing === 'true')));
+  if (!event) return false;
+  const input = event.target;
+  const state = input && searchInputStates_.get(input);
+  return Boolean(event.isComposing || event.keyCode === 229 || (input && input.dataset && input.dataset.composing === 'true') ||
+    (event.key === 'Enter' && state && (state.imeEnterDown || (!state.released && Date.now() - state.endedAt < SEARCH_IME_COMMIT_WINDOW_MS_))));
+}
+
+function syncSearchInputClearButtons_() {
+  SEARCH_TEXT_INPUT_IDS_.forEach(id => {
+    const input = document.getElementById(id);
+    const button = document.getElementById(id + '-clear');
+    if (input && button) button.hidden = !input.value;
+  });
+}
+
+function markSearchSubmitHandled_() {
+  searchSubmitHandled_ = true;
+  setTimeout(() => { searchSubmitHandled_ = false; }, 0);
+}
+
+function bindSearchInputControls_() {
+  SEARCH_TEXT_INPUT_IDS_.forEach(id => {
+    const input = document.getElementById(id);
+    if (!input) return;
+    const state = { endedAt: -Infinity, released: true, enterDown: false, imeEnterDown: false, consumed: false };
+    searchInputStates_.set(input, state);
+    input.addEventListener('focus', () => { lastSearchInput_ = input; syncSearchInputClearButtons_(); });
+    input.addEventListener('compositionstart', () => { input.dataset.composing = 'true'; });
+    input.addEventListener('compositionend', () => {
+      input.dataset.composing = 'false';
+      state.endedAt = Date.now();
+      state.released = false;
+      syncSearchInputClearButtons_();
+    });
+    input.addEventListener('keydown', event => {
+      if (event.key !== 'Enter') return;
+      if (isSearchCompositionEvent_(event)) {
+        state.imeEnterDown = true;
+        state.endedAt = Date.now();
+        // Do not cancel an active IME's default conversion/confirmation action.
+        if (!event.isComposing && event.keyCode !== 229 && input.dataset.composing !== 'true') event.preventDefault();
+      } else if (!event.repeat && !state.enterDown) {
+        searchSubmitHandled_ = false;
+        state.consumed = false;
+      }
+      state.enterDown = true;
+    }, true);
+    input.addEventListener('keyup', event => {
+      if (event.key !== 'Enter') return;
+      state.enterDown = false;
+      state.imeEnterDown = false;
+      state.consumed = false;
+      state.released = true;
+    });
+    input.addEventListener('blur', () => {
+      // Keyup can land elsewhere after focus moves; do not retain a held key.
+      state.enterDown = false;
+      state.imeEnterDown = false;
+      state.consumed = false;
+      state.released = true;
+    });
+    const button = document.getElementById(id + '-clear');
+    if (!button) return;
+    button.addEventListener('pointerdown', event => { event.preventDefault(); });
+    button.addEventListener('click', () => {
+      input.focus({ preventScroll: true });
+      input.value = '';
+      if (Object.prototype.hasOwnProperty.call(currentSuggestList, id)) {
+        currentSuggestList[id] = [];
+        currentSuggestIndex[id] = -1;
+        closeSuggest_(id + '-suggest');
+      }
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+  });
+  syncSearchInputClearButtons_();
+}
+
+function bindSearchSubmitHandlers_() {
+  const form = document.getElementById('librarySearchForm');
+  if (!form) return;
+  form.querySelectorAll('[data-action="search"]').forEach(button => {
+    button.addEventListener('click', event => {
+      // Keyboard implicit clicks have detail=0 and keep focus on the input.
+      searchButtonIntent_ = event.detail > 0 || document.activeElement === button;
+      setTimeout(() => { searchButtonIntent_ = false; }, 0);
+    });
+  });
+  form.addEventListener('submit', event => {
+    event.preventDefault();
+    const intentional = searchKeyboardIntent_ || searchButtonIntent_;
+    searchKeyboardIntent_ = false;
+    searchButtonIntent_ = false;
+    const input = SEARCH_TEXT_INPUT_IDS_.includes(document.activeElement && document.activeElement.id) ? document.activeElement : lastSearchInput_;
+    const state = input && searchInputStates_.get(input);
+    if (searchSubmitHandled_ || (!intentional && state &&
+        (input.dataset.composing === 'true' || state.imeEnterDown || state.consumed || Date.now() - state.endedAt < SEARCH_IME_COMMIT_WINDOW_MS_))) return;
+    markSearchSubmitHandled_();
+    if (state && state.enterDown) state.consumed = true;
+    hideAllSuggest();
+    search();
+  });
+  SEARCH_TEXT_INPUT_IDS_.forEach(id => {
+    const input = document.getElementById(id);
+    if (!input) return;
+    input.addEventListener('keydown', event => {
+      if (event.key !== 'Enter' || event.defaultPrevented || isSearchCompositionEvent_(event)) return;
+      event.preventDefault();
+      if (event.repeat) return;
+      searchKeyboardIntent_ = true;
+      form.requestSubmit();
+      searchKeyboardIntent_ = false;
+    });
+  });
 }
 
 function closeSuggest_(suggestId) {
@@ -842,6 +963,9 @@ function closeSuggest_(suggestId) {
 }
 
 function chooseSuggestion_(input, suggestId, value) {
+  markSearchSubmitHandled_();
+  const state = searchInputStates_.get(input);
+  if (state && state.enterDown) state.consumed = true;
   input.value = value;
   closeSuggest_(suggestId);
   input.focus();
@@ -1348,6 +1472,7 @@ function clearAdvancedFields() {
   });
 
   syncReleasedRangeOptions_();
+  syncSearchInputClearButtons_();
 }
 
 function clearSearchConditions() {
@@ -1385,6 +1510,7 @@ function clearSearchFormValuesForBrowse_() {
   if (typeof syncReleasedRangeOptions_ === 'function') {
     syncReleasedRangeOptions_();
   }
+  syncSearchInputClearButtons_();
 }
 
 function getSearchStatusElements_() {
@@ -2064,6 +2190,7 @@ function requestAuthoritativePreviewCount_(mode, params) {
 }
 
 function syncSearchStatusPreviewFromForm_() {
+  syncSearchInputClearButtons_();
   syncExtraFilterLabel_();
   const params = getEffectiveSearchParams_();
   const mode = isAdvancedOpen() || hasAnyAdvancedCondition_(params) ? 'advanced' : 'normal';
@@ -2113,6 +2240,7 @@ function isCurrentResultRequest_(generation) {
 }
 
 function rerunSearchWithParams_(params, loadingMessage) {
+  syncSearchInputClearButtons_();
   const requestGeneration = beginResultRequest_('search');
   if (!hasAnySearchCondition_(params)) {
     pwaSearchPerf_('cancelSearch', 'empty-input');

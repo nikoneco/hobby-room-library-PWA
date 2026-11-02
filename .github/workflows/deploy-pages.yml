@@ -88,6 +88,9 @@ jobs:
       - name: Check anchored title and reading matching
         run: node tools/check-title-reading-match.js
 
+      - name: Check search input controls and IME submission
+        run: node tools/check-search-input-controls.js
+
       - name: Check similar book ranking
         run: node tools/check-similar-books.js
 

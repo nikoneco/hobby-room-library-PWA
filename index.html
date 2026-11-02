@@ -42,16 +42,19 @@
       <div id="searchStatusLibrarianNote" class="search-status-librarian-note" aria-live="polite"></div>
     </div>
 
-    <div class="search-form">
+    <form id="librarySearchForm" class="search-form" role="search">
       <!-- 通常検索 -->
       <div class="input-group">
         <label for="keyword">検索</label>
-        <input type="text" id="keyword" autocomplete="off" role="combobox" aria-autocomplete="list" aria-controls="keyword-suggest" aria-expanded="false" placeholder="タイトル・読み仮名・作者で検索">
+        <div class="search-text-control">
+          <input type="text" id="keyword" enterkeyhint="search" autocomplete="off" role="combobox" aria-autocomplete="list" aria-controls="keyword-suggest" aria-expanded="false" placeholder="タイトル・読み仮名・作者で検索">
+          <button type="button" id="keyword-clear" class="search-input-clear" data-clear-search-input="keyword" aria-label="検索文字をすべて消去" hidden><span aria-hidden="true">×</span></button>
+        </div>
         <div id="keyword-suggest" class="suggest-box" role="listbox" aria-label="検索候補"></div>
       </div>
 
       <div class="button-group">
-        <button type="button" class="primary-action" data-action="search">
+        <button type="submit" class="primary-action" data-action="search">
           <span class="ui-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"></circle><path d="M16 16l4 4"></path></svg>
           </span>
@@ -128,18 +131,27 @@
           <div class="advanced-grid">
           <div class="input-group">
             <label for="detailTitle">タイトル</label>
-            <input type="text" id="detailTitle" autocomplete="off" role="combobox" aria-autocomplete="list" aria-controls="detailTitle-suggest" aria-expanded="false">
+            <div class="search-text-control">
+              <input type="text" id="detailTitle" enterkeyhint="search" autocomplete="off" role="combobox" aria-autocomplete="list" aria-controls="detailTitle-suggest" aria-expanded="false">
+              <button type="button" id="detailTitle-clear" class="search-input-clear" data-clear-search-input="detailTitle" aria-label="タイトルをすべて消去" hidden><span aria-hidden="true">×</span></button>
+            </div>
             <div id="detailTitle-suggest" class="suggest-box" role="listbox" aria-label="タイトル候補"></div>
           </div>
 
           <div class="input-group">
             <label for="detailYomi">読み仮名</label>
-            <input type="text" id="detailYomi" autocomplete="off">
+            <div class="search-text-control">
+              <input type="text" id="detailYomi" enterkeyhint="search" autocomplete="off">
+              <button type="button" id="detailYomi-clear" class="search-input-clear" data-clear-search-input="detailYomi" aria-label="読み仮名をすべて消去" hidden><span aria-hidden="true">×</span></button>
+            </div>
           </div>
 
           <div class="input-group">
             <label for="detailAuthor">著者・関係者</label>
-            <input type="text" id="detailAuthor" autocomplete="off">
+            <div class="search-text-control">
+              <input type="text" id="detailAuthor" enterkeyhint="search" autocomplete="off">
+              <button type="button" id="detailAuthor-clear" class="search-input-clear" data-clear-search-input="detailAuthor" aria-label="著者・関係者をすべて消去" hidden><span aria-hidden="true">×</span></button>
+            </div>
           </div>
 
           <div class="input-group">
@@ -173,7 +185,7 @@
         </details>
 
         <div class="advanced-actions">
-          <button type="button" class="primary-action" data-action="search">
+          <button type="submit" class="primary-action" data-action="search">
             <span class="ui-icon" aria-hidden="true">
               <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"></circle><path d="M16 16l4 4"></path></svg>
             </span>
@@ -220,7 +232,7 @@
         </button>
         <!-- PWA_REMOVE_END:series-status-home -->
       </div>
-    </div>
+    </form>
 
     <div id="viewToggle" class="view-toggle" role="group" aria-label="表示モード">
       <span class="view-toggle-kicker" aria-hidden="true">表示</span>

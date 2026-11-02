@@ -177,6 +177,8 @@ function bindStaticActionHandlers_() {
     const action = element.dataset.action || '';
     const handler = STATIC_ACTION_HANDLERS[action];
     if (typeof handler !== 'function') return;
+    // Search submit buttons are owned by the form's single submit handler.
+    if (action === 'search' && element.type === 'submit' && element.form && element.form.id === 'librarySearchForm') return;
 
     element.addEventListener('click', function(event) {
       event.preventDefault();
