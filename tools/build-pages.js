@@ -6147,7 +6147,8 @@ function fetchAndRefreshCache_(event, cacheKey, request) {
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(APP_SHELL))
+      // Stable shell URLs must not copy an older release from the HTTP cache.
+      .then(cache => cache.addAll(APP_SHELL.map(url => new Request(new URL(url, self.location.href), { cache: 'reload' }))))
   );
 });
 
@@ -6217,6 +6218,8 @@ function getAppShellFilePath_(entry) {
 
 function buildAppShellCacheName_(appShell) {
   const hash = crypto.createHash('sha256');
+  // A new installation policy gets a separate cache from already active workers.
+  hash.update('app-shell-install-reload-v1\0');
 
   appShell.forEach(entry => {
     const filePath = getAppShellFilePath_(entry);

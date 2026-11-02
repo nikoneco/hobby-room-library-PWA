@@ -232,6 +232,7 @@ assert(sw.includes('response || Response.error()'), 'service worker never return
 {
   const handlers = {};
   const deletedCaches = [];
+  const installedRequests = [];
   const immediate = value => ({
     then(callback) {
       return immediate(callback(value));
@@ -242,6 +243,7 @@ assert(sw.includes('response || Response.error()'), 'service worker never return
   });
   const serviceWorkerSandbox = {
     URL,
+    Request,
     console,
     Promise: {
       all(values) {
@@ -261,6 +263,9 @@ assert(sw.includes('response || Response.error()'), 'service worker never return
       }
     },
     caches: {
+      open() {
+        return immediate({ addAll(requests) { installedRequests.push(...requests); return immediate(true); } });
+      },
       keys() {
         return immediate(['shumi-library-pwa-old', 'other-pwa-v1', 'shared-cache']);
       },
@@ -272,6 +277,11 @@ assert(sw.includes('response || Response.error()'), 'service worker never return
   };
   vm.createContext(serviceWorkerSandbox);
   vm.runInContext(sw, serviceWorkerSandbox, { filename: 'sw.js' });
+  const installWaits = [];
+  handlers.install({ waitUntil(work) { installWaits.push(work); } });
+  assert(installWaits.length === 1 && installedRequests.length > 20, 'installation waits for the complete app shell');
+  assert(installedRequests.every(request => request.cache === 'reload'), 'installation bypasses stale HTTP-cached releases for stable shell URLs');
+  assert(installedRequests.some(request => request.url.endsWith('/assets/js/pwa-client.js')), 'installation refreshes the unversioned PWA client');
   const activateWaits = [];
   handlers.activate({
     waitUntil(work) {

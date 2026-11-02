@@ -1,4 +1,4 @@
-const CACHE_NAME = "shumi-library-pwa-6e14f1035247";
+const CACHE_NAME = "shumi-library-pwa-e5fd4c0cdfb9";
 const CACHE_PREFIX = 'shumi-library-pwa-';
 const APP_SHELL = [
   "./",
@@ -65,7 +65,8 @@ function fetchAndRefreshCache_(event, cacheKey, request) {
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(APP_SHELL))
+      // Stable shell URLs must not copy an older release from the HTTP cache.
+      .then(cache => cache.addAll(APP_SHELL.map(url => new Request(new URL(url, self.location.href), { cache: 'reload' }))))
   );
 });
 
