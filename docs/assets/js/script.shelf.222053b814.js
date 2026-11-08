@@ -55,11 +55,7 @@ function syncActiveShelfNavigation_(targetId) {
     chip.setAttribute('aria-current', active ? 'true' : 'false');
   });
 
-  document.querySelectorAll('.room-map-shelf[data-shelf-target], .room-map-index-button[data-shelf-target]').forEach(shelf => {
-    const active = shelf.dataset.shelfTarget === targetId;
-    shelf.classList.toggle('is-active', active);
-    shelf.setAttribute('aria-current', active ? 'location' : 'false');
-  });
+  syncRoomMapCurrent_(document, document.getElementById(targetId));
 
   document.querySelectorAll('.bookshelf-group').forEach(group => {
     group.classList.toggle('is-active', group.id === targetId);
@@ -236,11 +232,7 @@ function formatShelfRoomMapMeta_(stats) {
   return `${safeStats.activeShelves}/${safeStats.shelves}棚 ${safeStats.mappedBooks}冊`;
 }
 
-function scrollToRoomMapShelf_(index) {
-  if (index < 0) return;
-
-  const target = document.getElementById(getShelfNavTargetId_(index));
-  if (!target) return;
+function scrollToRoomMapShelf_(target) {
   shelfRoomMapSelection_ = target;
   syncActiveShelfNavigation_(target.id);
   scrollToShelfGroup_(target);
@@ -286,8 +278,34 @@ function setRoomMapBoxStyle_(el, config) {
   el.style.height = `${config.h / 1075 * 100}%`;
 }
 
-function createShelfRoomMapViewport_(groups, options) {
+function syncRoomMapCurrent_(root, target) {
+  root.querySelectorAll('.room-map-shelf[data-shelf-target], .room-map-index-button[data-shelf-target]').forEach(button => {
+    button.setAttribute('aria-current', button.dataset.shelfTarget === target?.id ? 'location' : 'false');
+  });
+  const label = target?.querySelector('.bookshelf-group-label')?.textContent.trim();
+  root.querySelectorAll('.room-map-current').forEach(status => {
+    const text = label ? `現在：${label}` : '';
+    if (status.textContent !== text) status.textContent = text;
+    status.hidden = !label;
+  });
+}
+
+function setRoomMapDestination_(content, targetId, description) {
+  content.querySelectorAll('button[aria-pressed]').forEach(button => {
+    button.setAttribute('aria-pressed', String(Boolean(targetId && button.dataset.shelfTarget === targetId)));
+  });
+  const move = content.querySelector('.room-map-move');
+  move.dataset.shelfTarget = targetId || '';
+  move.disabled = !targetId;
+  const status = content.querySelector('.room-map-destination');
+  const text = description ? `移動先：${description}` : '移動先の棚を選んでください';
+  if (status.textContent !== text) status.textContent = text;
+}
+
+function createShelfRoomMapContent_(groups, options) {
   const opt = options || {};
+  const content = document.createElement('div');
+  content.className = 'shelf-room-map-content';
   const viewport = document.createElement('div');
   viewport.className = opt.modal ? 'shelf-room-map-viewport modal' : 'shelf-room-map-viewport';
 
@@ -311,9 +329,9 @@ function createShelfRoomMapViewport_(groups, options) {
   const directory = document.createElement('div');
   directory.className = 'room-map-directory';
   directory.setAttribute('role', 'group');
-  directory.setAttribute('aria-label', '本棚へ移動');
+  directory.setAttribute('aria-label', '移動先の棚');
   directory.innerHTML = `
-    <p class="room-map-directory-title">本棚へ移動</p>
+    <p class="room-map-directory-title">棚を選ぶ</p>
     <div class="room-map-directory-grid"></div>
     <div class="room-map-directory-grid room-map-directory-extra"></div>
     <p class="room-map-directory-note">同人本棚は地図上の目印</p>
@@ -329,23 +347,20 @@ function createShelfRoomMapViewport_(groups, options) {
     const onMap = Boolean(config.w);
     const targetIndex = getRoomMapGroupIndex_(groups, config);
     const count = getRoomMapGroupCount_(groups?.[targetIndex]);
-    const name = onMap ? `${config.label} 本棚` : config.label;
-    function jumpToShelf() {
-      if (opt.closeOnShelfClick) {
-        closeShelfRoomMapOverlay_();
-      }
-      scrollToRoomMapShelf_(targetIndex);
-    }
+    const name = onMap && config.key !== 'PC横' ? `${config.label} 本棚` : config.label;
+    const description = `${name}（${count}冊）`;
+    const targetId = targetIndex >= 0 ? getShelfNavTargetId_(targetIndex) : '';
     function createButton(className) {
       const button = document.createElement('button');
       button.type = 'button';
       button.className = className;
-      button.disabled = targetIndex < 0;
-      if (!button.disabled) {
-        button.dataset.shelfTarget = getShelfNavTargetId_(targetIndex);
+      button.disabled = !targetId;
+      button.setAttribute('aria-pressed', 'false');
+      if (targetId) {
+        button.dataset.shelfTarget = targetId;
+        button.onclick = () => setRoomMapDestination_(content, targetId, description);
       }
-      button.setAttribute('aria-label', count ? `${name} ${count}冊へ移動` : `${name}は登録なし`);
-      button.onclick = jumpToShelf;
+      button.setAttribute('aria-label', count ? description : `${name}は登録なし`);
       return button;
     }
 
@@ -375,7 +390,26 @@ function createShelfRoomMapViewport_(groups, options) {
   });
 
   viewport.append(canvas, directory);
-  return viewport;
+  const actions = document.createElement('div');
+  actions.className = 'room-map-actions';
+  actions.innerHTML = `
+    <div>
+      <p class="room-map-destination" role="status" aria-atomic="true">移動先の棚を選んでください</p>
+      <p class="room-map-current" hidden></p>
+    </div>
+    <button class="room-map-move" type="button" disabled>移動する</button>
+  `;
+  const move = actions.querySelector('.room-map-move');
+  move.onclick = function() {
+    const target = document.getElementById(move.dataset.shelfTarget || '');
+    if (move.disabled || !target) return;
+    if (opt.modal) closeShelfRoomMapOverlay_();
+    else setRoomMapDestination_(content);
+    scrollToRoomMapShelf_(target);
+  };
+  content.append(viewport, actions);
+  syncRoomMapCurrent_(content, document.querySelector('.bookshelf-group.is-active'));
+  return content;
 }
 
 function renderShelfRoomMap_(groups) {
@@ -398,13 +432,15 @@ function renderShelfRoomMap_(groups) {
 
   details.appendChild(summary);
 
+  const content = createShelfRoomMapContent_(groups);
   details.addEventListener('toggle', function() {
     summaryLabel.textContent = details.open
       ? '趣味部屋マップを閉じる'
       : '趣味部屋マップを開く';
+    if (!details.open) setRoomMapDestination_(content);
   });
 
-  details.appendChild(createShelfRoomMapViewport_(groups));
+  details.appendChild(content);
   return details;
 }
 
@@ -488,10 +524,7 @@ function renderShelfRoomMapOverlay_(groups) {
   header.appendChild(closeButton);
   panel.appendChild(header);
 
-  panel.appendChild(createShelfRoomMapViewport_(groups, {
-    modal: true,
-    closeOnShelfClick: true
-  }));
+  panel.appendChild(createShelfRoomMapContent_(groups, { modal: true }));
 
   overlay.onclick = function() {
     closeShelfRoomMapOverlay_();
@@ -520,6 +553,7 @@ function openShelfRoomMapOverlay_(opener) {
   if (!overlay || !overlay.hidden) return;
   shelfRoomMapOpener_ = opener || document.activeElement;
   overlay.hidden = false;
+  overlay.querySelector('.shelf-room-map-viewport').scrollTop = 0;
   overlay.classList.add('open');
   document.body.classList.add('shelf-room-map-modal-open');
 
@@ -533,9 +567,10 @@ function openShelfRoomMapOverlay_(opener) {
 
 function closeShelfRoomMapOverlay_() {
   const overlay = document.querySelector('.shelf-room-map-overlay');
-  if (!overlay) return;
+  if (!overlay || overlay.hidden) return;
   overlay.classList.remove('open');
   overlay.hidden = true;
+  setRoomMapDestination_(overlay.querySelector('.shelf-room-map-content'));
   document.body.classList.remove('shelf-room-map-modal-open');
   if (shelfRoomMapOpener_ && shelfRoomMapOpener_.isConnected) {
     shelfRoomMapOpener_.focus({ preventScroll: true });

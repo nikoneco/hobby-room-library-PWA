@@ -707,15 +707,27 @@ body.shelf-immersive-active .shelf-book-title {
   border-bottom-color: rgba(255, 220, 168, 0.20);
 }
 
-.shelf-room-map-viewport,
+.shelf-room-map-content,
 .shelf-room-map-modal-panel {
-  --map-paper: #fbf5eb;
-  --map-ink: #302b23;
-  --map-muted: #665b4d;
-  --map-line: #d8cbb8;
-  --map-accent: #285447;
-  --map-selected: #e4eee5;
+  --map-accent: var(--lib-accent-2);
+  --map-ink: var(--pwa-accent-readable, var(--lib-text));
+  --map-muted: var(--lib-muted);
+  --map-paper: color-mix(in srgb, var(--lib-bg) 92%, var(--map-accent));
+  --map-surface: color-mix(in srgb, var(--map-paper) 90%, var(--map-ink));
+  --map-line: color-mix(in srgb, var(--map-paper) 50%, var(--map-ink));
+  --map-divider: color-mix(in srgb, var(--map-paper) 78%, var(--map-ink));
+  --map-hover: color-mix(in srgb, var(--map-surface) 87%, var(--map-accent));
+  --map-selected: color-mix(in srgb, var(--map-accent) 70%, var(--map-ink));
+  --map-selected-ink: var(--pwa-accent-text, var(--lib-bg));
+  --map-disabled: color-mix(in srgb, var(--map-paper) 96%, var(--map-ink));
   color: var(--map-ink);
+}
+
+.shelf-room-map-content {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--map-paper);
 }
 
 .shelf-room-map-viewport {
@@ -817,15 +829,20 @@ button.room-map-shelf:not(:disabled)::before {
   font-variant-numeric: tabular-nums;
 }
 
-button.room-map-shelf:not(:disabled):is(:hover, :focus-visible, .is-linked, .is-active) {
+button.room-map-shelf:not(:disabled):is(:hover, :focus-visible, .is-linked, [aria-pressed="true"]) {
   z-index: 1;
-  box-shadow: inset 0 0 0 2px #fff9ee, 0 0 0 1px var(--map-accent);
+  box-shadow: inset 0 0 0 2px var(--map-accent), 0 0 0 1px var(--map-selected-ink);
 }
 
-.room-map-shelf:not(:disabled):is(:hover, :focus-visible, .is-linked, .is-active) .room-map-pin {
-  border-color: var(--map-accent);
+.room-map-shelf[aria-pressed="true"] .room-map-pin {
+  border-color: var(--map-selected-ink);
   background: var(--map-accent);
-  color: white;
+  color: var(--map-selected-ink);
+}
+
+.room-map-shelf[aria-current="location"][aria-pressed="false"] .room-map-pin,
+.room-map-index-button[aria-current="location"][aria-pressed="false"] .room-map-index-label {
+  border-style: dashed;
 }
 
 .shelf-room-map-canvas button.room-map-shelf:active {
@@ -839,7 +856,7 @@ button.room-map-shelf:disabled {
 .room-map-shelf:disabled .room-map-pin {
   background: #ede5d8;
   border-style: dashed;
-  color: var(--map-muted);
+  color: #665b4d;
 }
 
 .room-map-doujin,
@@ -906,7 +923,7 @@ button.room-map-index-button {
   padding: 4px 6px;
   border: 1px solid var(--map-line);
   border-radius: 6px;
-  background: #fffbf4;
+  background: var(--map-surface);
   color: var(--map-ink);
   box-shadow: none;
   line-height: 1;
@@ -920,15 +937,23 @@ button.room-map-index-button::before {
   transform: none;
 }
 
-button.room-map-index-button:not(:disabled):is(:hover, :focus-visible, .is-active) {
+button.room-map-index-button:not(:disabled):is(:hover, :focus-visible) {
   border-color: var(--map-accent);
-  background: var(--map-selected);
+  background: var(--map-hover);
   color: var(--map-ink);
   transform: none;
 }
 
+button.room-map-index-button:not(:disabled)[aria-pressed="true"] {
+  border-color: var(--map-selected);
+  background: var(--map-selected);
+  color: var(--map-selected-ink);
+  transform: none;
+}
+
 button.room-map-index-button:disabled {
-  background: #f2eadd;
+  border-color: var(--map-divider);
+  background: var(--map-disabled);
   color: var(--map-muted);
   cursor: default;
   transform: none;
@@ -940,7 +965,7 @@ button.room-map-index-button:disabled {
   width: 21px;
   height: 21px;
   flex: 0 0 auto;
-  border: 1px solid #8a7660;
+  border: 1px solid var(--map-line);
   border-radius: 999px;
   color: var(--map-ink);
   font-size: 12px;
@@ -962,10 +987,10 @@ button.room-map-index-button:disabled {
   color: var(--map-muted);
 }
 
-.room-map-index-button.is-active .room-map-index-label {
-  border-color: var(--map-accent);
-  background: var(--map-accent);
-  color: white;
+.room-map-index-button[aria-pressed="true"] .room-map-index-label {
+  border-color: var(--map-selected-ink);
+  background: var(--map-selected-ink);
+  color: var(--map-selected);
 }
 
 .room-map-shelf-count {
@@ -988,10 +1013,65 @@ button.room-map-index-button:disabled {
   line-height: 1.4;
 }
 
-.shelf-room-map-viewport button:focus-visible,
+.room-map-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 18px;
+  border-top: 1px solid var(--map-divider);
+}
+
+.room-map-destination,
+.room-map-current {
+  margin: 0;
+  line-height: 1.45;
+  font-size: 13px;
+}
+
+.room-map-destination {
+  color: var(--map-ink);
+  font-weight: 750;
+}
+
+.room-map-current {
+  color: var(--map-muted);
+  font-size: 12px;
+}
+
+button.room-map-move {
+  flex: 0 0 auto;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--map-selected);
+  border-radius: 6px;
+  background: var(--map-selected);
+  color: var(--map-selected-ink);
+  font-size: 14px;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+button.room-map-move:not(:disabled):hover {
+  background: var(--map-accent);
+  color: var(--map-selected-ink);
+}
+
+button.room-map-move:disabled {
+  border-color: var(--map-line);
+  background: var(--map-disabled);
+  color: var(--map-muted);
+  cursor: default;
+  transform: none;
+}
+
+.shelf-room-map-viewport .room-map-index-button:focus-visible,
+.shelf-room-map-canvas .room-map-shelf:focus-visible,
+.room-map-actions .room-map-move:focus-visible,
 .shelf-room-map-modal-panel .shelf-room-map-modal-close:focus-visible {
   outline: 2px solid var(--map-accent) !important;
-  outline-offset: 2px;
+  outline-offset: 2px !important;
 }
 
 @media (max-width: 900px) {
@@ -1001,6 +1081,10 @@ button.room-map-index-button:disabled {
 }
 
 @media (max-width: 740px) {
+  .room-map-actions {
+    padding-inline: 12px;
+  }
+
   .shelf-room-map-viewport {
     grid-template-columns: minmax(0, 1fr);
     gap: 12px;
@@ -1113,7 +1197,7 @@ body.shelf-immersive-active .shelf-room-map-fab:focus-visible {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  border: 1px solid #e4d6c4;
+  border: 1px solid var(--map-divider);
   border-radius: 15px;
   background: var(--map-paper);
   box-shadow: 0 16px 60px rgba(12, 9, 6, 0.28);
@@ -1150,7 +1234,7 @@ button.shelf-room-map-modal-close {
   padding: 0;
   border-radius: 999px;
   border: 1px solid var(--map-line);
-  background: #fffbf4;
+  background: var(--map-surface);
   color: var(--map-ink);
   font-size: 19px;
   line-height: 1;
@@ -1159,7 +1243,7 @@ button.shelf-room-map-modal-close {
 
 button.shelf-room-map-modal-close:hover {
   border-color: var(--map-accent);
-  background: var(--map-selected);
+  background: var(--map-hover);
   color: var(--map-ink);
   transform: none;
 }
