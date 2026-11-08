@@ -707,197 +707,319 @@ body.shelf-immersive-active .shelf-book-title {
   border-bottom-color: rgba(255, 220, 168, 0.20);
 }
 
+.shelf-room-map-viewport,
+.shelf-room-map-modal-panel {
+  --map-paper: #fbf5eb;
+  --map-ink: #302b23;
+  --map-muted: #665b4d;
+  --map-line: #d8cbb8;
+  --map-accent: #285447;
+  --map-selected: #e4eee5;
+  color: var(--map-ink);
+}
+
 .shelf-room-map-viewport {
-  padding: 0.85em;
-  overflow: hidden;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 15.75rem;
+  grid-auto-rows: max-content;
+  align-content: start;
+  gap: clamp(14px, 2.5vw, 28px);
+  padding: 18px;
+  background: var(--map-paper);
 }
 
 .shelf-room-map-canvas {
   position: relative;
+  isolation: isolate;
   width: 100%;
-  height: clamp(300px, 34vw, 430px);
-  min-height: 300px;
-  border-radius: 18px;
-  background:
-    radial-gradient(circle at 42% 42%, rgba(255, 210, 140, 0.055), transparent 34%),
-    linear-gradient(135deg, rgba(14, 10, 7, 0.90), rgba(7, 8, 10, 0.92));
-  border: 2px solid rgba(255, 220, 168, 0.20);
-  box-shadow:
-    inset 0 0 44px rgba(0, 0, 0, 0.52),
-    0 8px 22px rgba(0, 0, 0, 0.28);
+  max-width: 690px;
+  margin-inline: auto;
+  aspect-ratio: 1464 / 1075;
+  border-radius: 7px;
+  background: #f5e2c4 url("https://nikoneco.github.io/hobby-room-library-PWA/assets/room-map.webp") center / 100% 100% no-repeat;
   overflow: hidden;
 }
 
-.room-map-outline {
+body.pwa-shell .shelf-room-map-canvas {
+  background-image: url("../room-map.webp");
+}
+
+button.room-map-shelf {
   position: absolute;
-  left: 3.5%;
-  right: 3.5%;
-  top: 6%;
-  bottom: 10%;
-  border: 3px solid rgba(235, 218, 190, 0.62);
-  border-bottom-color: rgba(235, 218, 190, 0.28);
-  border-radius: 18px 18px 12px 12px;
+  margin: 0;
+  padding: 0;
+  min-height: 0;
+  overflow: visible;
+  border: 0;
+  border-radius: 2px;
+  background: transparent;
+  box-shadow: none;
+  cursor: pointer;
+  transform: none;
+}
+
+/* Expand small hit areas toward the aisle, away from neighboring shelves. */
+button.room-map-shelf:not(:disabled)::before {
+  content: '';
+  position: absolute;
+  inset: var(--map-hit-y, 50%) auto auto var(--map-hit-x, 50%);
+  width: max(100%, 44px);
+  height: max(100%, var(--map-hit-min-height, 36px));
+  translate: calc(-1 * var(--map-hit-x, 50%)) calc(-1 * var(--map-hit-y, 50%));
+  pointer-events: auto;
+  background: none;
+}
+
+/* The two upper wall shelves and the central pairs grow in opposite directions. */
+.room-map-shelf:is([data-map-edge="left"], [data-map-edge="wall-left"], [data-map-edge="pc"]) {
+  --map-hit-x: 100%;
+}
+
+.room-map-shelf:is([data-map-edge="right"], [data-map-edge="wall-right"]) {
+  --map-hit-x: 0%;
+}
+
+.room-map-shelf:is([data-map-edge="left"], [data-map-edge="right"]) {
+  --map-hit-min-height: 0px;
+}
+
+.room-map-shelf:is([data-map-edge="left"], [data-map-edge="pc"]) {
+  --map-pin-x: 0%;
+  --map-pin-y: 50%;
+}
+
+.room-map-shelf[data-map-edge="right"] {
+  --map-pin-x: 100%;
+  --map-pin-y: 50%;
+}
+
+.room-map-shelf[data-map-edge="bottom"] {
+  --map-hit-y: 0%;
+}
+
+.room-map-pin {
+  position: absolute;
+  left: var(--map-pin-x, 50%);
+  top: var(--map-pin-y, 100%);
+  translate: -50% -50%;
+  display: grid;
+  place-items: center;
+  min-width: 22px;
+  height: 22px;
+  padding-inline: 3px;
+  border: 1px solid #50402e;
+  border-radius: 999px;
+  background: #fff9ee;
+  color: #3f3023;
+  font-size: 12px;
+  line-height: 1;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+}
+
+button.room-map-shelf:not(:disabled):is(:hover, :focus-visible, .is-linked, .is-active) {
+  z-index: 1;
+  box-shadow: inset 0 0 0 2px #fff9ee, 0 0 0 1px var(--map-accent);
+}
+
+.room-map-shelf:not(:disabled):is(:hover, :focus-visible, .is-linked, .is-active) .room-map-pin {
+  border-color: var(--map-accent);
+  background: var(--map-accent);
+  color: white;
+}
+
+.shelf-room-map-canvas button.room-map-shelf:active {
+  transform: none;
+}
+
+button.room-map-shelf:disabled {
+  cursor: default;
+}
+
+.room-map-shelf:disabled .room-map-pin {
+  background: #ede5d8;
+  border-style: dashed;
+  color: var(--map-muted);
+}
+
+.room-map-doujin,
+.room-map-entrance {
+  position: absolute;
   pointer-events: none;
+}
+
+.room-map-doujin span,
+.room-map-entrance {
+  padding: 2px 5px;
+  border-radius: 3px;
+  background: #fbf0dc;
+  color: #5d4a35;
+  font-size: clamp(10px, 1.1vw, 12px);
+  line-height: 1.2;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.room-map-doujin span {
+  position: absolute;
+  left: 50%;
+  translate: -50% -100%;
 }
 
 .room-map-entrance {
-  position: absolute;
-  left: 4%;
-  bottom: 2.5%;
-  color: #fff4dd;
-  font-weight: 800;
-  font-size: clamp(0.78rem, 1.2vw, 1.08rem);
-  text-shadow: 0 2px 5px rgba(0, 0, 0, 0.72);
+  left: 11%;
+  bottom: 6%;
+  translate: -50% 0;
 }
 
-.room-map-fixture {
-  position: absolute;
+.room-map-directory {
+  min-width: 0;
+  align-self: center;
+}
+
+.room-map-directory-title {
+  margin: 0 0 10px;
+  color: var(--map-ink);
+  font-size: 15px;
+  font-weight: 750;
+  line-height: 1.4;
+}
+
+.room-map-directory-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.room-map-directory-extra {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 6px;
+}
+
+button.room-map-index-button {
   display: flex;
   align-items: center;
-  justify-content: center;
-  text-align: center;
-  border-radius: 8px;
-  color: rgba(255, 244, 220, 0.84);
-  font-weight: 800;
-  letter-spacing: 0.03em;
-  border: 1px solid rgba(255, 235, 200, 0.18);
-  background: rgba(28, 26, 24, 0.62);
-  box-shadow: inset 0 0 18px rgba(0, 0, 0, 0.30);
-  pointer-events: none;
+  justify-content: space-between;
+  gap: 3px;
+  min-width: 0;
+  min-height: 44px;
+  padding: 4px 6px;
+  border: 1px solid var(--map-line);
+  border-radius: 6px;
+  background: #fffbf4;
+  color: var(--map-ink);
+  box-shadow: none;
+  line-height: 1;
 }
 
-.room-map-desk-main {
-  left: 47%;
-  top: 82%;
-  width: 46%;
-  height: 8%;
-  color: rgba(255, 244, 220, 0.76);
-  border-color: rgba(255, 235, 200, 0.18);
-  background: rgba(28, 26, 24, 0.56);
+button.room-map-index-button::before {
+  content: none;
 }
 
-.room-map-desk-side {
-  left: 84%;
-  top: 54%;
-  width: 9%;
-  height: 36%;
-  writing-mode: vertical-rl;
-  font-size: clamp(0.54rem, 0.9vw, 0.78rem);
-  color: rgba(255, 244, 220, 0.76);
-  border-color: rgba(255, 235, 200, 0.18);
-  background: rgba(28, 26, 24, 0.56);
-}
-
-.room-map-doujin {
-  left: 16%;
-  top: 82%;
-  width: 31%;
-  height: 8%;
-  flex-direction: column;
-  color: rgba(145, 236, 255, 0.78);
-  border-color: rgba(83, 211, 255, 0.18);
-  background: rgba(12, 22, 34, 0.50);
-}
-
-.room-map-doujin small {
-  margin-top: 0.22em;
-  font-size: 0.72em;
-  color: rgba(255, 241, 214, 0.60);
-}
-
-.room-map-shelf {
-  position: absolute;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 0.12em;
-  margin: 0;
-  padding: 0.18em 0.25em;
-  border-radius: 7px;
-  border: 2px solid rgba(255, 91, 126, 0.88);
-  background:
-    linear-gradient(135deg, rgba(78, 41, 22, 0.92), rgba(39, 19, 9, 0.92));
-  color: #fff2da;
-  box-shadow:
-    0 7px 16px rgba(0, 0, 0, 0.34),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  cursor: pointer;
-  transition: transform 150ms ease, box-shadow 150ms ease, border-color 150ms ease, background 150ms ease;
-}
-
-.room-map-shelf:hover,
-.room-map-shelf:focus-visible {
-  transform: translateY(-2px);
-  border-color: rgba(255, 192, 210, 1);
-  background:
-    linear-gradient(135deg, rgba(112, 64, 34, 0.98), rgba(54, 25, 12, 0.98));
-  box-shadow:
-    0 10px 22px rgba(0, 0, 0, 0.42),
-    0 0 18px rgba(255, 112, 150, 0.22);
-  outline: none;
-}
-
-.room-map-shelf:disabled {
-  cursor: default;
-  opacity: 0.45;
-  filter: grayscale(0.35);
-}
-
-.room-map-shelf:disabled:hover {
+.shelf-room-map-viewport button.room-map-index-button:active {
   transform: none;
-  box-shadow:
-    0 7px 16px rgba(0, 0, 0, 0.34),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
-.room-map-shelf.island {
-  border-color: rgba(255, 112, 150, 0.78);
+button.room-map-index-button:not(:disabled):is(:hover, :focus-visible, .is-active) {
+  border-color: var(--map-accent);
+  background: var(--map-selected);
+  color: var(--map-ink);
+  transform: none;
 }
 
-.room-map-shelf.vertical {
-  padding: 0.25em 0.18em;
+button.room-map-index-button:disabled {
+  background: #f2eadd;
+  color: var(--map-muted);
+  cursor: default;
+  transform: none;
 }
 
-.room-map-shelf.vertical .room-map-shelf-label {
-  font-size: clamp(0.82rem, 1.25vw, 1.06rem);
+.room-map-index-label {
+  display: grid;
+  place-items: center;
+  width: 21px;
+  height: 21px;
+  flex: 0 0 auto;
+  border: 1px solid #8a7660;
+  border-radius: 999px;
+  color: var(--map-ink);
+  font-size: 12px;
+  font-weight: 750;
 }
 
-.room-map-shelf.wall {
-  min-height: 34px;
+.room-map-index-label.is-word {
+  width: auto;
+  padding-inline: 3px;
+  font-size: 10px;
 }
 
-.room-map-shelf-label {
-  font-size: clamp(0.92rem, 1.45vw, 1.24rem);
-  line-height: 1.05;
-  font-weight: 900;
-  color: #9beeff;
-  text-shadow: 0 2px 5px rgba(0, 0, 0, 0.72);
+.room-map-directory-extra .room-map-index-label {
+  font-size: 12px;
+}
+
+.room-map-index-button:disabled .room-map-index-label {
+  border-style: dashed;
+  color: var(--map-muted);
+}
+
+.room-map-index-button.is-active .room-map-index-label {
+  border-color: var(--map-accent);
+  background: var(--map-accent);
+  color: white;
 }
 
 .room-map-shelf-count {
-  font-size: clamp(0.52rem, 0.82vw, 0.72rem);
-  line-height: 1.05;
-  color: #fff2da;
-  white-space: nowrap;
+  color: inherit;
+  font-size: 14px;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+}
+
+.room-map-shelf-count small {
+  margin-left: 1px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.room-map-directory-note {
+  margin: 12px 0 0;
+  color: var(--map-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.shelf-room-map-viewport button:focus-visible,
+.shelf-room-map-modal-panel .shelf-room-map-modal-close:focus-visible {
+  outline: 2px solid var(--map-accent) !important;
+  outline-offset: 2px;
 }
 
 @media (max-width: 900px) {
   .shelf-room-map {
     scroll-margin-top: 108px;
   }
+}
 
+@media (max-width: 740px) {
   .shelf-room-map-viewport {
-    padding: 0.70em;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+    padding: 12px;
   }
 
-  .shelf-room-map-canvas {
-    height: clamp(270px, 52vw, 390px);
-    min-height: 270px;
+  .room-map-pin {
+    min-width: 17px;
+    height: 17px;
+    font-size: 10px;
   }
 
-  .room-map-shelf {
-    border-width: 1.5px;
+  .room-map-directory-title {
+    margin-bottom: 7px;
+    font-size: 14px;
+  }
+
+  .room-map-directory-note {
+    margin-top: 8px;
   }
 }
 
@@ -910,26 +1032,6 @@ body.shelf-immersive-active .shelf-book-title {
   .shelf-room-map-summary {
     padding: 0.62em 0.72em;
     font-size: 0.82em;
-  }
-
-  .shelf-room-map-viewport {
-    padding: 0.56em;
-  }
-
-  .shelf-room-map-canvas {
-    height: clamp(238px, 66vw, 330px);
-    min-height: 238px;
-    border-radius: 14px;
-    border-width: 1.5px;
-  }
-
-  .room-map-outline {
-    border-width: 2px;
-    border-radius: 13px 13px 10px 10px;
-  }
-
-  .room-map-fixture {
-    border-radius: 6px;
   }
 }
 
@@ -1006,76 +1108,67 @@ body.shelf-immersive-active .shelf-room-map-fab:focus-visible {
 }
 
 .shelf-room-map-modal-panel {
-  width: min(1080px, calc(100vw - 32px));
-  max-height: min(86vh, 760px);
+  width: min(960px, 100%, max(620px, calc((88dvh - 7rem) * 1464 / 1075 + 19.75rem)));
+  max-height: min(88dvh, 760px);
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  border-radius: 20px;
-  border: 1px solid rgba(255, 220, 168, 0.24);
-  background:
-    linear-gradient(rgba(8, 7, 7, 0.82), rgba(8, 7, 7, 0.92)),
-    url("https://i.imgur.com/wQPeBYG.jpeg");
-  background-size: 840px auto;
-  box-shadow:
-    0 24px 60px rgba(0, 0, 0, 0.58),
-    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  border: 1px solid #e4d6c4;
+  border-radius: 15px;
+  background: var(--map-paper);
+  box-shadow: 0 16px 60px rgba(12, 9, 6, 0.28);
 }
 
 .shelf-room-map-modal-header {
   display: flex;
+  flex: 0 0 auto;
   align-items: center;
   justify-content: space-between;
-  gap: 1em;
-  padding: 0.9em 1.05em 0.55em;
-  border-bottom: 1px solid rgba(255, 220, 168, 0.12);
-  background: rgba(9, 10, 14, 0.72);
+  gap: 12px;
+  padding: 16px 18px 0;
 }
 
 .shelf-room-map-modal-title {
-  color: #fff1d6;
-  font-weight: 900;
-  letter-spacing: 0.06em;
-  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.72);
+  margin: 0;
+  color: var(--map-ink);
+  font-size: clamp(19px, 2.2vw, 26px);
+  font-weight: 750;
+  line-height: 1.3;
 }
 
-.shelf-room-map-modal-close {
-  min-width: 38px;
-  min-height: 38px;
+.shelf-room-map-modal-meta {
+  margin-top: 3px;
+  color: var(--map-muted);
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.4;
+}
+
+button.shelf-room-map-modal-close {
+  min-width: 44px;
+  min-height: 44px;
   padding: 0;
   border-radius: 999px;
-  border: 1px solid rgba(255, 220, 168, 0.36);
-  background: rgba(46, 30, 20, 0.78);
-  color: #fff2da;
-  font-size: 1.35em;
+  border: 1px solid var(--map-line);
+  background: #fffbf4;
+  color: var(--map-ink);
+  font-size: 19px;
   line-height: 1;
   box-shadow: none;
 }
 
-.shelf-room-map-modal-close:hover,
-.shelf-room-map-modal-close:focus-visible {
-  background: rgba(92, 54, 28, 0.92);
-  border-color: rgba(255, 232, 190, 0.84);
-  outline: none;
+button.shelf-room-map-modal-close:hover {
+  border-color: var(--map-accent);
+  background: var(--map-selected);
+  color: var(--map-ink);
+  transform: none;
 }
 
-.shelf-room-map-modal-hint {
-  padding: 0.62em 1.05em 0;
-  color: rgba(255, 241, 214, 0.74);
-  font-size: 0.86em;
-  font-weight: 700;
-}
-
-.shelf-room-map-overlay .shelf-room-map-viewport.modal {
+.shelf-room-map-viewport.modal {
   flex: 1 1 auto;
-  padding: 0.85em 1.05em 1.05em;
-  overflow: hidden;
-}
-
-.shelf-room-map-overlay .shelf-room-map-canvas {
-  height: clamp(310px, 48vw, 560px);
-  min-height: 300px;
-  max-height: calc(86vh - 132px);
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
 }
 
 @media (max-width: 900px) {
@@ -1085,17 +1178,15 @@ body.shelf-immersive-active .shelf-room-map-fab:focus-visible {
     min-height: 42px;
     padding: 0.64em 0.88em;
   }
+}
 
-  
-.shelf-room-map-modal-panel {
-    width: min(940px, calc(100vw - 24px));
-    max-height: 88vh;
-    border-radius: 16px;
+@media (max-width: 740px) {
+  .shelf-room-map-modal-panel {
+    width: min(510px, 100%);
   }
 
-  .shelf-room-map-overlay .shelf-room-map-canvas {
-    height: clamp(286px, 62vw, 500px);
-    max-height: calc(88vh - 128px);
+  .shelf-room-map-modal-header {
+    padding: 12px 12px 0;
   }
 }
 
@@ -1112,45 +1203,8 @@ body.shelf-immersive-active .shelf-room-map-fab:focus-visible {
     font-size: 0.78em;
   }
 
-  
-.shelf-room-map-overlay {
-    align-items: flex-start;
+  .shelf-room-map-overlay {
     padding: max(10px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
-  }
-
-  .shelf-room-map-modal-panel {
-    width: calc(100vw - 20px);
-    max-height: 92vh;
-    border-radius: 14px;
-  }
-
-  .shelf-room-map-modal-header {
-    padding: 0.72em 0.78em 0.46em;
-  }
-
-  .shelf-room-map-modal-title {
-    font-size: 0.92em;
-  }
-
-  .shelf-room-map-modal-close {
-    min-width: 34px;
-    min-height: 34px;
-    font-size: 1.2em;
-  }
-
-  .shelf-room-map-modal-hint {
-    padding: 0.52em 0.78em 0;
-    font-size: 0.76em;
-  }
-
-  .shelf-room-map-overlay .shelf-room-map-viewport.modal {
-    padding: 0.58em 0.62em 0.72em;
-  }
-
-  .shelf-room-map-overlay .shelf-room-map-canvas {
-    height: clamp(246px, 72vw, 360px);
-    min-height: 246px;
-    max-height: calc(92vh - 116px);
   }
 }
 

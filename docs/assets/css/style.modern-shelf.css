@@ -599,8 +599,7 @@ body.shelf-immersive-active .shelf-book-title {
   color: #fff1dc;
 }
 
-.shelf-room-map,
-.shelf-room-map-modal-panel {
+.shelf-room-map {
   position: relative;
   isolation: isolate;
   overflow: hidden;
@@ -614,8 +613,7 @@ body.shelf-immersive-active .shelf-book-title {
     inset 0 1px 0 rgba(255, 255, 255, 0.052);
 }
 
-.shelf-room-map-summary,
-.shelf-room-map-modal-header {
+.shelf-room-map-summary {
   border-bottom-color: rgba(240, 195, 122, 0.16);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.046), rgba(255, 255, 255, 0.014)),
@@ -642,9 +640,7 @@ body.shelf-immersive-active .shelf-book-title {
   white-space: nowrap;
 }
 
-.shelf-room-map-summary-meta,
-.shelf-room-map-modal-meta,
-.shelf-room-map-hint-meta {
+.shelf-room-map-summary-meta {
   display: inline-flex;
   width: fit-content;
   min-height: 1.54rem;
@@ -664,96 +660,6 @@ body.shelf-immersive-active .shelf-book-title {
   white-space: nowrap;
 }
 
-.shelf-room-map-modal-header {
-  align-items: center;
-}
-
-.shelf-room-map-modal-title-block {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: 0.22rem;
-}
-
-.shelf-room-map-modal-title {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  letter-spacing: 0;
-}
-
-.shelf-room-map-modal-meta {
-  min-height: 1.42rem;
-  padding-inline: 0.42rem;
-  font-size: 0.68rem;
-}
-
-.shelf-room-map-canvas {
-  border-color: rgba(240, 195, 122, 0.20);
-  background:
-    radial-gradient(circle at 48% 38%, rgba(240, 195, 122, 0.072), transparent 33%),
-    radial-gradient(circle at 82% 72%, rgba(126, 173, 181, 0.050), transparent 24%),
-    linear-gradient(135deg, rgba(18, 24, 31, 0.94), rgba(8, 11, 15, 0.96));
-  box-shadow:
-    inset 0 0 46px rgba(0, 0, 0, 0.50),
-    0 12px 28px rgba(0, 0, 0, 0.30);
-}
-
-.room-map-shelf {
-  border-color: rgba(240, 195, 122, 0.30);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.062), rgba(255, 255, 255, 0.018)),
-    rgba(20, 28, 36, 0.86);
-  box-shadow:
-    0 8px 18px rgba(0, 0, 0, 0.22),
-    inset 0 1px 0 rgba(255, 255, 255, 0.048);
-}
-
-.room-map-shelf.has-books {
-  border-color: rgba(240, 195, 122, 0.42);
-  background:
-    linear-gradient(180deg, rgba(240, 195, 122, 0.090), rgba(255, 255, 255, 0.022)),
-    rgba(22, 31, 39, 0.88);
-}
-
-.room-map-shelf:hover,
-.room-map-shelf:focus-visible {
-  border-color: rgba(240, 195, 122, 0.72);
-  background:
-    linear-gradient(180deg, rgba(240, 195, 122, 0.115), rgba(255, 255, 255, 0.024)),
-    rgba(23, 31, 39, 0.90);
-  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.36);
-}
-
-.room-map-shelf.is-active {
-  border-color: rgba(255, 232, 190, 0.92);
-  background:
-    linear-gradient(180deg, rgba(240, 195, 122, 0.18), rgba(255, 255, 255, 0.026)),
-    rgba(24, 32, 40, 0.92);
-  box-shadow:
-    0 0 0 2px rgba(214, 164, 95, 0.18),
-    0 16px 32px rgba(0, 0, 0, 0.40),
-    inset 0 1px 0 rgba(255, 255, 255, 0.075);
-}
-
-.room-map-shelf-label {
-  color: #f6ead8;
-}
-
-.room-map-shelf-count {
-  border: 1px solid rgba(240, 195, 122, 0.18);
-  background: rgba(0, 0, 0, 0.20);
-  color: rgba(255, 242, 214, 0.82);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
-}
-
-.room-map-shelf.has-books .room-map-shelf-count {
-  border-color: rgba(240, 195, 122, 0.26);
-  background: rgba(240, 195, 122, 0.13);
-  color: rgba(255, 242, 214, 0.90);
-}
-
 body.shelf-immersive-active .shelf-room-map-fab {
   border-color: rgba(240, 195, 122, 0.28);
   background:
@@ -771,28 +677,6 @@ body.shelf-immersive-active .shelf-room-map-fab:focus-visible {
   background:
     linear-gradient(180deg, rgba(240, 195, 122, 0.12), rgba(255, 255, 255, 0.024)),
     rgba(12, 18, 25, 0.94);
-}
-
-.shelf-room-map-modal-close {
-  color: #f6ead8;
-}
-
-.shelf-room-map-modal-hint {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.7rem;
-  border: 1px solid rgba(240, 195, 122, 0.14);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.042), rgba(255, 255, 255, 0.016)),
-    rgba(0, 0, 0, 0.16);
-  color: rgba(246, 234, 216, 0.76);
-}
-
-.shelf-room-map-hint-meta {
-  flex: 0 0 auto;
-  min-height: 1.44rem;
-  color: rgba(255, 242, 214, 0.74);
 }
 
 @media (max-width: 760px) {
@@ -852,13 +736,6 @@ body.shelf-immersive-active .shelf-room-map-fab:focus-visible {
   .shelf-room-map-summary-meta {
     padding-inline: 0.38rem;
     font-size: 0.66rem;
-  }
-
-  .shelf-room-map-modal-hint {
-    display: grid;
-    grid-template-columns: 1fr;
-    align-items: start;
-    gap: 0.42rem;
   }
 
   .bookshelf-group::after {
