@@ -185,17 +185,17 @@ function renderShelfJumpNav_(groups, totalCount, immersive) {
 
 
 function getRoomMapShelfConfigs_() {
-  // Pixel bounds on room-map.webp (1464 × 1075), not measured room dimensions.
+  // Pixel bounds and mascot centers on room-map.webp (1464 × 1075).
   return [
-    { key: '1', label: '①', x: 1160, y: 63, w: 258, h: 117 },
-    { key: '2', label: '②', x: 737, y: 62, w: 116, h: 187, edge: 'right' },
-    { key: '3', label: '③', x: 737, y: 257, w: 116, h: 194, edge: 'right' },
-    { key: '4', label: '④', x: 608, y: 460, w: 245, h: 103, edge: 'bottom' },
-    { key: '5', label: '⑤', x: 608, y: 257, w: 118, h: 194, edge: 'left' },
-    { key: '6', label: '⑥', x: 608, y: 62, w: 118, h: 187, edge: 'left' },
-    { key: '7', label: '⑦', x: 243, y: 64, w: 189, h: 116, edge: 'wall-right' },
-    { key: '8', label: '⑧', x: 43, y: 64, w: 192, h: 116, edge: 'wall-left' },
-    { key: 'PC横', label: 'PC横', groupKey: '__pcside__', x: 1150, y: 456, w: 269, h: 100, edge: 'pc' }
+    { key: '1', label: '①', x: 1160, y: 63, w: 258, h: 117, librarian: [1176, 271] },
+    { key: '2', label: '②', x: 737, y: 62, w: 116, h: 187, edge: 'right', librarian: [965, 155] },
+    { key: '3', label: '③', x: 737, y: 257, w: 116, h: 194, edge: 'right', librarian: [965, 354] },
+    { key: '4', label: '④', x: 608, y: 460, w: 245, h: 103, edge: 'bottom', librarian: [730, 700] },
+    { key: '5', label: '⑤', x: 608, y: 257, w: 118, h: 194, edge: 'left', librarian: [495, 354] },
+    { key: '6', label: '⑥', x: 608, y: 62, w: 118, h: 187, edge: 'left', librarian: [495, 155] },
+    { key: '7', label: '⑦', x: 243, y: 64, w: 189, h: 116, edge: 'wall-right', librarian: [338, 315] },
+    { key: '8', label: '⑧', x: 43, y: 64, w: 192, h: 116, edge: 'wall-left', librarian: [140, 315] },
+    { key: 'PC横', label: 'PC横', groupKey: '__pcside__', x: 1150, y: 456, w: 269, h: 100, edge: 'pc', librarian: [1024, 505] }
   ];
 }
 
@@ -291,11 +291,36 @@ function syncRoomMapCurrent_(root, target) {
   });
 }
 
-function setRoomMapDestination_(content, targetId, description) {
+function showRoomMapLibrarian_(content, targetId, position) {
+  content.querySelector('.room-map-librarian')?.remove();
+  if (!targetId || !document.body.classList.contains('pwa-shell')) return;
+
+  const librarian = document.createElement('img');
+  librarian.className = 'room-map-librarian';
+  librarian.src = './assets/room-map-librarian.webp';
+  librarian.width = 168;
+  librarian.height = 240;
+  librarian.alt = '';
+  librarian.setAttribute('aria-hidden', 'true');
+  librarian.draggable = false;
+  if (position) {
+    const [x, y] = position;
+    librarian.style.left = `${x / 1464 * 100}%`;
+    librarian.style.top = `${y / 1075 * 100}%`;
+    content.querySelector('.shelf-room-map-canvas').append(librarian);
+  } else {
+    content.querySelector('.room-map-action-details').prepend(librarian);
+  }
+}
+
+function setRoomMapDestination_(content, targetId, description, librarianPosition) {
   content.querySelectorAll('button[aria-pressed]').forEach(button => {
     button.setAttribute('aria-pressed', String(Boolean(targetId && button.dataset.shelfTarget === targetId)));
   });
   const move = content.querySelector('.room-map-move');
+  if ((move.dataset.shelfTarget || '') !== (targetId || '')) {
+    showRoomMapLibrarian_(content, targetId, librarianPosition);
+  }
   move.dataset.shelfTarget = targetId || '';
   move.disabled = !targetId;
   const status = content.querySelector('.room-map-destination');
@@ -359,7 +384,7 @@ function createShelfRoomMapContent_(groups, options) {
       button.setAttribute('aria-pressed', 'false');
       if (targetId) {
         button.dataset.shelfTarget = targetId;
-        button.onclick = () => setRoomMapDestination_(content, targetId, description);
+        button.onclick = () => setRoomMapDestination_(content, targetId, description, config.librarian);
       }
       button.setAttribute('aria-label', count ? description : `${name}は登録なし`);
       return button;
@@ -394,9 +419,11 @@ function createShelfRoomMapContent_(groups, options) {
   const actions = document.createElement('div');
   actions.className = 'room-map-actions';
   actions.innerHTML = `
-    <div>
-      <p class="room-map-destination" role="status" aria-atomic="true">移動先の棚を選んでください</p>
-      <p class="room-map-current" hidden></p>
+    <div class="room-map-action-details">
+      <div>
+        <p class="room-map-destination" role="status" aria-atomic="true">移動先の棚を選んでください</p>
+        <p class="room-map-current" hidden></p>
+      </div>
     </div>
     <button class="room-map-move" type="button" disabled>移動する</button>
   `;

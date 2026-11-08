@@ -6111,6 +6111,7 @@ function writePwaFiles() {
   './assets/librarian-presence.jpg',
   './assets/splash-lantern.jpg',
   './assets/room-map.webp',
+  './assets/room-map-librarian.webp',
   './assets/js/' + gasRunShimAssetName,
   './assets/js/pwa-client.js',
   ...jsFiles.map(fileName => './assets/js/' + jsOutName(fileName)),

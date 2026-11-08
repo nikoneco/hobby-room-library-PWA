@@ -755,6 +755,43 @@ body.pwa-shell .shelf-room-map-canvas {
   background-image: url("../room-map.webp");
 }
 
+.room-map-librarian {
+  width: auto;
+  pointer-events: none;
+  user-select: none;
+  transform-origin: center bottom;
+  animation:
+    room-map-librarian-appear 520ms ease-out both,
+    room-map-librarian-idle 4s ease-in-out 520ms infinite;
+}
+
+body:not(.pwa-librarian-presence) .room-map-librarian {
+  display: none;
+}
+
+.shelf-room-map-canvas > .room-map-librarian {
+  position: absolute;
+  z-index: 1;
+  height: 14.5%;
+  translate: -50% -50%;
+}
+
+@keyframes room-map-librarian-appear {
+  from { opacity: 0; scale: 0.82; }
+  to { opacity: 1; scale: 1; }
+}
+
+@keyframes room-map-librarian-idle {
+  0%, 100% { scale: 1; }
+  50% { scale: 0.98 0.96; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .room-map-librarian {
+    animation: none;
+  }
+}
+
 button.room-map-shelf {
   position: absolute;
   margin: 0;
@@ -1020,6 +1057,18 @@ button.room-map-index-button:disabled {
   gap: 10px;
   padding: 10px 18px;
   border-top: 1px solid var(--map-divider);
+}
+
+.room-map-action-details {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.room-map-action-details > .room-map-librarian {
+  flex: 0 0 auto;
+  height: 32px;
 }
 
 .room-map-destination,
