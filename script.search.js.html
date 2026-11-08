@@ -447,6 +447,9 @@ function applyInitialSearchData_(data) {
 }
 
 document.addEventListener('shumi-library-local-index-ready', function() {
+  // On reload IndexedDB can finish before the remaining scripts load.
+  // The DOMContentLoaded bootstrap also reads an index that is already ready.
+  if (document.readyState === 'loading') return;
   syncSearchDataFromLocalIndex_();
 });
 

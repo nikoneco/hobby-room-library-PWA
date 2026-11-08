@@ -172,6 +172,7 @@ async function checkInitialSearchDataFlow() {
     let ready = false;
     let resolveRefresh;
     let refreshCalls = 0;
+    let quickBrowseRenders = 0;
     const initialCalls = [];
     const eventHandlers = new Map();
     const timeoutCallbacks = new Map();
@@ -203,6 +204,7 @@ async function checkInitialSearchDataFlow() {
       getInitialSearchData() { initialCalls.push('initial'); return this; }
     };
     const document = {
+      readyState: 'interactive',
       addEventListener(type, handler) {
         if (!eventHandlers.has(type)) eventHandlers.set(type, []);
         eventHandlers.get(type).push(handler);
@@ -250,15 +252,27 @@ async function checkInitialSearchDataFlow() {
       getPreferredResultViewMode_: prefs => options.localPreference || prefs.resultViewMode || 'card',
       updateViewToggleButtons_() {},
       populateAdvancedOptions() {},
-      renderQuickBrowseRail_() {},
+      renderQuickBrowseRail_() { quickBrowseRenders += 1; },
       syncSearchStatusPreviewFromForm_() {}
     };
     vm.createContext(context);
     vm.runInContext(source, context);
+    if (mode === 'warm') {
+      ready = true;
+      document.readyState = 'loading';
+      document.dispatchEvent({ type: 'shumi-library-local-index-ready' });
+      assertEqual(quickBrowseRenders, 0, 'stored index does not render before the remaining scripts load');
+      document.readyState = 'interactive';
+    }
     context.fetchInitialSearchData();
     for (let i = 0; i < 6; i += 1) await Promise.resolve();
 
-    if (mode === 'success') {
+    if (mode === 'warm') {
+      assertEqual(quickBrowseRenders, 1, 'startup renders using the index that was already ready');
+      assertEqual(context.SUGGEST_DATA.titles[0], 'fixture title', 'startup uses the saved index metadata');
+      assert(refreshCalls === 0 && initialCalls.length === 0 && timeoutCallbacks.size === 0,
+        'startup with a ready index avoids a refresh, API fallback and pending timer');
+    } else if (mode === 'success') {
       if (options.userChangesWhileWaiting) {
         context.currentViewMode = 'shelf';
         context.resultViewModeChangedLocally = true;
@@ -307,6 +321,7 @@ async function checkInitialSearchDataFlow() {
     }
   }
 
+  await runFixture('warm');
   await runFixture('success');
   await runFixture('success', { localPreference: 'shelf' });
   await runFixture('success', { userChangesWhileWaiting: true });
