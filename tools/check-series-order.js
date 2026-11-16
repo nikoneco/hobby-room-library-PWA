@@ -160,20 +160,32 @@ if (process.argv.includes('--live-copy')) {
 
 // Exercise both real rendering entry points with a minimal DOM.
 const nodes = new Map();
-const element = () => ({ style: {}, children: [], classList: { add() {}, remove() {}, contains() { return false; } },
-  setAttribute() {}, appendChild(child) { if (child.fragment) this.children.push(...child.children); else this.children.push(child); },
+const imageCalls = [];
+const prefetchCalls = [];
+const element = tagName => ({ tagName, style: {}, children: [], attributes: {}, classList: { add() {}, remove() {}, contains() { return false; } },
+  setAttribute(name, value) { this.attributes[name] = value; }, appendChild(child) { if (child.fragment) this.children.push(...child.children); else this.children.push(child); },
   querySelector() { return seriesList; }, querySelectorAll() { return []; } });
 const seriesList = element();
 Object.assign(client, { currentDatasetRevision: 'render-revision', popupSeriesRequestGeneration_: 0, popupReturnScrollY: 0,
   document: { body: element(), getElementById: id => { if (!nodes.has(id)) nodes.set(id, element()); return nodes.get(id); },
     createElement: element, createDocumentFragment: () => ({ fragment: true, children: [], appendChild(child) { this.children.push(child); } }) },
-  window: { scrollY: 0 }, setPopupModalOpen_() {}, prioritizeBookDetailPrefetch_() {}, clearPopupTouchHandlers_() {},
-  escapeHtml: text => String(text), setupBookImageElement_() {}, buildExternalLinksHtml: () => '', isCurrentSeriesBook_: () => false,
-  uiIcon_: () => '', getSeriesVolumeLabel_: book => book.title, getSeriesListBadgeLabel_: (_, i) => String(i) });
-vm.runInContext(functionSource(modalSource, 'renderSearchResultSeriesPanel_') + '\n' + functionSource(modalSource, 'showSeriesPanel'), client);
+  window: { scrollY: 0 }, setPopupModalOpen_() {},
+  prioritizeBookDetailPrefetch_(books, options) { prefetchCalls.push({ books, options }); }, clearPopupTouchHandlers_() {},
+  escapeHtml: text => String(text), setupBookImageElement_(image, book, options) { imageCalls.push({ image, book, options }); },
+  buildExternalLinksHtml: () => '', isCurrentSeriesBook_: () => false, uiIcon_: () => '' });
+vm.runInContext(['getSeriesVolumeLabel_', 'getSeriesListBadgeLabel_', 'renderSearchResultSeriesPanel_', 'showSeriesPanel']
+  .map(name => functionSource(modalSource, name)).join('\n'), client);
+function renderBooks(input, group = { key: input[0].seriesKeyAuto, books: [input[0]], representativeBook: input[0] }) {
+  seriesList.children = [];
+  imageCalls.length = 0;
+  prefetchCalls.length = 0;
+  client.renderSearchResultSeriesPanel_(group, input);
+  return seriesList.children;
+}
+const renderedLabels = buttons => buttons.map(button => button.children[1].textContent);
 const group = { key: 'series-a', books: [books[7]], representativeBook: books[7] };
 const input = books.slice(0, 9);
-client.renderSearchResultSeriesPanel_(group, input);
+renderBooks(input, group);
 const expectedTitles = sort(input).map(book => book.title);
 assert.deepEqual(seriesList.children.map(button => button.title), expectedTitles, 'search-group series renders numeric order');
 assert.deepEqual(group.seriesBooks.map(book => book.bookId), input.map(book => book.bookId), 'cached series retains original baseline rather than sorted output');
@@ -186,5 +198,59 @@ for (const title of expectedTitles) {
   assert(position > previous, 'detail series renders the same numeric order'); previous = position;
 }
 console.log('both series rendering paths ok');
+
+const curatedInput = [
+  { title: '偽物語 下', seriesOrder: 40 },
+  { title: '化物語 上', seriesOrder: 10 },
+  { title: '化物語 下', seriesOrder: 20 },
+  { title: '傷物語', seriesOrder: 30 },
+  { title: '猫物語 黒', seriesOrder: 50 },
+  { title: '新刊 上', seriesOrder: null },
+  { title: '<img src=x onerror=alert(1)> 新刊 下', seriesOrder: null }
+].map((book, i) => ({ ...book, bookId: uuid(i), seriesKeyAuto: 'curated' }));
+const curatedBefore = plain(curatedInput);
+const curatedButtons = renderBooks(curatedInput);
+const curatedSorted = sort(curatedInput);
+assert.deepEqual(renderedLabels(curatedButtons), curatedSorted.map(book => book.title),
+  'curated series uses exact full titles for every card, including null-order new members');
+assert.deepEqual(plain(curatedInput), curatedBefore, 'rendering does not modify the input order or books');
+assert.deepEqual(prefetchCalls[0].books.map(book => book.bookId), curatedSorted.map(book => book.bookId),
+  'detail prefetch retains display order');
+assert.deepEqual(plain(prefetchCalls[0].options), { priority: true, allowModal: true });
+assert.equal(prefetchCalls.length, 1, 'full titles do not add detail prefetch work');
+assert.deepEqual(imageCalls.map(call => call.book.bookId), curatedSorted.map(book => book.bookId));
+assert.deepEqual(imageCalls.map(call => plain(call.options)), curatedSorted.map((_, i) => ({
+  track: false, loading: i < 4 ? 'eager' : 'lazy', fetchPriority: i < 4 ? 'high' : 'low'
+})), 'first four covers remain eager and all remaining covers stay lazy');
+curatedButtons.forEach((button, i) => {
+  const book = curatedSorted[i];
+  assert.equal(button.attributes['aria-label'], book.title + 'の詳細を開く', 'accessible name keeps full title');
+  assert.equal(button.title, book.title, 'tooltip keeps full title');
+  assert.equal(button.children[0].alt, book.title, 'cover alt keeps full title');
+});
+const unsafeLabel = curatedButtons.find(button => button.title.startsWith('<img')).children[1];
+assert.equal(unsafeLabel.textContent, '<img src=x onerror=alert(1)> 新刊 下', 'title markup remains literal text');
+assert.equal(unsafeLabel.innerHTML, undefined, 'full title is not assigned as HTML');
+assert.equal(unsafeLabel.children.length, 0, 'title markup creates no child elements');
+
+for (const order of [0, -2, 0.5]) {
+  const ordered = [{ title: '例外 上', seriesOrder: order }, { title: '新刊 下', seriesOrder: null }]
+    .map(book => ({ ...book, seriesKeyAuto: 'curated' }));
+  assert.deepEqual(renderedLabels(renderBooks(ordered)), ['例外 上', '新刊 下'],
+    'zero, negative and fractional numeric orders all activate full series titles: ' + order);
+}
+for (const order of [null, undefined, '', ' ', '0', true, NaN, Infinity, -Infinity]) {
+  const ordinary = [{ title: '通常 上', seriesOrder: order }, { title: '通常 下', seriesOrder: order },
+    { title: '通常 10', volume: 10, seriesOrder: order }, { title: '番外編', seriesOrder: order }]
+    .map(book => ({ ...book, seriesKeyAuto: 'ordinary' }));
+  assert.deepEqual(renderedLabels(renderBooks(ordinary)), ['上巻', '下巻', '10巻', '番外編'],
+    'missing or invalid transport metadata keeps ordinary compact labels: ' + String(order));
+}
+client.showSeriesPanel(curatedInput[0], curatedInput, { index: 0, data: curatedInput });
+assert(nodes.get('image-popup-info').innerHTML.includes('<span class="series-volume-label">上巻</span>'),
+  'separate detail series panel keeps its compact part label even for curated series');
+assert(nodes.get('image-popup-info').innerHTML.includes('>化物語 上</span>'),
+  'separate detail series panel retains its existing full-title column');
+console.log('curated series full-title rendering checks ok');
 
 console.log('series order checks ok');

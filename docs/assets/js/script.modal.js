@@ -2242,6 +2242,7 @@ function renderSearchResultSeriesPanel_(group, seriesBooks) {
   const prevBtn = document.getElementById('popup-prev');
   const nextBtn = document.getElementById('popup-next');
   const items = sortSeriesBooksForDisplay_(Array.isArray(seriesBooks) ? seriesBooks : []);
+  const useFullTitles = items.some(book => typeof book.seriesOrder === 'number' && Number.isFinite(book.seriesOrder));
   group.seriesBooks = Array.isArray(seriesBooks) ? seriesBooks.slice() : [];
   group.seriesBooksRevision = currentDatasetRevision;
   const sourceBook = group.representativeBook || group.books[0];
@@ -2290,7 +2291,7 @@ function renderSearchResultSeriesPanel_(group, seriesBooks) {
 
       const title = document.createElement('span');
       title.className = 'search-result-series-book-title';
-      title.textContent = getSeriesVolumeLabel_(book);
+      title.textContent = useFullTitles ? book.title : getSeriesVolumeLabel_(book);
       button.title = book && book.title ? book.title : '(タイトルなし)';
 
       button.appendChild(cover);
