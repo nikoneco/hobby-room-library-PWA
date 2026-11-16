@@ -106,6 +106,9 @@ jobs:
       - name: Check import enrichment retries
         run: node tools/check-import-retries.js
 
+      - name: Check queued import lock contention
+        run: node tools/check-import-queue.js
+
       - name: Check series registry lifecycle
         run: node tools/check-series-registry.js
 

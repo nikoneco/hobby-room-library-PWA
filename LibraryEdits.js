@@ -177,7 +177,8 @@ function handleInstalledLibraryEdit_(e) {
 }
 
 function ensureLibraryEditRetry_() {
-  if (!readLibraryEditQueue_().some(record => Number(record.data.attempts || 0) < LIBRARY_EDIT_CONFIG_.MAX_RETRIES)) return false;
+  if (!hasPendingNewBookImport_() &&
+      !readLibraryEditQueue_().some(record => Number(record.data.attempts || 0) < LIBRARY_EDIT_CONFIG_.MAX_RETRIES)) return false;
   const lock = LockService.getUserLock();
   if (!lock.tryLock(1000)) return false;
   try {
@@ -197,7 +198,8 @@ function retryLibraryEdits_(e) {
     trigger.getHandlerFunction() === LIBRARY_EDIT_CONFIG_.RETRY_HANDLER &&
     String(trigger.getUniqueId()) === String(e.triggerUid)).forEach(trigger => ScriptApp.deleteTrigger(trigger));
   const records = readLibraryEditQueue_();
-  if (!records.some(record => Number(record.data.attempts || 0) < LIBRARY_EDIT_CONFIG_.MAX_RETRIES)) return { pending: records.length };
+  const importPending = hasPendingNewBookImport_();
+  if (!importPending && !records.some(record => Number(record.data.attempts || 0) < LIBRARY_EDIT_CONFIG_.MAX_RETRIES)) return { pending: records.length };
   const source = PropertiesService.getScriptProperties().getProperty(LIBRARY_EDIT_CONFIG_.SOURCE_PROPERTY);
   if (!source) throw new Error('Library edit source has not been configured.');
   // Bound triggers can use their parent with the current-document scope.
@@ -207,7 +209,10 @@ function retryLibraryEdits_(e) {
     throw new Error('Library edit retry does not match the saved bound spreadsheet.');
   }
   ensureLibraryEditRetry_();
-  try { return processLibraryEditQueue_(spreadsheet, true); }
+  try {
+    if (importPending) return withLibraryEditSpreadsheet_(spreadsheet, () => processPendingNewBookImport_(spreadsheet));
+    return processLibraryEditQueue_(spreadsheet, true);
+  }
   catch (error) { console.error('library edit retry deferred:', String(error)); return { pending: readLibraryEditQueue_().length, error: String(error) }; }
 }
 
@@ -326,6 +331,11 @@ function expandLibraryEditRecords_(records) {
 
 function processLibraryEditQueue_(spreadsheet, retryOnly) {
   const started = Date.now();
+  // A confirmed new-book request gets the next free lock instead of starving
+  // behind the edit backlog. Capture/scheduling still preserve every edit.
+  if (hasPendingNewBookImport_()) {
+    return { busy: true, pending: readLibraryEditQueue_().length, importPending: true };
+  }
   const lock = LockService.getScriptLock();
   if (!lock.tryLock(LIBRARY_EDIT_CONFIG_.LOCK_WAIT_MS)) {
     const pending = readLibraryEditQueue_().filter(record => record.data.source === spreadsheet.getId());

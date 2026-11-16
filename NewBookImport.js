@@ -4,6 +4,8 @@ const NEW_BOOK_IMPORT_CONFIG = {
   DEFAULT_LIMIT: 20,
   TEST_LIMIT: 5,
   LOCK_WAIT_MS: 10000,
+  PENDING_PROPERTY: 'newBookImport.pending.v1',
+  MAX_QUEUED_ATTEMPTS: 3,
   YOMIGANA_CURSOR_PREFIX: 'newBookImport.yomiganaNextRow.'
 };
 
@@ -29,21 +31,109 @@ function enrichNewBooksAfterImport() {
 }
 
 function enrichNewBooksAfterImport_() {
-  return enrichNewBooksAfterImportByLimit_(NEW_BOOK_IMPORT_CONFIG.DEFAULT_LIMIT);
+  const spreadsheet = getLibrarySpreadsheet_();
+  rememberLibraryEditSource_(spreadsheet);
+  const pending = readPendingNewBookImport_();
+  if (pending) {
+    if (pending.source !== spreadsheet.getId()) {
+      throw new Error('New-book import retry does not match the saved bound spreadsheet.');
+    }
+    // A fresh, confirmed button click can resume a request whose automatic
+    // attempts were exhausted. Ordinary duplicate clicks keep the same job.
+    if (pending.attempts >= NEW_BOOK_IMPORT_CONFIG.MAX_QUEUED_ATTEMPTS) {
+      pending.attempts = 0;
+      PropertiesService.getScriptProperties().setProperty(NEW_BOOK_IMPORT_CONFIG.PENDING_PROPERTY, JSON.stringify(pending));
+    }
+    ensureLibraryEditRetry_();
+    return processPendingNewBookImport_(spreadsheet);
+  }
+
+  const result = enrichNewBooksAfterImportByLimit_(NEW_BOOK_IMPORT_CONFIG.DEFAULT_LIMIT);
+  if (!result.busy) return result;
+
+  // Do not wait out a multi-minute edit retry in a Sheets button execution.
+  // Reuse its one-shot worker, which will run this request before more edits.
+  if (!readPendingNewBookImport_()) {
+    PropertiesService.getScriptProperties().setProperty(NEW_BOOK_IMPORT_CONFIG.PENDING_PROPERTY, JSON.stringify({
+      id: Utilities.getUuid(), source: spreadsheet.getId(),
+      limit: NEW_BOOK_IMPORT_CONFIG.DEFAULT_LIMIT, attempts: 0
+    }));
+  }
+  ensureLibraryEditRetry_();
+  return notifyQueuedNewBookImport_(spreadsheet);
 }
 
 function enrichNewBooksAfterImportTest5_() {
   return enrichNewBooksAfterImportByLimit_(NEW_BOOK_IMPORT_CONFIG.TEST_LIMIT);
 }
 
-function enrichNewBooksAfterImportByLimit_(limit) {
+function readPendingNewBookImport_() {
+  const json = PropertiesService.getScriptProperties().getProperty(NEW_BOOK_IMPORT_CONFIG.PENDING_PROPERTY);
+  if (!json) return null;
+  const request = JSON.parse(json);
+  if (!request || !request.id || !request.source || !Number.isInteger(request.limit) ||
+      request.limit < 1 || request.limit > NEW_BOOK_IMPORT_CONFIG.DEFAULT_LIMIT ||
+      !Number.isInteger(request.attempts) || request.attempts < 0) {
+    throw new Error('Invalid pending new-book import request.');
+  }
+  return request;
+}
+
+function hasPendingNewBookImport_() {
+  const request = readPendingNewBookImport_();
+  return Boolean(request && request.attempts < NEW_BOOK_IMPORT_CONFIG.MAX_QUEUED_ATTEMPTS);
+}
+
+function notifyQueuedNewBookImport_(spreadsheet) {
+  spreadsheet.toast('別の自動更新が実行中のため、新刊登録後処理を予約しました。ロックが空き次第、自動で実行します。', '図書館', 15);
+  return { queued: true, busy: true };
+}
+
+function processPendingNewBookImport_(spreadsheet) {
+  const request = readPendingNewBookImport_();
+  if (!request) return { pending: false };
+  if (request.source !== spreadsheet.getId()) {
+    throw new Error('New-book import retry does not match the saved bound spreadsheet.');
+  }
+  if (request.attempts >= NEW_BOOK_IMPORT_CONFIG.MAX_QUEUED_ATTEMPTS) {
+    return { failed: true, attempts: request.attempts };
+  }
+  const properties = PropertiesService.getScriptProperties();
+  let result;
+  try {
+    result = enrichNewBooksAfterImportByLimit_(request.limit, () => {
+      // Checkpoint only after acquiring ScriptLock. Busy workers must not spend
+      // attempts, while forced GAS termination must still have a durable bound.
+      const current = readPendingNewBookImport_();
+      if (!current || current.id !== request.id ||
+          current.attempts >= NEW_BOOK_IMPORT_CONFIG.MAX_QUEUED_ATTEMPTS) return false;
+      current.attempts += 1;
+      properties.setProperty(NEW_BOOK_IMPORT_CONFIG.PENDING_PROPERTY, JSON.stringify(current));
+      return true;
+    }, () => {
+      // Consume before releasing ScriptLock so a waiting worker cannot start
+      // the same request in the gap between the final write and queue cleanup.
+      const current = readPendingNewBookImport_();
+      if (current && current.id === request.id) properties.deleteProperty(NEW_BOOK_IMPORT_CONFIG.PENDING_PROPERTY);
+    });
+  } catch (error) {
+    spreadsheet.toast('新刊登録後処理で停止しました。自動再試行は最大3回です。続く場合は実行ログを確認し、新刊登録後処理をもう一度押してください。', '図書館', 20);
+    throw error;
+  }
+  if (result.busy) return notifyQueuedNewBookImport_(spreadsheet);
+  return result;
+}
+
+function enrichNewBooksAfterImportByLimit_(limit, beforeRun, onComplete) {
   const lock = LockService.getScriptLock();
   if (!lock.tryLock(NEW_BOOK_IMPORT_CONFIG.LOCK_WAIT_MS)) {
-    throw new Error('Another import enrichment job is already running.');
+    console.log(JSON.stringify({ operation: 'newBookImport', busy: true }));
+    return { busy: true };
   }
 
   let retryBudgetStarted = false;
   try {
+    if (beforeRun && beforeRun() === false) return { stale: true };
     beginRakutenBooks429RetryBudget_();
     retryBudgetStarted = true;
     const batchLimit = Math.max(1, Number(limit || NEW_BOOK_IMPORT_CONFIG.DEFAULT_LIMIT));
@@ -81,6 +171,7 @@ function enrichNewBooksAfterImportByLimit_(limit) {
     );
 
     console.log(JSON.stringify(result));
+    if (onComplete) onComplete();
     return result;
   } finally {
     try {
