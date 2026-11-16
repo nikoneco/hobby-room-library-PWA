@@ -11,6 +11,9 @@ function onOpen() {
     .addItem('ISBN入力モード', 'startLibraryInputFromMenu_')
     .addItem('入力モード終了', 'finishLibraryInputFromMenu_')
     .addItem('Filter初期化', 'resetLibraryFilterFromMenu_')
+    .addSeparator()
+    .addItem('自動同期の状態を確認', 'inspectLibraryEditQueue_')
+    .addItem('自動同期を復旧', 'recoverLibraryEditQueue_')
     .addToUi();
 }
 

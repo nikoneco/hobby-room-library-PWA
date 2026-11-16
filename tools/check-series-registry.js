@@ -263,6 +263,7 @@ function makeFixture(options = {}) {
     SpreadsheetApp: {
       getActive: () => spreadsheet,
       getActiveSpreadsheet: () => spreadsheet,
+      getUi: () => ({}),
       openById: id => { assert.equal(id, spreadsheet.getId()); return spreadsheet; },
       flush() {},
       CopyPasteType: { PASTE_FORMAT: 'format', PASTE_DATA_VALIDATION: 'validation' }
@@ -1243,7 +1244,7 @@ function testInstalledBusyEditQueuesAndRecoversWithoutAnActiveSpreadsheet() {
   fixture.context.SpreadsheetApp.getActive = () => { throw Error('retry must not use active spreadsheet'); };
   fixture.context.SpreadsheetApp.getActiveSpreadsheet = () => fixture.spreadsheet;
   retryQueuedEdits(fixture);
-  assert.equal(fixture.context.readLibraryEditQueue_()[0].data.attempts, 1);
+  assert.equal(fixture.context.readLibraryEditQueue_()[0].data.attempts, 0, 'lock contention is not a processing failure');
   fixture.setLockAvailable(true);
   assert.equal(retryQueuedEdits(fixture).pending, 0);
   assert.equal(fixture.masterSheet.rows[1][7], 1);
@@ -1403,15 +1404,21 @@ function testBulkEditDrainsAtMostFourIdentitiesAndRetainsRemainingTokens() {
   assert.equal(fixture.catalogSheet.rows.slice(1).every(row => row[23] === 'Manual group'), true);
 }
 
-function testBusyRetryStopsAfterBoundedAttemptsWithoutDroppingIntent() {
+function testOnlyRealFailuresSpendBoundedRetryAttempts() {
   const fixture = makeFixture({ books: [makeBook('One', 'group', { uuid: editUuid(1) })] });
   fixture.setLockAvailable(false);
   triggerManualXEdit(fixture, 2);
   for (let index = 0; index < 9; index++) retryQueuedEdits(fixture);
+  assert.equal(fixture.triggers.length, 1, 'lock contention keeps its single successor');
+  assert.equal(fixture.context.readLibraryEditQueue_()[0].data.attempts, 0);
+  fixture.setLockAvailable(true);
+  const original = fixture.context.syncSeriesRegistryAfterManualKeyEdit_;
+  fixture.context.syncSeriesRegistryAfterManualKeyEdit_ = () => { throw Error('simulated processing failure'); };
+  for (let index = 0; index < 9; index++) retryQueuedEdits(fixture);
   assert.equal(fixture.triggers.length, 0);
   assert.equal(fixture.context.readLibraryEditQueue_().length, 1);
   assert.equal(fixture.context.readLibraryEditQueue_()[0].data.attempts, 8);
-  fixture.setLockAvailable(true);
+  fixture.context.syncSeriesRegistryAfterManualKeyEdit_ = original;
   triggerManualXEdit(fixture, 2); // A later installed edit can resume retained work.
   while (fixture.context.readLibraryEditQueue_().length) retryQueuedEdits(fixture);
   assert.equal(fixture.catalogSheet.rows[1][23], 'group');
@@ -1555,7 +1562,578 @@ function testRetryRejectsAParentThatDoesNotMatchSavedSource() {
   assert.equal(fixture.context.readLibraryEditQueue_().length, 1);
 }
 
+function testUuidAssignedAfterCaptureAdoptsCurrentBookAndManualKey() {
+  for (const manual of [false, true]) {
+    const fixture = makeFixture({ books: [makeBook('Final title 1', 'draft key')] });
+    fixture.catalogSheet.rows[1][18] = '9780000000001';
+    fixture.setLockAvailable(false);
+    triggerLibraryEdit(fixture, { range: fixture.catalogSheet.getRange(2, 9) });
+    assert.equal(fixture.context.readLibraryEditQueue_()[0].data.rows[0].uuid, '');
+    fixture.catalogSheet.rows[1][21] = editUuid(10);
+    fixture.catalogSheet.rows[1][23] = manual ? 'Human selected group' : 'intermediate key';
+    if (manual) fixture.catalogSheet.notes.set('2:24', '残すメモ\n[library.series-key:v1:MANUAL]');
+    fixture.setLockAvailable(true);
+    assert.equal(retryQueuedEdits(fixture).pending, 0);
+    assert.equal(fixture.catalogSheet.rows[1][21], editUuid(10));
+    assert.equal(fixture.catalogSheet.rows[1][18], '9780000000001');
+    assert.equal(fixture.catalogSheet.rows[1][8], 'Final title 1');
+    assert.equal(fixture.catalogSheet.rows[1][23], manual ? 'Human selected group' : 'final title');
+    if (manual) assert.equal(fixture.catalogSheet.getRange(2, 24).getNote(), '残すメモ\n[library.series-key:v1:MANUAL]');
+  }
+}
+
+function testEstablishedUuidOrBindingCannotFallBackToMatchingText() {
+  for (const boundAfterCapture of [false, true]) {
+    const fixture = makeFixture({ books: [makeBook('Same title', 'group', {
+      uuid: boundAfterCapture ? '' : editUuid(1)
+    })] });
+    fixture.setLockAvailable(false);
+    triggerManualXEdit(fixture, 2);
+    if (boundAfterCapture) {
+      fixture.setLockAvailable(true);
+      fixture.context.syncSeriesRegistryAfterManualKeyEdit_ = () => { throw Error('service failure after binding'); };
+      retryQueuedEdits(fixture);
+      assert.ok(fixture.context.readLibraryEditQueue_()[0].bindings[0]);
+    }
+    fixture.catalogSheet.rows[1][21] = editUuid(20);
+    const before = snapshotWrites(fixture);
+    fixture.setLockAvailable(true);
+    const result = retryQueuedEdits(fixture);
+    assert.match(result.error, /UUID is missing or ambiguous/);
+    assert.equal(result.pending, 1);
+    assert.equal(snapshotWrites(fixture), before, 'matching title/key cannot substitute another stable identity');
+    assert.equal(fixture.catalogSheet.rows[1][21], editUuid(20));
+  }
+}
+
+function testUuidAssignedAfterCaptureCannotAdoptDuplicatedUuid() {
+  const fixture = makeFixture({ books: [makeBook('Unique title', 'group'), makeBook('Other title', 'other')] });
+  fixture.setLockAvailable(false);
+  triggerManualXEdit(fixture, 2);
+  fixture.catalogSheet.rows[1][21] = editUuid(1);
+  fixture.catalogSheet.rows[2][21] = editUuid(1);
+  const before = snapshotWrites(fixture);
+  fixture.setLockAvailable(true);
+  assert.match(retryQueuedEdits(fixture).error, /UUID is missing or ambiguous/);
+  assert.equal(fixture.context.readLibraryEditQueue_().length, 1);
+  assert.equal(snapshotWrites(fixture), before);
+}
+
+function testRunBudgetYieldsUnstartedUnitsWithoutSpendingAttempts() {
+  const fixture = makeFixture({ books: [1, 2, 3].map(index =>
+    makeBook('Title ' + index, 'Group ' + index, { uuid: editUuid(index) })) });
+  fixture.setLockAvailable(false);
+  triggerLibraryEdit(fixture, { range: fixture.catalogSheet.getRange(2, 24, 3, 1) });
+  let now = 0;
+  fixture.context.Date = class extends Date { static now() { return now; } };
+  const expand = fixture.context.expandLibraryEditRecords_;
+  fixture.context.expandLibraryEditRecords_ = (...args) => {
+    const result = expand(...args);
+    now += 45000;
+    return result;
+  };
+  const original = fixture.context.syncSeriesRegistryAfterManualKeyEdit_;
+  fixture.context.syncSeriesRegistryAfterManualKeyEdit_ = (...args) => {
+    const result = original(...args);
+    now += 45000;
+    return result;
+  };
+  fixture.setLockAvailable(true);
+  const first = retryQueuedEdits(fixture);
+  assert.equal(first.processed, 1, 'the first unit runs even when queue preparation used the budget');
+  assert.equal(first.pending, 2);
+  assert.deepEqual(Array.from(fixture.context.readLibraryEditQueue_(), record => record.data.attempts), [0, 0]);
+  assert.equal(fixture.triggers.length, 1, 'yielded work keeps the next retry scheduled');
+  assert.equal(retryQueuedEdits(fixture).processed, 1);
+  assert.equal(retryQueuedEdits(fixture).pending, 0);
+}
+
+function readQueueBackup(fixture, key) {
+  const manifest = JSON.parse(fixture.properties.get(key));
+  if (!manifest.parts) return manifest;
+  return JSON.parse(Array.from({ length: manifest.parts }, (_, index) => fixture.properties.get(key + '.p' + index)).join(''));
+}
+
+function queueSnapshotProperties(fixture) {
+  return Object.fromEntries(fixture.context.readLibraryEditQueue_().flatMap(record =>
+    Array.from(record.keys, key => [key, fixture.properties.get(key)])));
+}
+
+function testRecoveryBacksUpExactQueueAndReconcilesCurrentInputsBeforeRetiring() {
+  const fixture = makeFixture({ books: [
+    makeBook('Copied draft', ''),
+    makeBook('Unrelated title', '  Human group  ', { uuid: editUuid(2) })
+  ], manualRows: [3] });
+  fixture.catalogSheet.rows[1][18] = '9780000000001';
+  fixture.catalogSheet.rows[2][18] = '9780000000002';
+  fixture.catalogSheet.notes.set('3:24', '残すメモ\n[library.series-key:v1:MANUAL]');
+  fixture.setLockAvailable(false);
+  triggerLibraryEdit(fixture, { range: fixture.catalogSheet.getRange(2, 9) });
+  fixture.catalogSheet.rows[1][8] = 'Final current title 2';
+  const originalQueue = queueSnapshotProperties(fixture);
+  const preservedInputs = fixture.catalogSheet.rows.slice(1).map(row => [row[8], row[18]]);
+  const sync = fixture.context.syncSeriesRegistryFromCatalog_;
+  let syncVerified = false;
+  fixture.context.syncSeriesRegistryFromCatalog_ = (...args) => {
+    const backups = [...fixture.properties.keys()].filter(key => key.startsWith('library.edit.backup.') && !/\.p\d+$/.test(key));
+    assert.equal(backups.length, 1, 'backup is published before catalog reconciliation');
+    assert.deepEqual(readQueueBackup(fixture, backups[0]).properties, originalQueue);
+    Object.entries(originalQueue).forEach(([key, value]) => assert.equal(fixture.properties.get(key), value, 'queue survives until reconciliation succeeds'));
+    const result = sync(...args);
+    syncVerified = true;
+    return result;
+  };
+  fixture.setLockAvailable(true);
+  const result = fixture.context.recoverLibraryEditQueue_();
+  assert.equal(syncVerified, true);
+  assert.equal(result.retired, 1);
+  assert.equal(result.pending, 0);
+  assert.deepEqual(readQueueBackup(fixture, result.backup).properties, originalQueue);
+  Object.keys(originalQueue).forEach(key => assert.equal(fixture.properties.has(key), false));
+  assert.deepEqual(fixture.catalogSheet.rows.slice(1).map(row => [row[8], row[18]]), preservedInputs);
+  assert.equal(fixture.context.isValidBookUuid_(fixture.catalogSheet.rows[1][21]), true);
+  assert.equal(fixture.catalogSheet.rows[2][21], editUuid(2));
+  assert.equal(fixture.catalogSheet.rows[1][23], 'final current title');
+  assert.equal(fixture.catalogSheet.rows[2][23], '  Human group  ');
+  assert.equal(fixture.catalogSheet.getRange(3, 24).getNote(), '残すメモ\n[library.series-key:v1:MANUAL]');
+  assert.equal(fixture.context.loadSeriesRegistryLookup_().catalogUsage.unresolved.length, 0);
+  assert.equal(fixture.context.resolveSeriesRegistryKey_('copied draft'), null);
+  assert.equal(fixture.triggers.length, 1, 'successful recovery leaves its one-shot successor scheduled');
+  assert.deepEqual(fixture.lockCounts(), { acquired: 2, released: 1 });
+  assert.equal(retryQueuedEdits(fixture).pending, 0);
+  assert.equal(fixture.triggers.length, 0, 'the empty successor retires itself naturally');
+}
+
+function testRecoveryVerificationFailureRetainsQueueAndBackup() {
+  for (const failure of ['integrity', 'input']) {
+    const fixture = makeFixture({ books: [makeBook('Current title 1', '', { uuid: editUuid(1) })] });
+    fixture.setLockAvailable(false);
+    triggerLibraryEdit(fixture, { range: fixture.catalogSheet.getRange(2, 9) });
+    const originalQueue = queueSnapshotProperties(fixture);
+    if (failure === 'integrity') {
+      const sync = fixture.context.syncSeriesRegistryFromCatalog_;
+      fixture.context.syncSeriesRegistryFromCatalog_ = (...args) => {
+        const result = sync(...args);
+        fixture.context.getSeriesRegistryIntegrityBlockers_ = () => ['simulated integrity failure'];
+        return result;
+      };
+    } else fixture.context.SpreadsheetApp.flush = () => { fixture.catalogSheet.rows[1][18] = 'concurrent ISBN edit'; };
+    fixture.setLockAvailable(true);
+    assert.throws(() => fixture.context.recoverLibraryEditQueue_(), failure === 'integrity' ? /unresolved series keys/ : /input changed/);
+    assert.deepEqual(queueSnapshotProperties(fixture), originalQueue);
+    const backups = [...fixture.properties.keys()].filter(key => key.startsWith('library.edit.backup.') && !/\.p\d+$/.test(key));
+    assert.equal(backups.length, 1);
+    assert.deepEqual(readQueueBackup(fixture, backups[0]).properties, originalQueue);
+    assert.equal(fixture.triggers.length, 1, 'failure does not delete retry triggers');
+    assert.equal(fixture.lockCounts().released, 1);
+  }
+}
+
+function testRecoveryPreservesNewEventCapturedDuringReconciliation() {
+  const fixture = makeFixture({ books: [makeBook('Current title 1', '', { uuid: editUuid(1) })] });
+  fixture.setLockAvailable(false);
+  triggerLibraryEdit(fixture, { range: fixture.catalogSheet.getRange(2, 9) });
+  const oldKey = fixture.context.readLibraryEditQueue_()[0].key;
+  const sync = fixture.context.syncSeriesRegistryFromCatalog_;
+  let newKey;
+  fixture.context.syncSeriesRegistryFromCatalog_ = (...args) => {
+    fixture.context.captureLibraryEdit_({ range: fixture.catalogSheet.getRange(2, 9) });
+    newKey = fixture.context.readLibraryEditQueue_().find(record => record.key !== oldKey).key;
+    return sync(...args);
+  };
+  fixture.setLockAvailable(true);
+  const result = fixture.context.recoverLibraryEditQueue_();
+  assert.equal(result.retired, 1);
+  assert.equal(result.pending, 1);
+  assert.deepEqual(Array.from(fixture.context.readLibraryEditQueue_(), record => record.key), [newKey]);
+  assert.equal(fixture.properties.has(oldKey), false);
+  assert.equal(fixture.triggers.length, 1);
+  assert.equal(retryQueuedEdits(fixture).pending, 0);
+}
+
+function testChunkedRecoveryBackupRoundTripsBindingsAttemptsAndUnicode() {
+  const fixture = makeFixture({ books: [makeBook('題名😀'.repeat(1800), '長いキー'.repeat(1800))] });
+  fixture.context.captureLibraryEdit_({ range: fixture.catalogSheet.getRange(2, 9) });
+  let records = fixture.context.readLibraryEditQueue_();
+  fixture.properties.set(records[0].key + '.b0', editUuid(1));
+  fixture.context.bumpLibraryEditAttempts_(records);
+  records = fixture.context.readLibraryEditQueue_();
+  const originalQueue = queueSnapshotProperties(fixture);
+  const backupKey = fixture.context.backupLibraryEditQueue_(records);
+  assert.ok(JSON.parse(fixture.properties.get(backupKey)).parts > 1);
+  assert.deepEqual(readQueueBackup(fixture, backupKey).properties, originalQueue);
+  assert.deepEqual(queueSnapshotProperties(fixture), originalQueue, 'backup does not alter queue parts/bindings/retry tokens');
+  [...fixture.properties].filter(([key]) => key.startsWith(backupKey)).forEach(([, value]) =>
+    assert.ok(Buffer.byteLength(value, 'utf8') <= 7500));
+}
+
+function testRecoveryBackupReadbackFailureStopsBeforeCatalogWrites() {
+  const fixture = makeFixture({ books: [makeBook('Current title 1', '')] });
+  fixture.setLockAvailable(false);
+  triggerLibraryEdit(fixture, { range: fixture.catalogSheet.getRange(2, 9) });
+  const originalQueue = queueSnapshotProperties(fixture);
+  const before = snapshotWrites(fixture);
+  const properties = fixture.context.PropertiesService.getScriptProperties();
+  fixture.context.PropertiesService.getScriptProperties = () => ({ ...properties,
+    getProperty: key => {
+      const value = properties.getProperty(key);
+      if (!key.startsWith('library.edit.backup.') || !value) return value;
+      const parsed = JSON.parse(value);
+      parsed.created = -1;
+      return JSON.stringify(parsed);
+    }
+  });
+  fixture.setLockAvailable(true);
+  assert.throws(() => fixture.context.recoverLibraryEditQueue_(), /backup verification failed/);
+  assert.equal(snapshotWrites(fixture), before);
+  assert.deepEqual(queueSnapshotProperties(fixture), originalQueue);
+  assert.equal(fixture.triggers.length, 1);
+  assert.equal(fixture.lockCounts().released, 1);
+}
+
+function testRecoveryKeepsQueuedTitleRenameOnExistingCuratedSeries() {
+  const genres = ['story', 'topic one', 'topic two', 'mood', 'state'];
+  const fixture = makeFixture({
+    masters: [makeMaster('old-owner', { canonical: 'old', name: 'Curated series name', genres, media: ['paper', 'digital'] })],
+    aliases: [makeAlias('old', 'old-owner')],
+    books: [makeBook('New title 1', 'old', { uuid: editUuid(1) })]
+  });
+  fixture.setLockAvailable(false);
+  triggerLibraryEdit(fixture, { range: fixture.catalogSheet.getRange(2, 9) });
+  const originalQueue = queueSnapshotProperties(fixture);
+  const titleSync = fixture.context.syncSeriesRegistryAfterTitleEdit_;
+  let titleSyncCalls = 0;
+  fixture.context.syncSeriesRegistryAfterTitleEdit_ = (...args) => {
+    titleSyncCalls++;
+    assert.deepEqual(queueSnapshotProperties(fixture), originalQueue, 'title intent is retained until its ordinary sync succeeds');
+    assert.ok([...fixture.properties.keys()].some(key => key.startsWith('library.edit.backup.v1.')), 'title synchronization follows the verified backup');
+    return titleSync(...args);
+  };
+  fixture.setLockAvailable(true);
+  const result = fixture.context.recoverLibraryEditQueue_();
+  assert.equal(titleSyncCalls, 1, 'recovery must honor the ordinary title-edit linking path');
+  assert.equal(result.retired, 1);
+  assert.equal(result.pending, 0);
+  assert.equal(fixture.context.resolveSeriesRegistryKey_('new title').seriesId, 'old-owner');
+  assert.equal(fixture.context.resolveSeriesRegistryKey_('old').seriesId, 'old-owner');
+  const masters = rowsWithoutHeaders(fixture.masterSheet);
+  assert.equal(masters.length, 1, 'recovery does not create a different series owner');
+  assert.equal(masters[0][1], 'Curated series name');
+  assert.deepEqual(masters[0].slice(2, 7), genres);
+  assert.deepEqual(masters[0].slice(11, 13), ['paper', 'digital']);
+  assert.equal(fixture.catalogSheet.rows[1][8], 'New title 1');
+  assert.equal(fixture.catalogSheet.rows[1][21], editUuid(1));
+  assert.equal(fixture.catalogSheet.rows[1][23], 'new title');
+}
+
+function testRecoveryRetainsQueuedTitleIntentWhenOrdinaryLinkFails() {
+  const fixture = makeFixture({
+    masters: [makeMaster('old-owner', { canonical: 'old', name: 'Curated series name', genres: ['story'] })],
+    aliases: [makeAlias('old', 'old-owner')],
+    books: [makeBook('New title 1', 'old', { uuid: editUuid(1) })]
+  });
+  fixture.setLockAvailable(false);
+  triggerLibraryEdit(fixture, { range: fixture.catalogSheet.getRange(2, 9) });
+  const originalQueue = queueSnapshotProperties(fixture);
+  fixture.context.syncSeriesRegistryAfterTitleEdit_ = () => { throw Error('simulated title-link service failure'); };
+  fixture.setLockAvailable(true);
+  assert.throws(() => fixture.context.recoverLibraryEditQueue_(), /simulated title-link service failure/);
+  assert.deepEqual(queueSnapshotProperties(fixture), originalQueue);
+  assert.equal(fixture.context.resolveSeriesRegistryKey_('old').seriesId, 'old-owner');
+  assert.equal(fixture.context.resolveSeriesRegistryKey_('new title'), null);
+  assert.equal(rowsWithoutHeaders(fixture.masterSheet).length, 1);
+  assert.equal(fixture.triggers.length, 1);
+}
+
+function testRecoveryRejectsTitleRenameOwnedByAnotherCuratedSeries() {
+  const oldGenres = ['old story', 'old topic', '', 'old mood', 'old state'];
+  const otherGenres = ['other story', '', 'other topic', '', 'other state'];
+  const fixture = makeFixture({
+    masters: [
+      makeMaster('old-owner', { canonical: 'old', name: 'Original curated name', genres: oldGenres }),
+      makeMaster('other-owner', { canonical: 'new title', name: 'Other curated name', genres: otherGenres })
+    ],
+    aliases: [makeAlias('old', 'old-owner'), makeAlias('new title', 'other-owner')],
+    books: [makeBook('New title 1', 'old', { uuid: editUuid(1) })]
+  });
+  fixture.setLockAvailable(false);
+  triggerLibraryEdit(fixture, { range: fixture.catalogSheet.getRange(2, 9) });
+  const originalQueue = queueSnapshotProperties(fixture);
+  const originalCatalog = JSON.stringify(fixture.catalogSheet.rows.slice(1));
+  const originalMasters = fixture.masterSheet.rows.slice(1).map(row => row.slice());
+  fixture.setLockAvailable(true);
+  assert.throws(() => fixture.context.recoverLibraryEditQueue_(), /conflict|owner|retained/i);
+  assert.deepEqual(queueSnapshotProperties(fixture), originalQueue, 'conflicting title ownership must preserve the original queued evidence');
+  assert.equal(JSON.stringify(fixture.catalogSheet.rows.slice(1)), originalCatalog, 'recovery must not overwrite old X after ordinary title conflict handling');
+  assert.equal(fixture.catalogSheet.rows[1][23], 'old');
+  assert.equal(fixture.context.resolveSeriesRegistryKey_('old').seriesId, 'old-owner');
+  assert.equal(fixture.context.resolveSeriesRegistryKey_('new title').seriesId, 'other-owner');
+  const masters = rowsWithoutHeaders(fixture.masterSheet);
+  assert.equal(masters.length, 2);
+  originalMasters.forEach(original => {
+    const current = masters.find(row => row[0] === original[0]);
+    assert.equal(current[1], original[1]);
+    assert.deepEqual(current.slice(2, 7), original.slice(2, 7));
+  });
+  const backupKeys = [...fixture.properties.keys()].filter(key => key.startsWith('library.edit.backup.v1.') && !/\.p\d+$/.test(key));
+  assert.equal(backupKeys.length, 1);
+  assert.deepEqual(readQueueBackup(fixture, backupKeys[0]).properties, originalQueue);
+  assert.equal(fixture.triggers.length, 1);
+}
+
+function assertUnboundTitleRecoveryFailsBeforeCatalogWrites(fixture) {
+  const originalQueue = queueSnapshotProperties(fixture);
+  const beforeWrites = snapshotWrites(fixture);
+  const catalogBefore = JSON.stringify(fixture.catalogSheet.rows);
+  const masterBefore = JSON.stringify(fixture.masterSheet.rows);
+  const aliasBefore = JSON.stringify(fixture.aliasSheet.rows);
+  fixture.setLockAvailable(true);
+  assert.throws(() => fixture.context.recoverLibraryEditQueue_(), /ambiguous|obsolete|unbound|identity|review|retained/i);
+  assert.equal(snapshotWrites(fixture), beforeWrites, 'unsafe unbound title intent must be rejected before UUID/key/catalog writes');
+  assert.equal(JSON.stringify(fixture.catalogSheet.rows), catalogBefore);
+  assert.equal(JSON.stringify(fixture.masterSheet.rows), masterBefore);
+  assert.equal(JSON.stringify(fixture.aliasSheet.rows), aliasBefore);
+  assert.deepEqual(queueSnapshotProperties(fixture), originalQueue);
+  assert.equal(fixture.context.resolveSeriesRegistryKey_('old').seriesId, 'old-owner');
+  const backupKeys = [...fixture.properties.keys()].filter(key => key.startsWith('library.edit.backup.v1.') && !/\.p\d+$/.test(key));
+  assert.equal(backupKeys.length, 1);
+  assert.deepEqual(readQueueBackup(fixture, backupKeys[0]).properties, originalQueue);
+  assert.equal(fixture.triggers.length, 1);
+}
+
+function testRecoveryRejectsAmbiguousUnboundTitleBeforeAllocatingUuids() {
+  const fixture = makeFixture({
+    masters: [makeMaster('old-owner', { canonical: 'old', name: 'Curated original name', genres: ['story', 'topic', '', 'mood'] })],
+    aliases: [makeAlias('old', 'old-owner')],
+    books: [makeBook('New title 1', 'old'), makeBook('New title 1', 'old')]
+  });
+  fixture.catalogSheet.rows[1][18] = '9780000000001';
+  fixture.catalogSheet.rows[2][18] = '9780000000001';
+  fixture.setLockAvailable(false);
+  triggerLibraryEdit(fixture, { range: fixture.catalogSheet.getRange(2, 9) });
+  assert.equal(fixture.context.readLibraryEditQueue_()[0].data.rows[0].uuid, '');
+  assertUnboundTitleRecoveryFailsBeforeCatalogWrites(fixture);
+  assert.equal(fixture.catalogSheet.rows[1][23], 'old');
+  assert.equal(fixture.catalogSheet.rows[2][23], 'old');
+  assert.equal(fixture.context.resolveSeriesRegistryKey_('new title'), null);
+}
+
+function testRecoveryRejectsObsoleteUnboundTitleWhenClassificationWouldChange() {
+  const fixture = makeFixture({
+    masters: [makeMaster('old-owner', { canonical: 'old', name: 'Curated original name', genres: ['story', 'topic', '', 'mood'] })],
+    aliases: [makeAlias('old', 'old-owner')],
+    books: [makeBook('Earlier draft 1', 'old')]
+  });
+  fixture.catalogSheet.rows[1][18] = '9780000000001';
+  fixture.setLockAvailable(false);
+  triggerLibraryEdit(fixture, { range: fixture.catalogSheet.getRange(2, 9) });
+  fixture.catalogSheet.rows[1][8] = 'Final title 1';
+  assertUnboundTitleRecoveryFailsBeforeCatalogWrites(fixture);
+  assert.equal(fixture.catalogSheet.rows[1][23], 'old');
+  assert.equal(fixture.context.resolveSeriesRegistryKey_('final title'), null);
+}
+
+function testRecoveryCanRetireObsoleteUnboundTitleWhenAlreadyReconciled() {
+  const fixture = makeFixture({
+    masters: [makeMaster('old-owner', { canonical: 'old', name: 'Curated original name', genres: ['story'] })],
+    aliases: [makeAlias('old', 'old-owner'), makeAlias('final title', 'old-owner')],
+    books: [makeBook('Earlier draft 1', 'old')]
+  });
+  fixture.setLockAvailable(false);
+  triggerLibraryEdit(fixture, { range: fixture.catalogSheet.getRange(2, 9) });
+  fixture.catalogSheet.rows[1][8] = 'Final title 1';
+  fixture.catalogSheet.rows[1][21] = editUuid(1);
+  fixture.catalogSheet.rows[1][23] = 'final title';
+  fixture.setLockAvailable(true);
+  const result = fixture.context.recoverLibraryEditQueue_();
+  assert.equal(result.retired, 1, 'a historical unbound title does not block already-reconciled current data');
+  assert.equal(result.pending, 0);
+  assert.equal(result.seriesKeysChanged, 0);
+  assert.equal(fixture.catalogSheet.rows[1][23], 'final title');
+  assert.equal(fixture.context.resolveSeriesRegistryKey_('final title').seriesId, 'old-owner');
+  assert.equal(rowsWithoutHeaders(fixture.masterSheet).length, 1);
+  assert.equal(fixture.masterSheet.rows[1][1], 'Curated original name');
+  assert.equal(fixture.masterSheet.rows[1][2], 'story');
+}
+
+function testRecoveryRejectsObsoleteUnboundTitleWithUnregisteredCurrentKey() {
+  const fixture = makeFixture({
+    masters: [makeMaster('old-owner', { canonical: 'old', name: 'Curated original name', genres: ['story', 'topic', '', 'mood'] })],
+    aliases: [makeAlias('old', 'old-owner')],
+    books: [makeBook('Earlier draft 1', 'old')]
+  });
+  fixture.setLockAvailable(false);
+  triggerLibraryEdit(fixture, { range: fixture.catalogSheet.getRange(2, 9) });
+  fixture.catalogSheet.rows[1][8] = 'Final title 1';
+  fixture.catalogSheet.rows[1][21] = editUuid(1);
+  fixture.catalogSheet.rows[1][23] = 'final title';
+  const plan = fixture.context.preflightSeriesKeyAutoClassification_(fixture.catalogSheet);
+  assert.equal(plan.changed, 0, 'automatic X already matches the current title');
+  const registry = fixture.context.loadSeriesRegistryLookup_();
+  assert.equal(registry.catalogUsage.unresolved.length, 1, 'the current key still lacks a registered series owner');
+  assertUnboundTitleRecoveryFailsBeforeCatalogWrites(fixture);
+  assert.equal(fixture.context.resolveSeriesRegistryKey_('final title'), null, 'recovery cannot silently create an empty-metadata replacement owner');
+  assert.equal(rowsWithoutHeaders(fixture.masterSheet).length, 1);
+  assert.equal(fixture.masterSheet.rows[1][1], 'Curated original name');
+  assert.equal(fixture.masterSheet.rows[1][2], 'story');
+}
+
+function assertRecoveryOwnershipGuardPreservesCatalog(fixture) {
+  const queueBefore = queueSnapshotProperties(fixture);
+  const catalogBefore = JSON.stringify(fixture.catalogSheet.rows);
+  const masterBefore = JSON.stringify(fixture.masterSheet.rows);
+  const aliasBefore = JSON.stringify(fixture.aliasSheet.rows);
+  const writesBefore = snapshotWrites(fixture);
+  fixture.setLockAvailable(true);
+  assert.throws(() => fixture.context.recoverLibraryEditQueue_(), /owner|series|classification|retained|review/i);
+  assert.equal(snapshotWrites(fixture), writesBefore, 'a global X ownership change must be rejected before any sheet write');
+  assert.equal(JSON.stringify(fixture.catalogSheet.rows), catalogBefore);
+  assert.equal(JSON.stringify(fixture.masterSheet.rows), masterBefore, 'curated names/genres/media and series owners are preserved');
+  assert.equal(JSON.stringify(fixture.aliasSheet.rows), aliasBefore);
+  assert.deepEqual(queueSnapshotProperties(fixture), queueBefore);
+  const backups = [...fixture.properties.keys()].filter(key => key.startsWith('library.edit.backup.v1.') && !/\.p\d+$/.test(key));
+  assert.equal(backups.length, 1);
+  assert.deepEqual(readQueueBackup(fixture, backups[0]).properties, queueBefore);
+}
+
+function testRecoveryRegistryOrEmptyQueueCannotRehomeCuratedExtraSeries() {
+  for (const kind of ['master', 'alias', 'empty']) {
+    const fixture = makeFixture({
+      masters: [makeMaster('art-owner', { canonical: 'art', name: 'Curated art name', genres: ['story', 'topic', '', 'mood'], media: ['画集', ''] })],
+      aliases: [makeAlias('art', 'art-owner')],
+      books: [makeBook('Art 1', 'art', { uuid: editUuid(1) })]
+    });
+    fixture.catalogSheet.rows[0][21] = 'UUID';
+    fixture.setLockAvailable(false);
+    if (kind !== 'empty') {
+      const sheet = kind === 'master' ? fixture.masterSheet : fixture.aliasSheet;
+      triggerLibraryEdit(fixture, { range: sheet.getRange(2, 1) });
+    }
+    const plan = fixture.context.preflightSeriesKeyAutoClassification_(fixture.catalogSheet);
+    assert.equal(plan.changed, 1);
+    assert.equal(plan.values[0][0], '__extra__art', `${kind} triggers global extra classification`);
+    assertRecoveryOwnershipGuardPreservesCatalog(fixture);
+    assert.equal(fixture.context.resolveSeriesRegistryKey_('art').seriesId, 'art-owner');
+    assert.equal(fixture.context.resolveSeriesRegistryKey_('__extra__art'), null);
+    assert.equal(rowsWithoutHeaders(fixture.masterSheet).length, 1);
+  }
+}
+
+function testRecoveryUuidOnlyEventCannotReplaceCuratedSeriesOwner() {
+  for (const nextOwner of ['missing', 'other-owner']) {
+    const masters = [makeMaster('old-owner', { canonical: 'old', name: 'Original curated name', genres: ['story', 'topic'], media: ['paper', ''] })];
+    const aliases = [makeAlias('old', 'old-owner')];
+    if (nextOwner === 'other-owner') {
+      masters.push(makeMaster('other-owner', { canonical: 'current title', name: 'Other curated name', genres: ['other story'] }));
+      aliases.push(makeAlias('current title', 'other-owner'));
+    }
+    const fixture = makeFixture({ masters, aliases, books: [makeBook('Current title 1', 'old', { uuid: editUuid(1) })] });
+    fixture.catalogSheet.rows[0][21] = 'UUID';
+    fixture.setLockAvailable(false);
+    triggerLibraryEdit(fixture, { range: fixture.catalogSheet.getRange(2, 22) });
+    assert.equal(fixture.context.readLibraryEditQueue_()[0].data.kind, 'uuid');
+    const plan = fixture.context.preflightSeriesKeyAutoClassification_(fixture.catalogSheet);
+    assert.equal(plan.changed, 1);
+    assert.equal(plan.values[0][0], 'current title');
+    assertRecoveryOwnershipGuardPreservesCatalog(fixture);
+    assert.equal(fixture.context.resolveSeriesRegistryKey_('old').seriesId, 'old-owner');
+    assert.equal(fixture.context.resolveSeriesRegistryKey_('current title')?.seriesId || 'missing', nextOwner);
+    assert.equal(rowsWithoutHeaders(fixture.masterSheet).length, masters.length);
+  }
+}
+
+function testRecoveryCannotOverwriteKeyOfInactiveOrUnresolvedOwner() {
+  for (const ownerState of ['inactive', 'missing']) {
+    const fixture = makeFixture({
+      masters: ownerState === 'inactive'
+        ? [makeMaster('old-owner', { canonical: 'old', name: 'Inactive curated name', status: 'INACTIVE', genres: ['story'], media: ['paper', ''] })]
+        : [],
+      aliases: [makeAlias('old', 'old-owner')],
+      books: [makeBook('Current title 1', 'old', { uuid: editUuid(1) })]
+    });
+    fixture.catalogSheet.rows[0][21] = 'UUID';
+    fixture.setLockAvailable(false);
+    triggerLibraryEdit(fixture, { range: fixture.catalogSheet.getRange(2, 22) });
+    assert.equal(fixture.context.resolveSeriesRegistryKey_('old'), null);
+    assertRecoveryOwnershipGuardPreservesCatalog(fixture);
+    assert.equal(fixture.catalogSheet.rows[1][23], 'old');
+    assert.equal(fixture.context.resolveSeriesRegistryKey_('current title'), null);
+  }
+}
+
+function testRecoveryRetainsLostOrAmbiguousEstablishedIdentityIntents() {
+  for (const state of ['lost-uuid', 'lost-binding', 'duplicate-uuid']) {
+    const fixture = makeFixture({ books: [
+      makeBook('Same title 1', 'same title', { uuid: state === 'lost-binding' ? '' : editUuid(1) }),
+      makeBook('Other title 1', 'other title', { uuid: editUuid(2) })
+    ] });
+    fixture.setLockAvailable(false);
+    triggerLibraryEdit(fixture, { range: fixture.catalogSheet.getRange(2, 9) });
+    const key = fixture.context.readLibraryEditQueue_()[0].key;
+    if (state === 'lost-binding') fixture.properties.set(key + '.b0', editUuid(1));
+    if (state === 'duplicate-uuid') fixture.catalogSheet.rows[2][21] = editUuid(1);
+    else fixture.catalogSheet.rows[1][21] = editUuid(20);
+    const originalQueue = queueSnapshotProperties(fixture);
+    fixture.setLockAvailable(true);
+    let recoveryError;
+    try { fixture.context.recoverLibraryEditQueue_(); } catch (error) { recoveryError = error; }
+    assert.deepEqual(queueSnapshotProperties(fixture), originalQueue, `${state} must retain established identity evidence`);
+    assert.equal(fixture.context.readLibraryEditQueue_().length, 1, `${state} cannot be retired as an obsolete draft`);
+    assert.equal(fixture.properties.has(key), true);
+    assert.ok([...fixture.properties.keys()].some(property => property.startsWith('library.edit.backup.v1.')));
+    if (recoveryError) assert.match(String(recoveryError), /UUID|identity|input changed/i);
+  }
+}
+
+function testInstalledEditAfterRecoveryIdleReadKeepsRetryScheduling() {
+  const fixture = makeFixture({ books: [makeBook('Current title 1', '', { uuid: editUuid(1) })] });
+  fixture.setLockAvailable(false);
+  triggerLibraryEdit(fixture, { range: fixture.catalogSheet.getRange(2, 9) });
+  fixture.setLockAvailable(true);
+  const readQueue = fixture.context.readLibraryEditQueue_;
+  let injected = false;
+  fixture.context.readLibraryEditQueue_ = (...args) => {
+    const records = readQueue(...args);
+    if (!injected && records.length === 0) {
+      injected = true;
+      fixture.catalogSheet.rows[1][8] = 'Later installed title 2';
+      const edit = fixture.context.handleInstalledLibraryEdit_({ range: fixture.catalogSheet.getRange(2, 9) });
+      assert.equal(edit.busy, true, 'new installed capture runs while recovery still owns ScriptLock');
+    }
+    return records;
+  };
+  fixture.context.recoverLibraryEditQueue_();
+  assert.equal(injected, true, 'race is injected after the empty queue snapshot is taken');
+  assert.equal(fixture.context.readLibraryEditQueue_().length, 1);
+  assert.equal(fixture.triggers.length, 1, 'recovery cannot remove the successor needed by a newly captured edit');
+  assert.equal(retryQueuedEdits(fixture).pending, 0);
+  assert.equal(fixture.catalogSheet.rows[1][23], 'later installed title');
+  retryQueuedEdits(fixture);
+  assert.equal(fixture.triggers.length, 0);
+}
+
 const tests = [
+  testRecoveryCannotOverwriteKeyOfInactiveOrUnresolvedOwner,
+  testRecoveryRegistryOrEmptyQueueCannotRehomeCuratedExtraSeries,
+  testRecoveryUuidOnlyEventCannotReplaceCuratedSeriesOwner,
+  testRecoveryRejectsObsoleteUnboundTitleWithUnregisteredCurrentKey,
+  testRecoveryRejectsAmbiguousUnboundTitleBeforeAllocatingUuids,
+  testRecoveryRejectsObsoleteUnboundTitleWhenClassificationWouldChange,
+  testRecoveryCanRetireObsoleteUnboundTitleWhenAlreadyReconciled,
+  testRecoveryRejectsTitleRenameOwnedByAnotherCuratedSeries,
+  testRecoveryKeepsQueuedTitleRenameOnExistingCuratedSeries,
+  testRecoveryRetainsQueuedTitleIntentWhenOrdinaryLinkFails,
+  testRecoveryRetainsLostOrAmbiguousEstablishedIdentityIntents,
+  testInstalledEditAfterRecoveryIdleReadKeepsRetryScheduling,
+  testUuidAssignedAfterCaptureAdoptsCurrentBookAndManualKey,
+  testEstablishedUuidOrBindingCannotFallBackToMatchingText,
+  testUuidAssignedAfterCaptureCannotAdoptDuplicatedUuid,
+  testRunBudgetYieldsUnstartedUnitsWithoutSpendingAttempts,
+  testRecoveryBacksUpExactQueueAndReconcilesCurrentInputsBeforeRetiring,
+  testRecoveryVerificationFailureRetainsQueueAndBackup,
+  testRecoveryPreservesNewEventCapturedDuringReconciliation,
+  testChunkedRecoveryBackupRoundTripsBindingsAttemptsAndUnicode,
+  testRecoveryBackupReadbackFailureStopsBeforeCatalogWrites,
   testRetryRejectsAParentThatDoesNotMatchSavedSource,
   testUnresolvableDraftCannotExhaustOtherQueuedEdits,
   testManualClearPlanRejectsMovedBookBeforeWriting,
@@ -1571,7 +2149,7 @@ const tests = [
   testAmbiguousBlankUuidRowsFailClosedAndRetainQueue,
   testDuplicateValidUuidCannotRebindToAnotherBook,
   testBulkEditDrainsAtMostFourIdentitiesAndRetainsRemainingTokens,
-  testBusyRetryStopsAfterBoundedAttemptsWithoutDroppingIntent,
+  testOnlyRealFailuresSpendBoundedRetryAttempts,
   testLargeEditPayloadUsesBoundedPropertiesAndImmutableParts,
   testSetupAndRepeatedCapturesInstallOnlyOneRetry,
   testManualGroupNewNameUsesChosenKeyAndKeepsExistingCuratedName,

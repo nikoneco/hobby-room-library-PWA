@@ -2,6 +2,7 @@
 
 const LIBRARY_EDIT_CONFIG_ = Object.freeze({
   PREFIX: 'library.edit.pending.v1.',
+  BACKUP_PREFIX: 'library.edit.backup.v1.',
   SOURCE_PROPERTY: 'library.edit.source.v1',
   RETRY_HANDLER: 'retryLibraryEdits_',
   CAPTURE_ROWS: 4,
@@ -9,6 +10,7 @@ const LIBRARY_EDIT_CONFIG_ = Object.freeze({
   PROPERTY_BYTES: 7500,
   LOCK_WAIT_MS: 250,
   RETRY_MS: 60000,
+  RUN_BUDGET_MS: 45000,
   MAX_RETRIES: 8
 });
 
@@ -31,6 +33,207 @@ function rememberLibraryEditSource_(spreadsheet) {
   const existing = properties.getProperty(LIBRARY_EDIT_CONFIG_.SOURCE_PROPERTY);
   if (existing && existing !== id) throw new Error('Library edit source does not match the bound spreadsheet.');
   if (!existing) properties.setProperty(LIBRARY_EDIT_CONFIG_.SOURCE_PROPERTY, id);
+}
+
+function inspectLibraryEditQueue_() {
+  SpreadsheetApp.getUi();
+  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  return withLibraryEditSpreadsheet_(spreadsheet, () => {
+    const records = readLibraryEditQueue_().filter(record => record.data.source === spreadsheet.getId());
+    const catalog = readLibraryEditCatalog_(getSheet(CONFIG.SHEETS.MAIN));
+    const entries = records.map(record => ({
+      key: record.key, kind: record.data.kind, attempts: record.data.attempts,
+      rows: record.data.rows.map((anchor, index) => {
+        const uuid = record.bindings[index] || anchor.uuid;
+        const matches = uuid ? catalog.filter(row => row.uuid === uuid) : [];
+        const contentMatches = anchor.title ? catalog.filter(row =>
+          row.title === anchor.title && row.isbn === anchor.isbn) : [];
+        return { anchor, binding: record.bindings[index], uuidMatches: matches.map(row => row.row),
+          contentMatches: contentMatches.map(row => ({ row: row.row, uuid: row.uuid, key: row.key })) };
+      })
+    }));
+    const result = { pending: entries.length,
+      retryable: entries.filter(entry => entry.attempts < LIBRARY_EDIT_CONFIG_.MAX_RETRIES).length,
+      retryTriggers: ScriptApp.getProjectTriggers().filter(trigger =>
+        trigger.getHandlerFunction() === LIBRARY_EDIT_CONFIG_.RETRY_HANDLER).length, entries };
+    entries.forEach(entry => console.log(JSON.stringify({ operation: 'libraryEditQueueEntry', entry })));
+    console.log(JSON.stringify({ operation: 'libraryEditQueueInspection', result: {
+      pending: result.pending, retryable: result.retryable, retryTriggers: result.retryTriggers,
+      importPending: readPendingNewBookImport_()
+    } }));
+    spreadsheet.toast('自動同期: 保留 ' + result.pending + ' 件 / 再試行対象 ' + result.retryable + ' 件。詳細は実行ログに記録しました。', '図書館', 15);
+    return result;
+  });
+}
+
+function backupLibraryEditQueue_(records) {
+  const properties = PropertiesService.getScriptProperties();
+  const snapshot = properties.getProperties();
+  const values = {};
+  records.forEach(record => record.keys.forEach(key => {
+    if (!(key in snapshot)) throw new Error('Library edit queue changed before backup.');
+    values[key] = snapshot[key];
+  }));
+  const backup = { created: Date.now(), records: records.length, properties: values };
+  const key = LIBRARY_EDIT_CONFIG_.BACKUP_PREFIX + Utilities.getUuid();
+  writeLibraryEditRecord_(key, backup);
+  let json = properties.getProperty(key);
+  const manifest = JSON.parse(json);
+  if (manifest.parts) {
+    json = '';
+    for (let index = 0; index < manifest.parts; index++) json += properties.getProperty(key + '.p' + index) || '';
+  }
+  if (json !== JSON.stringify(backup)) throw new Error('Library edit backup verification failed; queue retained.');
+  return key;
+}
+
+// Explicit Sheets maintenance: reconcile today's catalog, then retire exactly
+// the backed-up event snapshot. Never replay obsolete copied/formula titles.
+function recoverLibraryEditQueue_() {
+  SpreadsheetApp.getUi();
+  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  rememberLibraryEditSource_(spreadsheet);
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(1000)) {
+    spreadsheet.toast('自動更新の実行中です。完了後にもう一度復旧を選んでください。', '図書館', 15);
+    return { busy: true };
+  }
+  try {
+    return withLibraryEditSpreadsheet_(spreadsheet, () => {
+      const records = readLibraryEditQueue_().filter(record => record.data.source === spreadsheet.getId());
+      const backup = backupLibraryEditQueue_(records);
+      const sheet = getSheet(CONFIG.SHEETS.MAIN);
+      const before = readLibraryEditCatalog_(sheet);
+      const notes = before.length ? sheet.getRange(2, CONFIG.COL.SERIES_KEY_AUTO, before.length, 1).getNotes() : [];
+      const seenUuids = new Set();
+      before.forEach(row => {
+        if (!isValidBookUuid_(row.uuid)) return;
+        if (seenUuids.has(row.uuid)) throw new Error('Duplicate book UUID requires explicit resolution; queue retained.');
+        seenUuids.add(row.uuid);
+      });
+      assertLibraryEditRecoveryAnchors_(sheet, before, records);
+      const uuids = repairBookUuidsAll_(sheet);
+      const retained = reconcileLibraryEditTitleIntents_(sheet, records);
+      const plan = preflightSeriesKeyAutoClassification_(sheet);
+      if (plan.changed) {
+        const owners = loadSeriesRegistryLookup_();
+        plan.changedIndices.forEach(index => {
+          const oldKey = normalizeSeriesAliasKey_(plan.currentKeys[index][0]);
+          const nextKey = normalizeSeriesAliasKey_(plan.values[index][0]);
+          const oldOwner = resolveSeriesRegistryKey_(oldKey, owners);
+          const nextOwner = resolveSeriesRegistryKey_(nextKey, owners);
+          const unresolvedOwner = Boolean(oldKey && !oldOwner);
+          if ((oldOwner && (!nextOwner || oldOwner.seriesId !== nextOwner.seriesId)) ||
+              (!oldOwner && unresolvedOwner)) {
+            throw new Error('Catalog classification would change an existing series owner; queue retained for review.');
+          }
+        });
+        writeSeriesKeyAutoRepairPlan_(sheet, plan.startRow, plan);
+      }
+      const registrySync = syncSeriesRegistryFromCatalog_();
+      SpreadsheetApp.flush();
+      const registry = loadSeriesRegistryLookup_();
+      const blockers = registry ? getSeriesRegistryIntegrityBlockers_(registry) : ['registry unavailable'];
+      if (!registry || blockers.length || registry.catalogUsage.unresolved.length) {
+        throw new Error('Library edit recovery left unresolved series keys; queue retained.');
+      }
+      const after = readLibraryEditCatalog_(sheet);
+      if (after.length !== before.length || before.some((row, index) => {
+        const current = after[index];
+        return row.title !== current.title || row.isbn !== current.isbn ||
+          (isValidBookUuid_(row.uuid) && row.uuid !== current.uuid) ||
+          (hasSeriesKeyManualNote_(notes[index][0]) && row.key !== current.key);
+      })) throw new Error('Catalog input changed during recovery; queue retained.');
+      clearLibrarySearchCache_();
+      // New events captured independently during recovery are left untouched.
+      const properties = PropertiesService.getScriptProperties();
+      const retired = records.filter(record => !retained.has(record.key));
+      retired.forEach(record => record.keys.forEach(key => properties.deleteProperty(key)));
+      const pending = readLibraryEditQueue_().length;
+      // Leave the one-shot successor alone: an edit captured after this pending
+      // read may already be relying on it. An idle successor removes itself.
+      ensureLibraryEditRetry_();
+      const result = { retired: retired.length, pending, retained: retained.size, backup, uuidsChanged: uuids.changed,
+        seriesKeysChanged: Number(plan.changed || 0), registrySync };
+      console.log(JSON.stringify({ operation: 'libraryEditRecovery', result }));
+      spreadsheet.toast('自動同期を復旧しました。古い記録 ' + retired.length + ' 件を退避 / 保留 ' + pending + ' 件。', '図書館', 20);
+      return result;
+    });
+  } catch (error) {
+    clearLibrarySearchCache_();
+    throw error;
+  } finally { lock.releaseLock(); }
+}
+
+function assertLibraryEditRecoveryAnchors_(sheet, catalog, records) {
+  const plan = preflightSeriesKeyAutoClassification_(sheet);
+  const registry = loadSeriesRegistryLookup_();
+  const registryReconciled = Boolean(registry && registry.catalogUsage && registry.catalogUsage.complete &&
+    registry.catalogUsage.unresolved.length === 0 && getSeriesRegistryIntegrityBlockers_(registry).length === 0);
+  records.forEach(record => {
+    if (record.data.kind !== 'title') return;
+    record.data.rows.forEach((anchor, index) => {
+      if (!anchor.oldKey || !resolveSeriesRegistryKey_(anchor.oldKey, registry)) return;
+      const establishedUuid = record.bindings[index] || (isValidBookUuid_(anchor.uuid) ? anchor.uuid : '');
+      const matches = establishedUuid ? catalog.filter(row => row.uuid === establishedUuid) :
+        catalog.filter(row => row.title === anchor.title && row.isbn === anchor.isbn);
+      // A stale unbound draft can be retired when today's X is already fully
+      // reconciled. It cannot authorize changing a curated old owner's rows.
+      if (matches.length > 1 || (!matches.length && (plan.changed || !registryReconciled))) {
+        throw new Error('Title edit identity is unresolved; queue retained for review.');
+      }
+    });
+  });
+}
+
+function reconcileLibraryEditTitleIntents_(sheet, records) {
+  const catalog = readLibraryEditCatalog_(sheet);
+  const retained = new Set();
+  const intents = new Map();
+  records.forEach(record => record.data.rows.forEach((anchor, index) => {
+    const establishedUuid = record.bindings[index] || (isValidBookUuid_(anchor.uuid) ? anchor.uuid : '');
+    const matches = establishedUuid ? catalog.filter(row => row.uuid === establishedUuid) :
+      catalog.filter(row => row.title === anchor.title && row.isbn === anchor.isbn);
+    if (establishedUuid && matches.length !== 1) retained.add(record.key);
+    if (record.data.kind !== 'title' || matches.length !== 1 || !isValidBookUuid_(matches[0].uuid)) return;
+    const current = matches[0];
+    if (catalog.filter(row => row.uuid === current.uuid).length !== 1) {
+      retained.add(record.key);
+      return;
+    }
+    // Retain the earliest title event's old owner, just like ordinary retries.
+    if (!intents.has(current.uuid)) intents.set(current.uuid, { row: current.row, oldKey: anchor.oldKey || '', keys: new Set() });
+    intents.get(current.uuid).keys.add(record.key);
+  }));
+  if (!intents.size || !isSeriesRegistryV2Active_()) return retained;
+  const plan = preflightSeriesKeyAutoClassification_(sheet);
+  intents.forEach(intent => {
+    const note = sheet.getRange(intent.row, CONFIG.COL.SERIES_KEY_AUTO).getNote();
+    if (hasSeriesKeyManualNote_(note) || hasSeriesKeyAutoResetNote_(note)) return;
+    const oldKey = normalizeSeriesAliasKey_(intent.oldKey);
+    const plannedKey = plan.values[intent.row - plan.startRow];
+    const nextKey = normalizeSeriesAliasKey_(plannedKey ? plannedKey[0] : '');
+    if (!oldKey || oldKey === nextKey) return;
+    const oldOwner = resolveSeriesRegistryKey_(oldKey);
+    if (!oldOwner) {
+      intent.keys.forEach(key => retained.add(key));
+      return;
+    }
+    const nextOwner = nextKey ? resolveSeriesRegistryKey_(nextKey) : null;
+    if (nextOwner && nextOwner.seriesId !== oldOwner.seriesId) {
+      throw new Error('Title edit conflicts with another series; queue retained for review.');
+    }
+    // Catalog-wide recomputation cannot preserve oldKey -> newKey ownership.
+    // Run the existing guarded title-link path before retiring this intent.
+    onEditBody_({ range: sheet.getRange(intent.row, CONFIG.COL.TITLE), libraryDeferred: true,
+      libraryOldSeriesKeys: [[intent.oldKey]] });
+    const linkedKey = normalizeSeriesAliasKey_(sheet.getRange(intent.row, CONFIG.COL.SERIES_KEY_AUTO).getDisplayValue());
+    const linkedOwner = linkedKey ? resolveSeriesRegistryKey_(linkedKey) : null;
+    if (linkedKey !== nextKey || (nextKey && (!linkedOwner || linkedOwner.seriesId !== oldOwner.seriesId))) {
+      throw new Error('Title edit linkage did not preserve its series; queue retained for review.');
+    }
+  });
+  return retained;
 }
 
 function getLibraryEditKind_(range) {
@@ -241,15 +444,15 @@ function resolveLibraryEditAnchor_(sheet, catalog, record, index, resolved) {
   let uuid = record.bindings[index] || (isValidBookUuid_(anchor.uuid) ? anchor.uuid : '');
   if (!uuid && resolved.has(identity)) uuid = resolved.get(identity).uuid;
   let matches = uuid ? catalog.filter(row => row.uuid === uuid) : [];
-  if (!matches.length && !isValidBookUuid_(anchor.uuid)) {
-    // New rows can acquire a UUID only when their captured contents identify
-    // exactly one current row. A moved/ambiguous/deleted row is retained, never
-    // rebound by its obsolete row number or used to overwrite another UUID.
-    matches = catalog.filter(row => row.uuid === anchor.uuid && row.title === anchor.title &&
-      row.isbn === anchor.isbn && row.key === anchor.oldKey);
+  if (!matches.length && !record.bindings[index] && !isValidBookUuid_(anchor.uuid)) {
+    // An import may assign a UUID or derive X after capture. Adopt that UUID
+    // only when the captured title and ISBN still identify exactly one book.
+    // Established UUIDs/bindings never fall back to text or obsolete row numbers.
+    matches = catalog.filter(row => row.title === anchor.title && row.isbn === anchor.isbn);
     if (matches.length === 1 && anchor.title) {
       const target = matches[0];
-      uuid = uuid || createUniqueBookUuid_(new Set(catalog.map(row => row.uuid)));
+      const previousUuid = target.uuid;
+      uuid = isValidBookUuid_(previousUuid) ? previousUuid : createUniqueBookUuid_(new Set(catalog.map(row => row.uuid)));
       const bindingKey = record.key + '.b' + index;
       PropertiesService.getScriptProperties().setProperty(bindingKey, uuid);
       record.keys.push(bindingKey);
@@ -257,17 +460,20 @@ function resolveLibraryEditAnchor_(sheet, catalog, record, index, resolved) {
         CONFIG.COL.SERIES_KEY_AUTO - CONFIG.COL.TITLE + 1).getDisplayValues()[0];
       if (String(latest[0] || '') !== anchor.title ||
           String(latest[CONFIG.COL.ISBN - CONFIG.COL.TITLE] || '') !== anchor.isbn ||
-          normalizeBookUuid_(latest[CONFIG.COL.BOOK_UUID - CONFIG.COL.TITLE]) !== anchor.uuid ||
-          String(latest[CONFIG.COL.SERIES_KEY_AUTO - CONFIG.COL.TITLE] || '') !== anchor.oldKey) {
+          normalizeBookUuid_(latest[CONFIG.COL.BOOK_UUID - CONFIG.COL.TITLE]) !== previousUuid ||
+          String(latest[CONFIG.COL.SERIES_KEY_AUTO - CONFIG.COL.TITLE] || '') !== target.key) {
         throw new Error('Library edit identity changed before UUID allocation.');
       }
-      sheet.getRange(target.row, CONFIG.COL.BOOK_UUID).setValue(uuid);
+      if (previousUuid !== uuid) sheet.getRange(target.row, CONFIG.COL.BOOK_UUID).setValue(uuid);
       target.uuid = uuid;
     }
   }
   if (matches.length !== 1) throw new Error('Library edit UUID is missing or ambiguous; edit retained.');
   const target = matches[0];
   if (!isValidBookUuid_(target.uuid)) throw new Error('Library edit has no stable book identity; edit retained.');
+  if (catalog.filter(row => row.uuid === target.uuid).length !== 1) {
+    throw new Error('Library edit UUID is missing or ambiguous; edit retained.');
+  }
   if (!isValidBookUuid_(anchor.uuid)) {
     const bindingKey = record.key + '.b' + index;
     PropertiesService.getScriptProperties().setProperty(bindingKey, target.uuid);
@@ -339,7 +545,6 @@ function processLibraryEditQueue_(spreadsheet, retryOnly) {
   const lock = LockService.getScriptLock();
   if (!lock.tryLock(LIBRARY_EDIT_CONFIG_.LOCK_WAIT_MS)) {
     const pending = readLibraryEditQueue_().filter(record => record.data.source === spreadsheet.getId());
-    if (retryOnly) bumpLibraryEditAttempts_(pending.filter(record => Number(record.data.attempts || 0) < LIBRARY_EDIT_CONFIG_.MAX_RETRIES));
     console.log(JSON.stringify({ operation: 'libraryEdit', busy: true, processed: 0, pending: pending.length, ms: Date.now() - started }));
     return { busy: true, pending: pending.length };
   }
@@ -366,7 +571,12 @@ function processLibraryEditQueue_(spreadsheet, retryOnly) {
       if (!selected.length) return { processed: 0, pending: queue.length };
       const units = groupLibraryEditRecords_(expandLibraryEditRecords_(selected));
       let firstError = null;
+      let unitsRun = 0;
       for (const unit of units) {
+        // Finish the current unit, then yield the lock before another expensive
+        // full-registry scan can consume GAS's execution limit.
+        if (unitsRun && Date.now() - started >= LIBRARY_EDIT_CONFIG_.RUN_BUDGET_MS) break;
+        unitsRun++;
         selected = unit;
         try {
           // Checkpoint a scheduled attempt before heavy work. GAS termination at

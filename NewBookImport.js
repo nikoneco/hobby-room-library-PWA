@@ -170,7 +170,11 @@ function enrichNewBooksAfterImportByLimit_(limit, beforeRun, onComplete) {
       + (retryPending > 0 ? ` / 再試行待ち ${retryPending}` : '')
     );
 
-    console.log(JSON.stringify(result));
+    // The UUID repair plan contains the entire catalog. Logging that array
+    // truncates the entry before the synopsis/image results can be inspected.
+    const loggedBookUuids = Object.assign({}, bookUuids);
+    delete loggedBookUuids.values;
+    console.log(JSON.stringify(Object.assign({}, result, { bookUuids: loggedBookUuids })));
     if (onComplete) onComplete();
     return result;
   } finally {
