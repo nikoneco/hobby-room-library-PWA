@@ -120,7 +120,7 @@ function buildStaticIndex() {
     /<title>[^<]*<\/title>/,
     [
       '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">',
-      '<meta name="theme-color" content="#0a1217">',
+      '<meta name="theme-color" content="#0f0e13">',
       '<meta name="color-scheme" content="dark light">',
       '<meta name="apple-mobile-web-app-capable" content="yes">',
       '<meta name="apple-mobile-web-app-title" content="趣味部屋図書館">',
@@ -132,7 +132,7 @@ function buildStaticIndex() {
       '<link rel="manifest" href="./manifest.webmanifest">',
       '<link rel="apple-touch-icon" href="./assets/icons/apple-touch-icon-lantern-180.png">',
       '<title>趣味部屋図書館</title>',
-      '<style id="pwa-critical-style">html{background:#0a1217;color-scheme:dark light;}body{margin:0;background:#0a1217;color:#edf5f7;}</style>'
+      '<style id="pwa-critical-style">html{background:#0f0e13;color-scheme:dark light;}body{margin:0;background:#0f0e13;color:#edf5f7;}</style>'
     ].join('\n  ')
   );
 
@@ -163,6 +163,11 @@ function buildStaticIndex() {
   source = source.replace(
     /\s*<\?!= HtmlService\.createHtmlOutputFromFile\('([^']+\.js\.html)'\)\.getContent\(\); \?>/g,
     (match, fileName) => `\n  <script src="./assets/js/${jsOutName(fileName)}"></script>`
+  );
+
+  source = source.replace(
+    '<body class="sandbox-redesign">',
+    '<body class="sandbox-redesign pwa-theme-shikon">'
   );
 
   source = source.replace(
@@ -433,6 +438,16 @@ body.pwa-theme-kohaku {
   --pwa-warm-2: #f0c37a;
   --pwa-warm-rgb: 201, 138, 73;
   --pwa-grid-rgb: 214, 164, 95;
+}
+
+/* Keep solid accents aligned with the active night palette after PWA defaults. */
+body.sandbox-redesign.pwa-shell {
+  --pwa-accent: var(--night-accent);
+  --pwa-accent-2: var(--night-accent-strong);
+  --pwa-accent-text: var(--night-accent-ink);
+  --pwa-accent-readable: var(--night-text);
+  --pwa-warm: var(--night-accent);
+  --pwa-warm-2: var(--night-accent-strong);
 }
 
 .pwa-launch-splash {
@@ -1014,8 +1029,8 @@ body.pwa-settings-open {
 }
 
 .pwa-theme-settings label:has(input[value="shinhaku"]) {
-  --theme-swatch-1: #0a1217;
-  --theme-swatch-2: #7fb2bd;
+  --theme-swatch-1: #0b0f0e;
+  --theme-swatch-2: #8ab9a5;
 }
 
 .pwa-theme-settings label:has(input[value="kohi"]) {
@@ -1308,6 +1323,7 @@ body.pwa-shell .empty-result-action:focus-visible {
 }
 
 body.pwa-shell .empty-result-random {
+  color: var(--pwa-accent-readable) !important;
   border-color: color-mix(in srgb, var(--pwa-warm-2) 42%, transparent) !important;
   background:
     linear-gradient(180deg, rgba(var(--pwa-warm-rgb), 0.17), rgba(var(--pwa-warm-rgb), 0.068)),
@@ -4353,7 +4369,7 @@ function writePwaClient() {
   const PERF_LONG_TASK_THRESHOLD_MS = 50;
   const DEFAULT_LOGO_SRC = './assets/logo.png';
   const LIBRARIAN_LOGO_SRC = './assets/librarian-presence.jpg';
-  const THEME_DEFAULT = 'shinhaku';
+  const THEME_DEFAULT = 'shikon';
   const THEME_OPTIONS = ['shinhaku', 'kohi', 'shikon', 'kohaku'];
   const LEGACY_THEME_ALIASES = {
     default: 'shinhaku',
@@ -4363,7 +4379,7 @@ function writePwaClient() {
   const THEME_COLORS = {
     shinhaku: '#0a1217',
     kohi: '#120c0f',
-    shikon: '#0f0e18',
+    shikon: '#0f0e13',
     kohaku: '#120f0b'
   };
   const LIBRARIAN_TEXTS = {
@@ -5802,8 +5818,8 @@ function writePwaFiles() {
     scope: './',
     display: 'standalone',
     display_override: ['standalone', 'browser'],
-    background_color: '#0a1217',
-    theme_color: '#0a1217',
+    background_color: '#0f0e13',
+    theme_color: '#0f0e13',
     orientation: 'portrait',
     categories: ['books', 'education', 'productivity'],
     prefer_related_applications: false,

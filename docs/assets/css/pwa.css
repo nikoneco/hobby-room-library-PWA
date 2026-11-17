@@ -121,6 +121,16 @@ body.pwa-theme-kohaku {
   --pwa-grid-rgb: 214, 164, 95;
 }
 
+/* Keep solid accents aligned with the active night palette after PWA defaults. */
+body.sandbox-redesign.pwa-shell {
+  --pwa-accent: var(--night-accent);
+  --pwa-accent-2: var(--night-accent-strong);
+  --pwa-accent-text: var(--night-accent-ink);
+  --pwa-accent-readable: var(--night-text);
+  --pwa-warm: var(--night-accent);
+  --pwa-warm-2: var(--night-accent-strong);
+}
+
 .pwa-launch-splash {
   position: fixed;
   inset: 0;
@@ -700,8 +710,8 @@ body.pwa-settings-open {
 }
 
 .pwa-theme-settings label:has(input[value="shinhaku"]) {
-  --theme-swatch-1: #0a1217;
-  --theme-swatch-2: #7fb2bd;
+  --theme-swatch-1: #0b0f0e;
+  --theme-swatch-2: #8ab9a5;
 }
 
 .pwa-theme-settings label:has(input[value="kohi"]) {
@@ -994,6 +1004,7 @@ body.pwa-shell .empty-result-action:focus-visible {
 }
 
 body.pwa-shell .empty-result-random {
+  color: var(--pwa-accent-readable) !important;
   border-color: color-mix(in srgb, var(--pwa-warm-2) 42%, transparent) !important;
   background:
     linear-gradient(180deg, rgba(var(--pwa-warm-rgb), 0.17), rgba(var(--pwa-warm-rgb), 0.068)),

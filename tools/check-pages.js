@@ -70,11 +70,12 @@ assert(!index.includes('HtmlService.createHtmlOutputFromFile'), 'static index ha
 assert(index.includes('rel="manifest" href="./manifest.webmanifest"'), 'static index references manifest');
 assert(index.includes('rel="apple-touch-icon" href="./assets/icons/apple-touch-icon-lantern-180.png"'), 'static index references renamed lantern apple touch icon');
 assert(index.includes('interactive-widget=resizes-content'), 'static index requests keyboard viewport resizing');
-assert(index.includes('name="theme-color" content="#0a1217"'), 'static index uses shinhaku PWA theme color');
+assert(index.includes('name="theme-color" content="#0f0e13"'), 'static index uses shikon PWA theme color');
 assert(index.includes('rel="preconnect" href="https://script.google.com"'), 'static index preconnects to GAS endpoint host');
 assert(index.includes('rel="preconnect" href="https://script.googleusercontent.com"'), 'static index preconnects to GAS response host');
 assert(index.includes('id="pwa-critical-style"'), 'static index includes critical shell paint style');
-assert(index.includes('html{background:#0a1217'), 'critical style paints shinhaku shell before CSS loads');
+assert(index.includes('html{background:#0f0e13'), 'critical style paints shikon shell before CSS loads');
+assert(index.includes('<body class="sandbox-redesign pwa-theme-shikon">'), 'static shell defaults to shikon before the client applies stored preferences');
 assert(index.includes('apple-mobile-web-app-status-bar-style" content="black-translucent"'), 'static index uses translucent iOS standalone status bar');
 assert(index.includes('id="pwaLaunchSplash"'), 'static index includes launch splash overlay');
 assert(index.includes('src="./assets/splash-lantern.jpg"'), 'static index uses optimized lantern splash asset');
@@ -108,7 +109,7 @@ assert(pwaClientForMenu.includes("shumi-library-local-index-persistence"),
 assert(shelfClientForMenu.includes('getNextSeriesStatusFilter_'), 'static series status screen includes summary filter toggling');
 assert(shelfClientForMenu.includes('aria-pressed="false"'), 'static series status filters expose pressed state');
 assert(index.includes('id="pwaLibrarianPresence"'), 'static index includes librarian presence setting');
-assert(index.includes('class="sandbox-redesign"'), 'static index enables the night library redesign');
+assert(/<body class="[^"]*\bsandbox-redesign\b/.test(index), 'static index enables the night library redesign');
 assert(index.includes('id="appBrandResetBtn"'), 'static index includes the redesigned brand reset button');
 assert(index.includes('id="appBrandLibrarianImage"'), 'static index includes the librarian brand image');
 assert(index.includes('class="preview-brand-wordmark"'), 'static index includes the outlined English wordmark');
@@ -192,8 +193,9 @@ assert(resolvedAppId.href !== new URL('/Sudoku/', appIdBase).href,
 assert(manifest.lang === 'ja', 'manifest language is Japanese');
 assert(manifest.display === 'standalone', 'manifest display is standalone');
 assert(Array.isArray(manifest.display_override) && manifest.display_override.includes('standalone'), 'manifest has display override fallback');
-assert(manifest.theme_color === '#0a1217', 'manifest theme color matches shinhaku app shell');
-assert(manifest.background_color === '#0a1217', 'manifest splash background matches shinhaku app shell');
+assert(manifest.theme_color === '#0f0e13', 'manifest theme color matches shikon app shell');
+assert(manifest.background_color === '#0f0e13', 'manifest launch background matches shikon app shell');
+assert(manifest.background_color === '#0f0e13', 'manifest splash background matches shikon app shell');
 assert(manifest.start_url === './', 'manifest start_url stays within docs scope');
 assert(Array.isArray(manifest.categories) && manifest.categories.includes('books'), 'manifest declares library category');
 assert(manifest.prefer_related_applications === false, 'manifest keeps web app as preferred app');
@@ -358,6 +360,57 @@ assert(pwaClient.includes('THEME_COLORS'), 'PWA client maps themes to shell colo
 assert(pwaClient.includes("THEME_OPTIONS = ['shinhaku', 'kohi', 'shikon', 'kohaku']"), 'PWA client exposes the four named themes');
 assert(pwaClient.includes('LEGACY_THEME_ALIASES'), 'PWA client migrates old stored theme values');
 assert(pwaClient.includes('meta[name="theme-color"]'), 'PWA client updates browser theme color');
+
+// Exercise the actual preference functions: changing the fallback must not
+// overwrite a theme already selected on this device, including legacy values.
+{
+  let stored = null;
+  let storageBlocked = false;
+  const writes = [];
+  const classes = new Set(['sandbox-redesign', 'pwa-theme-shikon']);
+  const radios = ['shinhaku', 'kohi', 'shikon', 'kohaku'].map(value => ({ value, checked: false }));
+  let themeColor = '';
+  const context = vm.createContext({
+    window: { localStorage: {
+      getItem() { if (storageBlocked) throw new Error('storage denied'); return stored; },
+      setItem(key, value) { if (storageBlocked) throw new Error('storage denied'); stored = value; writes.push([key, value]); }
+    } },
+    document: {
+      body: { classList: { toggle(name, active) { active ? classes.add(name) : classes.delete(name); } } },
+      querySelector() { return { setAttribute(name, value) { themeColor = value; } }; },
+      querySelectorAll() { return radios; }
+    }
+  });
+  const constants = pwaClient.slice(pwaClient.indexOf('  const THEME_DEFAULT ='), pwaClient.indexOf('  const LIBRARIAN_TEXTS ='));
+  const functions = pwaClient.slice(pwaClient.indexOf('  function normalizeTheme_('), pwaClient.indexOf('  function getStoredBoolean_('));
+  vm.runInContext("const THEME_STORAGE_KEY = 'shumiLibrary.pwaTheme.v1';\n" + constants + functions, context);
+  for (const value of [null, '', 'invalid']) {
+    stored = value;
+    assert(vm.runInContext('getStoredTheme_()', context) === 'shikon', 'unset or invalid theme defaults to purple');
+  }
+  for (const [value, expected] of [
+    ['shinhaku', 'shinhaku'], ['kohi', 'kohi'], ['shikon', 'shikon'], ['kohaku', 'kohaku'],
+    ['default', 'shinhaku'], ['calm', 'shinhaku'], ['warm', 'kohaku']
+  ]) {
+    stored = value;
+    assert(vm.runInContext('getStoredTheme_()', context) === expected, `stored theme ${value} is preserved or migrated`);
+    vm.runInContext('applyTheme_(getStoredTheme_())', context);
+    assert(classes.has('sandbox-redesign') && classes.has('pwa-theme-' + expected), 'theme application preserves the app class');
+    assert([...classes].filter(name => name.startsWith('pwa-theme-')).length === 1, 'only the chosen theme stays active');
+    assert(radios.filter(radio => radio.checked).map(radio => radio.value).join() === expected, 'theme radio matches the active palette');
+  }
+  vm.runInContext("setTheme_('shinhaku')", context);
+  assert(stored === 'shinhaku' && writes.at(-1)[0] === 'shumiLibrary.pwaTheme.v1', 'selected green theme survives a reload');
+  storageBlocked = true;
+  assert(vm.runInContext('getStoredTheme_()', context) === 'shikon', 'blocked storage uses purple fallback');
+  vm.runInContext("setTheme_('shikon')", context);
+  assert(classes.has('pwa-theme-shikon') && themeColor === manifest.theme_color, 'theme switching still works without storage');
+}
+
+for (const theme of ['shinhaku', 'kohi', 'shikon', 'kohaku']) {
+  const palette = nightCss.match(new RegExp('body\\.sandbox-redesign\\.pwa-theme-' + theme + '\\s*\\{([^}]+)\\}'));
+  assert(palette && palette[1].includes('--night-accent:') && palette[1].includes('--pwa-warm-rgb:'), `${theme} defines the controls and detailed accent palette`);
+}
 assert(pwaClient.includes('moveSensitiveToggleToSettings_'), 'PWA client moves sensitive toggle into settings');
 assert(pwaClient.includes('bindSettingsPanel_'), 'PWA client binds settings panel controls');
 assert(pwaClient.includes('perfStart: startPerf_'), 'PWA client exposes performance start hook');

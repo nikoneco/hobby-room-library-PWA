@@ -83,6 +83,15 @@ body.sandbox-redesign {
   letter-spacing: 0.01em;
 }
 
+body.sandbox-redesign.pwa-theme-shinhaku {
+  --night-accent: #8ab9a5;
+  --night-accent-strong: #afd5c1;
+  --night-accent-ink: #10241a;
+  --pwa-accent-rgb: 138, 185, 165;
+  --pwa-accent-2-rgb: 175, 213, 193;
+  --pwa-warm-rgb: 138, 185, 165;
+}
+
 body.sandbox-redesign.pwa-theme-kohi {
   --night-bg: #110d0e;
   --night-bg-raised: #181213;
@@ -1923,7 +1932,7 @@ body.sandbox-redesign #image-popup-content .popup-arrow {
   background: var(--night-accent-strong); color: #201a12; opacity: 1;
   box-shadow: none; transform: translateY(-50%); font-size: 13px; font-weight: 700;
 }
-body.sandbox-redesign #image-popup-content .popup-arrow:hover { background: #edcb94; }
+body.sandbox-redesign #image-popup-content .popup-arrow:hover { background: color-mix(in srgb, var(--night-accent-strong) 82%, white); }
 body.sandbox-redesign #image-popup-content .popup-arrow::after { content: none; }
 body.sandbox-redesign #image-popup-content .popup-arrow .ui-icon { width: 22px; height: 22px; flex: 0 0 22px; }
 body.sandbox-redesign #image-popup-info { user-select: text; -webkit-user-select: text; }

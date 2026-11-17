@@ -22,7 +22,7 @@
   const PERF_LONG_TASK_THRESHOLD_MS = 50;
   const DEFAULT_LOGO_SRC = './assets/logo.png';
   const LIBRARIAN_LOGO_SRC = './assets/librarian-presence.jpg';
-  const THEME_DEFAULT = 'shinhaku';
+  const THEME_DEFAULT = 'shikon';
   const THEME_OPTIONS = ['shinhaku', 'kohi', 'shikon', 'kohaku'];
   const LEGACY_THEME_ALIASES = {
     default: 'shinhaku',
@@ -32,7 +32,7 @@
   const THEME_COLORS = {
     shinhaku: '#0a1217',
     kohi: '#120c0f',
-    shikon: '#0f0e18',
+    shikon: '#0f0e13',
     kohaku: '#120f0b'
   };
   const LIBRARIAN_TEXTS = {
