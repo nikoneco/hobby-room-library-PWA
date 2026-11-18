@@ -238,6 +238,8 @@ async function checkInitialSearchDataFlow() {
       ADVANCED_OPTIONS: null,
       PREVIEW_INDEX: [],
       QUICK_BROWSE_COUNTS: null,
+      appliedLocalSearchMetadata: null,
+      localBookshelfSnapshot: null,
       PREVIEW_INDEX_READY: false,
       searchStatusState: { mode: 'none' },
       isPwaShell_: () => true,
@@ -1041,17 +1043,6 @@ assert(
   'bookshelf book tiles have resilient tap-to-open detail handling'
 );
 assert(
-  clientScriptSources[clientScriptFiles.indexOf('script.state.js.html')].includes('SHELF_RENDER_INITIAL_BOOK_LIMIT') &&
-    clientScriptSources[clientScriptFiles.indexOf('script.state.js.html')].includes('SHELF_RENDER_CHUNK_SIZE') &&
-    clientScriptSources[clientScriptFiles.indexOf('script.state.js.html')].includes('const SHELF_RENDER_CHUNK_SIZE = 30') &&
-    clientScriptSources[clientScriptFiles.indexOf('script.state.js.html')].includes('SHELF_RENDER_PAUSE_RETRY_MS') &&
-    clientScriptSources[clientScriptFiles.indexOf('script.shelf.js.html')].includes('function scheduleShelfRenderQueue_') &&
-    clientScriptSources[clientScriptFiles.indexOf('script.shelf.js.html')].includes('appendShelfBookItems_') &&
-    clientScriptSources[clientScriptFiles.indexOf('script.shelf.js.html')].includes('function isShelfRenderPaused_') &&
-    clientScriptSources[clientScriptFiles.indexOf('script.shelf.js.html')].includes('renderQueue.push'),
-  'bookshelf view renders book tiles incrementally instead of blocking on every tile'
-);
-assert(
   clientScriptSources[clientScriptFiles.indexOf('script.state.js.html')].includes('RESULT_RENDER_INITIAL_BOOK_LIMIT') &&
     clientScriptSources[clientScriptFiles.indexOf('script.state.js.html')].includes('const RESULT_RENDER_INITIAL_BOOK_LIMIT = 12') &&
     clientScriptSources[clientScriptFiles.indexOf('script.shelf.js.html')].includes('function scheduleIncrementalResultRender_') &&
@@ -1291,11 +1282,9 @@ assert(
   );
 }
 assert(
-  clientScriptSources[clientScriptFiles.indexOf('script.state.js.html')].includes('BOOK_DETAIL_PREFETCH_WARM_DELAY_MS') &&
-    clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('function scheduleBookDetailPrefetchQueue_') &&
-    clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('window.requestIdleCallback(run') &&
-    clientScriptSources[clientScriptFiles.indexOf('script.shelf.js.html')].includes('priorityCount: 0'),
-  'bookshelf detail prefetch is delayed and scheduled through idle-friendly background work'
+  clientScriptSources[clientScriptFiles.indexOf('script.shelf.js.html')].includes('observeBookDetailPrefetch_(button, book)') &&
+    clientScriptSources[clientScriptFiles.indexOf('script.modal.js.html')].includes('function scheduleBookDetailPrefetchQueue_'),
+  'visible shelf books can prefetch details through the background queue'
 );
 assert(
   clientScriptSources[clientScriptFiles.indexOf('script.state.js.html')].includes('const BOOK_DETAIL_PREFETCH_BATCH_SIZE = 12') &&
@@ -1366,11 +1355,19 @@ assert(
 {
   sandbox.window.scrollY = 384;
   sandbox.window.lastScrollTo = null;
+  let focusedVisibleShelfBook = false;
+  sandbox.document.activeElement = {
+    isConnected: true,
+    focus() { focusedVisibleShelfBook = !sandboxBodyClassList.contains('shelf-popup-open'); }
+  };
+  sandbox.setShelfPopupPerformanceMode_(true);
   sandbox.setPopupModalOpen_(true);
   assert(sandboxBodyClassList.contains('modal-open'), 'popup scroll lock fixes the page body while details are open');
   assert(sandboxRootClassList.contains('modal-open'), 'popup scroll lock also blocks root-page overscroll');
   assertEqual(sandboxBodyStyle.getPropertyValue('--modal-scroll-lock-y'), '-384px', 'popup scroll lock preserves the page offset');
   sandbox.setPopupModalOpen_(false);
+  assert(focusedVisibleShelfBook, 'the shelf is visible when focus returns to the original book');
+  delete sandbox.document.activeElement;
   assert(!sandboxBodyClassList.contains('modal-open'), 'popup scroll lock releases the page body when details close');
   assert(!sandboxRootClassList.contains('modal-open'), 'popup scroll lock releases the root page when details close');
   assertEqual(sandbox.window.lastScrollTo.top, 384, 'popup scroll lock restores the original page offset');
@@ -1425,11 +1422,6 @@ const shelfNetworkChips = sandbox.buildSearchStatusChips_('shelf', { source: 'ne
 assert(
   shelfNetworkChips.some(chip => chip.key === 'bookshelfNetwork' && chip.label === '更新済み'),
   'shelf status shows network refresh complete'
-);
-assert(
-  searchScriptSource.includes('if (!hasCachedBookshelf)') &&
-    searchScriptSource.includes("showSpinner('本棚を広げています'"),
-  'bookshelf cache path avoids blocking spinner'
 );
 
 vm.runInContext(`

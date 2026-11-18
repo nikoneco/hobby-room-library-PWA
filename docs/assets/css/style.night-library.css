@@ -479,9 +479,7 @@ body.sandbox-redesign .bookshelf-cta-wrap {
 body.sandbox-redesign .bookshelf-cta-card.top-shelf-btn {
   display: grid;
   grid-template-columns: 32px minmax(0, 1fr) auto;
-  grid-template-areas:
-    "icon title arrow"
-    "icon subtitle arrow";
+  grid-template-areas: "icon title arrow";
   align-items: center;
   gap: 0.1rem 0.75rem;
   width: 100%;
@@ -1915,7 +1913,14 @@ body.sandbox-redesign :is(button, a, summary, [tabindex]):focus-visible { outlin
   body.sandbox-redesign #searchContainer.shrink { padding: 12px 16px; }
   body.sandbox-redesign #searchContainer.shrink .preview-brand { width: calc(100% - 56px); margin: 0 0 8px; min-height: 44px; }
   body.sandbox-redesign #searchContainer.shrink .search-status-area { margin-bottom: 8px; }
-  body.sandbox-redesign #searchContainer.shrink .search-form > .input-group > label { display: none; }
+  body.sandbox-redesign #searchContainer.shrink .search-form > .input-group > label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
   body.sandbox-redesign #searchContainer .advanced-actions { display: grid; grid-template-columns: 1fr 1fr; }
   body.sandbox-redesign #searchContainer .advanced-actions > button:last-child { grid-column: 1/-1; }
   body.sandbox-redesign #image-popup-content:not(.series-mode) #image-popup-img { max-height: 220px; width: auto; max-width: 100%; object-fit: contain; margin: 0 auto; }
@@ -2464,4 +2469,99 @@ body.sandbox-redesign #searchContainer .search-input-clear:focus-visible {
   color: var(--night-accent-strong);
   outline: 2px solid var(--night-accent-strong);
   outline-offset: -4px;
+}
+
+body.sandbox-redesign #backToDiscoverySourceBtn,
+body.sandbox-redesign #image-popup-info .popup-location-map-btn {
+  min-height: 44px;
+  padding: 6px 4px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--night-accent-strong);
+  font: inherit;
+  font-size: 14px;
+  text-decoration: underline;
+  text-underline-offset: 0.25em;
+  cursor: pointer;
+}
+body.sandbox-redesign #backToDiscoverySourceBtn:not([hidden]) {
+  display: block;
+  margin: 4px auto 0 max(16px, calc((100% - var(--night-max)) / 2));
+}
+body.sandbox-redesign #backToDiscoverySourceBtn[hidden] { display: none; }
+body.sandbox-redesign #image-popup-info .popup-book-location { flex-wrap: wrap; align-items: center; }
+body.sandbox-redesign #image-popup-info .popup-location-map-btn { margin-inline-start: auto; }
+body.sandbox-redesign #image-popup-info .popup-classification-label {
+  margin: 0 0 4px;
+  color: var(--night-muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+body.sandbox-redesign #image-popup-info .popup-book-classification .genre-chip-wrap { margin-top: 0; }
+body.sandbox-redesign #image-popup-info .popup-book-classification button.genre-chip {
+  min-height: 44px;
+  padding: 4px 6px;
+  border: 0;
+  color: var(--night-accent-strong);
+  text-decoration: underline;
+  text-underline-offset: 0.25em;
+}
+
+@media (max-width: 600px) {
+  body.sandbox-redesign #searchContainer.centered .button-group {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    gap: 6px;
+  }
+  body.sandbox-redesign #searchContainer.centered .button-group > button { padding-inline: 8px; }
+  body.sandbox-redesign #searchContainer.shrink .search-form {
+    gap: 6px;
+  }
+  body.sandbox-redesign #searchContainer.shrink #keyword { min-height: 44px; }
+  /* The dock supplies random selection on phones. Wider layouts keep the form action. */
+  body.sandbox-redesign:has(#mobileAppDock) #searchContainer.shrink .search-form {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+  }
+  body.sandbox-redesign:has(#mobileAppDock) #searchContainer.shrink .button-group {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    width: auto;
+    margin: 0;
+  }
+  body.sandbox-redesign:has(#mobileAppDock) #searchContainer.shrink .button-group > button {
+    flex: none;
+    min-width: 44px;
+    padding-inline: 6px;
+  }
+  body.sandbox-redesign:has(#mobileAppDock) #searchContainer.shrink .button-group > [data-action="random"],
+  body.sandbox-redesign:has(#mobileAppDock) #searchContainer.shrink .button-group > .primary-action > span:last-child,
+  body.sandbox-redesign:has(#mobileAppDock) #searchContainer.shrink #advancedToggleBtn .ui-icon { display: none; }
+  body.sandbox-redesign #searchContainer.shrink #advancedSearchArea { grid-column: 1 / -1; }
+  body.sandbox-redesign #searchContainer.shrink #viewToggle {
+    align-self: flex-start;
+    margin: 4px 0 0;
+  }
+  body.sandbox-redesign #searchContainer.shrink #viewToggle .toggle-btn {
+    min-height: 44px;
+    gap: 4px;
+    padding: 6px 10px;
+  }
+  body.sandbox-redesign #searchContainer.shrink #viewToggle .toggle-label {
+    position: static;
+    width: auto;
+    height: auto;
+    clip: auto;
+  }
+  body.sandbox-redesign #mobileDockStatus {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    min-height: 0;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
 }

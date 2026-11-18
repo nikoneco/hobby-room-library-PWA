@@ -9,8 +9,6 @@
   const IOS_INSTALL_MESSAGE = '共有からホーム画面に追加できます。';
   const IOS_INSTALL_STORAGE_KEY = 'shumiLibrary.pwaIosInstallHintDismissed.v1';
   const INSTALL_HINT_AUTO_HIDE_MS = 12000;
-  const LAUNCH_SPLASH_DURATION_MS = 1850;
-  const LAUNCH_SPLASH_DEBUG_DURATION_MS = 6000;
   const THEME_STORAGE_KEY = 'shumiLibrary.pwaTheme.v1';
   const LIBRARIAN_PRESENCE_STORAGE_KEY = 'shumiLibrary.librarianPresence.v1';
   const QUIET_MOTION_STORAGE_KEY = 'shumiLibrary.quietMotion.v1';
@@ -20,7 +18,6 @@
   const PERF_LOG_LIMIT = 20;
   const PERF_SLOW_THRESHOLD_MS = 250;
   const PERF_LONG_TASK_THRESHOLD_MS = 50;
-  const DEFAULT_LOGO_SRC = './assets/logo.png';
   const LIBRARIAN_LOGO_SRC = './assets/librarian-presence.jpg';
   const THEME_DEFAULT = 'shikon';
   const THEME_OPTIONS = ['shinhaku', 'kohi', 'shikon', 'kohaku'];
@@ -38,9 +35,6 @@
   const LIBRARIAN_TEXTS = {
     'empty.title': 'この条件の本は、今は棚の奥に隠れているようです',
     'empty.text': '言葉を少しゆるめるか、条件を外してもう一度だけ棚を覗いてみましょう。',
-    'empty.action.search': '検索語を整える',
-    'empty.action.clear': '条件をほどく',
-    'empty.action.random': '別の棚を眺める',
     'status.random': data => data && Number.isFinite(data.count) ? data.count + '冊をそっと選びました' : '棚から本を選びました',
     'status.shelf': data => data && Number.isFinite(data.count) ? '全' + data.count + '冊の棚を開いています' : '本棚を開いています',
     'status.result': data => data && Number.isFinite(data.count) ? data.count + '冊が灯りの下に出てきました' : '本が見つかりました',
@@ -52,7 +46,6 @@
     'status.previewUnavailable': '件数を確認できませんでした',
     'status.note.random': data => data && Number.isFinite(data.count) ? '今夜の気配で、この' + data.count + '冊を手前に出しました。' : '今夜目が合う本を手前に出しました。',
     'status.note.shelf': data => data && Number.isFinite(data.count) ? '棚位置を確かめたい時は、この' + data.count + '冊の眺めが近道です。' : '棚位置を確かめるなら、この眺めが近道です。',
-    'status.note.result': data => data && data.sourceMode === 'advanced' ? '細かい手がかりに合う本だけ、棚の前へ寄せています。' : '見つかった本だけ、棚の前へ寄せています。',
     'notice.keywordRequired': '探す手がかりをひとつください',
     'notice.conditionsRequired': '棚を探す手がかりをひとつください',
     'spinner.label.search': '棚を探しています',
@@ -83,8 +76,6 @@
   let activeRegistration = null;
   let lastUpdateCheckAt = 0;
   let installHintTimer = 0;
-  let launchSplashTimer = 0;
-  let launchSplashReady = false;
   let perfHudEnabled = false;
   let perfHudElement = null;
   let perfLog = null;
@@ -441,16 +432,6 @@
   }
 
   function syncLogoForLibrarianPresence_(enabled) {
-    const logo = document.getElementById('logoResetBtn');
-    if (logo) {
-      const nextSrc = enabled ? LIBRARIAN_LOGO_SRC : DEFAULT_LOGO_SRC;
-      const currentSrc = logo.getAttribute('src') || '';
-      if (currentSrc !== nextSrc) {
-        logo.setAttribute('src', nextSrc);
-      }
-      logo.setAttribute('alt', enabled ? '司書のいる趣味部屋図書館' : 'ロゴ');
-    }
-
     const brandButton = document.getElementById('appBrandResetBtn');
     const brandImage = document.getElementById('appBrandLibrarianImage');
     if (brandButton) {
@@ -1291,86 +1272,6 @@
     });
   }
 
-  function finishLaunchSplash_() {
-    const splash = document.getElementById('pwaLaunchSplash');
-    if (!splash) return;
-
-    splash.classList.add('is-leaving');
-    if (document.body) {
-      document.body.classList.remove('pwa-launch-splash-visible');
-    }
-    window.setTimeout(function() {
-      if (splash.parentNode) {
-        splash.parentNode.removeChild(splash);
-      }
-    }, 560);
-  }
-
-  function getLaunchSplashDuration_() {
-    try {
-      const params = new URLSearchParams(window.location.search || '');
-      return params.has('debugLaunchSplash') ? LAUNCH_SPLASH_DEBUG_DURATION_MS : LAUNCH_SPLASH_DURATION_MS;
-    } catch (e) {
-      return LAUNCH_SPLASH_DURATION_MS;
-    }
-  }
-
-  function isLaunchSplashDebug_() {
-    try {
-      const params = new URLSearchParams(window.location.search || '');
-      return params.has('debugLaunchSplash');
-    } catch (e) {
-      return false;
-    }
-  }
-
-  function shouldShowLaunchSplash_() {
-    return isStandalone_() || isLaunchSplashDebug_();
-  }
-
-  function removeLaunchSplashImmediately_() {
-    const splash = document.getElementById('pwaLaunchSplash');
-    if (!splash) return;
-    if (document.body) {
-      document.body.classList.remove('pwa-launch-splash-visible');
-    }
-    if (splash.parentNode) {
-      splash.parentNode.removeChild(splash);
-    }
-  }
-
-  function startLaunchSplash_() {
-    const splash = document.getElementById('pwaLaunchSplash');
-    if (!splash || !document.body) return;
-
-    if (!shouldShowLaunchSplash_()) {
-      removeLaunchSplashImmediately_();
-      return;
-    }
-
-    document.body.classList.add('pwa-launch-splash-visible');
-
-    function markReady() {
-      if (launchSplashReady) return;
-      launchSplashReady = true;
-      splash.classList.add('is-ready');
-      launchSplashTimer = window.setTimeout(function() {
-        launchSplashTimer = 0;
-        finishLaunchSplash_();
-      }, getLaunchSplashDuration_());
-    }
-
-    const image = splash.querySelector('img');
-    if (!image || image.complete) {
-      window.setTimeout(markReady, 40);
-      return;
-    }
-
-    image.addEventListener('load', markReady, { once: true });
-    image.addEventListener('error', markReady, { once: true });
-    window.setTimeout(markReady, 1200);
-  }
-
   window.ShumiLibraryPwa = {
     isPwaShell: true,
     isLibrarianPresenceEnabled: isLibrarianPresenceEnabled_,
@@ -1436,7 +1337,6 @@
 
   window.addEventListener('DOMContentLoaded', function() {
     syncBodyState_();
-    startLaunchSplash_();
     bindSettingsPanel_();
     syncOnlineState_();
     window.setTimeout(showIosInstallHint_, 3500);

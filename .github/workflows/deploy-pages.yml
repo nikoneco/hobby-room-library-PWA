@@ -55,6 +55,12 @@ jobs:
       - name: Check client request races
         run: node tools/check-client-races.js
 
+      - name: Check shelf rendering and book location map
+        run: node tools/check-shelf-window.js
+
+      - name: Check browsing state, genre counts and shelf cache
+        run: node tools/check-library-browsing.js
+
       - name: Check search performance lifecycle
         run: node tools/check-search-perf.js
 

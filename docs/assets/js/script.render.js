@@ -158,7 +158,7 @@ function renderEmptyResult_(result) {
   const focusButton = document.createElement('button');
   focusButton.type = 'button';
   focusButton.className = 'quiet-action empty-result-action';
-  focusButton.innerHTML = `${uiIcon_('search', 'ui-icon-inline')}<span>${escapeHtml(getPwaLibrarianText_('empty.action.search', '検索語を見直す'))}</span>`;
+  focusButton.innerHTML = `${uiIcon_('search', 'ui-icon-inline')}<span>検索語を見直す</span>`;
   focusButton.onclick = function() {
     const keyword = document.getElementById('keyword');
     if (keyword && typeof keyword.focus === 'function') {
@@ -170,7 +170,7 @@ function renderEmptyResult_(result) {
   const clearButton = document.createElement('button');
   clearButton.type = 'button';
   clearButton.className = 'quiet-action empty-result-action';
-  clearButton.innerHTML = `${uiIcon_('trash', 'ui-icon-inline')}<span>${escapeHtml(getPwaLibrarianText_('empty.action.clear', '条件をクリア'))}</span>`;
+  clearButton.innerHTML = `${uiIcon_('trash', 'ui-icon-inline')}<span>条件をクリア</span>`;
   clearButton.onclick = function() {
     resetSearch();
   };
@@ -178,7 +178,7 @@ function renderEmptyResult_(result) {
   const randomButton = document.createElement('button');
   randomButton.type = 'button';
   randomButton.className = 'quiet-action empty-result-action empty-result-random';
-  randomButton.innerHTML = `${uiIcon_('shuffle', 'ui-icon-inline')}<span>${escapeHtml(getPwaLibrarianText_('empty.action.random', 'ランダムで眺める'))}</span>`;
+  randomButton.innerHTML = `${uiIcon_('shuffle', 'ui-icon-inline')}<span>おまかせ10冊</span>`;
   randomButton.onclick = function() {
     showRandomBooks();
   };

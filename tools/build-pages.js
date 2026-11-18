@@ -33,6 +33,9 @@ const jsFiles = [
 ];
 
 const jsAssetNames = new Map();
+// These layouts must match the shelf renderer even while an older worker controls the page.
+const versionedStyles = new Set(['style.shelf.css.html', 'style.night-library.css.html']);
+const cssAssetNames = new Map();
 let gasRunShimAssetName = 'gas-run-shim.js';
 
 function ensureDir(dir) {
@@ -62,7 +65,7 @@ function jsOutBaseName(fileName) {
 }
 
 function cssOutName(fileName) {
-  return cssOutBaseName(fileName);
+  return cssAssetNames.get(fileName) || cssOutBaseName(fileName);
 }
 
 function jsOutName(fileName) {
@@ -75,20 +78,21 @@ function buildHashedAssetName(baseName, source) {
   return `${stem}.${shortHash(source)}${ext}`;
 }
 
-function writeHashedGeneratedJsAsset(baseName) {
-  const sourcePath = path.join(jsDir, baseName);
+function writeVersionedAsset(directory, baseName) {
+  const sourcePath = path.join(directory, baseName);
   const source = fs.readFileSync(sourcePath, 'utf8');
   const hashedName = buildHashedAssetName(baseName, source);
   const stem = path.basename(baseName, path.extname(baseName)).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const hashedPattern = new RegExp(`^${stem}\\.[0-9a-f]{10}\\.js$`);
+  const extension = path.extname(baseName).slice(1);
+  const hashedPattern = new RegExp(`^${stem}\\.[0-9a-f]{10}\\.${extension}$`);
 
-  fs.readdirSync(jsDir).forEach(fileName => {
+  fs.readdirSync(directory).forEach(fileName => {
     if (hashedPattern.test(fileName) && fileName !== hashedName) {
-      fs.rmSync(path.join(jsDir, fileName));
+      fs.rmSync(path.join(directory, fileName));
     }
   });
 
-  fs.copyFileSync(sourcePath, path.join(jsDir, hashedName));
+  fs.copyFileSync(sourcePath, path.join(directory, hashedName));
   return hashedName;
 }
 
@@ -137,11 +141,6 @@ function buildStaticIndex() {
   );
 
   source = source.replace(
-    'https://i.imgur.com/szIBHwj.png',
-    './assets/logo.png'
-  );
-
-  source = source.replace(
     /\s*<\?!= HtmlService\.createHtmlOutputFromFile\('([^']+\.css\.html)'\)\.getContent\(\); \?>/g,
     (match, fileName) => `\n  <link rel="stylesheet" href="./assets/css/${cssOutName(fileName)}">`
   );
@@ -173,11 +172,6 @@ function buildStaticIndex() {
   source = source.replace(
     /(<body[^>]*>)/,
     `$1
-  <div id="pwaLaunchSplash" class="pwa-launch-splash" aria-hidden="true">
-    <div class="pwa-launch-splash-scene">
-      <img src="./assets/splash-lantern.jpg" alt="">
-    </div>
-  </div>
   <div id="pwaNetworkBanner" class="pwa-network-banner" role="status" aria-live="polite" hidden></div>
   <button id="pwaSettingsButton" class="pwa-settings-button" type="button" aria-label="メニューを開く" aria-controls="pwaSettingsPanel" aria-expanded="false">
     <span aria-hidden="true"></span>
@@ -288,16 +282,11 @@ function writeStaticAssets() {
 
   cssFiles.forEach(fileName => {
     const source = stripWrapper(readUtf8(fileName), 'style');
-    fs.writeFileSync(
-      path.join(cssDir, cssOutBaseName(fileName)),
-      source,
-      'utf8'
-    );
-    fs.writeFileSync(
-      path.join(cssDir, cssOutName(fileName)),
-      source,
-      'utf8'
-    );
+    const baseName = cssOutBaseName(fileName);
+    fs.writeFileSync(path.join(cssDir, baseName), source, 'utf8');
+    if (versionedStyles.has(fileName)) {
+      cssAssetNames.set(fileName, writeVersionedAsset(cssDir, baseName));
+    }
   });
 
   jsFiles.forEach(fileName => {
@@ -448,171 +437,6 @@ body.sandbox-redesign.pwa-shell {
   --pwa-accent-readable: var(--night-text);
   --pwa-warm: var(--night-accent);
   --pwa-warm-2: var(--night-accent-strong);
-}
-
-.pwa-launch-splash {
-  position: fixed;
-  inset: 0;
-  z-index: 13000;
-  display: grid;
-  place-items: center;
-  padding: max(18px, env(safe-area-inset-top)) max(18px, env(safe-area-inset-right)) max(18px, env(safe-area-inset-bottom)) max(18px, env(safe-area-inset-left));
-  background:
-    radial-gradient(circle at 50% 62%, rgba(214, 164, 95, 0.16), transparent 22%),
-    radial-gradient(circle at 50% 44%, rgba(90, 174, 192, 0.10), transparent 34%),
-    linear-gradient(180deg, #05090d 0%, #0a1217 52%, #05070a 100%);
-  opacity: 0;
-  visibility: hidden;
-  pointer-events: none;
-  transition: opacity 520ms ease, visibility 520ms ease;
-}
-
-body.pwa-launch-splash-visible .pwa-launch-splash {
-  opacity: 1;
-  visibility: visible;
-  pointer-events: auto;
-}
-
-.pwa-launch-splash::before,
-.pwa-launch-splash::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
-
-.pwa-launch-splash::before {
-  background:
-    radial-gradient(circle at 50% 59%, rgba(240, 195, 122, 0.00) 0 8%, rgba(240, 195, 122, 0.22) 18%, transparent 38%),
-    radial-gradient(circle at 50% 57%, rgba(255, 226, 154, 0.18), transparent 18%);
-  opacity: 0;
-  transform: scale(0.82);
-}
-
-.pwa-launch-splash::after {
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 30%),
-    radial-gradient(circle at 50% 18%, rgba(120, 200, 200, 0.07), transparent 32%);
-  opacity: 0;
-}
-
-.pwa-launch-splash-scene {
-  position: relative;
-  width: min(82vw, 440px);
-  max-height: min(82svh, 660px);
-  aspect-ratio: 2 / 3;
-  display: grid;
-  place-items: center;
-  overflow: hidden;
-  border-radius: 8px;
-  transform: translateY(10px) scale(0.985);
-  opacity: 0;
-}
-
-.pwa-launch-splash-scene img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: 50% 56%;
-  filter: brightness(0.58) saturate(0.92);
-  transform: scale(1.04);
-}
-
-.pwa-launch-splash-scene::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  background:
-    radial-gradient(circle at 50% 61%, rgba(255, 220, 140, 0.00) 0 9%, rgba(255, 218, 139, 0.34) 18%, transparent 36%),
-    radial-gradient(circle at 50% 59%, rgba(240, 195, 122, 0.25), transparent 24%);
-  mix-blend-mode: screen;
-  opacity: 0;
-}
-
-.pwa-launch-splash.is-ready::before {
-  animation: pwaLanternGlow 1700ms cubic-bezier(.18,.86,.22,1) forwards;
-}
-
-.pwa-launch-splash.is-ready::after {
-  animation: pwaLanternAir 1700ms ease forwards;
-}
-
-.pwa-launch-splash.is-ready .pwa-launch-splash-scene {
-  animation: pwaLanternScene 1700ms cubic-bezier(.18,.86,.22,1) forwards;
-}
-
-.pwa-launch-splash.is-ready .pwa-launch-splash-scene img {
-  animation: pwaLanternImage 1700ms cubic-bezier(.18,.86,.22,1) forwards;
-}
-
-.pwa-launch-splash.is-ready .pwa-launch-splash-scene::before {
-  animation: pwaLanternCore 1700ms cubic-bezier(.18,.86,.22,1) forwards;
-}
-
-.pwa-launch-splash.is-leaving {
-  opacity: 0;
-  visibility: hidden;
-  pointer-events: none;
-}
-
-body.pwa-launch-splash-visible {
-  overflow: hidden;
-}
-
-@keyframes pwaLanternGlow {
-  0% { opacity: 0; transform: scale(0.76); filter: blur(16px); }
-  38% { opacity: 0.42; transform: scale(0.92); filter: blur(14px); }
-  68% { opacity: 0.88; transform: scale(1.02); filter: blur(10px); }
-  100% { opacity: 0.66; transform: scale(1); filter: blur(12px); }
-}
-
-@keyframes pwaLanternAir {
-  0%, 30% { opacity: 0; }
-  100% { opacity: 1; }
-}
-
-@keyframes pwaLanternScene {
-  0% { opacity: 0; transform: translateY(14px) scale(0.975); }
-  34% { opacity: 0.72; }
-  100% { opacity: 1; transform: translateY(0) scale(1); }
-}
-
-@keyframes pwaLanternImage {
-  0% { filter: brightness(0.42) saturate(0.82); transform: scale(1.075); }
-  58% { filter: brightness(0.84) saturate(1.04); }
-  100% { filter: brightness(0.96) saturate(1.08); transform: scale(1.02); }
-}
-
-@keyframes pwaLanternCore {
-  0%, 24% { opacity: 0; transform: scale(0.76); }
-  62% { opacity: 0.72; transform: scale(1.04); }
-  100% { opacity: 0.48; transform: scale(1); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .pwa-launch-splash,
-  .pwa-launch-splash::before,
-  .pwa-launch-splash::after,
-  .pwa-launch-splash-scene,
-  .pwa-launch-splash-scene img,
-  .pwa-launch-splash-scene::before {
-    animation: none;
-    transition-duration: 160ms;
-  }
-
-  .pwa-launch-splash::before,
-  .pwa-launch-splash::after,
-  .pwa-launch-splash-scene,
-  .pwa-launch-splash-scene::before {
-    opacity: 1;
-    transform: none;
-  }
-
-  .pwa-launch-splash-scene img {
-    filter: brightness(0.92) saturate(1.02);
-    transform: scale(1.02);
-  }
 }
 
 .pwa-network-banner {
@@ -1844,16 +1668,6 @@ body.pwa-shell .search-container.centered::before {
   content: none;
 }
 
-body.pwa-shell .search-container.centered #logoResetBtn.logo {
-  border-color: color-mix(in srgb, var(--pwa-warm-2) 28%, transparent);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.022)),
-    rgba(7, 11, 16, 0.54);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.060),
-    0 24px 58px rgba(var(--pwa-shadow-rgb), 0.38);
-}
-
 body.pwa-shell .search-container.centered .search-form {
   position: relative;
   isolation: isolate;
@@ -2168,30 +1982,6 @@ body.pwa-shell .book-meta-pill-label,
 body.pwa-shell .shelf-view-stat-value,
 body.pwa-shell .spinner-shelf::after {
   color: var(--pwa-warm-2);
-}
-
-body.pwa-librarian-presence #logoResetBtn.logo {
-  width: min(360px, 72vw);
-  height: clamp(112px, 17vw, 172px);
-  object-fit: cover;
-  object-position: 22% 42%;
-  border: 1px solid color-mix(in srgb, var(--pwa-warm-2) 28%, transparent);
-  border-radius: 18px;
-  box-shadow:
-    0 18px 46px rgba(0, 0, 0, 0.34),
-    0 0 0 1px rgba(255, 255, 255, 0.045) inset;
-}
-
-body.pwa-librarian-presence .search-container.shrink #logoResetBtn.logo {
-  width: 132px;
-  height: 62px;
-  border-radius: 12px;
-  object-position: 22% 42%;
-}
-
-body.pwa-librarian-presence .search-container.shrink.shelf-view-active #logoResetBtn.logo {
-  width: 108px;
-  height: 48px;
 }
 
 body.pwa-shell .genre-chip,
@@ -2697,14 +2487,6 @@ body.pwa-shell .search-container.centered {
     align-items: stretch;
     text-align: left;
     padding-inline: 10px;
-  }
-
-  body.pwa-shell .search-container.centered #logoResetBtn.logo {
-    width: 116px;
-    height: 116px;
-    padding: 0.58rem;
-    border-radius: var(--lib-radius-lg);
-    margin-inline: 0 auto;
   }
 
   body.pwa-shell .search-container.centered .search-form {
@@ -4356,8 +4138,6 @@ function writePwaClient() {
   const IOS_INSTALL_MESSAGE = '共有からホーム画面に追加できます。';
   const IOS_INSTALL_STORAGE_KEY = 'shumiLibrary.pwaIosInstallHintDismissed.v1';
   const INSTALL_HINT_AUTO_HIDE_MS = 12000;
-  const LAUNCH_SPLASH_DURATION_MS = 1850;
-  const LAUNCH_SPLASH_DEBUG_DURATION_MS = 6000;
   const THEME_STORAGE_KEY = 'shumiLibrary.pwaTheme.v1';
   const LIBRARIAN_PRESENCE_STORAGE_KEY = 'shumiLibrary.librarianPresence.v1';
   const QUIET_MOTION_STORAGE_KEY = 'shumiLibrary.quietMotion.v1';
@@ -4367,7 +4147,6 @@ function writePwaClient() {
   const PERF_LOG_LIMIT = 20;
   const PERF_SLOW_THRESHOLD_MS = 250;
   const PERF_LONG_TASK_THRESHOLD_MS = 50;
-  const DEFAULT_LOGO_SRC = './assets/logo.png';
   const LIBRARIAN_LOGO_SRC = './assets/librarian-presence.jpg';
   const THEME_DEFAULT = 'shikon';
   const THEME_OPTIONS = ['shinhaku', 'kohi', 'shikon', 'kohaku'];
@@ -4385,9 +4164,6 @@ function writePwaClient() {
   const LIBRARIAN_TEXTS = {
     'empty.title': 'この条件の本は、今は棚の奥に隠れているようです',
     'empty.text': '言葉を少しゆるめるか、条件を外してもう一度だけ棚を覗いてみましょう。',
-    'empty.action.search': '検索語を整える',
-    'empty.action.clear': '条件をほどく',
-    'empty.action.random': '別の棚を眺める',
     'status.random': data => data && Number.isFinite(data.count) ? data.count + '冊をそっと選びました' : '棚から本を選びました',
     'status.shelf': data => data && Number.isFinite(data.count) ? '全' + data.count + '冊の棚を開いています' : '本棚を開いています',
     'status.result': data => data && Number.isFinite(data.count) ? data.count + '冊が灯りの下に出てきました' : '本が見つかりました',
@@ -4399,7 +4175,6 @@ function writePwaClient() {
     'status.previewUnavailable': '件数を確認できませんでした',
     'status.note.random': data => data && Number.isFinite(data.count) ? '今夜の気配で、この' + data.count + '冊を手前に出しました。' : '今夜目が合う本を手前に出しました。',
     'status.note.shelf': data => data && Number.isFinite(data.count) ? '棚位置を確かめたい時は、この' + data.count + '冊の眺めが近道です。' : '棚位置を確かめるなら、この眺めが近道です。',
-    'status.note.result': data => data && data.sourceMode === 'advanced' ? '細かい手がかりに合う本だけ、棚の前へ寄せています。' : '見つかった本だけ、棚の前へ寄せています。',
     'notice.keywordRequired': '探す手がかりをひとつください',
     'notice.conditionsRequired': '棚を探す手がかりをひとつください',
     'spinner.label.search': '棚を探しています',
@@ -4430,8 +4205,6 @@ function writePwaClient() {
   let activeRegistration = null;
   let lastUpdateCheckAt = 0;
   let installHintTimer = 0;
-  let launchSplashTimer = 0;
-  let launchSplashReady = false;
   let perfHudEnabled = false;
   let perfHudElement = null;
   let perfLog = null;
@@ -4788,16 +4561,6 @@ function writePwaClient() {
   }
 
   function syncLogoForLibrarianPresence_(enabled) {
-    const logo = document.getElementById('logoResetBtn');
-    if (logo) {
-      const nextSrc = enabled ? LIBRARIAN_LOGO_SRC : DEFAULT_LOGO_SRC;
-      const currentSrc = logo.getAttribute('src') || '';
-      if (currentSrc !== nextSrc) {
-        logo.setAttribute('src', nextSrc);
-      }
-      logo.setAttribute('alt', enabled ? '司書のいる趣味部屋図書館' : 'ロゴ');
-    }
-
     const brandButton = document.getElementById('appBrandResetBtn');
     const brandImage = document.getElementById('appBrandLibrarianImage');
     if (brandButton) {
@@ -5638,86 +5401,6 @@ function writePwaClient() {
     });
   }
 
-  function finishLaunchSplash_() {
-    const splash = document.getElementById('pwaLaunchSplash');
-    if (!splash) return;
-
-    splash.classList.add('is-leaving');
-    if (document.body) {
-      document.body.classList.remove('pwa-launch-splash-visible');
-    }
-    window.setTimeout(function() {
-      if (splash.parentNode) {
-        splash.parentNode.removeChild(splash);
-      }
-    }, 560);
-  }
-
-  function getLaunchSplashDuration_() {
-    try {
-      const params = new URLSearchParams(window.location.search || '');
-      return params.has('debugLaunchSplash') ? LAUNCH_SPLASH_DEBUG_DURATION_MS : LAUNCH_SPLASH_DURATION_MS;
-    } catch (e) {
-      return LAUNCH_SPLASH_DURATION_MS;
-    }
-  }
-
-  function isLaunchSplashDebug_() {
-    try {
-      const params = new URLSearchParams(window.location.search || '');
-      return params.has('debugLaunchSplash');
-    } catch (e) {
-      return false;
-    }
-  }
-
-  function shouldShowLaunchSplash_() {
-    return isStandalone_() || isLaunchSplashDebug_();
-  }
-
-  function removeLaunchSplashImmediately_() {
-    const splash = document.getElementById('pwaLaunchSplash');
-    if (!splash) return;
-    if (document.body) {
-      document.body.classList.remove('pwa-launch-splash-visible');
-    }
-    if (splash.parentNode) {
-      splash.parentNode.removeChild(splash);
-    }
-  }
-
-  function startLaunchSplash_() {
-    const splash = document.getElementById('pwaLaunchSplash');
-    if (!splash || !document.body) return;
-
-    if (!shouldShowLaunchSplash_()) {
-      removeLaunchSplashImmediately_();
-      return;
-    }
-
-    document.body.classList.add('pwa-launch-splash-visible');
-
-    function markReady() {
-      if (launchSplashReady) return;
-      launchSplashReady = true;
-      splash.classList.add('is-ready');
-      launchSplashTimer = window.setTimeout(function() {
-        launchSplashTimer = 0;
-        finishLaunchSplash_();
-      }, getLaunchSplashDuration_());
-    }
-
-    const image = splash.querySelector('img');
-    if (!image || image.complete) {
-      window.setTimeout(markReady, 40);
-      return;
-    }
-
-    image.addEventListener('load', markReady, { once: true });
-    image.addEventListener('error', markReady, { once: true });
-    window.setTimeout(markReady, 1200);
-  }
-
   window.ShumiLibraryPwa = {
     isPwaShell: true,
     isLibrarianPresenceEnabled: isLibrarianPresenceEnabled_,
@@ -5783,7 +5466,6 @@ function writePwaClient() {
 
   window.addEventListener('DOMContentLoaded', function() {
     syncBodyState_();
-    startLaunchSplash_();
     bindSettingsPanel_();
     syncOnlineState_();
     window.setTimeout(showIosInstallHint_, 3500);
@@ -5838,9 +5520,9 @@ function writePwaFiles() {
         ]
       },
       {
-        name: '本棚を見る',
+        name: '本棚を開く',
         short_name: '本棚',
-        description: '棚マップから所蔵本を眺める',
+        description: '所蔵本を棚順に表示する',
         url: './?launch=bookshelf',
         icons: [
           {
@@ -5851,8 +5533,8 @@ function writePwaFiles() {
         ]
       },
       {
-        name: 'ランダムに選ぶ',
-        short_name: 'ランダム',
+        name: 'おまかせ10冊',
+        short_name: 'おまかせ10冊',
         description: '棚から10冊をランダムに表示する',
         url: './?launch=random',
         icons: [
@@ -6113,19 +5795,10 @@ function writePwaFiles() {
   './index.html',
   './offline.html',
   './manifest.webmanifest',
-  './assets/css/style.legacy-core.css',
-  './assets/css/style.legacy-modal.css',
-  './assets/css/style.shelf.css',
-  './assets/css/style.modern-core.css',
-  './assets/css/style.modern-modal.css',
-  './assets/css/style.modern-shelf.css',
-  './assets/css/style.responsive.css',
-  './assets/css/style.night-library.css',
+  ...cssFiles.map(fileName => './assets/css/' + cssOutName(fileName)),
   './assets/css/tokens.css',
   './assets/css/pwa.css',
-  './assets/logo.png',
   './assets/librarian-presence.jpg',
-  './assets/splash-lantern.jpg',
   './assets/room-map.webp',
   './assets/room-map-librarian.webp',
   './assets/js/' + gasRunShimAssetName,
@@ -6449,7 +6122,7 @@ function main() {
   writeStaticAssets();
   writePwaCss();
   writeGasRunShim();
-  gasRunShimAssetName = writeHashedGeneratedJsAsset('gas-run-shim.js');
+  gasRunShimAssetName = writeVersionedAsset(jsDir, 'gas-run-shim.js');
   writePwaClient();
   writeIcons();
   fs.writeFileSync(path.join(docsDir, 'index.html'), buildStaticIndex(), 'utf8');

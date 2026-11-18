@@ -217,6 +217,7 @@ window.addEventListener('DOMContentLoaded', function() {
 
 
 function focusSearchEntry_() {
+  if (isShelfImmersiveMode) resetSearch();
   hideAllSuggest();
 
   const container = document.getElementById('searchContainer');
@@ -269,7 +270,7 @@ function getMobileDockStatusText_(hasResults) {
 
   const count = Array.isArray(lastResult) ? lastResult.length : 0;
   if (searchStatusState && searchStatusState.mode === 'random') {
-    return `${count}冊をランダム表示`;
+    return `${count}冊をおまかせ表示`;
   }
   if (searchStatusState && searchStatusState.mode === 'shelf') {
     return `全${count}冊 / 棚表示`;
@@ -288,7 +289,7 @@ function getMobileDockStatusParts_(hasResults) {
 
   const count = Array.isArray(lastResult) ? lastResult.length : 0;
   if (searchStatusState && searchStatusState.mode === 'random') {
-    return { count: `${count}冊`, mode: 'ランダム' };
+    return { count: `${count}冊`, mode: 'おまかせ' };
   }
   if (searchStatusState && searchStatusState.mode === 'shelf') {
     return { count: `全${count}冊`, mode: '棚表示' };

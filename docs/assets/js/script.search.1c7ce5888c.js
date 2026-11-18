@@ -42,43 +42,43 @@ let PREVIEW_INDEX_READY = false;
 let PREVIEW_COUNT_REQUEST_SEQ = 0;
 let PREVIEW_COUNT_DEBOUNCE_TIMER = null;
 let QUICK_BROWSE_COUNTS = null;
+let quickBrowseCandidateCache = null;
 let quickBrowseLastSignature = '';
+let appliedLocalSearchMetadata = null;
+let discoverySource = null;
+let localBookshelfSnapshot = null;
+const BOOKSHELF_INDEX_WAIT_MS_ = 1500;
 
 const QUICK_BROWSE_CONFIG = [
   {
     field: 'detailMedia',
     source: 'mediaGenres',
     genreKey: 'media',
-    label: '媒体',
-    priority: ['漫画', '小説', '絵本', '写真集', '画集', '資料集', '理論書', '雑誌']
+    label: '媒体'
   },
   {
     field: 'detailMood',
     source: 'moodGenres',
     genreKey: 'mood',
-    label: '雰囲気',
-    priority: ['シリアス', '日常コメディ', 'ほのぼの', '癒し', '明るい', '泣ける', 'ダーク']
+    label: '雰囲気'
   },
   {
     field: 'detailTheme',
     source: 'themeGenres',
     genreKey: 'theme',
-    label: '題材',
-    priority: ['青春', '学園', '恋愛', '魔法', 'ファンタジー', 'ミステリー', '家族', '仕事']
+    label: '題材'
   },
   {
     field: 'detailStory',
     source: 'storyGenres',
     genreKey: 'story',
-    label: 'ストーリー',
-    priority: ['4コマ／短編集', 'ファンタジー', 'ラブコメ', 'ミステリー', 'ホラー', 'SF']
+    label: 'ストーリー'
   },
   {
     field: 'detailStatus',
     source: 'statusGenres',
     genreKey: 'status',
-    label: '状況',
-    priority: ['単巻', '完結', '連載中', '完結(全巻未所持)']
+    label: '状況'
   }
 ];
 
@@ -388,6 +388,10 @@ function syncSearchDataFromLocalIndex_() {
     : null;
   if (!metadata || typeof metadata !== 'object') return false;
 
+  const revision = typeof manager.getRevision === 'function' ? manager.getRevision() : '';
+  if (appliedLocalSearchMetadata && appliedLocalSearchMetadata.metadata === metadata &&
+      appliedLocalSearchMetadata.revision === revision) return true;
+
   const localPreview = typeof manager.getPreviewIndex === 'function'
     ? manager.getPreviewIndex()
     : [];
@@ -398,9 +402,9 @@ function syncSearchDataFromLocalIndex_() {
     : null;
   PREVIEW_INDEX = Array.isArray(localPreview) ? localPreview : [];
   PREVIEW_INDEX_READY = true;
-  if (typeof manager.getRevision === 'function') {
-    requestBookDetailCacheRevisionSync_(manager.getRevision());
-  }
+  appliedLocalSearchMetadata = { metadata, revision };
+  if (localBookshelfSnapshot && localBookshelfSnapshot.revision !== revision) localBookshelfSnapshot = null;
+  requestBookDetailCacheRevisionSync_(revision);
   populateAdvancedOptions();
   renderQuickBrowseRail_();
   if (!lastResult || ['normal', 'advanced', 'preview'].includes(searchStatusState.mode)) {
@@ -415,14 +419,6 @@ function syncPreviewIndexFromLocal_() {
 
 function applyInitialSearchData_(data) {
   const payload = data || {};
-
-  SUGGEST_DATA = normalizeContributorSuggestions_(payload.suggest);
-  ADVANCED_OPTIONS = payload.advancedOptions || getEmptyAdvancedOptions_();
-  PREVIEW_INDEX = Array.isArray(payload.previewIndex) ? payload.previewIndex : [];
-  QUICK_BROWSE_COUNTS = payload.quickBrowseCounts && typeof payload.quickBrowseCounts === 'object'
-    ? payload.quickBrowseCounts
-    : null;
-  PREVIEW_INDEX_READY = !isPwaShell_() && Array.isArray(payload.previewIndex) && payload.previewIndexReady !== false;
   requestBookDetailCacheRevisionSync_(payload.datasetRevision);
 
   const localIndexManager = window.ShumiLibraryLocalIndex;
@@ -437,12 +433,20 @@ function applyInitialSearchData_(data) {
     updateViewToggleButtons_();
   }
 
+  if (syncPreviewIndexFromLocal_()) return;
+  appliedLocalSearchMetadata = null;
+  SUGGEST_DATA = normalizeContributorSuggestions_(payload.suggest);
+  ADVANCED_OPTIONS = payload.advancedOptions || getEmptyAdvancedOptions_();
+  PREVIEW_INDEX = Array.isArray(payload.previewIndex) ? payload.previewIndex : [];
+  QUICK_BROWSE_COUNTS = payload.quickBrowseCounts && typeof payload.quickBrowseCounts === 'object'
+    ? payload.quickBrowseCounts
+    : null;
+  PREVIEW_INDEX_READY = !isPwaShell_() && Array.isArray(payload.previewIndex) && payload.previewIndexReady !== false;
   populateAdvancedOptions();
   renderQuickBrowseRail_();
   if (!lastResult) {
     syncSearchStatusPreviewFromForm_();
   }
-  syncPreviewIndexFromLocal_();
 }
 
 document.addEventListener('shumi-library-local-index-ready', function() {
@@ -563,9 +567,11 @@ function fetchInitialSearchData() {
 function fetchSuggestData() {
   google.script.run
     .withSuccessHandler(function(data) {
+      if (appliedLocalSearchMetadata) return;
       SUGGEST_DATA = normalizeContributorSuggestions_(data);
     })
     .withFailureHandler(function(err) {
+      if (appliedLocalSearchMetadata) return;
       console.error('getSuggestData failed:', err);
       SUGGEST_DATA = getEmptySuggestData_();
     })
@@ -575,11 +581,15 @@ function fetchSuggestData() {
 function fetchAdvancedOptions() {
   google.script.run
     .withSuccessHandler(function(data) {
+      if (appliedLocalSearchMetadata) return;
+      QUICK_BROWSE_COUNTS = null;
       ADVANCED_OPTIONS = data || getEmptyAdvancedOptions_();
       populateAdvancedOptions();
       renderQuickBrowseRail_();
     })
     .withFailureHandler(function(err) {
+      if (appliedLocalSearchMetadata) return;
+      QUICK_BROWSE_COUNTS = null;
       console.error('getAdvancedSearchOptions failed:', err);
       ADVANCED_OPTIONS = getEmptyAdvancedOptions_();
       populateAdvancedOptions();
@@ -591,12 +601,16 @@ function fetchAdvancedOptions() {
 function fetchPreviewIndex() {
   google.script.run
     .withSuccessHandler(function(data) {
+      if (appliedLocalSearchMetadata) return;
+      QUICK_BROWSE_COUNTS = null;
       PREVIEW_INDEX = Array.isArray(data) ? data : [];
       PREVIEW_INDEX_READY = true;
       renderQuickBrowseRail_();
       syncSearchStatusPreviewFromForm_();
     })
     .withFailureHandler(function(err) {
+      if (appliedLocalSearchMetadata) return;
+      QUICK_BROWSE_COUNTS = null;
       console.error('getPreviewIndex failed:', err);
       PREVIEW_INDEX = [];
       PREVIEW_INDEX_READY = false;
@@ -1208,60 +1222,65 @@ function shuffledCopy_(items) {
   return result;
 }
 
-function countQuickBrowseMatches_(config, value) {
-  const category = config && config.genreKey ? config.genreKey : '';
-  const key = String(value || '').trim();
-  if (
-    !PREVIEW_INDEX.length &&
-    QUICK_BROWSE_COUNTS &&
-    category &&
-    key &&
-    QUICK_BROWSE_COUNTS[category] &&
-    Object.prototype.hasOwnProperty.call(QUICK_BROWSE_COUNTS[category], key)
-  ) {
-    return Number(QUICK_BROWSE_COUNTS[category][key]) || 0;
+function getQuickBrowseCandidates_() {
+  if (quickBrowseCandidateCache &&
+      quickBrowseCandidateCache.options === ADVANCED_OPTIONS &&
+      quickBrowseCandidateCache.counts === QUICK_BROWSE_COUNTS &&
+      quickBrowseCandidateCache.index === PREVIEW_INDEX) {
+    return quickBrowseCandidateCache.candidates;
   }
 
-  if (!Array.isArray(PREVIEW_INDEX) || !PREVIEW_INDEX.length) return 0;
+  const countsByCategory = new Map();
+  const missingCategories = new Map();
+  QUICK_BROWSE_CONFIG.forEach(({ genreKey }) => {
+    const counts = QUICK_BROWSE_COUNTS && QUICK_BROWSE_COUNTS[genreKey];
+    if (counts && typeof counts === 'object' && !Array.isArray(counts)) {
+      countsByCategory.set(genreKey, new Map(Object.entries(counts)));
+    } else {
+      const emptyCounts = new Map();
+      countsByCategory.set(genreKey, emptyCounts);
+      missingCategories.set(genreKey, emptyCounts);
+    }
+  });
 
-  return PREVIEW_INDEX.reduce((count, item) => {
-    if (isSensitiveSearchIndexItem_(item)) return count;
-    const genres = item && item.genres ? item.genres : {};
-    const values = Array.isArray(genres[config.genreKey]) ? genres[config.genreKey] : [];
-    return values.includes(value) ? count + 1 : count;
-  }, 0);
-}
+  if (missingCategories.size) {
+    PREVIEW_INDEX.forEach(item => {
+      if (isSensitiveSearchIndexItem_(item) || !item || !item.genres) return;
+      missingCategories.forEach((counts, genreKey) => {
+        const values = item.genres[genreKey];
+        if (!Array.isArray(values)) return;
+        for (const value of new Set(values)) {
+          counts.set(value, (counts.get(value) || 0) + 1);
+        }
+      });
+    });
+  }
 
-function buildQuickBrowseItems_() {
-  const items = [];
-  const used = new Set();
-
-  QUICK_BROWSE_CONFIG.forEach(config => {
+  const candidates = QUICK_BROWSE_CONFIG.map(config => {
     const values = Array.isArray(ADVANCED_OPTIONS[config.source])
       ? ADVANCED_OPTIONS[config.source].filter(value => hasDisplayValue_(value) && !shouldExcludeQuickBrowseValue_(config, value))
       : [];
-    if (!values.length) return;
+    const counts = countsByCategory.get(config.genreKey);
+    const hasMetadata = !missingCategories.has(config.genreKey);
+    return values.map(value => ({
+      config,
+      value,
+      count: Number(counts.get(hasMetadata ? String(value).trim() : value)) || 0
+    })).filter(item => item.count > 0);
+  }).filter(group => group.length);
 
-    const counts = new Map(values.map(value => [value, countQuickBrowseMatches_(config, value)]));
-    const candidates = values
-      .map(value => ({
-        config,
-        value,
-        count: counts.get(value) || 0,
-        preferred: config.priority.includes(value)
-      }))
-      .filter(item => item.count > 0);
+  quickBrowseCandidateCache = {
+    options: ADVANCED_OPTIONS,
+    counts: QUICK_BROWSE_COUNTS,
+    index: PREVIEW_INDEX,
+    candidates
+  };
+  return candidates;
+}
 
-    shuffledCopy_(candidates).some(item => {
-      const key = `${item.config.field}:${item.value}`;
-      if (used.has(key)) return false;
-      used.add(key);
-      items.push(item);
-      return true;
-    });
-  });
-
-  return shuffledCopy_(items).slice(0, 7);
+function buildQuickBrowseItems_() {
+  const items = getQuickBrowseCandidates_().map(group => group[Math.floor(Math.random() * group.length)]);
+  return shuffledCopy_(items);
 }
 
 function getQuickBrowseSignature_(items) {
@@ -1388,14 +1407,197 @@ function closeActiveBookPopup_() {
 
   closeCoverFullscreen_();
   clearPopupTouchHandlers_();
+  clearPopupNeighborDetailTimer_();
+  clearPopupImagePrefetchTimer_();
   overlay.style.display = 'none';
   if (typeof setPopupModalOpen_ === 'function') {
     setPopupModalOpen_(false);
   } else {
     document.body.classList.remove('modal-open');
+    if (typeof setShelfPopupPerformanceMode_ === 'function') setShelfPopupPerformanceMode_(false);
   }
-  if (typeof setShelfPopupPerformanceMode_ === 'function') setShelfPopupPerformanceMode_(false);
   document.onkeydown = null;
+  resumeBookDetailPrefetchQueue_();
+}
+
+function setDiscoverySource_(source) {
+  discoverySource = source;
+  const button = document.getElementById('backToDiscoverySourceBtn');
+  if (!button) return;
+
+  button.hidden = !source;
+  if (source) {
+    const label = button.querySelector('[data-discovery-back-label]') || button;
+    label.textContent = source.viewMode === 'shelf' ? '元の棚に戻る' : '元の本に戻る';
+  }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  const button = document.getElementById('backToDiscoverySourceBtn');
+  if (button) button.addEventListener('click', returnToDiscoverySource_);
+});
+
+const DISCOVERY_POPUP_DISCLOSURES_ = [
+  '.popup-summary',
+  '.popup-book-bibliography',
+  '.popup-discovery',
+  '.popup-discovery-method'
+];
+
+function captureDiscoveryPopupDisclosures_() {
+  const info = document.getElementById('image-popup-info');
+  return DISCOVERY_POPUP_DISCLOSURES_.flatMap(selector => {
+    const details = info?.querySelector(selector);
+    return details ? [{ selector, open: details.open }] : [];
+  });
+}
+
+function restoreDiscoveryPopupDisclosures_(disclosures) {
+  const info = document.getElementById('image-popup-info');
+  disclosures.forEach(({ selector, open }) => {
+    const details = info?.querySelector(selector);
+    if (details) details.open = open;
+  });
+}
+
+function captureDiscoverySource_() {
+  if (!Array.isArray(lastResult) || !isBookPopupOpen_() || isSeriesPopupOpen_() || !popupData[popupIndex]) return false;
+
+  const viewMode = getCurrentViewMode_();
+  const activeShelf = viewMode === 'shelf' && document.querySelector('.bookshelf-group.is-active');
+  const strips = viewMode === 'shelf' ? Array.from(document.querySelectorAll('#result .bookshelf-strip')) : [];
+  const opener = popupFocusReturn_;
+  const openerStrip = opener && typeof opener.closest === 'function' ? opener.closest('.bookshelf-strip') : null;
+  const resultOpeners = viewMode !== 'shelf'
+    ? Array.from(document.querySelectorAll('#result .book-open-keyboard-surface, #result .search-series-card'))
+    : [];
+  const renderedCount = document.querySelector('#result > .card-view, #result > .list-view')?.childElementCount || 0;
+  const filterMore = document.getElementById('filterMore');
+  const viewToggle = document.getElementById('viewToggle');
+  const form = {};
+  SEARCH_CONDITION_KEYS.forEach(key => {
+    const input = document.getElementById(key);
+    if (input) form[key] = input.value;
+  });
+  setDiscoverySource_({
+    result: lastResult,
+    resultKind: lastResultKind,
+    status: { ...searchStatusState, removingChipKey: '' },
+    viewMode,
+    immersive: isShelfImmersiveMode,
+    activeShelfId: activeShelf ? activeShelf.id : '',
+    shelfScroll: strips.map(strip => strip.scrollLeft),
+    openerStripIndex: strips.indexOf(openerStrip),
+    openerBookIndex: opener?.dataset?.shelfBookIndex,
+    resultOpenerIndex: resultOpeners.indexOf(opener),
+    renderedCount,
+    showViewToggle: viewToggle ? viewToggle.style.display : '',
+    scrollY: popupReturnScrollY,
+    form,
+    advancedOpen: isAdvancedOpen(),
+    filterMoreOpen: Boolean(filterMore && filterMore.open),
+    popup: {
+      data: popupData,
+      index: popupIndex,
+      context: popupSeriesContext,
+      similarSession: popupSimilarSession_,
+      disclosures: captureDiscoveryPopupDisclosures_(),
+      scroll: similarPopupScroll_()
+    }
+  });
+  return true;
+}
+
+function restoreDiscoveryPosition_(source, isRestoreCurrent) {
+  const renderRunId = resultRenderRunId;
+  const isRenderedViewCurrent = () => isRestoreCurrent() && resultRenderRunId === renderRunId;
+
+  const targetY = Math.max(0, Number(source.scrollY) || 0);
+  function reopenBook_() {
+    if (!isRenderedViewCurrent()) return;
+    if (source.activeShelfId && document.getElementById(source.activeShelfId)) {
+      syncActiveShelfNavigation_(source.activeShelfId);
+    }
+
+    let opener;
+    if (source.openerStripIndex >= 0) {
+      const strip = document.querySelectorAll('#result .bookshelf-strip')[source.openerStripIndex];
+      opener = strip && Array.from(strip.querySelectorAll('[data-shelf-book-index]')).find(
+        book => book.dataset.shelfBookIndex === source.openerBookIndex
+      ) || strip;
+    } else if (source.resultOpenerIndex >= 0) {
+      opener = document.querySelectorAll('#result .book-open-keyboard-surface, #result .search-series-card')[source.resultOpenerIndex];
+    }
+    const original = source.popup;
+    popupSimilarSession_ = original.similarSession;
+    showPopup(original.data[original.index], original.index, original.data, original.context);
+    if (opener) popupFocusReturn_ = opener;
+    restoreDiscoveryPopupDisclosures_(original.disclosures);
+    restoreSimilarPopupScroll_(original.scroll);
+    document.getElementById('image-popup-close')?.focus({ preventScroll: true });
+  }
+  window.requestAnimationFrame(function() {
+    if (!isRenderedViewCurrent()) return;
+    if (source.viewMode === 'shelf') {
+      document.querySelectorAll('#result .bookshelf-strip').forEach((strip, index) => {
+        strip.scrollLeft = source.shelfScroll[index] || 0;
+      });
+    }
+    window.scrollTo({ top: targetY, behavior: 'instant' });
+    // Reattach the originating book before the detail modal pauses shelf rendering.
+    if (source.viewMode === 'shelf' && refreshShelfWindow_) refreshShelfWindow_();
+    window.requestAnimationFrame(reopenBook_);
+  });
+}
+
+function returnToDiscoverySource_() {
+  const source = discoverySource;
+  if (!source) return;
+
+  const generation = beginResultRequest_();
+  closeActiveBookPopup_();
+  const popupGeneration = popupSeriesRequestGeneration_;
+  const isRestoreCurrent = () => isCurrentResultRequest_(generation) &&
+    popupSeriesRequestGeneration_ === popupGeneration && !isBookPopupOpen_();
+  const restorePosition = () => restoreDiscoveryPosition_(source, isRestoreCurrent);
+  hideAllSuggest();
+  Object.entries(source.form).forEach(([key, value]) => {
+    const input = document.getElementById(key);
+    if (input) input.value = value;
+  });
+  syncReleasedRangeOptions_();
+  syncSearchInputClearButtons_();
+  const area = document.getElementById('advancedSearchArea');
+  if (area) {
+    area.style.display = source.advancedOpen ? 'block' : 'none';
+    area.setAttribute('aria-hidden', source.advancedOpen ? 'false' : 'true');
+  }
+  setAdvancedToggleButtonState_(source.advancedOpen);
+  const filterMore = document.getElementById('filterMore');
+  if (filterMore) filterMore.open = source.filterMoreOpen;
+  syncExtraFilterLabel_();
+  syncBookshelfCtaVisibility_();
+
+  applyResultViewMode_(source.viewMode);
+  isShelfImmersiveMode = source.immersive;
+  const viewToggle = document.getElementById('viewToggle');
+  if (viewToggle) viewToggle.style.display = source.showViewToggle;
+  lastResult = source.result;
+  lastResultKind = source.resultKind;
+  searchStatusState = source.status;
+  if (source.viewMode === 'shelf' || !source.result.length) {
+    showResult(lastResult);
+    restorePosition();
+  } else {
+    showResult(lastResult, null, {
+      minimumRendered: source.renderedCount,
+      isCurrent: isRestoreCurrent,
+      onMinimumRendered: restorePosition
+    });
+  }
+  renderSearchStatus_();
+  if (typeof syncMobileAppDockState_ === 'function') syncMobileAppDockState_();
+  if (searchStatusState.previewPending) syncSearchStatusPreviewFromForm_();
 }
 
 function applyGenreChipSearch_(field, value) {
@@ -1405,12 +1607,13 @@ function applyGenreChipSearch_(field, value) {
   const hasOption = Array.from(select.options || []).some(option => option.value === value);
   if (!hasOption) return;
 
+  const keepDiscoverySource = captureDiscoverySource_();
   closeActiveBookPopup_();
   clearSearchFormValuesForBrowse_();
   select.value = value;
   closeAdvancedSearchPanel_();
   syncSearchStatusPreviewFromForm_();
-  rerunSearchWithParams_(getAdvancedSearchParams_(), `${value} の棚をたどっています`);
+  rerunSearchWithParams_(getAdvancedSearchParams_(), `${value} の棚をたどっています`, keepDiscoverySource);
 }
 
 function normalizeBookMetadataSearchValue_(field, value) {
@@ -1439,6 +1642,7 @@ function applyBookMetadataSearch_(field, value) {
     if (!hasOption) return;
   }
 
+  const keepDiscoverySource = captureDiscoverySource_();
   closeActiveBookPopup_();
   clearSearchFormValuesForBrowse_();
   input.value = normalizedValue;
@@ -1446,7 +1650,8 @@ function applyBookMetadataSearch_(field, value) {
   syncSearchStatusPreviewFromForm_();
   rerunSearchWithParams_(
     getAdvancedSearchParams_(),
-    `${config}「${normalizedValue}」の棚をたどっています`
+    `${config}「${normalizedValue}」の棚をたどっています`,
+    keepDiscoverySource
   );
 }
 
@@ -1655,7 +1860,7 @@ function buildSearchStatusChips_(mode, params) {
     chips.push({
       key: 'random',
       value: 'random',
-      label: 'ランダム',
+      label: 'おまかせ10冊',
       className: 'random',
       removable: false
     });
@@ -1908,17 +2113,6 @@ function getSearchStatusLibrarianNote_() {
     );
   }
 
-  if (searchStatusState.mode === 'result') {
-    return getPwaLibrarianText_(
-      'status.note.result',
-      '',
-      {
-        count: searchStatusState.resultCount,
-        sourceMode: searchStatusState.sourceMode || ''
-      }
-    );
-  }
-
   return '';
 }
 
@@ -2002,8 +2196,8 @@ function renderSearchStatus_() {
         type="button"
         class="search-status-reroll"
         data-action="random-reroll"
-        aria-label="ランダムで別の10冊を表示"
-        title="ランダム選書をやり直す"
+        aria-label="おまかせで別の10冊を表示"
+        title="おまかせ10冊をもう一度"
         ${rerollBusyAttrs}
       >${uiIcon_('shuffle', 'ui-icon-inline')}<span>もう一度ひく</span></button>
     `);
@@ -2226,10 +2420,11 @@ function hasAnyAdvancedCondition_(params) {
   });
 }
 
-function beginResultRequest_(kind) {
+function beginResultRequest_(kind, keepDiscoverySource) {
   pwaSearchPerf_('cancelSearch', 'superseded');
   cancelPreviewCountRequest_();
   resultRequestGeneration += 1;
+  if (!keepDiscoverySource && discoverySource) setDiscoverySource_(null);
   if (kind === 'search') pwaSearchPerf_('startSearch', resultRequestGeneration);
   cancelShelfJump_();
   searchStatusState.removingChipKey = '';
@@ -2242,9 +2437,9 @@ function isCurrentResultRequest_(generation) {
   return generation === resultRequestGeneration;
 }
 
-function rerunSearchWithParams_(params, loadingMessage) {
+function rerunSearchWithParams_(params, loadingMessage, keepDiscoverySource) {
   syncSearchInputClearButtons_();
-  const requestGeneration = beginResultRequest_('search');
+  const requestGeneration = beginResultRequest_('search', keepDiscoverySource);
   if (!hasAnySearchCondition_(params)) {
     pwaSearchPerf_('cancelSearch', 'empty-input');
     hideSpinner();
@@ -2262,6 +2457,11 @@ function rerunSearchWithParams_(params, loadingMessage) {
   showSpinner(loadingMessage || (hasAdvancedCondition
     ? '条件に合う棚を探しています'
     : '本棚を探しています'), getSearchSpinnerOptions_(params, loadingMessage));
+  if (keepDiscoverySource) {
+    const back = document.getElementById('backToDiscoverySourceBtn');
+    back?.focus?.({ preventScroll: true });
+    back?.scrollIntoView?.({ block: 'nearest', behavior: 'instant' });
+  }
 
   if (hasAdvancedCondition) {
     google.script.run
@@ -2276,7 +2476,7 @@ function rerunSearchWithParams_(params, loadingMessage) {
         if (!isCurrentResultRequest_(requestGeneration)) return;
         console.error('rerun advanced search failed:', err);
         hideSpinner();
-        showSearchFailure_(function() { rerunSearchWithParams_(params); });
+        showSearchFailure_(function() { rerunSearchWithParams_(params, loadingMessage, keepDiscoverySource); });
       })
       .searchBooksAdvanced(
         params.keyword,
@@ -2309,7 +2509,7 @@ function rerunSearchWithParams_(params, loadingMessage) {
       if (!isCurrentResultRequest_(requestGeneration)) return;
       console.error('rerun simple search failed:', err);
       hideSpinner();
-      showSearchFailure_(function() { rerunSearchWithParams_(params); });
+      showSearchFailure_(function() { rerunSearchWithParams_(params, loadingMessage, keepDiscoverySource); });
     })
     .searchBooksSimple(params.keyword);
 }
@@ -2409,6 +2609,9 @@ function showEmptySearchNotice_(message) {
   hideSpinner();
   hideAllSuggest();
   resetViewModeToCardForNewSearch_();
+  resetResultRenderQueue_();
+  disconnectShelfScrollSpy_();
+  unmountShelfRoomMapPortal_();
 
   const result = document.getElementById('result');
   if (result) result.innerHTML = '';
@@ -2434,6 +2637,8 @@ function showEmptySearchNotice_(message) {
 function showSearchFailure_(retry) {
   hideSpinner();
   resetResultRenderQueue_();
+  disconnectShelfScrollSpy_();
+  unmountShelfRoomMapPortal_();
   lastResult = null;
   currentSearchResultPresentationStats = null;
   const result = document.getElementById('result');
@@ -2716,9 +2921,17 @@ function areBookshelfSnapshotsEqual_(previous, next) {
   });
 }
 
+function getUsableLocalBookshelfRevision_() {
+  const manager = window.ShumiLibraryLocalIndex;
+  if (!manager || !manager.isReady() ||
+      (manager.getFreshnessState() !== 'fresh' && navigator.onLine !== false)) return '';
+  return String(manager.getRevision() || '');
+}
+
 function showAllBookshelf() {
   const requestGeneration = beginResultRequest_();
   const initialJumpGeneration = shelfJumpGeneration;
+  const alreadyViewingShelf = lastResultKind === 'shelf' && isShelfImmersiveMode;
   try {
     clearSearchFormValuesForBrowse_();
     closeAdvancedSearchPanel_();
@@ -2738,12 +2951,10 @@ function showAllBookshelf() {
     resultViewModeChangedLocally = true;
     updateViewToggleButtons_();
 
-    const cachedBookshelf = readBookshelfCache_();
-    const hasCachedBookshelf = Boolean(cachedBookshelf && Array.isArray(cachedBookshelf.books));
-    if (!hasCachedBookshelf) {
-      showSpinner('本棚を広げています', { kind: 'shelf' });
-    }
+    const localRevision = getUsableLocalBookshelfRevision_();
+    let cachedBookshelf = localRevision ? null : readBookshelfCache_();
     let renderedFromCache = false;
+    let canRetry = true;
 
     function finishBookshelfLoad_(loadedBooks, options) {
       if (!isCurrentResultRequest_(requestGeneration)) return;
@@ -2765,6 +2976,17 @@ function showAllBookshelf() {
     function failBookshelfLoad_(err) {
       if (!isCurrentResultRequest_(requestGeneration)) return;
       console.error('showAllBookshelf failed:', err);
+      if (localRevision && !renderedFromCache) {
+        cachedBookshelf = readBookshelfCache_();
+        if (cachedBookshelf) {
+          renderedFromCache = true;
+          finishBookshelfLoad_(cachedBookshelf.books, {
+            restoreScroll: true,
+            statusParams: { source: 'cache', refreshFailed: true }
+          });
+          return;
+        }
+      }
       if (renderedFromCache && Array.isArray(lastResult)) {
         showSearchStatusResult_('shelf', lastResult.length, { source: 'cache', refreshFailed: true });
         return;
@@ -2773,45 +2995,115 @@ function showAllBookshelf() {
       alert('本棚表示の読み込み中にエラーが発生しました。時間をおいて再度お試しください。');
     }
 
-    if (hasCachedBookshelf) {
+    function renderLocalBookshelfSnapshot_(revision) {
+      if (!revision || !localBookshelfSnapshot || localBookshelfSnapshot.revision !== revision) return false;
+      if (alreadyViewingShelf && lastResult === localBookshelfSnapshot.books) {
+        hideSpinner();
+        showSearchStatusResult_('shelf', lastResult.length, {});
+      } else {
+        finishBookshelfLoad_(localBookshelfSnapshot.books, { restoreScroll: true });
+      }
+      return true;
+    }
+
+    if (renderLocalBookshelfSnapshot_(localRevision)) return;
+
+    if (cachedBookshelf) {
       renderedFromCache = true;
       finishBookshelfLoad_(cachedBookshelf.books, {
         fromCache: true,
         restoreScroll: true,
         statusParams: { source: 'cache', refreshing: true }
       });
+    } else {
+      showSpinner('本棚を広げています', { kind: 'shelf' });
     }
 
-    google.script.run
-      .withSuccessHandler(function(payload) {
-        if (!isCurrentResultRequest_(requestGeneration)) return;
-        if (!Array.isArray(payload)) {
-          failBookshelfLoad_(new Error('Bookshelf API returned an unexpected payload.'));
-          return;
-        }
+    function retryBookshelf_(revision) {
+      if (!canRetry) return false;
+      canRetry = false;
+      if (!renderLocalBookshelfSnapshot_(revision)) requestBookshelf_(revision);
+      return true;
+    }
 
-        if (renderedFromCache && areBookshelfSnapshotsEqual_(cachedBookshelf.books, payload)) {
-          showSearchStatusResult_('shelf', lastResult.length, { source: 'cache' });
+    function handleBookshelfLoad_(payload, meta, requestedRevision) {
+      if (!isCurrentResultRequest_(requestGeneration)) return;
+      if (!Array.isArray(payload)) {
+        failBookshelfLoad_(new Error('Bookshelf API returned an unexpected payload.'));
+        return;
+      }
+
+      if (requestedRevision && meta && meta.source === 'local') {
+        const usableRevision = getUsableLocalBookshelfRevision_();
+        if (usableRevision !== requestedRevision) {
+          if (!retryBookshelf_(usableRevision)) failBookshelfLoad_(new Error('Bookshelf revision changed while loading.'));
           return;
         }
-        writeBookshelfCache_(payload);
-        // Keep an opened book/map or a user-selected shelf in place. The fresh
-        // cache will be used on the next visit instead of interrupting this one.
-        if (renderedFromCache && (
-          document.body.classList.contains('modal-open') ||
-          document.body.classList.contains('shelf-room-map-modal-open') ||
-          initialJumpGeneration !== shelfJumpGeneration
-        )) {
-          showSearchStatusResult_('shelf', lastResult.length, { source: 'cache' });
-          return;
+        localBookshelfSnapshot = { revision: requestedRevision, books: payload };
+        const manager = window.ShumiLibraryLocalIndex;
+        if (typeof manager.getPersistenceState !== 'function' || manager.getPersistenceState() !== 'saved') {
+          writeBookshelfCache_(payload);
         }
-        finishBookshelfLoad_(payload, {
-          keepScroll: renderedFromCache,
-          statusParams: { source: 'network' }
-        });
-      })
-      .withFailureHandler(failBookshelfLoad_)
-      .getBookshelfBooks();
+        finishBookshelfLoad_(payload, { restoreScroll: true });
+        return;
+      }
+
+      if (renderedFromCache && areBookshelfSnapshotsEqual_(cachedBookshelf.books, payload)) {
+        showSearchStatusResult_('shelf', lastResult.length, { source: 'cache' });
+        return;
+      }
+      writeBookshelfCache_(payload);
+      // Keep an opened book/map or a user-selected shelf in place. The fresh
+      // cache will be used on the next visit instead of interrupting this one.
+      if (renderedFromCache && (
+        document.body.classList.contains('modal-open') ||
+        document.body.classList.contains('shelf-room-map-modal-open') ||
+        initialJumpGeneration !== shelfJumpGeneration
+      )) {
+        showSearchStatusResult_('shelf', lastResult.length, { source: 'cache' });
+        return;
+      }
+      finishBookshelfLoad_(payload, {
+        restoreScroll: Boolean(localRevision && !renderedFromCache),
+        keepScroll: renderedFromCache,
+        statusParams: { source: 'network' }
+      });
+    }
+
+    function requestBookshelf_(revision) {
+      google.script.run
+        .withSuccessHandler(function(payload, meta) {
+          handleBookshelfLoad_(payload, meta, revision);
+        })
+        .withFailureHandler(function(error) {
+          if (!isCurrentResultRequest_(requestGeneration)) return;
+          const usableRevision = getUsableLocalBookshelfRevision_();
+          if (usableRevision && usableRevision !== revision && retryBookshelf_(usableRevision)) return;
+          failBookshelfLoad_(error);
+        })
+        .getBookshelfBooks();
+    }
+
+    const manager = window.ShumiLibraryLocalIndex;
+    if (!localRevision && !cachedBookshelf && manager && !manager.isReady() &&
+        typeof manager.whenLoaded === 'function') {
+      let waitingForIndex = true;
+      const timer = window.setTimeout(continueAfterLocalLoad_, BOOKSHELF_INDEX_WAIT_MS_);
+
+      function continueAfterLocalLoad_() {
+        if (!waitingForIndex) return;
+        waitingForIndex = false;
+        window.clearTimeout(timer);
+        if (!isCurrentResultRequest_(requestGeneration)) return;
+        const usableRevision = getUsableLocalBookshelfRevision_();
+        if (!renderLocalBookshelfSnapshot_(usableRevision)) requestBookshelf_(usableRevision);
+      }
+
+      Promise.resolve().then(() => manager.whenLoaded()).then(continueAfterLocalLoad_, continueAfterLocalLoad_);
+      return;
+    }
+
+    requestBookshelf_(localRevision);
   } catch (e) {
     console.error('showAllBookshelf client error:', e);
     hideSpinner();
@@ -2838,6 +3130,9 @@ function resetSearch() {
 
   closeAdvancedSearchPanel_();
 
+  resetResultRenderQueue_();
+  disconnectShelfScrollSpy_();
+  unmountShelfRoomMapPortal_();
   document.getElementById('result').innerHTML = '';
   document.getElementById('viewToggle').style.display = 'none';
 

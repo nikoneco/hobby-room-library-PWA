@@ -36,9 +36,9 @@
       ]
     },
     {
-      "name": "本棚を見る",
+      "name": "本棚を開く",
       "short_name": "本棚",
-      "description": "棚マップから所蔵本を眺める",
+      "description": "所蔵本を棚順に表示する",
       "url": "./?launch=bookshelf",
       "icons": [
         {
@@ -49,8 +49,8 @@
       ]
     },
     {
-      "name": "ランダムに選ぶ",
-      "short_name": "ランダム",
+      "name": "おまかせ10冊",
+      "short_name": "おまかせ10冊",
       "description": "棚から10冊をランダムに表示する",
       "url": "./?launch=random",
       "icons": [

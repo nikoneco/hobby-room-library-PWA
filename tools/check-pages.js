@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const crypto = require('crypto');
 
 const root = path.resolve(__dirname, '..');
 const docs = path.join(root, 'docs');
@@ -77,15 +78,14 @@ assert(index.includes('id="pwa-critical-style"'), 'static index includes critica
 assert(index.includes('html{background:#0f0e13'), 'critical style paints shikon shell before CSS loads');
 assert(index.includes('<body class="sandbox-redesign pwa-theme-shikon">'), 'static shell defaults to shikon before the client applies stored preferences');
 assert(index.includes('apple-mobile-web-app-status-bar-style" content="black-translucent"'), 'static index uses translucent iOS standalone status bar');
-assert(index.includes('id="pwaLaunchSplash"'), 'static index includes launch splash overlay');
-assert(index.includes('src="./assets/splash-lantern.jpg"'), 'static index uses optimized lantern splash asset');
+assert(!index.includes('pwaLaunchSplash') && !index.includes('splash-lantern.jpg'), 'hidden splash is not loaded on startup');
 assert(index.includes('id="pwaNetworkBanner"'), 'static index includes offline/network banner');
 assert(gasRunShimAssetMatch, 'static index loads a fingerprinted GAS JSONP shim');
 assert(fs.existsSync(path.join(docs, 'assets', 'js', gasRunShimAssetMatch[1])), 'fingerprinted GAS JSONP shim exists');
 assert(sw.includes(`./assets/js/${gasRunShimAssetMatch[1]}`), 'service worker precaches the fingerprinted GAS JSONP shim');
 assert(index.includes('./assets/js/pwa-client.js'), 'static index loads PWA client');
 assert(index.includes('./assets/css/pwa.css'), 'static index loads PWA CSS');
-assert(index.includes('src="./assets/logo.png"'), 'static index uses local logo asset');
+assert(!index.includes('assets/logo.png'), 'hidden legacy logo is not loaded on startup');
 assert(index.includes('id="pwaSettingsButton"'), 'static index includes PWA settings button');
 assert(index.includes('id="pwaSettingsPanel"'), 'static index includes PWA settings panel');
 assert(index.includes('id="detailMedia"'), 'static index includes the series media filter');
@@ -152,8 +152,15 @@ assert(pagesWorkflow.includes('actions/deploy-pages@v5'), 'Pages workflow deploy
   'style.responsive.css',
   'style.night-library.css'
 ].forEach(fileName => {
-  assert(index.includes(`./assets/css/${fileName}`), `static index references ${fileName}`);
   const source = read(path.join(docs, 'assets', 'css', fileName));
+  const versioned = fileName === 'style.shelf.css' || fileName === 'style.night-library.css';
+  const digest = crypto.createHash('sha256').update(source.replace(/\r\n/g, '\n')).digest('hex').slice(0, 10);
+  const linked = versioned ? fileName.replace(/\.css$/, `.${digest}.css`) : fileName;
+  assert(index.includes(`href="./assets/css/${linked}"`), `static index references ${linked}`);
+  assert(sw.includes(`"./assets/css/${linked}"`), `service worker caches matching ${linked}`);
+  if (versioned) {
+    assert(read(path.join(docs, 'assets', 'css', linked)) === source, `versioned stylesheet matches ${fileName}`);
+  }
   assert(!/^\s*<style>/i.test(source), `${fileName} has no <style> wrapper`);
 });
 
@@ -210,12 +217,11 @@ assert(manifest.shortcuts.some(item => item.url === './?launch=random'), 'manife
 
 assert(sw.includes('offline.html'), 'service worker caches offline fallback');
 assert(/shumi-library-pwa-[a-f0-9]{12}/.test(sw), 'service worker cache name is content hashed');
-assert(sw.includes('./assets/logo.png'), 'service worker caches local logo');
+assert(!sw.includes('./assets/logo.png'), 'hidden legacy logo is excluded from precache');
 assert(sw.includes('./assets/librarian-presence.jpg'), 'service worker caches librarian presence logo');
-assert(sw.includes('./assets/splash-lantern.jpg'), 'service worker caches optimized lantern splash image');
+assert(!sw.includes('splash-lantern.'), 'hidden splash images are excluded from precache');
 assert(/\.\/assets\/js\/script\.state\.[a-f0-9]{10}\.js/.test(sw), 'service worker caches hashed state script');
 assert(sw.includes('./assets/css/style.responsive.css'), 'service worker caches responsive CSS');
-assert(sw.includes('./assets/css/style.night-library.css'), 'service worker caches night library CSS');
 assert(sw.includes('./assets/icons/icon-lantern-192.png'), 'service worker caches renamed 192px lantern icon');
 assert(sw.includes('./assets/icons/icon-lantern-512.png'), 'service worker caches renamed 512px lantern icon');
 assert(sw.includes('./assets/icons/apple-touch-icon-lantern-180.png'), 'service worker caches renamed apple touch lantern icon');
@@ -306,9 +312,6 @@ const gasRunShim = read(path.join(docs, 'assets', 'js', 'gas-run-shim.js'));
 const bootClient = read(path.join(docs, 'assets', 'js', 'script.boot.js'));
 const searchClient = read(path.join(docs, 'assets', 'js', 'script.search.js'));
 assert(pwaCss.includes('body.pwa-standalone .mobile-app-dock'), 'PWA CSS styles standalone dock');
-assert(pwaCss.includes('.pwa-launch-splash'), 'PWA CSS styles launch splash overlay');
-assert(pwaCss.includes('body.pwa-launch-splash-visible .pwa-launch-splash'), 'PWA CSS only reveals launch splash while body state is active');
-assert(pwaCss.includes('@keyframes pwaLanternGlow'), 'PWA CSS animates lantern glow');
 assert(pwaCss.includes('.pwa-settings-button'), 'PWA CSS styles settings button');
 assert(pwaCss.includes('.pwa-settings-panel'), 'PWA CSS styles settings panel');
 assert(pwaCss.includes('.pwa-perf-hud'), 'PWA CSS styles performance HUD');
@@ -321,7 +324,6 @@ assert(pwaCss.includes('body.pwa-theme-shinhaku'), 'PWA CSS includes shinhaku th
 assert(pwaCss.includes('body.pwa-theme-kohi'), 'PWA CSS includes kohi theme');
 assert(pwaCss.includes('body.pwa-theme-shikon'), 'PWA CSS includes shikon theme');
 assert(pwaCss.includes('body.pwa-theme-kohaku'), 'PWA CSS includes kohaku theme');
-assert(pwaCss.includes('body.pwa-librarian-presence #logoResetBtn.logo'), 'PWA CSS styles librarian presence logo');
 assert(pwaCss.includes('body.pwa-quiet-motion .result-fade.show'), 'PWA CSS adds quiet motion option');
 assert(pwaCss.includes('--pwa-accent-rgb'), 'PWA CSS uses theme color variables for detailed accents');
 assert(pwaCss.includes('--pwa-safe-top: env(safe-area-inset-top'), 'PWA CSS defines standalone top safe-area');
@@ -332,10 +334,6 @@ assert(pwaClient.includes("currentBannerKind && currentBannerKind !== 'update'")
 assert(!pwaCss.includes('.pwa-recent-rail'), 'PWA CSS omits recent book rail');
 assert(!pwaCss.includes('.pwa-recent-book'), 'PWA CSS omits recent book cards');
 assert(pwaClient.includes("document.body.classList.add('pwa-shell')"), 'PWA client marks shell body');
-assert(pwaClient.includes('startLaunchSplash_'), 'PWA client starts launch splash animation');
-assert(pwaClient.includes('finishLaunchSplash_'), 'PWA client removes launch splash animation');
-assert(pwaClient.includes('shouldShowLaunchSplash_'), 'PWA client gates launch splash visibility');
-assert(pwaClient.includes('removeLaunchSplashImmediately_'), 'PWA client removes launch splash outside standalone mode');
 assert(pwaClient.includes("window.matchMedia('(display-mode: standalone)')"), 'PWA client detects standalone display mode');
 assert(pwaClient.includes('requestServiceWorkerUpdate_'), 'PWA client can request service worker update checks');
 assert(pwaClient.includes("document.addEventListener('visibilitychange'"), 'PWA client checks updates when returning to foreground');
@@ -352,6 +350,7 @@ assert(pwaClient.includes('PERF_LOG_STORAGE_KEY'), 'PWA client persists performa
 assert(pwaClient.includes('recordPerf_'), 'PWA client records performance entries');
 assert(pwaClient.includes('observeLongTasks_'), 'PWA client observes long tasks for performance HUD');
 assert(pwaClient.includes('copyPerfLog_'), 'PWA client can copy performance logs');
+assert(!pwaClient.includes('assets/logo.png') && !pwaClient.includes('pwa-launch-splash-visible'), 'startup skips unused image and scroll lock');
 assert(pwaClient.includes('LIBRARIAN_LOGO_SRC'), 'PWA client can switch to librarian logo');
 assert(pwaClient.includes("document.getElementById('appBrandLibrarianImage')"), 'PWA client updates the redesigned librarian brand image');
 assert(pwaClient.includes("document.getElementById('appBrandResetBtn')"), 'PWA client updates the redesigned brand label');

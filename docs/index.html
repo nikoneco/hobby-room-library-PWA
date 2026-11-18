@@ -18,21 +18,16 @@
   <style id="pwa-critical-style">html{background:#0f0e13;color-scheme:dark light;}body{margin:0;background:#0f0e13;color:#edf5f7;}</style>
   <link rel="stylesheet" href="./assets/css/style.legacy-core.css">
   <link rel="stylesheet" href="./assets/css/style.legacy-modal.css">
-  <link rel="stylesheet" href="./assets/css/style.shelf.css">
+  <link rel="stylesheet" href="./assets/css/style.shelf.6cc01d0ac3.css">
   <link rel="stylesheet" href="./assets/css/style.modern-core.css">
   <link rel="stylesheet" href="./assets/css/style.modern-modal.css">
   <link rel="stylesheet" href="./assets/css/style.modern-shelf.css">
   <link rel="stylesheet" href="./assets/css/style.responsive.css">
-  <link rel="stylesheet" href="./assets/css/style.night-library.css">
+  <link rel="stylesheet" href="./assets/css/style.night-library.5cdcb94eaa.css">
   <link rel="stylesheet" href="./assets/css/tokens.css">
   <link rel="stylesheet" href="./assets/css/pwa.css">
 </head>
 <body class="sandbox-redesign pwa-theme-shikon">
-  <div id="pwaLaunchSplash" class="pwa-launch-splash" aria-hidden="true">
-    <div class="pwa-launch-splash-scene">
-      <img src="./assets/splash-lantern.jpg" alt="">
-    </div>
-  </div>
   <div id="pwaNetworkBanner" class="pwa-network-banner" role="status" aria-live="polite" hidden></div>
   <button id="pwaSettingsButton" class="pwa-settings-button" type="button" aria-label="メニューを開く" aria-controls="pwaSettingsPanel" aria-expanded="false">
     <span aria-hidden="true"></span>
@@ -145,8 +140,6 @@
       <span class="sensitive-toggle-switch" aria-hidden="true"></span>
     </label>
 
-    <img src="./assets/logo.png" alt="ロゴ" class="logo" id="logoResetBtn" role="button" tabindex="0" data-action="reset-search">
-
     <div id="searchStatusArea" class="search-status-area" hidden>
       <div id="searchStatusCount" class="search-status-count"></div>
       <div id="searchStatusChips" class="search-status-chips"></div>
@@ -165,7 +158,7 @@
       </div>
 
       <div class="button-group">
-        <button type="submit" class="primary-action" data-action="search">
+        <button type="submit" class="primary-action" data-action="search" aria-label="検索">
           <span class="ui-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"></circle><path d="M16 16l4 4"></path></svg>
           </span>
@@ -175,7 +168,7 @@
           <span class="ui-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24"><path d="M4 7h4l3 10h3"></path><path d="M17 7h3v3"></path><path d="M20 7l-6 6"></path><path d="M17 17h3v-3"></path><path d="M20 17l-3-3"></path></svg>
           </span>
-          <span>ランダム</span>
+          <span>おまかせ10冊</span>
         </button>
         <button type="button" class="quiet-action" id="advancedToggleBtn" data-action="toggle-advanced" aria-controls="advancedSearchArea" aria-expanded="false" title="絞り込みを開く">
           <span class="ui-icon advanced-toggle-icon" aria-hidden="true">
@@ -188,11 +181,11 @@
       <div id="quickBrowseRail" class="quick-browse-rail" aria-label="気分で開く" hidden>
         <div class="quick-browse-heading">
           <span class="quick-browse-kicker">気分で開く</span>
-          <button type="button" class="quick-browse-refresh" id="quickBrowseRefresh" aria-label="気分で開く候補を入れ替える">
+          <button type="button" class="quick-browse-refresh" id="quickBrowseRefresh">
             <span class="ui-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24"><path d="M4 7h4l3 10h3"></path><path d="M17 7h3v3"></path><path d="M20 7l-6 6"></path><path d="M17 17h3v-3"></path><path d="M20 17l-3-3"></path></svg>
+              <svg viewBox="0 0 24 24"><path d="M20 10a8 8 0 0 0-14-4L3 9"></path><path d="M3 4v5h5"></path><path d="M4 14a8 8 0 0 0 14 4l3-3"></path><path d="M21 20v-5h-5"></path></svg>
             </span>
-            <span>気分転換</span>
+            <span>候補を入れ替える</span>
           </button>
         </div>
         <div id="quickBrowseChips" class="quick-browse-chips"></div>
@@ -318,12 +311,11 @@
       </div>
 
       <div class="bookshelf-cta-wrap">
-        <button type="button" class="bookshelf-cta-card top-shelf-btn" aria-label="すべての本棚を見る。棚マップから所蔵本を眺める">
+        <button type="button" class="bookshelf-cta-card top-shelf-btn">
           <span class="bookshelf-cta-icon ui-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24"><path d="M5 4h3v16H5z"></path><path d="M10 4h3v16h-3z"></path><path d="M15 5l3-.8 4.1 15.4-3 .8z"></path></svg>
           </span>
-          <span class="bookshelf-cta-title">すべての本棚</span>
-          <span class="bookshelf-cta-subtitle">棚マップから所蔵本を眺める</span>
+          <span class="bookshelf-cta-title">本棚を開く</span>
           <span class="preview-cta-arrow ui-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"></path></svg>
           </span>
@@ -369,6 +361,7 @@
     </div>
   </div>
 
+  <button type="button" id="backToDiscoverySourceBtn" hidden>前の検索結果に戻る</button>
   <div id="result"></div>
 
   <nav id="mobileAppDock" class="mobile-app-dock" aria-label="主要操作">
@@ -380,11 +373,11 @@
         </span>
         <span>検索</span>
       </button>
-      <button type="button" class="mobile-app-dock-btn" data-action="random" aria-label="ランダムに本を表示">
+      <button type="button" class="mobile-app-dock-btn" data-action="random">
         <span class="ui-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24"><path d="M4 7h4l3 10h3"></path><path d="M17 7h3v3"></path><path d="M20 7l-6 6"></path><path d="M17 17h3v-3"></path><path d="M20 17l-3-3"></path></svg>
         </span>
-        <span>ランダム</span>
+        <span>おまかせ10冊</span>
       </button>
       <button type="button" class="mobile-app-dock-btn" data-action="top" aria-label="トップページへ戻る">
         <span class="ui-icon" aria-hidden="true">
@@ -444,12 +437,12 @@
   </div>
   <script src="./assets/js/gas-run-shim.3f7bfa9f2b.js"></script>
   <script src="./assets/js/pwa-client.js"></script>
-  <script src="./assets/js/script.state.6a44d5133b.js"></script>
+  <script src="./assets/js/script.state.be1f377967.js"></script>
   <script src="./assets/js/script.images.a1017e139e.js"></script>
-  <script src="./assets/js/script.search.260e684ceb.js"></script>
-  <script src="./assets/js/script.render.b65928bcf3.js"></script>
-  <script src="./assets/js/script.shelf.89455b8ecd.js"></script>
-  <script src="./assets/js/script.modal.29d80e18bd.js"></script>
-  <script src="./assets/js/script.boot.68eaba7748.js"></script>
+  <script src="./assets/js/script.search.1c7ce5888c.js"></script>
+  <script src="./assets/js/script.render.ddfbafa62d.js"></script>
+  <script src="./assets/js/script.shelf.df447732e8.js"></script>
+  <script src="./assets/js/script.modal.a9dca8eb28.js"></script>
+  <script src="./assets/js/script.boot.b5c905556d.js"></script>
 </body>
 </html>

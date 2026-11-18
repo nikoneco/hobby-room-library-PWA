@@ -228,6 +228,7 @@ const seriesBooksCache_ = new Map();
 const seriesBooksInFlight_ = new Map();
 
 function focusPopupIfNeeded_() {
+  if (isBookLocationShelfMapOpen_()) return;
   const cover = document.getElementById('cover-fullscreen-overlay');
   const popup = document.getElementById('image-popup-content');
   const active = cover && cover.style.display === 'flex' ? cover : popup;
@@ -237,7 +238,7 @@ function focusPopupIfNeeded_() {
 }
 
 document.addEventListener('keydown', function(event) {
-  if (event.key !== 'Tab' || !document.body.classList.contains('modal-open')) return;
+  if (event.key !== 'Tab' || !document.body.classList.contains('modal-open') || isBookLocationShelfMapOpen_()) return;
   const cover = document.getElementById('cover-fullscreen-overlay');
   const active = cover && cover.style.display === 'flex' ? cover : document.getElementById('image-popup-content');
   if (!active) return;
@@ -255,6 +256,7 @@ function setPopupModalOpen_(enabled) {
   const body = document.body;
   const root = document.documentElement;
   if (!body || !body.classList) return;
+  if (!enabled && isBookLocationShelfMapOpen_()) closeBookLocationShelfMap_();
 
   if (enabled) {
     if (!body.classList.contains('modal-open')) {
@@ -286,6 +288,7 @@ function setPopupModalOpen_(enabled) {
   popupPageScrollLockY_ = null;
   popupInertElements_.forEach((inert, element) => { element.inert = inert; });
   popupInertElements_.clear();
+  setShelfPopupPerformanceMode_(false);
   if (popupFocusReturn_ && popupFocusReturn_.isConnected && typeof popupFocusReturn_.focus === 'function') {
     popupFocusReturn_.focus({ preventScroll: true });
   }
@@ -1755,37 +1758,6 @@ function syncSearchResultBookDetailPrefetch_(books, resultKind) {
   }, SEARCH_RESULT_DETAIL_PREFETCH_DELAY_MS);
 }
 
-function warmBookDetailPrefetch_(books, options) {
-  if (!Array.isArray(books) || !books.length || !canRunBackgroundBookDetailPrefetch_()) return;
-
-  const opt = options || {};
-  const limit = Math.max(0, Number(opt.limit || BOOK_DETAIL_PREFETCH_WARM_LIMIT));
-  const priorityCount = opt.priorityCount === undefined
-    ? 4
-    : Math.max(0, Number(opt.priorityCount || 0));
-  const targets = books
-    .filter(book => shouldFetchDeferredBookDetails_(book) && !getCachedBookDetail_(book))
-    .slice(0, limit);
-
-  if (!targets.length) return;
-
-  const run = function() {
-    targets.forEach((book, index) => {
-      queueBookDetailPrefetch_(book, index < priorityCount);
-    });
-  };
-
-  const delay = Math.max(0, Number(opt.delay || BOOK_DETAIL_PREFETCH_WARM_DELAY_MS));
-  const timeout = Math.max(500, Number(opt.timeout || BOOK_DETAIL_PREFETCH_WARM_TIMEOUT_MS));
-  window.setTimeout(function() {
-    if (typeof window.requestIdleCallback === 'function') {
-      window.requestIdleCallback(run, { timeout });
-    } else {
-      run();
-    }
-  }, delay);
-}
-
 function warmPopupNeighborDetails_(index, dataArr) {
   if (!Array.isArray(dataArr) || !dataArr.length || !canPrefetchBookDetails_()) return;
 
@@ -2203,7 +2175,6 @@ function showSearchResultSeriesPanel_(group) {
     overlay.style.display = 'none';
     setPopupModalOpen_(false);
     popupContent.classList.remove('series-mode', 'search-result-series-mode');
-    setShelfPopupPerformanceMode_(false);
     document.onkeydown = null;
     resumeBookDetailPrefetchQueue_();
     window.requestAnimationFrame(() => window.scrollTo({ top: popupReturnScrollY || 0, behavior: 'auto' }));
@@ -2314,7 +2285,6 @@ function renderSearchResultSeriesPanel_(group, seriesBooks) {
     overlay.style.display = 'none';
     setPopupModalOpen_(false);
     if (popupContent) popupContent.classList.remove('series-mode', 'search-result-series-mode');
-    setShelfPopupPerformanceMode_(false);
     document.onkeydown = null;
     resumeBookDetailPrefetchQueue_();
     window.requestAnimationFrame(function() {
@@ -2405,7 +2375,6 @@ function showSeriesPanel(sourceBook, seriesBooks, returnContext) {
     if (e.target === overlay) {
       overlay.style.display = 'none';
       setPopupModalOpen_(false);
-      setShelfPopupPerformanceMode_(false);
       document.onkeydown = null;
       resumeBookDetailPrefetchQueue_();
     }
@@ -2414,7 +2383,6 @@ function showSeriesPanel(sourceBook, seriesBooks, returnContext) {
   closeBtn.onclick = function() {
     overlay.style.display = 'none';
     setPopupModalOpen_(false);
-    setShelfPopupPerformanceMode_(false);
     document.onkeydown = null;
     resumeBookDetailPrefetchQueue_();
   };
@@ -2423,7 +2391,6 @@ function showSeriesPanel(sourceBook, seriesBooks, returnContext) {
     if (e.key === 'Escape') {
       overlay.style.display = 'none';
       setPopupModalOpen_(false);
-      setShelfPopupPerformanceMode_(false);
       document.onkeydown = null;
       resumeBookDetailPrefetchQueue_();
     }
@@ -2511,6 +2478,7 @@ function sortSeriesBooksForDisplay_(books) {
 function showPopup(book, index, dataArr, seriesContext, options) {
   const similarScroll = isBookPopupOpen_() && similarBookIdentity_(popupData[popupIndex]) === similarBookIdentity_(book)
     ? similarPopupScroll_() : null;
+  const popupDisclosures = similarScroll ? captureDiscoveryPopupDisclosures_() : null;
   const similarFocus = similarScroll && document.activeElement;
   const similarFocusSelector = similarFocus && similarFocus.matches('.popup-discovery-book')
     ? '[data-similar-book="' + similarFocus.dataset.similarBook + '"]'
@@ -2598,17 +2566,24 @@ function showPopup(book, index, dataArr, seriesContext, options) {
   };
 
   const actionsHtml = buildPopupActionsHtml(renderBook, popupSeriesContext);
+  const genreChips = buildGenreChips(renderBook);
   info.innerHTML = `
     <div class="popup-book-detail">
         ${buildSimilarBackHtml_()}
         <div class="popup-book-head">
           <div class="popup-book-title">${escapeHtml(renderBook.title || '(タイトルなし)')}</div>
           ${buildPopupBookLeadHtml_(renderBook)}
-          <div class="popup-book-location"><span>置き場所</span><strong>${escapeHtml(formatShelfLabel_(renderBook) || '配置未定')}</strong></div>
+          <div class="popup-book-location">
+            <span>置き場所</span><strong>${escapeHtml(formatShelfLabel_(renderBook) || '配置未定')}</strong>
+            ${canShowBookLocationShelfMap_(renderBook) ? '<button type="button" class="popup-location-map-btn" data-book-location-map aria-haspopup="dialog">地図で見る</button>' : ''}
+          </div>
         </div>
       <div class="popup-summary-section"></div>
       ${buildPopupDetailLoadingHtml_(renderBook)}
-      <div class="genre-chip-wrap popup" aria-label="この本の分類">${buildGenreChips(renderBook)}</div>
+      ${genreChips ? `<section class="popup-book-classification" aria-label="この分類の本を探す">
+        <div class="popup-classification-label">この分類の本を探す</div>
+        <div class="genre-chip-wrap popup">${genreChips}</div>
+      </section>` : ''}
       ${buildBookMemoHtml_(renderBook)}
       <details class="popup-book-bibliography">
         <summary>書誌情報</summary>
@@ -2621,6 +2596,8 @@ function showPopup(book, index, dataArr, seriesContext, options) {
   `;
 
   appendPopupSummaryAccordion_(info.querySelector('.popup-summary-section'), renderBook);
+  const locationMap = info.querySelector('.popup-location-map-btn');
+  if (locationMap) locationMap.onclick = () => openBookLocationShelfMap_(renderBook, locationMap);
   bindPopupDetailRetry_(info, sourceBook);
   attachPopupActionHandlers(renderBook, popupSeriesContext);
   if (deferCurrentDetailRender) {
@@ -2651,7 +2628,10 @@ function showPopup(book, index, dataArr, seriesContext, options) {
   setPopupModalOpen_(true);
 
   bindSimilarBooks_(renderBook);
-  if (similarScroll) restoreSimilarPopupScroll_(similarScroll);
+  if (similarScroll) {
+    restoreDiscoveryPopupDisclosures_(popupDisclosures);
+    restoreSimilarPopupScroll_(similarScroll);
+  }
   if (similarFocusSelector) {
     const focusTarget = info.querySelector(similarFocusSelector);
     if (focusTarget) focusTarget.focus({ preventScroll: true });
@@ -2666,7 +2646,6 @@ function showPopup(book, index, dataArr, seriesContext, options) {
     clearPopupImagePrefetchTimer_();
     overlay.style.display = 'none';
     setPopupModalOpen_(false);
-    setShelfPopupPerformanceMode_(false);
     document.onkeydown = null;
     resumeBookDetailPrefetchQueue_();
     window.requestAnimationFrame(function() {
@@ -2682,6 +2661,7 @@ function showPopup(book, index, dataArr, seriesContext, options) {
   };
 
   document.onkeydown = function(e) {
+    if (isBookLocationShelfMapOpen_()) return;
     if (e.key === 'Escape') hide();
     if (!shouldHandlePopupArrowKey_(e)) return;
     if (e.key === 'ArrowLeft') { e.preventDefault(); popupMove(-1); }

@@ -242,6 +242,41 @@ body.shelf-immersive-active .bookshelf-group {
   word-break: keep-all;
 }
 
+.shelf-window > .bookshelf-group {
+  content-visibility: visible;
+}
+
+.shelf-window .bookshelf-strip {
+  scroll-snap-type: none;
+}
+
+.shelf-window .bookshelf-strip:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: -2px;
+}
+
+.shelf-window-track {
+  position: relative;
+  flex: none;
+}
+
+#result .shelf-window-track > .shelf-book {
+  position: absolute;
+  top: 0;
+}
+
+.shelf-window-track > .shelf-book:not(.shelf-window-probe) {
+  height: 100%;
+}
+
+.shelf-window-probe {
+  left: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: none !important;
+  animation: none !important;
+}
+
 @media (max-width: 900px) {
   .view-toggle {
     right: 10px;
@@ -1302,6 +1337,42 @@ button.shelf-room-map-modal-close:hover {
   min-height: 0;
   overflow: auto;
   overscroll-behavior: contain;
+}
+
+dialog.shelf-room-map-book-location {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  border: 0;
+  box-sizing: border-box;
+}
+
+dialog.shelf-room-map-book-location:not([open]) {
+  display: none;
+}
+
+.shelf-room-map-book-location .shelf-room-map-modal-panel {
+  width: min(726px, 100%);
+}
+
+.shelf-room-map-book-location .shelf-room-map-viewport {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.room-map-location-marker {
+  position: absolute;
+  z-index: 1;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--map-accent) 38%, transparent);
+  box-shadow: inset 0 0 0 2px var(--map-accent), 0 0 0 1px var(--map-selected-ink);
+}
+
+.room-map-location-marker .room-map-pin {
+  border-color: var(--map-selected-ink);
+  background: var(--map-accent);
+  color: var(--map-selected-ink);
 }
 
 @media (max-width: 900px) {

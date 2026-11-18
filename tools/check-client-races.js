@@ -332,16 +332,10 @@ for (const start of ['simple', 'advanced', 'rerun', 'status']) {
   flushFrames();
   assert.equal(calls.second, beforeCancel + 1);
 
-  read('shelfRenderInProgress = true; bookshelfPendingRestoreScroll = true;');
+  read('bookshelfPendingRestoreScroll = true;');
   c.scrollToShelfGroup_(first);
-  assert.equal(read('bookshelfPendingRestoreScroll'), false);
+  assert.equal(read('bookshelfPendingRestoreScroll'), false, 'explicit shelf jumps supersede scroll restoration');
   flushFrames();
-  const beforeFinish = calls.first;
-  c.pwaPerfEnd_ = () => {};
-  c.finishShelfRenderQueue_({ runId: read('shelfRenderRunId') });
-  flushFrames();
-  assert(calls.first > beforeFinish, 'finish rendering aligns an early jump once shelves have their final height');
-  assert.equal(read('pendingShelfJump'), null);
 
   c.scrollToShelfGroup_(first);
   const beforeNavigation = calls.first;
