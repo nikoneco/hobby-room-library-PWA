@@ -150,6 +150,8 @@ function buildStaticIndex() {
     '  <link rel="stylesheet" href="./assets/css/tokens.css">\n  <link rel="stylesheet" href="./assets/css/pwa.css">\n</head>'
   );
 
+  source = source.replace(/\s*<\?!= getLibrarySearchMatcherScript_\(\); \?>/, '');
+
   source = source.replace(
     /\s*<\?!= HtmlService\.createHtmlOutputFromFile\('script\.state\.js\.html'\)\.getContent\(\); \?>/,
     [
@@ -2575,10 +2577,21 @@ body.pwa-shell .search-container.centered {
 }
 
 function writeGasRunShim() {
+  // Both functions are self-contained and shared with the GAS-rendered page.
+  const readFunction = (file, name) => {
+    const source = fs.readFileSync(path.join(root, file), 'utf8').replace(/\r\n/g, '\n');
+    const start = source.indexOf('function ' + name + '(');
+    const end = source.indexOf('\n}', start);
+    if (start < 0 || end < 0) throw new Error('Could not find ' + name + ' in ' + file);
+    return source.slice(start, end + 2);
+  };
+  const createMatcher = readFunction('Webアプリ.js', 'createLibrarySearchMatcher_');
+  const normalizeKana = readFunction('config.js', 'normalizeKana');
   const js = `
 (function() {
   'use strict';
 
+  const searchMatcher = window.ShumiLibrarySearchMatcher = (${createMatcher})(${normalizeKana});
   const GAS_JSONP_ENDPOINT = ${JSON.stringify(gasEndpoint)};
   const JSONP_TIMEOUT_MS = 60000;
   const SERIES_REQUEST_TIMEOUT_MS = 25000;
@@ -2907,10 +2920,6 @@ function writeGasRunShim() {
       .replace(/[\\s【】「」『』（）()・:：\\-–—~～・,，.。！？!?[\\]{}]/g, '');
   }
 
-  function isKanaCharLocal_(char) {
-    return /^[\u3041-\u3096\u30fc]$/.test(char || '');
-  }
-
   function parseBookContributorsLocal_(value) {
     const seen = new Set();
     return String(value == null ? '' : value).split('|').map(function(name) { return name.trim(); }).filter(function(name) {
@@ -2921,157 +2930,6 @@ function writeGasRunShim() {
       return true;
     });
   }
-
-  function splitMixedSearchQueryLocal_(query) {
-    const q = normalizeKanaLocal_(query);
-    const chunks = [];
-    let currentType = '';
-    let currentText = '';
-
-    for (let i = 0; i < q.length; i += 1) {
-      const type = isKanaCharLocal_(q[i]) ? 'kana' : 'title';
-      if (currentText && type !== currentType) {
-        chunks.push({ type: currentType, text: currentText });
-        currentText = '';
-      }
-      currentType = type;
-      currentText += q[i];
-    }
-    if (currentText) chunks.push({ type: currentType, text: currentText });
-    return chunks;
-  }
-
-  function findChunkMixedMatchLocal_(chunk, text, minProgress) {
-    if (!chunk || !text) return null;
-    const step = 1 / Math.max(text.length, 1);
-
-    for (let index = text.indexOf(chunk); index >= 0; index = text.indexOf(chunk, index + 1)) {
-      const progress = index * step;
-      if (progress + 0.000001 < minProgress) continue;
-      return { progress: progress };
-    }
-    return null;
-  }
-
-  function titleYomiMixedMatchLocal_(query, title, yomi) {
-    const q = normalizeKanaLocal_(query);
-    const normalizedTitle = normalizeKanaLocal_(title);
-    const normalizedYomi = normalizeKanaLocal_(yomi);
-    if (!q) return true;
-    if ((normalizedTitle && normalizedTitle.includes(q)) || (normalizedYomi && normalizedYomi.includes(q))) {
-      return true;
-    }
-    if (!normalizedTitle || !normalizedYomi) return false;
-
-    const chunks = splitMixedSearchQueryLocal_(q);
-    if (chunks.length <= 1) return false;
-    let progress = 0;
-    for (let i = 0; i < chunks.length; i += 1) {
-      const target = chunks[i].type === 'kana' ? normalizedYomi : normalizedTitle;
-      const match = findChunkMixedMatchLocal_(chunks[i].text, target, progress);
-      if (!match) return false;
-      progress = match.progress;
-    }
-    return true;
-  }
-
-  function keywordMixedMatchLocal_(query, item) {
-    const q = normalizeKanaLocal_(query);
-    if (!q) return true;
-    if (item && item.searchKey && item.searchKey.includes(q)) return true;
-    if (item && normalizeKanaLocal_(item.seriesSearchTitle || '').includes(q)) return true;
-    return titleYomiMixedMatchLocal_(q, item && item.title, item && item.yomi) || alignedTitleReadingMatchLocal_(q, item);
-  }
-
-  // A conservative supplement to the existing matcher. Shared, unique kana /
-  // bracket anchors align a title with its stored reading; no reading is guessed.
-  // Each aligned gap offers at most its literal title and its recorded reading.
-  // A streaming prefix automaton checks the alternatives without enumerating the
-  // exponentially many whole-title combinations or allowing gaps / edit distance.
-  const alignedTitleReadingCache_ = new WeakMap();
-  let alignedTitleQuery_ = null;
-  function isAlignedMixedQueryLocal_(query) {
-    return query.length <= 128 && /[\u3400-\u9fff]/.test(query) && /[\u3041-\u3096\u30fc]/.test(query);
-  }
-  function compileAlignedTitleReadingLocal_(title, yomi) {
-    if (!title || !yomi || title.length > 512 || yomi.length > 512) return null;
-    const anchors = title.match(/[\u3041-\u3096\u30fc]+|[〈〉《》]+/g) || [];
-    if (!anchors.length) return null;
-    const parts = [];
-    let t = 0, y = 0, alternatives = 0;
-    function gap_(titlePart, readingPart) {
-      const choices = [titlePart];
-      if (titlePart !== readingPart && /[\u3400-\u9fff]/.test(titlePart) &&
-          readingPart && !/[\u3400-\u9fff]/.test(readingPart)) {
-        choices.push(readingPart);
-        alternatives += 1;
-      }
-      parts.push(choices);
-    }
-    for (const anchor of anchors) {
-      const ti = title.indexOf(anchor, t);
-      const yi = yomi.indexOf(anchor, y);
-      // Repeated or missing anchors cannot establish a reliable correspondence.
-      if (yi < 0 || yomi.indexOf(anchor) !== yomi.lastIndexOf(anchor)) return null;
-      gap_(title.slice(t, ti), yomi.slice(y, yi));
-      parts.push([anchor]);
-      t = ti + anchor.length;
-      y = yi + anchor.length;
-    }
-    gap_(title.slice(t), yomi.slice(y));
-    return alternatives ? parts : null;
-  }
-  function alignedTitleReadingMatchLocal_(query, item) {
-    if (!item) return false;
-    // One current query only; do not rebuild its chunks / prefix table per book.
-    if (!alignedTitleQuery_ || alignedTitleQuery_.query !== query) {
-      const mixed = isAlignedMixedQueryLocal_(query);
-      const prefix = [0];
-      if (mixed) for (let i = 1, j = 0; i < query.length; i += 1) {
-        while (j && query[i] !== query[j]) j = prefix[j - 1];
-        if (query[i] === query[j]) j += 1;
-        prefix[i] = j;
-      }
-      alignedTitleQuery_ = { query: query, mixed: mixed, prefix: prefix,
-        chunks: mixed ? query.match(/[\u3400-\u9fff]+/g) : [],
-        readings: mixed ? query.match(/[\u3041-\u3096\u30fc]+/g) : [] };
-    }
-    if (!alignedTitleQuery_.mixed) return false;
-    const title = String(item.title || ''), yomi = String(item.yomi || '');
-    let at = 0;
-    for (const chunk of alignedTitleQuery_.chunks) {
-      at = title.indexOf(chunk, at);
-      if (at < 0) return false;
-      at += chunk.length;
-    }
-    for (const chunk of alignedTitleQuery_.readings) if (!yomi.includes(chunk)) return false;
-    let cached = alignedTitleReadingCache_.get(item);
-    if (!cached || cached.title !== title || cached.yomi !== yomi) {
-      cached = { title: title, yomi: yomi, parts: compileAlignedTitleReadingLocal_(title, yomi) };
-      alignedTitleReadingCache_.set(item, cached);
-    }
-    if (!cached.parts) return false;
-    const prefix = alignedTitleQuery_.prefix;
-    let states = new Set([0]);
-    for (const choices of cached.parts) {
-      const next = new Set();
-      for (const choice of choices) for (const state of states) {
-        let j = state;
-        for (const char of choice) {
-          while (j && char !== query[j]) j = prefix[j - 1];
-          if (char === query[j]) j += 1;
-          if (j === query.length) return true;
-        }
-        next.add(j);
-      }
-      states = next;
-    }
-    return false;
-  }
-  window.ShumiLibraryTitleReading = {
-    isMixed: isAlignedMixedQueryLocal_,
-    matches: alignedTitleReadingMatchLocal_
-  };
 
   function normalizeReleasedYmLocal_(year, month, isFrom) {
     if (!year) return 0;
@@ -3086,9 +2944,9 @@ function writeGasRunShim() {
       return String(args[index] || '').trim();
     }
     return {
-      keyword: normalizeKanaLocal_(valueAt_(0)),
-      title: normalizeKanaLocal_(valueAt_(1)),
-      yomi: normalizeKanaLocal_(valueAt_(2)),
+      matchKeyword: searchMatcher.prepareKeyword(valueAt_(0)),
+      matchTitle: searchMatcher.prepareTitle(valueAt_(1)),
+      matchYomi: searchMatcher.prepareTitle(valueAt_(2)),
       author: normalizeKanaLocal_(valueAt_(3)),
       publisher: valueAt_(4),
       story: valueAt_(5),
@@ -3135,9 +2993,9 @@ function writeGasRunShim() {
     const genres = item.genres || { story: [], theme: [], mood: [], status: [], media: [] };
     const releasedYm = Number(item.releasedYm || 0);
     return Boolean(
-      (!criteria.keyword || keywordMixedMatchLocal_(criteria.keyword, item)) &&
-      (!criteria.title || titleYomiMixedMatchLocal_(criteria.title, item.title, item.yomi) || alignedTitleReadingMatchLocal_(criteria.title, item)) &&
-      (!criteria.yomi || titleYomiMixedMatchLocal_(criteria.yomi, item.title, item.yomi) || alignedTitleReadingMatchLocal_(criteria.yomi, item)) &&
+      (!criteria.matchKeyword || criteria.matchKeyword(item)) &&
+      (!criteria.matchTitle || criteria.matchTitle(item)) &&
+      (!criteria.matchYomi || criteria.matchYomi(item)) &&
       (!criteria.author || (item.author && item.author.includes(criteria.author)) ||
         (Array.isArray(item.contributors) && item.contributors.some(function(name) { return name.includes(criteria.author); }))) &&
       (!criteria.publisher || item.publisher === criteria.publisher) &&
@@ -3245,10 +3103,11 @@ function writeGasRunShim() {
   }
 
   function searchLocalSimple_(keyword) {
-    const query = normalizeKanaLocal_(keyword);
-    return localIndexRecords
-      .filter(function(record) { return keywordMixedMatchLocal_(query, record.index); })
-      .map(cloneLocalBook_);
+    const matchesKeyword = searchMatcher.prepareKeyword(keyword);
+    const matches = matchesKeyword
+      ? localIndexRecords.filter(function(record) { return matchesKeyword(record.index); })
+      : localIndexRecords;
+    return matches.map(cloneLocalBook_);
   }
 
   function searchLocalAdvanced_(args) {

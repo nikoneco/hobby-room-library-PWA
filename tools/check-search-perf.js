@@ -7,7 +7,7 @@ const build = fs.readFileSync(path.join(root, 'tools/build-pages.js'), 'utf8');
 const generated = {};
 for (const [name, next] of [['writeGasRunShim', 'writePwaClient'], ['writePwaClient', 'writePwaFiles']]) {
   vm.runInNewContext(build.slice(build.indexOf('function ' + name + '()'), build.indexOf('function ' + next + '()')) + '\n' + name + '();', {
-    fs: { writeFileSync(file, content) { generated[path.basename(file)] = content; } },
+    root, fs: { readFileSync: fs.readFileSync, writeFileSync(file, content) { generated[path.basename(file)] = content; } },
     path, jsDir: '/fixture', gasEndpoint: 'https://example.invalid/exec'
   });
 }

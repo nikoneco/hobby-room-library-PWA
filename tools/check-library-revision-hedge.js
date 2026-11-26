@@ -12,7 +12,7 @@ const end = build.indexOf('function writePwaClient()', start);
 assert(start >= 0 && end > start);
 let fixtureShim;
 vm.runInNewContext(build.slice(start, end) + '\nwriteGasRunShim();', {
-  fs: { writeFileSync(file, content) { fixtureShim = content; } }, path,
+  root, fs: { readFileSync: fs.readFileSync, writeFileSync(file, content) { fixtureShim = content; } }, path,
   jsDir: '/fixture', gasEndpoint: 'https://example.invalid/exec'
 });
 // Expose private entry points only to the VM, following the series-loading fixture.

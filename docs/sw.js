@@ -1,4 +1,4 @@
-const CACHE_NAME = "shumi-library-pwa-195d8ac1f585";
+const CACHE_NAME = "shumi-library-pwa-bb0ab9060a30";
 const CACHE_PREFIX = 'shumi-library-pwa-';
 const APP_SHELL = [
   "./",
@@ -18,11 +18,11 @@ const APP_SHELL = [
   "./assets/librarian-presence.jpg",
   "./assets/room-map.webp",
   "./assets/room-map-librarian.webp",
-  "./assets/js/gas-run-shim.3f7bfa9f2b.js",
+  "./assets/js/gas-run-shim.575b128afb.js",
   "./assets/js/pwa-client.js",
   "./assets/js/script.state.be1f377967.js",
   "./assets/js/script.images.a1017e139e.js",
-  "./assets/js/script.search.1c7ce5888c.js",
+  "./assets/js/script.search.f131bd216d.js",
   "./assets/js/script.render.ddfbafa62d.js",
   "./assets/js/script.shelf.df447732e8.js",
   "./assets/js/script.modal.a9dca8eb28.js",

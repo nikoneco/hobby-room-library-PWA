@@ -10,7 +10,7 @@ const shimEnd = buildSource.indexOf('function writePwaClient()', shimStart);
 if (shimStart < 0 || shimEnd <= shimStart) throw new Error('Shim generator not found');
 let shimSource;
 vm.runInNewContext(buildSource.slice(shimStart, shimEnd) + '\nwriteGasRunShim();', {
-  fs: { writeFileSync(file, content) { shimSource = content; } }, path,
+  root, fs: { readFileSync: fs.readFileSync, writeFileSync(file, content) { shimSource = content; } }, path,
   jsDir: '/fixture', gasEndpoint: 'https://example.invalid/exec'
 });
 

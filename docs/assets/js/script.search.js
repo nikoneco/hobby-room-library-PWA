@@ -116,93 +116,6 @@ function normalizeContributorSuggestions_(data) {
   });
 }
 
-function titleYomiMixedMatch_(query, title, yomi) {
-  const q = normalizeKana(query || '');
-  if (!q) return true;
-
-  const t = normalizeKana(title || '');
-  const y = normalizeKana(yomi || '');
-
-  if ((t && t.includes(q)) || (y && y.includes(q))) return true;
-  if (!t || !y) return false;
-
-  const chunks = splitMixedSearchQuery_(q);
-  if (chunks.length <= 1) return false;
-
-  let progress = 0;
-
-  for (let i = 0; i < chunks.length; i++) {
-    const chunk = chunks[i];
-    const target = chunk.type === 'kana' ? y : t;
-    const match = findChunkMixedMatch_(chunk.text, target, progress);
-
-    if (!match) return false;
-
-    progress = match.progress;
-  }
-
-  return true;
-}
-
-function splitMixedSearchQuery_(query) {
-  const q = normalizeKana(query || '');
-  if (!q) return [];
-
-  const chunks = [];
-  let currentType = '';
-  let currentText = '';
-
-  for (let i = 0; i < q.length; i++) {
-    const char = q[i];
-    const type = isKanaChar_(char) ? 'kana' : 'title';
-
-    if (currentText && type !== currentType) {
-      chunks.push({ type: currentType, text: currentText });
-      currentText = '';
-    }
-
-    currentType = type;
-    currentText += char;
-  }
-
-  if (currentText) {
-    chunks.push({ type: currentType, text: currentText });
-  }
-
-  return chunks;
-}
-
-function isKanaChar_(char) {
-  return /^[\u3041-\u3096\u30fc]$/.test(char || '');
-}
-
-function findChunkMixedMatch_(chunk, text, minProgress) {
-  if (!chunk || !text) return null;
-
-  const step = 1 / Math.max(text.length, 1);
-
-  for (let index = text.indexOf(chunk); index >= 0; index = text.indexOf(chunk, index + 1)) {
-    const progress = index * step;
-    if (progress + 0.000001 < minProgress) continue;
-
-    return {
-      index,
-      progress,
-      progressAfter: (index + chunk.length) * step
-    };
-  }
-
-  return null;
-}
-
-function keywordMixedMatch_(query, idx) {
-  const q = normalizeKana(query || '');
-  if (!q) return true;
-  if (idx && idx.searchKey && idx.searchKey.includes(q)) return true;
-  if (idx && normalizeKana(idx.seriesSearchTitle || '').includes(q)) return true;
-  return titleYomiMixedMatch_(q, idx && idx.title, idx && idx.yomi);
-}
-
 const SEARCH_CONDITION_KEYS = [
   'keyword',
   'detailTitle',
@@ -239,11 +152,12 @@ function normalizeSearchParams_(params) {
 
 function buildClientSearchCriteria_(params) {
   const normalized = normalizeSearchParams_(params);
+  const matcher = window.ShumiLibrarySearchMatcher;
   return {
     params: normalized,
-    nKeyword: normalizeKana(normalized.keyword),
-    nTitle: normalizeKana(normalized.detailTitle),
-    nYomi: normalizeKana(normalized.detailYomi),
+    matchKeyword: matcher.prepareKeyword(normalized.keyword),
+    matchTitle: matcher.prepareTitle(normalized.detailTitle),
+    matchYomi: matcher.prepareTitle(normalized.detailYomi),
     nAuthor: normalizeKana(normalized.detailAuthor),
     selectedPublisher: normalized.detailPublisher,
     selectedMedia: normalized.detailMedia,
@@ -312,9 +226,9 @@ function matchesSearchCriteria_(idx, criteria) {
   const item = idx || getDefaultPreviewIndexItem_();
   const c = criteria || buildClientSearchCriteria_({});
 
-  const keywordMatch = !c.nKeyword || keywordMixedMatch_(c.nKeyword, item);
-  const titleMatch = !c.nTitle || titleYomiMixedMatch_(c.nTitle, item.title, item.yomi);
-  const yomiMatch = !c.nYomi || titleYomiMixedMatch_(c.nYomi, item.title, item.yomi);
+  if ((c.matchKeyword && !c.matchKeyword(item)) ||
+      (c.matchTitle && !c.matchTitle(item)) ||
+      (c.matchYomi && !c.matchYomi(item))) return false;
   const authorMatch = !c.nAuthor || (item.author && item.author.includes(c.nAuthor)) ||
     (Array.isArray(item.contributors) && item.contributors.some(name => name.includes(c.nAuthor)));
   const publisherMatch = !c.selectedPublisher || item.publisher === c.selectedPublisher;
@@ -330,9 +244,6 @@ function matchesSearchCriteria_(idx, criteria) {
   const releasedToMatch = !c.toYm || (releasedYm && releasedYm <= c.toYm);
 
   return Boolean(
-    keywordMatch &&
-    titleMatch &&
-    yomiMatch &&
     authorMatch &&
     publisherMatch &&
     storyMatch &&
@@ -827,12 +738,15 @@ function suggest(input, type) {
 }
 
 function suggestAlignedTitles_(query, pool, type) {
-  const matcher = window.ShumiLibraryTitleReading;
+  const matcher = window.ShumiLibrarySearchMatcher;
+  if (!matcher) return [];
+  const alignment = matcher.prepareAlignment(query);
   const readingOnly = type === 'detailTitle' && /^[\u3041-\u3096\u30fc]+$/.test(query);
-  if (!matcher || (!matcher.isMixed(query) && !readingOnly)) return [];
+  if (!alignment && !readingOnly) return [];
   const matchedTitles = new Set();
   for (const item of pool.preview) {
-    if ((readingOnly && String(item.yomi || '').includes(query)) || matcher.matches(query, item)) matchedTitles.add(String(item.title || ''));
+    if ((readingOnly && String(item.yomi || '').includes(query)) ||
+        matcher.matchesAlignment(alignment, item)) matchedTitles.add(String(item.title || ''));
   }
   if (!matchedTitles.size) return [];
   const matched = Array.from(matchedTitles);

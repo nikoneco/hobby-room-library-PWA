@@ -123,7 +123,7 @@ function datasetChecks(expectedRows) {
   assert.deepEqual(sort(full).map(book => book.bookId), sort(converted.map(record => record.book)).map(book => book.bookId), 'server and local render order agree');
   // Execute the actual local search function using converted records.
   shim.localIndexRecords = converted; shim.cloneLocalBook_ = record => ({ ...record.book });
-  shim.normalizeKanaLocal_ = server.normalizeKana; shim.keywordMixedMatchLocal_ = server.keywordMixedMatch_;
+  shim.searchMatcher = vm.runInContext('librarySearchMatcher_', server);
   vm.runInContext(functionSource(shimSource, 'searchLocalSimple_'), shim);
   assert.deepEqual(plain(shim.searchLocalSimple_('')).map(book => book.bookId), compact.map(book => book.bookId), 'local search keeps catalog order');
   return { dataset, full, payload };

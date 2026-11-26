@@ -13,7 +13,7 @@ const builder = read('tools/build-pages.js');
 let shimSource;
 vm.runInNewContext(builder.slice(builder.indexOf('function writeGasRunShim()'), builder.indexOf('function writePwaClient()')) + '\nwriteGasRunShim();', {
   gasEndpoint: 'https://example.invalid/api', path, jsDir: '',
-  fs: { writeFileSync(file, source) { shimSource = source; } }
+  root, fs: { readFileSync: fs.readFileSync, writeFileSync(file, source) { shimSource = source; } }
 });
 
 function clientFixture() {
@@ -31,6 +31,7 @@ function clientFixture() {
     document: { addEventListener() {}, getElementById() { return null; } },
     google: { script: { run: {} } }
   });
+  vm.runInContext(server.getLibrarySearchMatcherScript_().slice(8, -9), context);
   for (const name of ['state', 'search', 'render', 'modal']) {
     vm.runInContext(read(`script.${name}.js.html`).replace(/^\s*<script>\s*/, '').replace(/\s*<\/script>\s*$/, ''), context);
   }

@@ -24,6 +24,9 @@ const clientScriptSources = clientScriptFiles
     .readFileSync(path.join(root, fileName), 'utf8')
     .replace(/^\s*<script>\s*/, '')
     .replace(/\s*<\/script>\s*$/, ''));
+const matcherServer = vm.createContext({});
+vm.runInContext(fs.readFileSync(path.join(root, 'config.js'), 'utf8') + '\n' + serverSource, matcherServer);
+const searchMatcherScript = matcherServer.getLibrarySearchMatcherScript_().slice(8, -9);
 const searchScriptSource = clientScriptSources[clientScriptFiles.indexOf('script.search.js.html')];
 
 clientScriptFiles.forEach((fileName, index) => {
@@ -146,6 +149,7 @@ const sandbox = {
 sandbox.globalThis = sandbox;
 sandbox.window.localStorage = sandbox.localStorage;
 vm.createContext(sandbox);
+vm.runInContext(searchMatcherScript, sandbox);
 clientScriptSources.forEach((source, index) => {
   vm.runInContext(source, sandbox, { filename: clientScriptFiles[index] });
 });
@@ -166,7 +170,7 @@ async function checkInitialSearchDataFlow() {
   const start = searchScriptSource.indexOf('function syncSearchDataFromLocalIndex_()');
   const end = searchScriptSource.indexOf('function fetchSuggestData()', start);
   assert(start >= 0 && end > start, 'search startup data functions are available to the client fixture');
-  const source = searchScriptSource.slice(searchScriptSource.indexOf('function normalizeKana('), searchScriptSource.indexOf('function titleYomiMixedMatch_(')) + searchScriptSource.slice(start, end);
+  const source = searchScriptSource.slice(searchScriptSource.indexOf('function normalizeKana('), searchScriptSource.indexOf('const SEARCH_CONDITION_KEYS')) + searchScriptSource.slice(start, end);
 
   async function runFixture(mode, options = {}) {
     let ready = false;
@@ -674,8 +678,8 @@ const mixedIndex = {
   }
 };
 
-assert(sandbox.keywordMixedMatch_('葬送', mixedIndex), 'keywordMixedMatch_ matches title text');
-assert(sandbox.keywordMixedMatch_('そうそう', mixedIndex), 'keywordMixedMatch_ matches yomi text');
+assert(sandbox.window.ShumiLibrarySearchMatcher.prepareKeyword('葬送')(mixedIndex), 'keywordMixedMatch_ matches title text');
+assert(sandbox.window.ShumiLibrarySearchMatcher.prepareKeyword('そうそう')(mixedIndex), 'keywordMixedMatch_ matches yomi text');
 
 const criteria = sandbox.buildClientSearchCriteria_({
   keyword: 'フリーレン',
