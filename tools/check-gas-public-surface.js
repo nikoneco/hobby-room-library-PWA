@@ -16,6 +16,9 @@ const ALLOWED_PUBLIC_GAS_FUNCTIONS = new Set([
   // it delegates to the private write function, so anonymous web calls stop.
   'enrichNewBooksAfterImport',
 
+  // Sheet custom function. It requires an active spreadsheet before fetching.
+  'HONNO_BOOK_XML',
+
   // Public read-only GAS HTML / JSONP APIs.
   'doGet',
   'getInitialSearchData',

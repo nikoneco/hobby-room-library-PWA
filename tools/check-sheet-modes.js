@@ -4,7 +4,7 @@ const vm = require('vm');
 const assert = require('assert/strict');
 const root = path.resolve(__dirname, '..');
 const context = vm.createContext({ console: { log() {}, error() {} }, Date });
-for (const file of ['config.js', 'コード.js', 'SheetModes.js']) {
+for (const file of ['config.js', 'コード.js', 'SheetModes.js', 'HonnoBookImport.js']) {
   vm.runInContext(fs.readFileSync(path.join(root, file), 'utf8'), context, { filename: file });
 }
 const plain = value => JSON.parse(JSON.stringify(value));
@@ -18,6 +18,44 @@ assert.deepEqual(plain(context.buildLibraryInputFinishPlan_([], [])), { runs: []
 const incomplete = [row('', 'missing'), row('#N/A', 'error'), row('書名', 'publisher-error')];
 incomplete[2][10] = '#REF!';
 assert.deepEqual(plain(context.buildLibraryInputFinishPlan_(incomplete, [[], [], ['=IMPORTXML()']])), { runs: [], incompleteRows: [2, 3, 4] });
+
+// A manually entered title must not hide errors or an in-flight request in B.
+const sourceRows = ['#ERROR!', '読み込んでいます...', ''].map(source => {
+  const values = row('手入力した書名', '9784065451397');
+  values[0] = source;
+  return values;
+});
+const sourceFormulas = sourceRows.map(() => ['=IF($S2="","",HONNO_BOOK_XML($S2))']);
+assert.deepEqual(plain(context.buildLibraryInputFinishPlan_(sourceRows, sourceFormulas)), {
+  runs: [{ row: 4, count: 1 }], incompleteRows: [2, 3]
+});
+
+// A failed request may be retried once. Sparse XML still yields seven columns.
+let fetchCount = 0;
+let retryWaits = 0;
+const fields = { author: '星野翼', title: 'ＭＡＸＴＯＯＮＡＧＥＲ(003)' };
+context.SpreadsheetApp = { getActiveSpreadsheet: () => null };
+context.UrlFetchApp = { fetch(url) {
+  assert.equal(url, 'https://honno.info/bsdx/openbdtoxml.php?isbn=9784065451397');
+  const status = ++fetchCount === 1 ? 503 : 200;
+  return { getResponseCode: () => status, getContentText: () => '<items/>' };
+} };
+context.XmlService = { parse: () => ({ getRootElement: () => ({
+  getName: () => 'items', getChild: name => Object.hasOwn(fields, name) ? {} : null,
+  getChildText: name => fields[name] ?? null
+}) }) };
+context.Utilities = { sleep(ms) { assert.ok(ms >= 300 && ms < 500); retryWaits++; } };
+assert.throws(() => context.HONNO_BOOK_XML(9784065451397), /セルから/);
+assert.deepEqual(plain(context.HONNO_BOOK_XML('')), [['', '', '', '', '', '', '']]);
+assert.equal(fetchCount, 0);
+context.SpreadsheetApp.getActiveSpreadsheet = () => ({});
+const sparseBook = [['', '', '星野翼', 'ＭＡＸＴＯＯＮＡＧＥＲ(003)', '', '', '']];
+assert.deepEqual(plain(context.HONNO_BOOK_XML(9784065451397)), sparseBook);
+assert.equal(fetchCount, 2);
+assert.equal(retryWaits, 1);
+assert.deepEqual(plain(context.HONNO_BOOK_XML(9784065451397)), sparseBook);
+assert.equal(fetchCount, 3);
+assert.equal(retryWaits, 1);
 
 // Values/clear only target completed input runs; no existing row, template,
 // image, date format, UUID, genre spill or summary column is touched.

@@ -150,7 +150,11 @@ function buildLibraryInputFinishPlan_(displayRows, formulaRows) {
     // input marker and must not cause all existing books to be rewritten.
     const pending = formulas.some((formula, col) => col !== CONFIG.COL.IMAGE - 2 && col < CONFIG.COL.ISBN - 2 && Boolean(formula));
     const outputColumns = [CONFIG.COL.TITLE, CONFIG.COL.AUTHOR, CONFIG.COL.PUBLISHER, 13, 14, 15, 16, 17, 18];
-    if (!title || errorValue.test(title) || (pending && outputColumns.some(col => errorValue.test(String(values[col - 2] || ''))))) {
+    const source = String(values[0] || '').trim();
+    const sourcePending = /\bHONNO_BOOK_XML\s*\(/i.test(formulas[0] || '') &&
+      (errorValue.test(source) || /^(?:Loading|読み込み中|読み込んでいます)[.…\s]*$/i.test(source));
+    if (!title || errorValue.test(title) || sourcePending ||
+        (pending && outputColumns.some(col => errorValue.test(String(values[col - 2] || ''))))) {
       incompleteRows.push(index + 2);
       return;
     }
