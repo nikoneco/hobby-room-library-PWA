@@ -1952,6 +1952,7 @@ function isPwaShell_() {
 }
 
 function getSearchStatusCountText_() {
+  if (searchStatusState.removingChipKey) return '';
   const hasConditions = searchStatusState.chips.length > 0;
 
   if (searchStatusState.message) {
@@ -2012,6 +2013,9 @@ function getSearchStatusCountText_() {
 }
 
 function getSearchStatusLibrarianNote_() {
+  if (searchStatusState.removingChipKey) {
+    return getPwaLibrarianText_('spinner.label.refine', '条件を外して並べ直しています');
+  }
   if (searchStatusState.mode === 'random') {
     return getPwaLibrarianText_(
       'status.note.random',
@@ -2059,7 +2063,9 @@ function renderSearchStatus_() {
   els.area.classList.toggle('has-librarian-note', Boolean(librarianNote));
 
   const chipCount = searchStatusState.chips.length;
-  const removableChipCount = searchStatusState.chips.filter(chip => chip && chip.removable).length;
+  const removableChipCount = searchStatusState.chips.filter(chip =>
+    chip.removable && chip.key !== searchStatusState.removingChipKey
+  ).length;
   els.area.classList.toggle('has-condition-stack', chipCount > 1 || Boolean(librarianNote));
   els.chips.setAttribute(
     'aria-label',
@@ -2067,11 +2073,12 @@ function renderSearchStatus_() {
   );
 
   els.chips.innerHTML = searchStatusState.chips.map(chip => {
-    const canRemoveChip = chip.removable && removableChipCount > 1;
+    const isRemoving = Boolean(chip.key && chip.key === searchStatusState.removingChipKey);
+    const canRemoveChip = chip.removable && (isRemoving || removableChipCount > 1);
     const classNames = ['search-status-chip'];
     if (chip.className) classNames.push(chip.className);
     if (canRemoveChip) classNames.push('removable');
-    if (chip.key && chip.key === searchStatusState.removingChipKey) classNames.push('is-removing');
+    if (isRemoving) classNames.push('is-removing');
 
     const visibleLabel = chip.labelPrefix
       ? `${chip.labelPrefix}: ${chip.label || ''}`
@@ -2089,6 +2096,7 @@ function renderSearchStatus_() {
         data-key="${escapeHtml(chip.key || '')}"
         aria-label="${escapeHtml(visibleLabel + ' を削除')}"
         title="${escapeHtml(visibleLabel + ' を外す')}"
+        ${isRemoving ? 'disabled' : ''}
       >${uiIcon_('close', 'ui-icon-inline')}</button>
     ` : '';
 
@@ -2335,6 +2343,13 @@ function hasAnyAdvancedCondition_(params) {
   });
 }
 
+function clearPendingSearchChip_() {
+  const key = searchStatusState.removingChipKey;
+  if (!key) return;
+  searchStatusState.chips = searchStatusState.chips.filter(chip => chip.key !== key);
+  searchStatusState.removingChipKey = '';
+}
+
 function beginResultRequest_(kind, keepDiscoverySource) {
   pwaSearchPerf_('cancelSearch', 'superseded');
   cancelPreviewCountRequest_();
@@ -2342,7 +2357,7 @@ function beginResultRequest_(kind, keepDiscoverySource) {
   if (!keepDiscoverySource && discoverySource) setDiscoverySource_(null);
   if (kind === 'search') pwaSearchPerf_('startSearch', resultRequestGeneration);
   cancelShelfJump_();
-  searchStatusState.removingChipKey = '';
+  clearPendingSearchChip_();
   isRandomBooksLoading = false;
   setRandomRerollLoading_(false);
   return resultRequestGeneration;
@@ -2352,7 +2367,7 @@ function isCurrentResultRequest_(generation) {
   return generation === resultRequestGeneration;
 }
 
-function rerunSearchWithParams_(params, loadingMessage, keepDiscoverySource) {
+function rerunSearchWithParams_(params, loadingMessage, keepDiscoverySource, removingChipKey) {
   syncSearchInputClearButtons_();
   const requestGeneration = beginResultRequest_('search', keepDiscoverySource);
   if (!hasAnySearchCondition_(params)) {
@@ -2369,9 +2384,15 @@ function rerunSearchWithParams_(params, loadingMessage, keepDiscoverySource) {
   container.classList.add('shrink');
   document.getElementById('viewToggle').style.display = 'flex';
   const hasAdvancedCondition = hasAnyAdvancedCondition_(params);
-  showSpinner(loadingMessage || (hasAdvancedCondition
-    ? '条件に合う棚を探しています'
-    : '本棚を探しています'), getSearchSpinnerOptions_(params, loadingMessage));
+  if (removingChipKey) {
+    hideSpinner();
+    searchStatusState.removingChipKey = removingChipKey;
+    renderSearchStatus_();
+  } else {
+    showSpinner(loadingMessage || (hasAdvancedCondition
+      ? '条件に合う棚を探しています'
+      : '本棚を探しています'), getSearchSpinnerOptions_(params, loadingMessage));
+  }
   if (keepDiscoverySource) {
     const back = document.getElementById('backToDiscoverySourceBtn');
     back?.focus?.({ preventScroll: true });
@@ -2435,89 +2456,30 @@ function rerunSearchFromCurrentConditions_() {
 }
 
 function removeSearchCondition_(key) {
-  if (searchStatusState.removingChipKey) {
+  if (key === searchStatusState.removingChipKey) {
     return;
   }
 
-  const currentChips = Array.isArray(searchStatusState.chips) ? searchStatusState.chips.slice() : [];
-  const targetChip = currentChips.find(chip => chip && chip.key === key && chip.removable);
+  const targetChip = searchStatusState.chips.find(chip => chip.key === key && chip.removable);
   if (!targetChip) {
     return;
   }
 
-  const requestGeneration = beginResultRequest_();
-
   hideAllSuggest();
 
-  const remainingChipCount = currentChips.filter(chip => chip && chip.removable && chip.key !== key).length;
-
-  searchStatusState.removingChipKey = key;
-  if (remainingChipCount > 0 && (searchStatusState.mode === 'result' || searchStatusState.mode === 'random')) {
-    showSpinner('条件を外して並べ直しています', { kind: 'refine' });
+  if (key === 'detailReleased') {
+    document.getElementById('detailReleasedFromYear').value = '';
+    document.getElementById('detailReleasedFromMonth').value = '';
+    document.getElementById('detailReleasedToYear').value = '';
+    document.getElementById('detailReleasedToMonth').value = '';
+    syncReleasedRangeOptions_();
+  } else if (SEARCH_CONDITION_KEYS.includes(key)) {
+    document.getElementById(key).value = '';
+  } else {
+    return;
   }
-  renderSearchStatus_();
 
-  window.setTimeout(function() {
-    if (!isCurrentResultRequest_(requestGeneration)) return;
-    switch (key) {
-      case 'keyword':
-        document.getElementById('keyword').value = '';
-        break;
-      case 'detailTitle':
-        document.getElementById('detailTitle').value = '';
-        break;
-      case 'detailYomi':
-        document.getElementById('detailYomi').value = '';
-        break;
-      case 'detailAuthor':
-        document.getElementById('detailAuthor').value = '';
-        break;
-      case 'detailPublisher':
-        document.getElementById('detailPublisher').value = '';
-        break;
-      case 'detailMedia':
-        document.getElementById('detailMedia').value = '';
-        break;
-      case 'detailStory':
-        document.getElementById('detailStory').value = '';
-        break;
-      case 'detailTheme':
-        document.getElementById('detailTheme').value = '';
-        break;
-      case 'detailMood':
-        document.getElementById('detailMood').value = '';
-        break;
-      case 'detailStatus':
-        document.getElementById('detailStatus').value = '';
-        break;
-      case 'detailReleased':
-        document.getElementById('detailReleasedFromYear').value = '';
-        document.getElementById('detailReleasedFromMonth').value = '';
-        document.getElementById('detailReleasedToYear').value = '';
-        document.getElementById('detailReleasedToMonth').value = '';
-        syncReleasedRangeOptions_();
-        break;
-      default:
-        searchStatusState.removingChipKey = '';
-        hideSpinner();
-        renderSearchStatus_();
-        return;
-    }
-
-    searchStatusState.removingChipKey = '';
-
-    const nextParams = getStickyActionSearchParams_();
-    const nextMode = hasAnyAdvancedCondition_(nextParams) ? 'advanced' : 'normal';
-    const nextChipCount = buildSearchStatusChips_(nextMode, nextParams).length;
-
-    if (nextChipCount <= 0) {
-      hideSpinner();
-      syncSearchStatusPreviewFromForm_();
-      return;
-    }
-
-    rerunSearchWithParams_(nextParams, '条件を外して並べ直しています');
-  }, 180);
+  rerunSearchWithParams_(getStickyActionSearchParams_(), '条件を外して並べ直しています', false, key);
 }
 
 function showEmptySearchNotice_(message) {
@@ -2560,6 +2522,7 @@ function showSearchFailure_(retry) {
   result.innerHTML = '<div class="empty-result search-error" role="alert"><div class="empty-result-title">検索結果を取得できませんでした</div><p class="empty-result-text">通信状態を確認して、もう一度お試しください。検索条件はそのまま残っています。</p><button type="button" class="quiet-action search-retry">もう一度検索する</button></div>';
   result.querySelector('.search-retry').onclick = retry;
   document.getElementById('viewToggle').style.display = 'none';
+  clearPendingSearchChip_();
   searchStatusState.message = '検索結果を取得できませんでした';
   searchStatusState.previewPending = false;
   renderSearchStatus_();

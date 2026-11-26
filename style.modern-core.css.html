@@ -589,7 +589,17 @@ body::before {
 .search-status-chip.is-removing {
   opacity: 0.62;
   transform: scale(0.985);
-  transition: opacity 160ms ease, transform 160ms ease;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .search-status-chip.is-removing {
+    animation: search-chip-removing 160ms ease both;
+  }
+}
+
+@keyframes search-chip-removing {
+  from { opacity: 1; transform: none; }
+  to { opacity: 0.62; transform: scale(0.985); }
 }
 
 .search-status-chip-label {

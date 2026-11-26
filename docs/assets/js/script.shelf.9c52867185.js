@@ -1734,14 +1734,18 @@ function showResult(data, searchPerf, restoration) {
   if (viewMode === 'shelf') {
     pwaPerfEnd_(renderPerfToken, { count: data.length });
   }
-  result.classList.remove('show');
-  result.classList.add('result-fade');
-
-  const revealRunId = resultRenderRunId;
-  setTimeout(() => {
-    if (revealRunId !== resultRenderRunId) return;
+  if (lastResultKind === 'search') {
+    result.classList.remove('result-fade');
     result.classList.add('show');
-  }, 40);
+  } else {
+    result.classList.remove('show');
+    result.classList.add('result-fade');
+    const revealRunId = resultRenderRunId;
+    setTimeout(() => {
+      if (revealRunId !== resultRenderRunId) return;
+      result.classList.add('show');
+    }, 40);
+  }
   pwaSearchPerf_('renderSearch', searchPerf, result, data.length);
 }
 

@@ -75,6 +75,49 @@ function client() {
   assert.equal(legacy.author, 'Legacy author');
 }
 
+// Removing a condition animates while the current filters are already being queried.
+{
+  const { c, read, timers, requests, rendered } = client();
+  const field = id => c.document.getElementById(id);
+  field('keyword').value = '魔法';
+  field('detailMedia').value = '漫画';
+  field('detailReleasedFromYear').value = '2020';
+  field('detailReleasedFromMonth').value = '04';
+  let releaseOptionsUpdated = false;
+  c.syncReleasedRangeOptions_ = () => { releaseOptionsUpdated = true; };
+  c.showSpinner = () => assert.fail('refining keeps the result screen available');
+  read(`
+    searchStatusState.visible = true;
+    searchStatusState.mode = 'result';
+    searchStatusState.chips = buildSearchStatusChips_('advanced', getAdvancedSearchParams_());
+  `);
+
+  c.removeSearchCondition_('detailMedia');
+  assert.equal(field('detailMedia').value, '');
+  assert.equal(requests[0].method, 'searchBooksAdvanced');
+  assert.equal(requests[0].args[9], '2020');
+  assert.equal(requests[0].args[13], '');
+  assert.equal(read('searchStatusState.removingChipKey'), 'detailMedia');
+  assert.match(field('searchStatusChips').innerHTML, /is-removing/);
+  assert.equal(field('searchStatusLibrarianNote').textContent, '条件を外して並べ直しています');
+  assert(!timers.some(timer => timer.ms === 180), 'the old animation gate is absent');
+
+  c.removeSearchCondition_('detailMedia');
+  assert.equal(requests.length, 1, 'the same pending chip cannot start a second search');
+  c.removeSearchCondition_('detailReleased');
+  assert.equal(requests.length, 2);
+  assert.equal(releaseOptionsUpdated, true);
+  assert.equal(field('detailReleasedFromMonth').value, '');
+  assert.equal(requests[1].method, 'searchBooksSimple');
+  assert.deepEqual(requests[1].args, ['魔法']);
+  assert(!field('searchStatusChips').innerHTML.includes('data-key="detailMedia"'));
+  assert(!field('searchStatusChips').innerHTML.includes('検索: 魔法 を削除'), 'the last active condition has no remove button');
+
+  requests[1].ok([{ title: 'New result' }]);
+  requests[0].ok([{ title: 'Old result' }]);
+  assert.deepEqual(rendered.map(titles => Array.from(titles)), [['New result']]);
+}
+
 // Cancel every waiter, then reject late success/failure without touching a new request.
 {
   const { c, requests } = client();

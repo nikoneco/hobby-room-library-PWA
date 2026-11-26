@@ -71,6 +71,40 @@ function fixture() {
 }
 
 {
+  const { context, run, elements } = fixture();
+  const classes = new Set(['result-fade']);
+  const result = {
+    classList: { add: name => classes.add(name), remove: name => classes.delete(name) },
+    appendChild() {}
+  };
+  elements.set('result', result);
+  let initialCards = false;
+  let ready = false;
+  Object.assign(context, {
+    hideSpinner() {},
+    resetResultRenderQueue_() {},
+    syncSearchResultBookDetailPrefetch_() {},
+    getCurrentViewMode_: () => 'card',
+    syncSearchResultPresentationStats_() {},
+    syncShelfViewUiState_() {},
+    resetBookDetailPrefetchObserver_() {},
+    resetImageLoadStats_() {},
+    unmountShelfRoomMapPortal_() {},
+    buildSearchResultPresentation_: books => ({ entries: books.map(book => ({ kind: 'book', book })) }),
+    scheduleIncrementalResultRender_() { initialCards = true; },
+    setTimeout() { assert.fail('search result reveal must not schedule a timer'); },
+    pwaSearchPerf_(event) {
+      if (event !== 'renderSearch') return;
+      assert(initialCards && classes.has('show') && !classes.has('result-fade'));
+      ready = true;
+    }
+  });
+  run("lastResultKind = 'search'");
+  context.showResult([{ title: 'Matching book' }], { id: 'search' });
+  assert(ready, 'first cards can be displayed as soon as they are mounted');
+}
+
+{
   const { context, run } = fixture();
   context.hasDisplayValue_ = value => Boolean(String(value || '').trim());
   run(`
